@@ -15,16 +15,20 @@ const (
 	TokenString     TokenType = "STRING"
 	TokenBool       TokenType = "BOOL"
 
-	TokenDef   TokenType = "DEF"
-	TokenLet   TokenType = "LET"
-	TokenMut   TokenType = "MUT"
-	TokenIf    TokenType = "IF"
-	TokenElse  TokenType = "ELSE"
-	TokenFor   TokenType = "FOR"
-	TokenYield TokenType = "YIELD"
-	TokenMatch TokenType = "MATCH"
-	TokenRet   TokenType = "RET"
-	TokenBreak TokenType = "BREAK"
+	TokenDef        TokenType = "DEF"
+	TokenInterface  TokenType = "INTERFACE"
+	TokenClass      TokenType = "CLASS"
+	TokenImplements TokenType = "IMPLEMENTS"
+	TokenPrivate    TokenType = "PRIVATE"
+	TokenLet        TokenType = "LET"
+	TokenMut        TokenType = "MUT"
+	TokenIf         TokenType = "IF"
+	TokenElse       TokenType = "ELSE"
+	TokenFor        TokenType = "FOR"
+	TokenYield      TokenType = "YIELD"
+	TokenMatch      TokenType = "MATCH"
+	TokenRet        TokenType = "RET"
+	TokenBreak      TokenType = "BREAK"
 
 	TokenLParen   TokenType = "("
 	TokenRParen   TokenType = ")"
@@ -68,18 +72,22 @@ const (
 )
 
 var keywords = map[string]TokenType{
-	"def":   TokenDef,
-	"let":   TokenLet,
-	"mut":   TokenMut,
-	"if":    TokenIf,
-	"else":  TokenElse,
-	"for":   TokenFor,
-	"yield": TokenYield,
-	"match": TokenMatch,
-	"ret":   TokenRet,
-	"break": TokenBreak,
-	"true":  TokenBool,
-	"false": TokenBool,
+	"def":        TokenDef,
+	"interface":  TokenInterface,
+	"class":      TokenClass,
+	"implements": TokenImplements,
+	"private":    TokenPrivate,
+	"let":        TokenLet,
+	"mut":        TokenMut,
+	"if":         TokenIf,
+	"else":       TokenElse,
+	"for":        TokenFor,
+	"yield":      TokenYield,
+	"match":      TokenMatch,
+	"ret":        TokenRet,
+	"break":      TokenBreak,
+	"true":       TokenBool,
+	"false":      TokenBool,
 }
 
 type Token struct {

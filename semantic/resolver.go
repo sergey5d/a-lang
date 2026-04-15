@@ -6,6 +6,8 @@ type Resolver struct {
 	diagnostics []Diagnostic
 	scopes      []scope
 	functions   map[string]parser.Span
+	classes     map[string]parser.Span
+	interfaces  map[string]parser.Span
 	loopDepth   int
 }
 
@@ -18,7 +20,9 @@ type scope map[string]symbol
 
 func Analyze(program *parser.Program) []Diagnostic {
 	resolver := &Resolver{
-		functions: map[string]parser.Span{},
+		functions:  map[string]parser.Span{},
+		classes:    map[string]parser.Span{},
+		interfaces: map[string]parser.Span{},
 	}
 	resolver.resolveProgram(program)
 	return resolver.diagnostics
@@ -33,10 +37,34 @@ func (r *Resolver) resolveProgram(program *parser.Program) {
 		}
 		r.functions[fn.Name] = fn.Span
 	}
+	for _, decl := range program.Interfaces {
+		if previous, exists := r.interfaces[decl.Name]; exists {
+			r.addDiagnostic("duplicate_interface", "duplicate interface '"+decl.Name+"'", decl.Span)
+			r.addDiagnostic("duplicate_interface", "previous declaration of interface '"+decl.Name+"'", previous)
+			continue
+		}
+		r.interfaces[decl.Name] = decl.Span
+	}
+	for _, decl := range program.Classes {
+		if previous, exists := r.classes[decl.Name]; exists {
+			r.addDiagnostic("duplicate_class", "duplicate class '"+decl.Name+"'", decl.Span)
+			r.addDiagnostic("duplicate_class", "previous declaration of class '"+decl.Name+"'", previous)
+			continue
+		}
+		r.classes[decl.Name] = decl.Span
+	}
 
 	for _, fn := range program.Functions {
 		r.resolveFunction(fn)
 	}
+	for _, decl := range program.Classes {
+		r.resolveClass(decl)
+	}
+	r.pushScope()
+	for _, stmt := range program.Statements {
+		r.resolveStatement(stmt)
+	}
+	r.popScope()
 }
 
 func (r *Resolver) resolveFunction(fn *parser.FunctionDecl) {
@@ -47,6 +75,28 @@ func (r *Resolver) resolveFunction(fn *parser.FunctionDecl) {
 		r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
 	}
 	r.resolveBlock(fn.Body)
+}
+
+func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
+	r.pushScope()
+	defer r.popScope()
+	r.defineMutable("this", decl.Span, false, "duplicate_binding", "duplicate binding 'this'")
+	for _, field := range decl.Fields {
+		r.defineMutable(field.Name, field.Span, field.Mutable, "duplicate_binding", "duplicate binding '"+field.Name+"'")
+	}
+	for _, method := range decl.Methods {
+		r.resolveMethod(method)
+	}
+}
+
+func (r *Resolver) resolveMethod(method *parser.MethodDecl) {
+	r.pushScope()
+	defer r.popScope()
+	r.defineMutable("this", method.Span, false, "duplicate_binding", "duplicate binding 'this'")
+	for _, param := range method.Parameters {
+		r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
+	}
+	r.resolveBlockStatements(method.Body.Statements)
 }
 
 func (r *Resolver) resolveBlock(block *parser.BlockStmt) {
@@ -119,7 +169,7 @@ func (r *Resolver) resolveBlockStatements(statements []parser.Statement) {
 func (r *Resolver) resolveExpr(expr parser.Expr) {
 	switch e := expr.(type) {
 	case *parser.Identifier:
-		if r.isDefined(e.Name) || r.functions[e.Name] != (parser.Span{}) || isBuiltin(e.Name) {
+		if r.isDefined(e.Name) || r.functions[e.Name] != (parser.Span{}) || r.classes[e.Name] != (parser.Span{}) || r.interfaces[e.Name] != (parser.Span{}) || isBuiltin(e.Name) {
 			return
 		}
 		r.addDiagnostic("undefined_name", "undefined name '"+e.Name+"'", e.Span)

@@ -11,8 +11,11 @@ type Span struct {
 }
 
 type Program struct {
-	Functions []*FunctionDecl `json:"functions"`
-	Span      Span            `json:"span"`
+	Functions  []*FunctionDecl  `json:"functions"`
+	Interfaces []*InterfaceDecl `json:"interfaces,omitempty"`
+	Classes    []*ClassDecl     `json:"classes,omitempty"`
+	Statements []Statement      `json:"statements,omitempty"`
+	Span       Span             `json:"span"`
 }
 
 type FunctionDecl struct {
@@ -21,6 +24,45 @@ type FunctionDecl struct {
 	ReturnType string      `json:"returnType"`
 	Body       *BlockStmt  `json:"body"`
 	Span       Span        `json:"span"`
+}
+
+type InterfaceDecl struct {
+	Name    string            `json:"name"`
+	Methods []InterfaceMethod `json:"methods"`
+	Span    Span              `json:"span"`
+}
+
+type InterfaceMethod struct {
+	Name       string      `json:"name"`
+	Parameters []Parameter `json:"parameters"`
+	ReturnType string      `json:"returnType"`
+	Span       Span        `json:"span"`
+}
+
+type ClassDecl struct {
+	Name       string        `json:"name"`
+	Implements []string      `json:"implements,omitempty"`
+	Fields     []FieldDecl   `json:"fields,omitempty"`
+	Methods    []*MethodDecl `json:"methods,omitempty"`
+	Span       Span          `json:"span"`
+}
+
+type FieldDecl struct {
+	Name    string `json:"name"`
+	Type    string `json:"type"`
+	Mutable bool   `json:"mutable,omitempty"`
+	Private bool   `json:"private,omitempty"`
+	Span    Span   `json:"span"`
+}
+
+type MethodDecl struct {
+	Name        string      `json:"name"`
+	Parameters  []Parameter `json:"parameters"`
+	ReturnType  string      `json:"returnType,omitempty"`
+	Body        *BlockStmt  `json:"body"`
+	Private     bool        `json:"private,omitempty"`
+	Constructor bool        `json:"constructor,omitempty"`
+	Span        Span        `json:"span"`
 }
 
 type Parameter struct {

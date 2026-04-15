@@ -187,3 +187,36 @@ def run() Bool {
 		t.Fatalf("expected no diagnostics, got %#v", diagnostics)
 	}
 }
+
+func TestAnalyzeClassesAndInterfaces(t *testing.T) {
+	src := `
+interface Stringable {
+	def toString() String
+}
+
+class SolidWork implements Stringable {
+	private let a Int
+	private mut b Bool
+
+	def init(a Int, b Bool) {
+		this.a = a
+		this.b = b
+	}
+
+	def toString() String {
+		ret this.buildLabel()
+	}
+
+	private def buildLabel() String {
+		ret this.a.toString()
+	}
+}
+
+let solidWork = SolidWork(1, false)
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", diagnostics)
+	}
+}

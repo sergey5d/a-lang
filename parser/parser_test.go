@@ -190,6 +190,71 @@ def literals() Bool {
 	}
 }
 
+func TestParseInterfacesAndClasses(t *testing.T) {
+	src := `
+interface Stringable {
+	def toString() String
+}
+
+class SolidWork implements Stringable {
+	private let a Int
+	private mut b Bool
+
+	def init(a Int, b Bool) {
+		this.a = a
+		this.b = b
+	}
+
+	def toString() String {
+	}
+
+	def addOne(one Int) Int {
+	}
+
+	private def buildLabel() String {
+	}
+}
+
+class RecordKeeper {
+	let record String
+	private let approved Bool
+}
+
+let recordKeeper = RecordKeeper("test record", true)
+let solidWork = SolidWork(1, false)
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Interfaces) != 1 {
+		t.Fatalf("expected 1 interface, got %d", len(program.Interfaces))
+	}
+	if len(program.Classes) != 2 {
+		t.Fatalf("expected 2 classes, got %d", len(program.Classes))
+	}
+	if len(program.Statements) != 2 {
+		t.Fatalf("expected 2 top-level statements, got %d", len(program.Statements))
+	}
+	cls := program.Classes[0]
+	if cls.Name != "SolidWork" || len(cls.Implements) != 1 || cls.Implements[0] != "Stringable" {
+		t.Fatalf("unexpected class declaration %#v", cls)
+	}
+	if len(cls.Fields) != 2 || len(cls.Methods) != 4 {
+		t.Fatalf("unexpected class members %#v", cls)
+	}
+	if !cls.Fields[0].Private || !cls.Fields[1].Private {
+		t.Fatalf("expected first class fields to be private")
+	}
+	if !cls.Methods[3].Private {
+		t.Fatalf("expected helper method to be private")
+	}
+	if !cls.Methods[0].Constructor {
+		t.Fatalf("expected init to be marked as constructor")
+	}
+}
+
 func TestRejectInvalidRuneLiterals(t *testing.T) {
 	cases := []string{
 		"def bad() Bool { let a = '' ret true }",

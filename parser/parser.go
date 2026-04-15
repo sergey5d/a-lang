@@ -91,16 +91,57 @@ func stmtSpan(stmt Statement) Span {
 func (p *Parser) parseProgram() (*Program, error) {
 	program := &Program{}
 	for !p.isAtEnd() {
-		fn, err := p.parseFunction()
-		if err != nil {
-			return nil, err
+		switch p.peek().Type {
+		case TokenDef:
+			fn, err := p.parseFunction()
+			if err != nil {
+				return nil, err
+			}
+			program.Functions = append(program.Functions, fn)
+		case TokenInterface:
+			decl, err := p.parseInterface()
+			if err != nil {
+				return nil, err
+			}
+			program.Interfaces = append(program.Interfaces, decl)
+		case TokenClass:
+			decl, err := p.parseClass()
+			if err != nil {
+				return nil, err
+			}
+			program.Classes = append(program.Classes, decl)
+		default:
+			stmt, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+			program.Statements = append(program.Statements, stmt)
 		}
-		program.Functions = append(program.Functions, fn)
 	}
-	if len(program.Functions) > 0 {
-		program.Span = mergeSpans(program.Functions[0].Span, program.Functions[len(program.Functions)-1].Span)
+	if span, ok := p.programSpan(program); ok {
+		program.Span = span
 	}
 	return program, nil
+}
+
+func (p *Parser) programSpan(program *Program) (Span, bool) {
+	var spans []Span
+	for _, fn := range program.Functions {
+		spans = append(spans, fn.Span)
+	}
+	for _, decl := range program.Interfaces {
+		spans = append(spans, decl.Span)
+	}
+	for _, decl := range program.Classes {
+		spans = append(spans, decl.Span)
+	}
+	for _, stmt := range program.Statements {
+		spans = append(spans, stmtSpan(stmt))
+	}
+	if len(spans) == 0 {
+		return Span{}, false
+	}
+	return mergeSpans(spans[0], spans[len(spans)-1]), true
 }
 
 func (p *Parser) parseFunction() (*FunctionDecl, error) {
@@ -112,10 +153,194 @@ func (p *Parser) parseFunction() (*FunctionDecl, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := p.consume(TokenLParen, "expected '(' after function name"); err != nil {
+	params, err := p.parseParameters()
+	if err != nil {
+		return nil, err
+	}
+	returnType, err := p.consume(TokenIdentifier, "expected return type")
+	if err != nil {
+		return nil, err
+	}
+	body, err := p.parseBlock()
+	if err != nil {
 		return nil, err
 	}
 
+	return &FunctionDecl{
+		Name:       name.Lexeme,
+		Parameters: params,
+		ReturnType: returnType.Lexeme,
+		Body:       body,
+		Span:       mergeSpans(tokenSpan(defToken), body.Span),
+	}, nil
+}
+
+func (p *Parser) parseInterface() (*InterfaceDecl, error) {
+	start, err := p.consume(TokenInterface, "expected 'interface'")
+	if err != nil {
+		return nil, err
+	}
+	name, err := p.consume(TokenIdentifier, "expected interface name")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.consume(TokenLBrace, "expected '{' after interface name"); err != nil {
+		return nil, err
+	}
+	decl := &InterfaceDecl{Name: name.Lexeme}
+	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		method, err := p.parseInterfaceMethod()
+		if err != nil {
+			return nil, err
+		}
+		decl.Methods = append(decl.Methods, method)
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after interface body")
+	if err != nil {
+		return nil, err
+	}
+	decl.Span = mergeSpans(tokenSpan(start), tokenSpan(end))
+	return decl, nil
+}
+
+func (p *Parser) parseInterfaceMethod() (InterfaceMethod, error) {
+	start, err := p.consume(TokenDef, "expected 'def' in interface")
+	if err != nil {
+		return InterfaceMethod{}, err
+	}
+	name, err := p.consume(TokenIdentifier, "expected method name")
+	if err != nil {
+		return InterfaceMethod{}, err
+	}
+	params, err := p.parseParameters()
+	if err != nil {
+		return InterfaceMethod{}, err
+	}
+	returnType, err := p.consume(TokenIdentifier, "expected return type")
+	if err != nil {
+		return InterfaceMethod{}, err
+	}
+	return InterfaceMethod{
+		Name:       name.Lexeme,
+		Parameters: params,
+		ReturnType: returnType.Lexeme,
+		Span:       mergeSpans(tokenSpan(start), tokenSpan(returnType)),
+	}, nil
+}
+
+func (p *Parser) parseClass() (*ClassDecl, error) {
+	start, err := p.consume(TokenClass, "expected 'class'")
+	if err != nil {
+		return nil, err
+	}
+	name, err := p.consume(TokenIdentifier, "expected class name")
+	if err != nil {
+		return nil, err
+	}
+	decl := &ClassDecl{Name: name.Lexeme}
+	if p.match(TokenImplements) {
+		for {
+			target, err := p.consume(TokenIdentifier, "expected interface name after 'implements'")
+			if err != nil {
+				return nil, err
+			}
+			decl.Implements = append(decl.Implements, target.Lexeme)
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+	}
+	if _, err := p.consume(TokenLBrace, "expected '{' after class name"); err != nil {
+		return nil, err
+	}
+	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		private := p.match(TokenPrivate)
+		switch p.peek().Type {
+		case TokenLet, TokenMut:
+			field, err := p.parseField(private)
+			if err != nil {
+				return nil, err
+			}
+			decl.Fields = append(decl.Fields, field)
+		case TokenDef:
+			method, err := p.parseMethod(private)
+			if err != nil {
+				return nil, err
+			}
+			decl.Methods = append(decl.Methods, method)
+		default:
+			return nil, fmt.Errorf("expected class member, got %s", p.peek().String())
+		}
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after class body")
+	if err != nil {
+		return nil, err
+	}
+	decl.Span = mergeSpans(tokenSpan(start), tokenSpan(end))
+	return decl, nil
+}
+
+func (p *Parser) parseField(private bool) (FieldDecl, error) {
+	start := p.advance()
+	mutable := start.Type == TokenMut
+	name, err := p.consume(TokenIdentifier, "expected field name")
+	if err != nil {
+		return FieldDecl{}, err
+	}
+	typ, err := p.consume(TokenIdentifier, "expected field type")
+	if err != nil {
+		return FieldDecl{}, err
+	}
+	return FieldDecl{
+		Name:    name.Lexeme,
+		Type:    typ.Lexeme,
+		Mutable: mutable,
+		Private: private,
+		Span:    mergeSpans(tokenSpan(start), tokenSpan(typ)),
+	}, nil
+}
+
+func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
+	start, err := p.consume(TokenDef, "expected 'def'")
+	if err != nil {
+		return nil, err
+	}
+	name, err := p.consume(TokenIdentifier, "expected method name")
+	if err != nil {
+		return nil, err
+	}
+	params, err := p.parseParameters()
+	if err != nil {
+		return nil, err
+	}
+	constructor := name.Lexeme == "init"
+	returnType := ""
+	if !constructor {
+		typ, err := p.consume(TokenIdentifier, "expected return type")
+		if err != nil {
+			return nil, err
+		}
+		returnType = typ.Lexeme
+	}
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &MethodDecl{
+		Name:        name.Lexeme,
+		Parameters:  params,
+		ReturnType:  returnType,
+		Body:        body,
+		Private:     private,
+		Constructor: constructor,
+		Span:        mergeSpans(tokenSpan(start), body.Span),
+	}, nil
+}
+
+func (p *Parser) parseParameters() ([]Parameter, error) {
+	if _, err := p.consume(TokenLParen, "expected '('"); err != nil {
+		return nil, err
+	}
 	var params []Parameter
 	if !p.check(TokenRParen) {
 		for {
@@ -137,27 +362,10 @@ func (p *Parser) parseFunction() (*FunctionDecl, error) {
 			}
 		}
 	}
-
 	if _, err := p.consume(TokenRParen, "expected ')' after parameters"); err != nil {
 		return nil, err
 	}
-
-	returnType, err := p.consume(TokenIdentifier, "expected return type")
-	if err != nil {
-		return nil, err
-	}
-	body, err := p.parseBlock()
-	if err != nil {
-		return nil, err
-	}
-
-	return &FunctionDecl{
-		Name:       name.Lexeme,
-		Parameters: params,
-		ReturnType: returnType.Lexeme,
-		Body:       body,
-		Span:       mergeSpans(tokenSpan(defToken), body.Span),
-	}, nil
+	return params, nil
 }
 
 func (p *Parser) parseBlock() (*BlockStmt, error) {
