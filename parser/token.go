@@ -21,7 +21,7 @@ const (
 	TokenImplements TokenType = "IMPLEMENTS"
 	TokenPrivate    TokenType = "PRIVATE"
 	TokenLet        TokenType = "LET"
-	TokenMut        TokenType = "MUT"
+	TokenVar        TokenType = "VAR"
 	TokenIf         TokenType = "IF"
 	TokenElse       TokenType = "ELSE"
 	TokenFor        TokenType = "FOR"
@@ -78,7 +78,7 @@ var keywords = map[string]TokenType{
 	"implements": TokenImplements,
 	"private":    TokenPrivate,
 	"let":        TokenLet,
-	"mut":        TokenMut,
+	"var":        TokenVar,
 	"if":         TokenIf,
 	"else":       TokenElse,
 	"for":        TokenFor,

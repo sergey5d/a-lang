@@ -232,7 +232,7 @@ class Box[T] implements Mapper[T, Stringable] {
 
 class SolidWork implements Stringable {
 	private let a List[Int]
-	private mut b Map[String, Bool]
+	private var b Map[String, Bool]
 
 	def init(a Int, b Bool) {
 		this.a = a
@@ -324,8 +324,8 @@ func TestRejectInvalidRuneLiterals(t *testing.T) {
 func TestParseMutableBindings(t *testing.T) {
 	src := `
 def vars() Bool {
-	mut count Int = 1
-	mut left Int, right Int = 1, 2
+	var count Int = 1
+	var left Int, right Int = 1, 2
 	count = count + 1
 	return count == right
 }
@@ -360,7 +360,7 @@ def vars() Bool {
 func TestParseAssignmentStatement(t *testing.T) {
 	src := `
 def vars() Bool {
-	mut counter = 0
+	var counter = 0
 	counter = counter + 1
 	counter += 2
 	counter -= 1
@@ -424,7 +424,7 @@ func TestParseUntypedBindings(t *testing.T) {
 	src := `
 def vars() Bool {
 	let a = "some string"
-	mut counter = 0
+	var counter = 0
 	return counter == 0
 }
 `
@@ -444,12 +444,12 @@ def vars() Bool {
 		t.Fatalf("expected let binding to be immutable")
 	}
 
-	mutStmt := fn.Body.Statements[1].(*ValStmt)
-	if mutStmt.Bindings[0].Type != nil {
-		t.Fatalf("expected untyped mut binding, got type %#v", mutStmt.Bindings[0].Type)
+	varStmt := fn.Body.Statements[1].(*ValStmt)
+	if varStmt.Bindings[0].Type != nil {
+		t.Fatalf("expected untyped var binding, got type %#v", varStmt.Bindings[0].Type)
 	}
-	if !mutStmt.Bindings[0].Mutable {
-		t.Fatalf("expected mut binding to be mutable")
+	if !varStmt.Bindings[0].Mutable {
+		t.Fatalf("expected var binding to be mutable")
 	}
 }
 

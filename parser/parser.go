@@ -271,7 +271,7 @@ func (p *Parser) parseClass() (*ClassDecl, error) {
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		private := p.match(TokenPrivate)
 		switch p.peek().Type {
-		case TokenLet, TokenMut:
+		case TokenLet, TokenVar:
 			field, err := p.parseField(private)
 			if err != nil {
 				return nil, err
@@ -297,7 +297,7 @@ func (p *Parser) parseClass() (*ClassDecl, error) {
 
 func (p *Parser) parseField(private bool) (FieldDecl, error) {
 	start := p.advance()
-	mutable := start.Type == TokenMut
+	mutable := start.Type == TokenVar
 	name, err := p.consume(TokenIdentifier, "expected field name")
 	if err != nil {
 		return FieldDecl{}, err
@@ -408,7 +408,7 @@ func (p *Parser) parseStatement() (Statement, error) {
 	switch p.peek().Type {
 	case TokenLet:
 		return p.parseBindingStmt(false)
-	case TokenMut:
+	case TokenVar:
 		return p.parseBindingStmt(true)
 	case TokenIf:
 		return p.parseIfStmt()
