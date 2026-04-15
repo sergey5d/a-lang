@@ -28,6 +28,13 @@ func mergeSpans(start, end Span) Span {
 	return Span{Start: start.Start, End: end.End}
 }
 
+func typeSpan(ref *TypeRef) Span {
+	if ref == nil {
+		return Span{}
+	}
+	return ref.Span
+}
+
 func exprSpan(expr Expr) Span {
 	switch e := expr.(type) {
 	case *Identifier:
@@ -157,7 +164,7 @@ func (p *Parser) parseFunction() (*FunctionDecl, error) {
 	if err != nil {
 		return nil, err
 	}
-	returnType, err := p.consume(TokenIdentifier, "expected return type")
+	returnType, err := p.parseTypeRef()
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +176,7 @@ func (p *Parser) parseFunction() (*FunctionDecl, error) {
 	return &FunctionDecl{
 		Name:       name.Lexeme,
 		Parameters: params,
-		ReturnType: returnType.Lexeme,
+		ReturnType: returnType,
 		Body:       body,
 		Span:       mergeSpans(tokenSpan(defToken), body.Span),
 	}, nil
@@ -184,10 +191,14 @@ func (p *Parser) parseInterface() (*InterfaceDecl, error) {
 	if err != nil {
 		return nil, err
 	}
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
 	if _, err := p.consume(TokenLBrace, "expected '{' after interface name"); err != nil {
 		return nil, err
 	}
-	decl := &InterfaceDecl{Name: name.Lexeme}
+	decl := &InterfaceDecl{Name: name.Lexeme, TypeParameters: typeParams}
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		method, err := p.parseInterfaceMethod()
 		if err != nil {
@@ -216,15 +227,15 @@ func (p *Parser) parseInterfaceMethod() (InterfaceMethod, error) {
 	if err != nil {
 		return InterfaceMethod{}, err
 	}
-	returnType, err := p.consume(TokenIdentifier, "expected return type")
+	returnType, err := p.parseTypeRef()
 	if err != nil {
 		return InterfaceMethod{}, err
 	}
 	return InterfaceMethod{
 		Name:       name.Lexeme,
 		Parameters: params,
-		ReturnType: returnType.Lexeme,
-		Span:       mergeSpans(tokenSpan(start), tokenSpan(returnType)),
+		ReturnType: returnType,
+		Span:       mergeSpans(tokenSpan(start), typeSpan(returnType)),
 	}, nil
 }
 
@@ -237,14 +248,18 @@ func (p *Parser) parseClass() (*ClassDecl, error) {
 	if err != nil {
 		return nil, err
 	}
-	decl := &ClassDecl{Name: name.Lexeme}
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
+	decl := &ClassDecl{Name: name.Lexeme, TypeParameters: typeParams}
 	if p.match(TokenImplements) {
 		for {
-			target, err := p.consume(TokenIdentifier, "expected interface name after 'implements'")
+			target, err := p.parseTypeRef()
 			if err != nil {
 				return nil, err
 			}
-			decl.Implements = append(decl.Implements, target.Lexeme)
+			decl.Implements = append(decl.Implements, target)
 			if !p.match(TokenComma) {
 				break
 			}
@@ -287,16 +302,16 @@ func (p *Parser) parseField(private bool) (FieldDecl, error) {
 	if err != nil {
 		return FieldDecl{}, err
 	}
-	typ, err := p.consume(TokenIdentifier, "expected field type")
+	typ, err := p.parseTypeRef()
 	if err != nil {
 		return FieldDecl{}, err
 	}
 	return FieldDecl{
 		Name:    name.Lexeme,
-		Type:    typ.Lexeme,
+		Type:    typ,
 		Mutable: mutable,
 		Private: private,
-		Span:    mergeSpans(tokenSpan(start), tokenSpan(typ)),
+		Span:    mergeSpans(tokenSpan(start), typeSpan(typ)),
 	}, nil
 }
 
@@ -314,13 +329,13 @@ func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
 		return nil, err
 	}
 	constructor := name.Lexeme == "init"
-	returnType := ""
+	var returnType *TypeRef
 	if !constructor {
-		typ, err := p.consume(TokenIdentifier, "expected return type")
+		typ, err := p.parseTypeRef()
 		if err != nil {
 			return nil, err
 		}
-		returnType = typ.Lexeme
+		returnType = typ
 	}
 	body, err := p.parseBlock()
 	if err != nil {
@@ -348,14 +363,14 @@ func (p *Parser) parseParameters() ([]Parameter, error) {
 			if err != nil {
 				return nil, err
 			}
-			paramType, err := p.consume(TokenIdentifier, "expected parameter type")
+			paramType, err := p.parseTypeRef()
 			if err != nil {
 				return nil, err
 			}
 			params = append(params, Parameter{
 				Name: paramName.Lexeme,
-				Type: paramType.Lexeme,
-				Span: mergeSpans(tokenSpan(paramName), tokenSpan(paramType)),
+				Type: paramType,
+				Span: mergeSpans(tokenSpan(paramName), typeSpan(paramType)),
 			})
 			if !p.match(TokenComma) {
 				break
@@ -423,9 +438,12 @@ func (p *Parser) parseBindingStmt(mutable bool) (Statement, error) {
 		binding.Name = name.Lexeme
 		binding.Span = tokenSpan(name)
 		if p.check(TokenIdentifier) {
-			typeToken := p.advance()
-			binding.Type = typeToken.Lexeme
-			binding.Span = mergeSpans(binding.Span, tokenSpan(typeToken))
+			typeRef, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			binding.Type = typeRef
+			binding.Span = mergeSpans(binding.Span, typeSpan(typeRef))
 		}
 		bindings = append(bindings, binding)
 		if !p.match(TokenComma) {
@@ -673,9 +691,13 @@ func (p *Parser) parseMatchArm() (MatchArm, error) {
 		return MatchArm{}, err
 	}
 
-	var patternType string
-	if p.check(TokenIdentifier) && p.checkNext(TokenColon) {
-		patternType = p.advance().Lexeme
+	var patternType *TypeRef
+	if p.check(TokenIdentifier) && p.typeRefFollowedBy(TokenColon) {
+		typeRef, err := p.parseTypeRef()
+		if err != nil {
+			return MatchArm{}, err
+		}
+		patternType = typeRef
 	}
 
 	if _, err := p.consume(TokenColon, "expected ':' after match pattern"); err != nil {
@@ -821,10 +843,13 @@ func (p *Parser) parseLambdaIdentifier() (Expr, error) {
 	}
 	param := LambdaParameter{Name: name.Lexeme}
 	param.Span = tokenSpan(name)
-	if p.check(TokenIdentifier) && p.checkNext(TokenArrow) {
-		typeToken := p.advance()
-		param.Type = typeToken.Lexeme
-		param.Span = mergeSpans(param.Span, tokenSpan(typeToken))
+	if p.check(TokenIdentifier) && p.typeRefFollowedBy(TokenArrow) {
+		typeRef, err := p.parseTypeRef()
+		if err != nil {
+			return nil, err
+		}
+		param.Type = typeRef
+		param.Span = mergeSpans(param.Span, typeSpan(typeRef))
 	}
 	if _, err := p.consume(TokenArrow, "expected '->' after lambda parameter"); err != nil {
 		return nil, err
@@ -873,9 +898,12 @@ func (p *Parser) parseLambdaParams() ([]LambdaParameter, error) {
 			lambdaParam := LambdaParameter{Name: param.Lexeme}
 			lambdaParam.Span = tokenSpan(param)
 			if p.check(TokenIdentifier) {
-				typeToken := p.advance()
-				lambdaParam.Type = typeToken.Lexeme
-				lambdaParam.Span = mergeSpans(lambdaParam.Span, tokenSpan(typeToken))
+				typeRef, err := p.parseTypeRef()
+				if err != nil {
+					return nil, err
+				}
+				lambdaParam.Type = typeRef
+				lambdaParam.Span = mergeSpans(lambdaParam.Span, typeSpan(typeRef))
 			}
 			params = append(params, lambdaParam)
 			if !p.match(TokenComma) {
@@ -896,7 +924,7 @@ func (p *Parser) isLambdaIdentifierStart() bool {
 	if p.checkNext(TokenArrow) {
 		return true
 	}
-	return p.checkNext(TokenIdentifier) && p.checkNth(2, TokenArrow)
+	return p.checkNext(TokenIdentifier) && p.typeRefFollowedByAt(p.pos+1, TokenArrow)
 }
 
 func (p *Parser) isLambdaParenStart() bool {
@@ -919,7 +947,11 @@ func (p *Parser) isLambdaParenStart() bool {
 		}
 		i++
 		if i < len(p.tokens) && p.tokens[i].Type == TokenIdentifier {
-			i++
+			end, ok := p.scanTypeRef(i)
+			if !ok {
+				return false
+			}
+			i = end
 		}
 		if i >= len(p.tokens) {
 			return false
@@ -933,6 +965,97 @@ func (p *Parser) isLambdaParenStart() bool {
 		}
 		return false
 	}
+}
+
+func (p *Parser) parseTypeParameters() ([]TypeParameter, error) {
+	if !p.match(TokenLBracket) {
+		return nil, nil
+	}
+	var params []TypeParameter
+	if !p.check(TokenRBracket) {
+		for {
+			name, err := p.consume(TokenIdentifier, "expected type parameter name")
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, TypeParameter{Name: name.Lexeme, Span: tokenSpan(name)})
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+	}
+	if _, err := p.consume(TokenRBracket, "expected ']' after type parameters"); err != nil {
+		return nil, err
+	}
+	return params, nil
+}
+
+func (p *Parser) parseTypeRef() (*TypeRef, error) {
+	name, err := p.consume(TokenIdentifier, "expected type name")
+	if err != nil {
+		return nil, err
+	}
+	ref := &TypeRef{Name: name.Lexeme, Span: tokenSpan(name)}
+	if p.match(TokenLBracket) {
+		for {
+			arg, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			ref.Arguments = append(ref.Arguments, arg)
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+		end, err := p.consume(TokenRBracket, "expected ']' after type arguments")
+		if err != nil {
+			return nil, err
+		}
+		ref.Span = mergeSpans(ref.Span, tokenSpan(end))
+	}
+	return ref, nil
+}
+
+func (p *Parser) typeRefFollowedBy(tt TokenType) bool {
+	return p.typeRefFollowedByAt(p.pos, tt)
+}
+
+func (p *Parser) typeRefFollowedByAt(start int, tt TokenType) bool {
+	end, ok := p.scanTypeRef(start)
+	if !ok || end >= len(p.tokens) {
+		return false
+	}
+	return p.tokens[end].Type == tt
+}
+
+func (p *Parser) scanTypeRef(start int) (int, bool) {
+	if start >= len(p.tokens) || p.tokens[start].Type != TokenIdentifier {
+		return start, false
+	}
+	i := start + 1
+	if i < len(p.tokens) && p.tokens[i].Type == TokenLBracket {
+		i++
+		for {
+			var ok bool
+			i, ok = p.scanTypeRef(i)
+			if !ok {
+				return start, false
+			}
+			if i >= len(p.tokens) {
+				return start, false
+			}
+			if p.tokens[i].Type == TokenComma {
+				i++
+				continue
+			}
+			if p.tokens[i].Type == TokenRBracket {
+				i++
+				break
+			}
+			return start, false
+		}
+	}
+	return i, true
 }
 
 func (p *Parser) parseCallArgs() ([]Expr, error) {

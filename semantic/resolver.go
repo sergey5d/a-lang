@@ -5,9 +5,12 @@ import "a-lang/parser"
 type Resolver struct {
 	diagnostics []Diagnostic
 	scopes      []scope
+	typeScopes  []typeScope
 	functions   map[string]parser.Span
 	classes     map[string]parser.Span
 	interfaces  map[string]parser.Span
+	classTypes  map[string]typeDecl
+	ifaceTypes  map[string]typeDecl
 	loopDepth   int
 }
 
@@ -17,12 +20,20 @@ type symbol struct {
 }
 
 type scope map[string]symbol
+type typeScope map[string]parser.Span
+
+type typeDecl struct {
+	span  parser.Span
+	arity int
+}
 
 func Analyze(program *parser.Program) []Diagnostic {
 	resolver := &Resolver{
 		functions:  map[string]parser.Span{},
 		classes:    map[string]parser.Span{},
 		interfaces: map[string]parser.Span{},
+		classTypes: map[string]typeDecl{},
+		ifaceTypes: map[string]typeDecl{},
 	}
 	resolver.resolveProgram(program)
 	return resolver.diagnostics
@@ -44,6 +55,7 @@ func (r *Resolver) resolveProgram(program *parser.Program) {
 			continue
 		}
 		r.interfaces[decl.Name] = decl.Span
+		r.ifaceTypes[decl.Name] = typeDecl{span: decl.Span, arity: len(decl.TypeParameters)}
 	}
 	for _, decl := range program.Classes {
 		if previous, exists := r.classes[decl.Name]; exists {
@@ -52,10 +64,14 @@ func (r *Resolver) resolveProgram(program *parser.Program) {
 			continue
 		}
 		r.classes[decl.Name] = decl.Span
+		r.classTypes[decl.Name] = typeDecl{span: decl.Span, arity: len(decl.TypeParameters)}
 	}
 
 	for _, fn := range program.Functions {
 		r.resolveFunction(fn)
+	}
+	for _, decl := range program.Interfaces {
+		r.resolveInterface(decl)
 	}
 	for _, decl := range program.Classes {
 		r.resolveClass(decl)
@@ -68,16 +84,44 @@ func (r *Resolver) resolveProgram(program *parser.Program) {
 }
 
 func (r *Resolver) resolveFunction(fn *parser.FunctionDecl) {
+	r.resolveTypeRef(fn.ReturnType)
 	r.pushScope()
 	defer r.popScope()
 
 	for _, param := range fn.Parameters {
+		r.resolveTypeRef(param.Type)
 		r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
 	}
 	r.resolveBlock(fn.Body)
 }
 
+func (r *Resolver) resolveInterface(decl *parser.InterfaceDecl) {
+	r.pushTypeScope()
+	defer r.popTypeScope()
+	for _, param := range decl.TypeParameters {
+		r.defineType(param.Name, param.Span, "duplicate_type_parameter", "duplicate type parameter '"+param.Name+"'")
+	}
+	for _, method := range decl.Methods {
+		r.resolveTypeRef(method.ReturnType)
+		for _, param := range method.Parameters {
+			r.resolveTypeRef(param.Type)
+		}
+	}
+}
+
 func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
+	r.pushTypeScope()
+	defer r.popTypeScope()
+	for _, param := range decl.TypeParameters {
+		r.defineType(param.Name, param.Span, "duplicate_type_parameter", "duplicate type parameter '"+param.Name+"'")
+	}
+	for _, target := range decl.Implements {
+		r.resolveTypeRef(target)
+	}
+	for _, field := range decl.Fields {
+		r.resolveTypeRef(field.Type)
+	}
+
 	r.pushScope()
 	defer r.popScope()
 	r.defineMutable("this", decl.Span, false, "duplicate_binding", "duplicate binding 'this'")
@@ -90,10 +134,12 @@ func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
 }
 
 func (r *Resolver) resolveMethod(method *parser.MethodDecl) {
+	r.resolveTypeRef(method.ReturnType)
 	r.pushScope()
 	defer r.popScope()
 	r.defineMutable("this", method.Span, false, "duplicate_binding", "duplicate binding 'this'")
 	for _, param := range method.Parameters {
+		r.resolveTypeRef(param.Type)
 		r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
 	}
 	r.resolveBlockStatements(method.Body.Statements)
@@ -115,6 +161,7 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 			r.resolveExpr(value)
 		}
 		for _, binding := range s.Bindings {
+			r.resolveTypeRef(binding.Type)
 			r.defineMutable(binding.Name, binding.Span, binding.Mutable, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
 		}
 	case *parser.AssignmentStmt:
@@ -147,6 +194,7 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		r.resolveExpr(s.Target)
 		for _, arm := range s.Arms {
 			r.resolveExpr(arm.Pattern)
+			r.resolveTypeRef(arm.PatternType)
 			r.resolveExpr(arm.Result)
 		}
 	case *parser.ReturnStmt:
@@ -190,6 +238,7 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 	case *parser.LambdaExpr:
 		r.pushScope()
 		for _, param := range e.Parameters {
+			r.resolveTypeRef(param.Type)
 			r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
 		}
 		r.resolveExpr(e.Body)
@@ -221,16 +270,6 @@ func (r *Resolver) resolveAssignment(stmt *parser.AssignmentStmt) {
 	r.resolveExpr(stmt.Value)
 }
 
-func (r *Resolver) define(name string, span parser.Span, code, message string) {
-	current := r.currentScope()
-	if previous, exists := current[name]; exists {
-		r.addDiagnostic(code, message, span)
-		r.addDiagnostic(code, "previous declaration of '"+name+"'", previous.span)
-		return
-	}
-	current[name] = symbol{span: span, mutable: true}
-}
-
 func (r *Resolver) defineMutable(name string, span parser.Span, mutable bool, code, message string) {
 	current := r.currentScope()
 	if previous, exists := current[name]; exists {
@@ -239,6 +278,85 @@ func (r *Resolver) defineMutable(name string, span parser.Span, mutable bool, co
 		return
 	}
 	current[name] = symbol{span: span, mutable: mutable}
+}
+
+func (r *Resolver) defineType(name string, span parser.Span, code, message string) {
+	current := r.currentTypeScope()
+	if previous, exists := current[name]; exists {
+		r.addDiagnostic(code, message, span)
+		r.addDiagnostic(code, "previous declaration of '"+name+"'", previous)
+		return
+	}
+	current[name] = span
+}
+
+func (r *Resolver) resolveTypeRef(ref *parser.TypeRef) {
+	if ref == nil {
+		return
+	}
+	for _, arg := range ref.Arguments {
+		r.resolveTypeRef(arg)
+	}
+	if r.isTypeParameter(ref.Name) {
+		if len(ref.Arguments) != 0 {
+			r.addDiagnostic("invalid_type_arity", "type parameter '"+ref.Name+"' cannot have type arguments", ref.Span)
+		}
+		return
+	}
+	if arity, ok := builtinTypeArity(ref.Name); ok {
+		if len(ref.Arguments) != arity {
+			r.addDiagnostic("invalid_type_arity", "type '"+ref.Name+"' expects "+arityLabel(arity)+" type arguments", ref.Span)
+		}
+		return
+	}
+	if decl, ok := r.classTypes[ref.Name]; ok {
+		if len(ref.Arguments) != decl.arity {
+			r.addDiagnostic("invalid_type_arity", "type '"+ref.Name+"' expects "+arityLabel(decl.arity)+" type arguments", ref.Span)
+		}
+		return
+	}
+	if decl, ok := r.ifaceTypes[ref.Name]; ok {
+		if len(ref.Arguments) != decl.arity {
+			r.addDiagnostic("invalid_type_arity", "type '"+ref.Name+"' expects "+arityLabel(decl.arity)+" type arguments", ref.Span)
+		}
+		return
+	}
+	r.addDiagnostic("undefined_type", "undefined type '"+ref.Name+"'", ref.Span)
+}
+
+func (r *Resolver) isTypeParameter(name string) bool {
+	for i := len(r.typeScopes) - 1; i >= 0; i-- {
+		if _, ok := r.typeScopes[i][name]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func builtinTypeArity(name string) (int, bool) {
+	switch name {
+	case "Int", "Int64", "Bool", "String", "Rune", "Float", "Float64", "int":
+		return 0, true
+	case "List", "Set", "Array":
+		return 1, true
+	case "Map":
+		return 2, true
+	default:
+		return 0, false
+	}
+}
+
+func arityLabel(arity int) string {
+	switch arity {
+	case 0:
+		return "0"
+	case 1:
+		return "1"
+	case 2:
+		return "2"
+	default:
+		return "multiple"
+	}
 }
 
 func (r *Resolver) isDefined(name string) bool {
@@ -272,7 +390,25 @@ func (r *Resolver) popScope() {
 }
 
 func (r *Resolver) currentScope() scope {
+	if len(r.scopes) == 0 {
+		r.pushScope()
+	}
 	return r.scopes[len(r.scopes)-1]
+}
+
+func (r *Resolver) pushTypeScope() {
+	r.typeScopes = append(r.typeScopes, typeScope{})
+}
+
+func (r *Resolver) popTypeScope() {
+	r.typeScopes = r.typeScopes[:len(r.typeScopes)-1]
+}
+
+func (r *Resolver) currentTypeScope() typeScope {
+	if len(r.typeScopes) == 0 {
+		r.pushTypeScope()
+	}
+	return r.typeScopes[len(r.typeScopes)-1]
 }
 
 func isBuiltin(name string) bool {

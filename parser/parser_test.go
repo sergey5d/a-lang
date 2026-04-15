@@ -52,6 +52,24 @@ def doSomeWork(a Int, b Int) Bool {
 }
 `
 
+func assertTypeRef(t *testing.T, ref *TypeRef, name string, argNames ...string) {
+	t.Helper()
+	if ref == nil {
+		t.Fatalf("expected type %q, got nil", name)
+	}
+	if ref.Name != name {
+		t.Fatalf("expected type %q, got %q", name, ref.Name)
+	}
+	if len(ref.Arguments) != len(argNames) {
+		t.Fatalf("expected %d type arguments for %q, got %d", len(argNames), name, len(ref.Arguments))
+	}
+	for i, argName := range argNames {
+		if ref.Arguments[i].Name != argName {
+			t.Fatalf("expected type argument %d for %q to be %q, got %q", i, name, argName, ref.Arguments[i].Name)
+		}
+	}
+}
+
 func TestParseSampleProgram(t *testing.T) {
 	program, err := Parse(sampleProgram)
 	if err != nil {
@@ -192,13 +210,29 @@ def literals() Bool {
 
 func TestParseInterfacesAndClasses(t *testing.T) {
 	src := `
+interface Mapper[K, V] {
+	def map(key K) V
+}
+
 interface Stringable {
 	def toString() String
 }
 
+class Box[T] implements Mapper[T, Stringable] {
+	private let value T
+
+	def init(value T) {
+		this.value = value
+	}
+
+	def map(key T) Stringable {
+		ret this
+	}
+}
+
 class SolidWork implements Stringable {
-	private let a Int
-	private mut b Bool
+	private let a List[Int]
+	private mut b Map[String, Bool]
 
 	def init(a Int, b Bool) {
 		this.a = a
@@ -216,7 +250,7 @@ class SolidWork implements Stringable {
 }
 
 class RecordKeeper {
-	let record String
+	let record Set[String]
 	private let approved Bool
 }
 
@@ -228,22 +262,41 @@ let solidWork = SolidWork(1, false)
 	if err != nil {
 		t.Fatalf("Parse returned error: %v", err)
 	}
-	if len(program.Interfaces) != 1 {
-		t.Fatalf("expected 1 interface, got %d", len(program.Interfaces))
+	if len(program.Interfaces) != 2 {
+		t.Fatalf("expected 2 interfaces, got %d", len(program.Interfaces))
 	}
-	if len(program.Classes) != 2 {
-		t.Fatalf("expected 2 classes, got %d", len(program.Classes))
+	if len(program.Classes) != 3 {
+		t.Fatalf("expected 3 classes, got %d", len(program.Classes))
 	}
 	if len(program.Statements) != 2 {
 		t.Fatalf("expected 2 top-level statements, got %d", len(program.Statements))
 	}
-	cls := program.Classes[0]
-	if cls.Name != "SolidWork" || len(cls.Implements) != 1 || cls.Implements[0] != "Stringable" {
+	mapper := program.Interfaces[0]
+	if mapper.Name != "Mapper" || len(mapper.TypeParameters) != 2 {
+		t.Fatalf("unexpected generic interface %#v", mapper)
+	}
+	assertTypeRef(t, mapper.Methods[0].Parameters[0].Type, "K")
+	assertTypeRef(t, mapper.Methods[0].ReturnType, "V")
+
+	box := program.Classes[0]
+	if box.Name != "Box" || len(box.TypeParameters) != 1 {
+		t.Fatalf("unexpected generic class %#v", box)
+	}
+	if len(box.Implements) != 1 || box.Implements[0].Name != "Mapper" {
+		t.Fatalf("unexpected generic implements clause %#v", box.Implements)
+	}
+	assertTypeRef(t, box.Implements[0], "Mapper", "T", "Stringable")
+	assertTypeRef(t, box.Fields[0].Type, "T")
+
+	cls := program.Classes[1]
+	if cls.Name != "SolidWork" || len(cls.Implements) != 1 || cls.Implements[0].Name != "Stringable" {
 		t.Fatalf("unexpected class declaration %#v", cls)
 	}
 	if len(cls.Fields) != 2 || len(cls.Methods) != 4 {
 		t.Fatalf("unexpected class members %#v", cls)
 	}
+	assertTypeRef(t, cls.Fields[0].Type, "List", "Int")
+	assertTypeRef(t, cls.Fields[1].Type, "Map", "String", "Bool")
 	if !cls.Fields[0].Private || !cls.Fields[1].Private {
 		t.Fatalf("expected first class fields to be private")
 	}
@@ -384,16 +437,16 @@ def vars() Bool {
 	fn := program.Functions[0]
 
 	letStmt := fn.Body.Statements[0].(*ValStmt)
-	if letStmt.Bindings[0].Type != "" {
-		t.Fatalf("expected untyped let binding, got type %q", letStmt.Bindings[0].Type)
+	if letStmt.Bindings[0].Type != nil {
+		t.Fatalf("expected untyped let binding, got type %#v", letStmt.Bindings[0].Type)
 	}
 	if letStmt.Bindings[0].Mutable {
 		t.Fatalf("expected let binding to be immutable")
 	}
 
 	mutStmt := fn.Body.Statements[1].(*ValStmt)
-	if mutStmt.Bindings[0].Type != "" {
-		t.Fatalf("expected untyped mut binding, got type %q", mutStmt.Bindings[0].Type)
+	if mutStmt.Bindings[0].Type != nil {
+		t.Fatalf("expected untyped mut binding, got type %#v", mutStmt.Bindings[0].Type)
 	}
 	if !mutStmt.Bindings[0].Mutable {
 		t.Fatalf("expected mut binding to be mutable")
@@ -468,7 +521,7 @@ def vars() Bool {
 	if !ok {
 		t.Fatalf("expected map argument to be lambda, got %T", secondCall.Args[0])
 	}
-	if len(secondLambda.Parameters) != 1 || secondLambda.Parameters[0].Name != "key" || secondLambda.Parameters[0].Type != "" {
+	if len(secondLambda.Parameters) != 1 || secondLambda.Parameters[0].Name != "key" || secondLambda.Parameters[0].Type != nil {
 		t.Fatalf("unexpected single-parameter lambda: %#v", secondLambda.Parameters)
 	}
 
@@ -481,7 +534,7 @@ def vars() Bool {
 	if !ok {
 		t.Fatalf("expected typed map argument to be lambda, got %T", thirdCall.Args[0])
 	}
-	if thirdLambda.Parameters[0].Type != "Int" || thirdLambda.Parameters[1].Type != "Int" {
+	if thirdLambda.Parameters[0].Type == nil || thirdLambda.Parameters[0].Type.Name != "Int" || thirdLambda.Parameters[1].Type == nil || thirdLambda.Parameters[1].Type.Name != "Int" {
 		t.Fatalf("expected typed lambda parameters, got %#v", thirdLambda.Parameters)
 	}
 
@@ -494,8 +547,44 @@ def vars() Bool {
 	if !ok {
 		t.Fatalf("expected typed single-parameter lambda, got %T", fourthCall.Args[0])
 	}
-	if len(fourthLambda.Parameters) != 1 || fourthLambda.Parameters[0].Name != "key" || fourthLambda.Parameters[0].Type != "Int" {
+	if len(fourthLambda.Parameters) != 1 || fourthLambda.Parameters[0].Name != "key" || fourthLambda.Parameters[0].Type == nil || fourthLambda.Parameters[0].Type.Name != "Int" {
 		t.Fatalf("unexpected typed single-parameter lambda: %#v", fourthLambda.Parameters)
+	}
+}
+
+func TestParseGenericTypeRefs(t *testing.T) {
+	src := `
+interface Pairer[K, V] {
+	def pair(left K, right V) Map[K, V]
+}
+
+class Store[T] {
+	let values List[T]
+
+	def init(values List[T]) {
+	}
+}
+
+def wrap(input Map[String, List[Int]]) List[Map[String, Int]] {
+	let cache Map[String, List[Int]] = input
+	ret [cache]
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	assertTypeRef(t, program.Interfaces[0].Methods[0].ReturnType, "Map", "K", "V")
+	assertTypeRef(t, program.Classes[0].Fields[0].Type, "List", "T")
+	assertTypeRef(t, program.Functions[0].Parameters[0].Type, "Map", "String", "List")
+	if len(program.Functions[0].Parameters[0].Type.Arguments[1].Arguments) != 1 || program.Functions[0].Parameters[0].Type.Arguments[1].Arguments[0].Name != "Int" {
+		t.Fatalf("expected nested generic type argument, got %#v", program.Functions[0].Parameters[0].Type)
+	}
+	assertTypeRef(t, program.Functions[0].ReturnType, "List", "Map")
+	if len(program.Functions[0].ReturnType.Arguments[0].Arguments) != 2 {
+		t.Fatalf("expected nested return type arguments, got %#v", program.Functions[0].ReturnType)
 	}
 }
 

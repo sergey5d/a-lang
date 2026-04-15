@@ -190,13 +190,29 @@ def run() Bool {
 
 func TestAnalyzeClassesAndInterfaces(t *testing.T) {
 	src := `
+interface Mapper[K, V] {
+	def map(value K) V
+}
+
 interface Stringable {
 	def toString() String
 }
 
+class Box[T] implements Mapper[T, Stringable] {
+	private let value T
+
+	def init(value T) {
+		this.value = value
+	}
+
+	def map(value T) Stringable {
+		ret this
+	}
+}
+
 class SolidWork implements Stringable {
-	private let a Int
-	private mut b Bool
+	private let a List[Int]
+	private mut b Map[String, Bool]
 
 	def init(a Int, b Bool) {
 		this.a = a
@@ -218,5 +234,31 @@ let solidWork = SolidWork(1, false)
 	diagnostics := Analyze(parseProgram(t, src))
 	if len(diagnostics) != 0 {
 		t.Fatalf("expected no diagnostics, got %#v", diagnostics)
+	}
+}
+
+func TestAnalyzeGenericTypes(t *testing.T) {
+	src := `
+class Store[T] {
+	let values List[T]
+}
+
+def useStore(input Map[String, List[Int]]) List[Map[String, Int]] {
+	let store Store[Int] = Store(input)
+	let bad Unknown[Int] = store
+	let wrong List[Int, String] = []
+	ret [Map()]
+}
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics, got %#v", diagnostics)
+	}
+	if diagnostics[0].Code != "undefined_type" {
+		t.Fatalf("unexpected first diagnostic %#v", diagnostics[0])
+	}
+	if diagnostics[1].Code != "invalid_type_arity" {
+		t.Fatalf("unexpected second diagnostic %#v", diagnostics[1])
 	}
 }

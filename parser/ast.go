@@ -18,47 +18,60 @@ type Program struct {
 	Span       Span             `json:"span"`
 }
 
+type TypeRef struct {
+	Name      string     `json:"name"`
+	Arguments []*TypeRef `json:"arguments,omitempty"`
+	Span      Span       `json:"span"`
+}
+
+type TypeParameter struct {
+	Name string `json:"name"`
+	Span Span   `json:"span"`
+}
+
 type FunctionDecl struct {
 	Name       string      `json:"name"`
 	Parameters []Parameter `json:"parameters"`
-	ReturnType string      `json:"returnType"`
+	ReturnType *TypeRef    `json:"returnType"`
 	Body       *BlockStmt  `json:"body"`
 	Span       Span        `json:"span"`
 }
 
 type InterfaceDecl struct {
-	Name    string            `json:"name"`
-	Methods []InterfaceMethod `json:"methods"`
-	Span    Span              `json:"span"`
+	Name           string            `json:"name"`
+	TypeParameters []TypeParameter   `json:"typeParameters,omitempty"`
+	Methods        []InterfaceMethod `json:"methods"`
+	Span           Span              `json:"span"`
 }
 
 type InterfaceMethod struct {
 	Name       string      `json:"name"`
 	Parameters []Parameter `json:"parameters"`
-	ReturnType string      `json:"returnType"`
+	ReturnType *TypeRef    `json:"returnType"`
 	Span       Span        `json:"span"`
 }
 
 type ClassDecl struct {
-	Name       string        `json:"name"`
-	Implements []string      `json:"implements,omitempty"`
-	Fields     []FieldDecl   `json:"fields,omitempty"`
-	Methods    []*MethodDecl `json:"methods,omitempty"`
-	Span       Span          `json:"span"`
+	Name           string          `json:"name"`
+	TypeParameters []TypeParameter `json:"typeParameters,omitempty"`
+	Implements     []*TypeRef      `json:"implements,omitempty"`
+	Fields         []FieldDecl     `json:"fields,omitempty"`
+	Methods        []*MethodDecl   `json:"methods,omitempty"`
+	Span           Span            `json:"span"`
 }
 
 type FieldDecl struct {
-	Name    string `json:"name"`
-	Type    string `json:"type"`
-	Mutable bool   `json:"mutable,omitempty"`
-	Private bool   `json:"private,omitempty"`
-	Span    Span   `json:"span"`
+	Name    string   `json:"name"`
+	Type    *TypeRef `json:"type"`
+	Mutable bool     `json:"mutable,omitempty"`
+	Private bool     `json:"private,omitempty"`
+	Span    Span     `json:"span"`
 }
 
 type MethodDecl struct {
 	Name        string      `json:"name"`
 	Parameters  []Parameter `json:"parameters"`
-	ReturnType  string      `json:"returnType,omitempty"`
+	ReturnType  *TypeRef    `json:"returnType,omitempty"`
 	Body        *BlockStmt  `json:"body"`
 	Private     bool        `json:"private,omitempty"`
 	Constructor bool        `json:"constructor,omitempty"`
@@ -66,9 +79,9 @@ type MethodDecl struct {
 }
 
 type Parameter struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
-	Span Span   `json:"span"`
+	Name string   `json:"name"`
+	Type *TypeRef `json:"type"`
+	Span Span     `json:"span"`
 }
 
 type BlockStmt struct {
@@ -91,10 +104,10 @@ type ValStmt struct {
 }
 
 type Binding struct {
-	Name    string `json:"name"`
-	Type    string `json:"type,omitempty"`
-	Mutable bool   `json:"mutable,omitempty"`
-	Span    Span   `json:"span"`
+	Name    string   `json:"name"`
+	Type    *TypeRef `json:"type,omitempty"`
+	Mutable bool     `json:"mutable,omitempty"`
+	Span    Span     `json:"span"`
 }
 
 func (*ValStmt) statementNode() {}
@@ -142,10 +155,10 @@ type MatchStmt struct {
 func (*MatchStmt) statementNode() {}
 
 type MatchArm struct {
-	Pattern     Expr   `json:"pattern"`
-	PatternType string `json:"patternType,omitempty"`
-	Result      Expr   `json:"result"`
-	Span        Span   `json:"span"`
+	Pattern     Expr     `json:"pattern"`
+	PatternType *TypeRef `json:"patternType,omitempty"`
+	Result      Expr     `json:"result"`
+	Span        Span     `json:"span"`
 }
 
 type ReturnStmt struct {
@@ -246,9 +259,9 @@ type MemberExpr struct {
 func (*MemberExpr) exprNode() {}
 
 type LambdaParameter struct {
-	Name string `json:"name"`
-	Type string `json:"type,omitempty"`
-	Span Span   `json:"span"`
+	Name string   `json:"name"`
+	Type *TypeRef `json:"type,omitempty"`
+	Span Span     `json:"span"`
 }
 
 type LambdaExpr struct {
