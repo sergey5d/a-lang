@@ -20,6 +20,7 @@ func TestAnalyzeValidScopes(t *testing.T) {
 def run(input Int) Bool {
 	let value = helper(input)
 	mut acc = 0
+	let item = input
 
 	for item <- [1, 2, 3] {
 		if item == input {
@@ -27,8 +28,14 @@ def run(input Int) Bool {
 		}
 	}
 
-	for {
+	for item <- range(1, 5, 2) {
 		if item == input {
+			break
+		}
+	}
+
+	for {
+		if acc == input {
 			break
 		}
 	}

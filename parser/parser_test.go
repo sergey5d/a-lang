@@ -35,10 +35,10 @@ def doSomeWork(a Int, b Int) Bool {
 
 	}
 
-	do (
+	for {
 		a <- list,
 		c <- map
-	) yield {
+	} yield {
 		a + c
 	}
 
@@ -69,6 +69,58 @@ func TestParseSampleProgram(t *testing.T) {
 	}
 	if _, ok := fn.Body.Statements[len(fn.Body.Statements)-1].(*ReturnStmt); !ok {
 		t.Fatalf("expected final statement to be return, got %T", fn.Body.Statements[len(fn.Body.Statements)-1])
+	}
+}
+
+func TestParseForForms(t *testing.T) {
+	src := `
+def loops(input Int, value Int) Bool {
+	for item <- [1, 2, 3] {
+		if item == input {
+			break
+		}
+	}
+
+	for item <- range(1, 5, 2) {
+		if item == input {
+			break
+		}
+	}
+
+	for {
+		break
+	}
+
+	for {
+		x <- [value],
+		y <- [input]
+	} yield {
+		x + y
+	}
+
+	ret value == input
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	first := fn.Body.Statements[0].(*ForStmt)
+	if len(first.Bindings) != 1 || first.Body == nil {
+		t.Fatalf("expected single-binding for loop, got %#v", first)
+	}
+
+	third := fn.Body.Statements[2].(*ForStmt)
+	if len(third.Bindings) != 0 || third.Body == nil {
+		t.Fatalf("expected infinite for loop, got %#v", third)
+	}
+
+	fourth := fn.Body.Statements[3].(*ForStmt)
+	if len(fourth.Bindings) != 2 || fourth.YieldBody == nil {
+		t.Fatalf("expected yield-style for loop, got %#v", fourth)
 	}
 }
 

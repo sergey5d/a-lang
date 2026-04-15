@@ -72,20 +72,19 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 			r.resolveBlock(s.Else)
 		}
 	case *parser.ForStmt:
-		r.resolveExpr(s.Iterable)
-		r.pushScope()
-		r.define(s.Name, s.Span, "duplicate_binding", "duplicate binding '"+s.Name+"'")
-		r.loopDepth++
-		r.resolveBlockStatements(s.Body.Statements)
-		r.loopDepth--
-		r.popScope()
-	case *parser.DoYieldStmt:
 		r.pushScope()
 		for _, binding := range s.Bindings {
 			r.resolveExpr(binding.Iterable)
 			r.define(binding.Name, binding.Span, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
 		}
-		r.resolveBlockStatements(s.Body.Statements)
+		if s.Body != nil {
+			r.loopDepth++
+			r.resolveBlockStatements(s.Body.Statements)
+			r.loopDepth--
+		}
+		if s.YieldBody != nil {
+			r.resolveBlockStatements(s.YieldBody.Statements)
+		}
 		r.popScope()
 	case *parser.MatchStmt:
 		r.resolveExpr(s.Target)
@@ -186,7 +185,7 @@ func (r *Resolver) currentScope() scope {
 
 func isBuiltin(name string) bool {
 	switch name {
-	case "Map", "Set", "Array":
+	case "Map", "Set", "Array", "range":
 		return true
 	default:
 		return false

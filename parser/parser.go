@@ -67,8 +67,6 @@ func stmtSpan(stmt Statement) Span {
 		return s.Span
 	case *ForStmt:
 		return s.Span
-	case *DoYieldStmt:
-		return s.Span
 	case *MatchStmt:
 		return s.Span
 	case *ReturnStmt:
@@ -185,13 +183,11 @@ func (p *Parser) parseStatement() (Statement, error) {
 		return p.parseIfStmt()
 	case TokenFor:
 		return p.parseForStmt()
-	case TokenDo:
-		return p.parseDoYieldStmt()
 	case TokenRet:
 		return p.parseReturnStmt()
 	case TokenBreak:
-		p.advance()
-		return &BreakStmt{}, nil
+		token := p.advance()
+		return &BreakStmt{Span: tokenSpan(token)}, nil
 	default:
 		return p.parseExprOrMatchStmt()
 	}
@@ -291,69 +287,105 @@ func (p *Parser) parseIfStmt() (Statement, error) {
 
 func (p *Parser) parseForStmt() (Statement, error) {
 	start := p.advance()
-	name, err := p.consume(TokenIdentifier, "expected loop variable")
-	if err != nil {
-		return nil, err
+	if p.check(TokenIdentifier) && p.checkNext(TokenLeftArrow) {
+		binding, err := p.parseForBinding()
+		if err != nil {
+			return nil, err
+		}
+		body, err := p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
+		return &ForStmt{
+			Bindings: []ForBinding{binding},
+			Body:     body,
+			Span:     mergeSpans(tokenSpan(start), body.Span),
+		}, nil
 	}
-	if _, err := p.consume(TokenLeftArrow, "expected '<-'"); err != nil {
-		return nil, err
-	}
-	iterable, err := p.parseExpression(0)
-	if err != nil {
-		return nil, err
+	if p.check(TokenLBrace) && p.isForYieldStart() {
+		bindings, err := p.parseForBindingsBlock()
+		if err != nil {
+			return nil, err
+		}
+		if _, err := p.consume(TokenYield, "expected 'yield' after for bindings"); err != nil {
+			return nil, err
+		}
+		yieldBody, err := p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
+		return &ForStmt{
+			Bindings:  bindings,
+			YieldBody: yieldBody,
+			Span:      mergeSpans(tokenSpan(start), yieldBody.Span),
+		}, nil
 	}
 	body, err := p.parseBlock()
 	if err != nil {
 		return nil, err
 	}
-	return &ForStmt{
+	return &ForStmt{Body: body, Span: mergeSpans(tokenSpan(start), body.Span)}, nil
+}
+
+func (p *Parser) parseForBinding() (ForBinding, error) {
+	name, err := p.consume(TokenIdentifier, "expected loop variable")
+	if err != nil {
+		return ForBinding{}, err
+	}
+	if _, err := p.consume(TokenLeftArrow, "expected '<-'"); err != nil {
+		return ForBinding{}, err
+	}
+	iterable, err := p.parseExpression(0)
+	if err != nil {
+		return ForBinding{}, err
+	}
+	return ForBinding{
 		Name:     name.Lexeme,
 		Iterable: iterable,
-		Body:     body,
-		Span:     mergeSpans(tokenSpan(start), body.Span),
+		Span:     mergeSpans(tokenSpan(name), exprSpan(iterable)),
 	}, nil
 }
 
-func (p *Parser) parseDoYieldStmt() (Statement, error) {
-	start := p.advance()
-	if _, err := p.consume(TokenLParen, "expected '(' after 'do'"); err != nil {
+func (p *Parser) parseForBindingsBlock() ([]ForBinding, error) {
+	if _, err := p.consume(TokenLBrace, "expected '{' after 'for'"); err != nil {
 		return nil, err
 	}
 	var bindings []ForBinding
-	if !p.check(TokenRParen) {
+	if !p.check(TokenRBrace) {
 		for {
-			name, err := p.consume(TokenIdentifier, "expected generator name")
+			binding, err := p.parseForBinding()
 			if err != nil {
 				return nil, err
 			}
-			if _, err := p.consume(TokenLeftArrow, "expected '<-'"); err != nil {
-				return nil, err
-			}
-			iterable, err := p.parseExpression(0)
-			if err != nil {
-				return nil, err
-			}
-			bindings = append(bindings, ForBinding{
-				Name:     name.Lexeme,
-				Iterable: iterable,
-				Span:     mergeSpans(tokenSpan(name), exprSpan(iterable)),
-			})
+			bindings = append(bindings, binding)
 			if !p.match(TokenComma) {
 				break
 			}
 		}
 	}
-	if _, err := p.consume(TokenRParen, "expected ')' after generators"); err != nil {
+	if _, err := p.consume(TokenRBrace, "expected '}' after for bindings"); err != nil {
 		return nil, err
 	}
-	if _, err := p.consume(TokenYield, "expected 'yield'"); err != nil {
-		return nil, err
+	return bindings, nil
+}
+
+func (p *Parser) isForYieldStart() bool {
+	if !p.check(TokenLBrace) {
+		return false
 	}
-	body, err := p.parseBlock()
-	if err != nil {
-		return nil, err
+	depthBrace := 0
+	for i := p.pos; i < len(p.tokens); i++ {
+		switch p.tokens[i].Type {
+		case TokenLBrace:
+			depthBrace++
+		case TokenRBrace:
+			depthBrace--
+			if depthBrace == 0 {
+				return i+1 < len(p.tokens) && p.tokens[i+1].Type == TokenYield
+			}
+		}
 	}
-	return &DoYieldStmt{Bindings: bindings, Body: body, Span: mergeSpans(tokenSpan(start), body.Span)}, nil
+	return false
 }
 
 func (p *Parser) parseReturnStmt() (Statement, error) {

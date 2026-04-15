@@ -68,21 +68,13 @@ type IfStmt struct {
 func (*IfStmt) statementNode() {}
 
 type ForStmt struct {
-	Name     string     `json:"name"`
-	Iterable Expr       `json:"iterable"`
-	Body     *BlockStmt `json:"body"`
-	Span     Span       `json:"span"`
+	Bindings  []ForBinding `json:"bindings,omitempty"`
+	Body      *BlockStmt   `json:"body,omitempty"`
+	YieldBody *BlockStmt   `json:"yieldBody,omitempty"`
+	Span      Span         `json:"span"`
 }
 
 func (*ForStmt) statementNode() {}
-
-type DoYieldStmt struct {
-	Bindings []ForBinding `json:"bindings"`
-	Body     *BlockStmt   `json:"body"`
-	Span     Span         `json:"span"`
-}
-
-func (*DoYieldStmt) statementNode() {}
 
 type ForBinding struct {
 	Name     string `json:"name"`

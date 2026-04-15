@@ -18,7 +18,6 @@ const (
 	TokenIf    TokenType = "IF"
 	TokenElse  TokenType = "ELSE"
 	TokenFor   TokenType = "FOR"
-	TokenDo    TokenType = "DO"
 	TokenYield TokenType = "YIELD"
 	TokenMatch TokenType = "MATCH"
 	TokenRet   TokenType = "RET"
@@ -63,7 +62,6 @@ var keywords = map[string]TokenType{
 	"if":    TokenIf,
 	"else":  TokenElse,
 	"for":   TokenFor,
-	"do":    TokenDo,
 	"yield": TokenYield,
 	"match": TokenMatch,
 	"ret":   TokenRet,
