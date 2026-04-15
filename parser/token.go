@@ -11,6 +11,7 @@ const (
 	TokenIdentifier TokenType = "IDENT"
 	TokenInteger    TokenType = "INT"
 	TokenFloat      TokenType = "FLOAT"
+	TokenRune       TokenType = "RUNE"
 	TokenString     TokenType = "STRING"
 	TokenBool       TokenType = "BOOL"
 

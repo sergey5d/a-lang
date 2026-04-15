@@ -38,6 +38,8 @@ func exprSpan(expr Expr) Span {
 		return e.Span
 	case *FloatLiteral:
 		return e.Span
+	case *RuneLiteral:
+		return e.Span
 	case *BoolLiteral:
 		return e.Span
 	case *StringLiteral:
@@ -557,6 +559,8 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		return &IntegerLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, nil
 	case TokenFloat:
 		return &FloatLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, nil
+	case TokenRune:
+		return &RuneLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, nil
 	case TokenBool:
 		return &BoolLiteral{Value: token.Lexeme == "true", Span: tokenSpan(token)}, nil
 	case TokenString:

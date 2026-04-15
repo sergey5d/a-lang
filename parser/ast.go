@@ -153,6 +153,13 @@ type FloatLiteral struct {
 
 func (*FloatLiteral) exprNode() {}
 
+type RuneLiteral struct {
+	Value string `json:"value"`
+	Span  Span   `json:"span"`
+}
+
+func (*RuneLiteral) exprNode() {}
+
 type BoolLiteral struct {
 	Value bool `json:"value"`
 	Span  Span `json:"span"`

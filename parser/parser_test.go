@@ -158,6 +158,8 @@ def literals() Bool {
 	let no = false
 	let a = 1.1
 	let b = 1.
+	let c = 'x'
+	let d = '\n'
 	ret yes == true
 }
 `
@@ -179,6 +181,25 @@ def literals() Bool {
 	}
 	if literal, ok := fn.Body.Statements[3].(*ValStmt).Values[0].(*FloatLiteral); !ok || literal.Value != "1." {
 		t.Fatalf("expected 1. to parse as float literal, got %#v", fn.Body.Statements[3].(*ValStmt).Values[0])
+	}
+	if literal, ok := fn.Body.Statements[4].(*ValStmt).Values[0].(*RuneLiteral); !ok || literal.Value != "x" {
+		t.Fatalf("expected 'x' to parse as rune literal, got %#v", fn.Body.Statements[4].(*ValStmt).Values[0])
+	}
+	if literal, ok := fn.Body.Statements[5].(*ValStmt).Values[0].(*RuneLiteral); !ok || literal.Value != "\\n" {
+		t.Fatalf("expected '\\n' to parse as escaped rune literal, got %#v", fn.Body.Statements[5].(*ValStmt).Values[0])
+	}
+}
+
+func TestRejectInvalidRuneLiterals(t *testing.T) {
+	cases := []string{
+		"def bad() Bool { let a = '' ret true }",
+		"def bad() Bool { let a = 'ab' ret true }",
+	}
+
+	for _, src := range cases {
+		if _, err := Parse(src); err == nil {
+			t.Fatalf("expected parse error for invalid rune literal in %q", src)
+		}
 	}
 }
 

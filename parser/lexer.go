@@ -150,6 +150,8 @@ func (l *Lexer) nextToken() (Token, error) {
 			return l.token(TokenOrOr, "||", startLine, startColumn), nil
 		}
 		return Token{}, fmt.Errorf("unexpected '|' at %d:%d", startLine, startColumn)
+	case '\'':
+		return l.lexRune(startLine, startColumn)
 	case '"':
 		return l.lexString(startLine, startColumn)
 	}
@@ -180,6 +182,37 @@ func (l *Lexer) lexString(line, column int) (Token, error) {
 	value := string(l.input[start:l.pos])
 	l.advance()
 	return l.token(TokenString, value, line, column), nil
+}
+
+func (l *Lexer) lexRune(line, column int) (Token, error) {
+	l.advance()
+	if l.isAtEnd() || l.peek() == '\n' {
+		return Token{}, fmt.Errorf("unterminated rune literal at %d:%d", line, column)
+	}
+
+	var value string
+	if l.peek() == '\\' {
+		l.advance()
+		if l.isAtEnd() || l.peek() == '\n' {
+			return Token{}, fmt.Errorf("unterminated rune literal at %d:%d", line, column)
+		}
+		escape := l.advance()
+		switch escape {
+		case 'n', 't', 'r', '\\', '\'', '"':
+			value = "\\" + string(escape)
+		default:
+			return Token{}, fmt.Errorf("unsupported char escape \\%c at %d:%d", escape, line, column)
+		}
+	} else {
+		ch := l.advance()
+		value = string(ch)
+	}
+
+	if l.isAtEnd() || l.peek() != '\'' {
+		return Token{}, fmt.Errorf("rune literal must contain exactly one character at %d:%d", line, column)
+	}
+	l.advance()
+	return l.token(TokenRune, value, line, column), nil
 }
 
 func (l *Lexer) lexNumber(line, column int) Token {

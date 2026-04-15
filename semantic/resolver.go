@@ -124,6 +124,7 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 		}
 		r.addDiagnostic("undefined_name", "undefined name '"+e.Name+"'", e.Span)
 	case *parser.FloatLiteral:
+	case *parser.RuneLiteral:
 	case *parser.BoolLiteral:
 	case *parser.ListLiteral:
 		for _, item := range e.Elements {
