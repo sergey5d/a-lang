@@ -318,3 +318,41 @@ def classify(a Int) Bool {
 		t.Fatalf("expected final else block on else-if chain")
 	}
 }
+
+func TestAttachSourceSpans(t *testing.T) {
+	src := `
+def sample(a Int) Bool {
+	let value = function(a)
+	ret value == a
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	if program.Span.Start.Line == 0 || program.Span.End.Line == 0 {
+		t.Fatalf("expected program span to be populated, got %#v", program.Span)
+	}
+
+	fn := program.Functions[0]
+	if fn.Span.Start.Line != 2 {
+		t.Fatalf("expected function to start on line 2, got %#v", fn.Span)
+	}
+
+	stmt := fn.Body.Statements[0].(*ValStmt)
+	if stmt.Span.Start.Line != 3 {
+		t.Fatalf("expected let statement to start on line 3, got %#v", stmt.Span)
+	}
+
+	call := stmt.Values[0].(*CallExpr)
+	if call.Span.Start.Line != 3 || call.Span.End.Line != 3 {
+		t.Fatalf("expected call span on line 3, got %#v", call.Span)
+	}
+
+	retStmt := fn.Body.Statements[1].(*ReturnStmt)
+	if retStmt.Span.Start.Line != 4 {
+		t.Fatalf("expected return statement span on line 4, got %#v", retStmt.Span)
+	}
+}

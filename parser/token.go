@@ -1,6 +1,8 @@
 package parser
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type TokenType string
 
@@ -69,10 +71,12 @@ var keywords = map[string]TokenType{
 }
 
 type Token struct {
-	Type   TokenType
-	Lexeme string
-	Line   int
-	Column int
+	Type      TokenType
+	Lexeme    string
+	Line      int
+	Column    int
+	EndLine   int
+	EndColumn int
 }
 
 func (t Token) String() string {

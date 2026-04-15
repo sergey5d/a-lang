@@ -17,6 +17,71 @@ type Parser struct {
 	pos    int
 }
 
+func tokenSpan(token Token) Span {
+	return Span{
+		Start: Position{Line: token.Line, Column: token.Column},
+		End:   Position{Line: token.EndLine, Column: token.EndColumn},
+	}
+}
+
+func mergeSpans(start, end Span) Span {
+	return Span{Start: start.Start, End: end.End}
+}
+
+func exprSpan(expr Expr) Span {
+	switch e := expr.(type) {
+	case *Identifier:
+		return e.Span
+	case *PlaceholderExpr:
+		return e.Span
+	case *IntegerLiteral:
+		return e.Span
+	case *StringLiteral:
+		return e.Span
+	case *ListLiteral:
+		return e.Span
+	case *MapLiteral:
+		return e.Span
+	case *CallExpr:
+		return e.Span
+	case *MemberExpr:
+		return e.Span
+	case *LambdaExpr:
+		return e.Span
+	case *BinaryExpr:
+		return e.Span
+	case *UnaryExpr:
+		return e.Span
+	case *GroupExpr:
+		return e.Span
+	default:
+		return Span{}
+	}
+}
+
+func stmtSpan(stmt Statement) Span {
+	switch s := stmt.(type) {
+	case *ValStmt:
+		return s.Span
+	case *IfStmt:
+		return s.Span
+	case *ForStmt:
+		return s.Span
+	case *DoYieldStmt:
+		return s.Span
+	case *MatchStmt:
+		return s.Span
+	case *ReturnStmt:
+		return s.Span
+	case *BreakStmt:
+		return s.Span
+	case *ExprStmt:
+		return s.Span
+	default:
+		return Span{}
+	}
+}
+
 func (p *Parser) parseProgram() (*Program, error) {
 	program := &Program{}
 	for !p.isAtEnd() {
@@ -26,11 +91,15 @@ func (p *Parser) parseProgram() (*Program, error) {
 		}
 		program.Functions = append(program.Functions, fn)
 	}
+	if len(program.Functions) > 0 {
+		program.Span = mergeSpans(program.Functions[0].Span, program.Functions[len(program.Functions)-1].Span)
+	}
 	return program, nil
 }
 
 func (p *Parser) parseFunction() (*FunctionDecl, error) {
-	if _, err := p.consume(TokenDef, "expected 'def'"); err != nil {
+	defToken, err := p.consume(TokenDef, "expected 'def'")
+	if err != nil {
 		return nil, err
 	}
 	name, err := p.consume(TokenIdentifier, "expected function name")
@@ -52,7 +121,11 @@ func (p *Parser) parseFunction() (*FunctionDecl, error) {
 			if err != nil {
 				return nil, err
 			}
-			params = append(params, Parameter{Name: paramName.Lexeme, Type: paramType.Lexeme})
+			params = append(params, Parameter{
+				Name: paramName.Lexeme,
+				Type: paramType.Lexeme,
+				Span: mergeSpans(tokenSpan(paramName), tokenSpan(paramType)),
+			})
 			if !p.match(TokenComma) {
 				break
 			}
@@ -77,11 +150,13 @@ func (p *Parser) parseFunction() (*FunctionDecl, error) {
 		Parameters: params,
 		ReturnType: returnType.Lexeme,
 		Body:       body,
+		Span:       mergeSpans(tokenSpan(defToken), body.Span),
 	}, nil
 }
 
 func (p *Parser) parseBlock() (*BlockStmt, error) {
-	if _, err := p.consume(TokenLBrace, "expected '{'"); err != nil {
+	start, err := p.consume(TokenLBrace, "expected '{'")
+	if err != nil {
 		return nil, err
 	}
 	block := &BlockStmt{}
@@ -92,9 +167,11 @@ func (p *Parser) parseBlock() (*BlockStmt, error) {
 		}
 		block.Statements = append(block.Statements, stmt)
 	}
-	if _, err := p.consume(TokenRBrace, "expected '}'"); err != nil {
+	end, err := p.consume(TokenRBrace, "expected '}'")
+	if err != nil {
 		return nil, err
 	}
+	block.Span = mergeSpans(tokenSpan(start), tokenSpan(end))
 	return block, nil
 }
 
@@ -121,7 +198,7 @@ func (p *Parser) parseStatement() (Statement, error) {
 }
 
 func (p *Parser) parseBindingStmt(mutable bool) (Statement, error) {
-	p.advance()
+	start := p.advance()
 
 	var bindings []Binding
 	for {
@@ -132,8 +209,11 @@ func (p *Parser) parseBindingStmt(mutable bool) (Statement, error) {
 			return nil, err
 		}
 		binding.Name = name.Lexeme
+		binding.Span = tokenSpan(name)
 		if p.check(TokenIdentifier) {
-			binding.Type = p.advance().Lexeme
+			typeToken := p.advance()
+			binding.Type = typeToken.Lexeme
+			binding.Span = mergeSpans(binding.Span, tokenSpan(typeToken))
 		}
 		bindings = append(bindings, binding)
 		if !p.match(TokenComma) {
@@ -149,7 +229,13 @@ func (p *Parser) parseBindingStmt(mutable bool) (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ValStmt{Bindings: bindings, Values: values}, nil
+	stmt := &ValStmt{Bindings: bindings, Values: values}
+	if len(values) > 0 {
+		stmt.Span = mergeSpans(tokenSpan(start), exprSpan(values[len(values)-1]))
+	} else {
+		stmt.Span = tokenSpan(start)
+	}
+	return stmt, nil
 }
 
 func (p *Parser) parseExprList(until TokenType) ([]Expr, error) {
@@ -171,7 +257,7 @@ func (p *Parser) parseExprList(until TokenType) ([]Expr, error) {
 }
 
 func (p *Parser) parseIfStmt() (Statement, error) {
-	p.advance()
+	start := p.advance()
 	condition, err := p.parseExpression(0)
 	if err != nil {
 		return nil, err
@@ -188,6 +274,7 @@ func (p *Parser) parseIfStmt() (Statement, error) {
 				return nil, err
 			}
 			stmt.ElseIf = elseIfStmt.(*IfStmt)
+			stmt.Span = mergeSpans(tokenSpan(start), stmt.ElseIf.Span)
 			return stmt, nil
 		}
 		elseBlock, err := p.parseBlock()
@@ -195,12 +282,15 @@ func (p *Parser) parseIfStmt() (Statement, error) {
 			return nil, err
 		}
 		stmt.Else = elseBlock
+		stmt.Span = mergeSpans(tokenSpan(start), elseBlock.Span)
+		return stmt, nil
 	}
+	stmt.Span = mergeSpans(tokenSpan(start), thenBlock.Span)
 	return stmt, nil
 }
 
 func (p *Parser) parseForStmt() (Statement, error) {
-	p.advance()
+	start := p.advance()
 	name, err := p.consume(TokenIdentifier, "expected loop variable")
 	if err != nil {
 		return nil, err
@@ -216,11 +306,16 @@ func (p *Parser) parseForStmt() (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ForStmt{Name: name.Lexeme, Iterable: iterable, Body: body}, nil
+	return &ForStmt{
+		Name:     name.Lexeme,
+		Iterable: iterable,
+		Body:     body,
+		Span:     mergeSpans(tokenSpan(start), body.Span),
+	}, nil
 }
 
 func (p *Parser) parseDoYieldStmt() (Statement, error) {
-	p.advance()
+	start := p.advance()
 	if _, err := p.consume(TokenLParen, "expected '(' after 'do'"); err != nil {
 		return nil, err
 	}
@@ -238,7 +333,11 @@ func (p *Parser) parseDoYieldStmt() (Statement, error) {
 			if err != nil {
 				return nil, err
 			}
-			bindings = append(bindings, ForBinding{Name: name.Lexeme, Iterable: iterable})
+			bindings = append(bindings, ForBinding{
+				Name:     name.Lexeme,
+				Iterable: iterable,
+				Span:     mergeSpans(tokenSpan(name), exprSpan(iterable)),
+			})
 			if !p.match(TokenComma) {
 				break
 			}
@@ -254,16 +353,16 @@ func (p *Parser) parseDoYieldStmt() (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DoYieldStmt{Bindings: bindings, Body: body}, nil
+	return &DoYieldStmt{Bindings: bindings, Body: body, Span: mergeSpans(tokenSpan(start), body.Span)}, nil
 }
 
 func (p *Parser) parseReturnStmt() (Statement, error) {
-	p.advance()
+	start := p.advance()
 	value, err := p.parseExpression(0)
 	if err != nil {
 		return nil, err
 	}
-	return &ReturnStmt{Value: value}, nil
+	return &ReturnStmt{Value: value, Span: mergeSpans(tokenSpan(start), exprSpan(value))}, nil
 }
 
 func (p *Parser) parseExprOrMatchStmt() (Statement, error) {
@@ -286,9 +385,15 @@ func (p *Parser) parseExprOrMatchStmt() (Statement, error) {
 		if _, err := p.consume(TokenRBrace, "expected '}' after match arms"); err != nil {
 			return nil, err
 		}
-		return &MatchStmt{Target: target, Arms: arms}, nil
+		stmt := &MatchStmt{Target: target, Arms: arms}
+		if len(arms) > 0 {
+			stmt.Span = mergeSpans(exprSpan(target), arms[len(arms)-1].Span)
+		} else {
+			stmt.Span = exprSpan(target)
+		}
+		return stmt, nil
 	}
-	return &ExprStmt{Expr: target}, nil
+	return &ExprStmt{Expr: target, Span: exprSpan(target)}, nil
 }
 
 func (p *Parser) parseMatchArm() (MatchArm, error) {
@@ -310,7 +415,12 @@ func (p *Parser) parseMatchArm() (MatchArm, error) {
 	if err != nil {
 		return MatchArm{}, err
 	}
-	return MatchArm{Pattern: pattern, PatternType: patternType, Result: result}, nil
+	return MatchArm{
+		Pattern:     pattern,
+		PatternType: patternType,
+		Result:      result,
+		Span:        mergeSpans(exprSpan(pattern), exprSpan(result)),
+	}, nil
 }
 
 func (p *Parser) parseExpression(minPrec int) (Expr, error) {
@@ -325,7 +435,13 @@ func (p *Parser) parseExpression(minPrec int) (Expr, error) {
 			if err != nil {
 				return nil, err
 			}
-			left = &CallExpr{Callee: left, Args: args}
+			call := &CallExpr{Callee: left, Args: args}
+			endSpan := exprSpan(left)
+			if len(args) > 0 {
+				endSpan = exprSpan(args[len(args)-1])
+			}
+			call.Span = mergeSpans(exprSpan(left), endSpan)
+			left = call
 			continue
 		}
 		if p.match(TokenDot) {
@@ -333,7 +449,7 @@ func (p *Parser) parseExpression(minPrec int) (Expr, error) {
 			if err != nil {
 				return nil, err
 			}
-			left = &MemberExpr{Receiver: left, Name: name.Lexeme}
+			left = &MemberExpr{Receiver: left, Name: name.Lexeme, Span: mergeSpans(exprSpan(left), tokenSpan(name))}
 			continue
 		}
 
@@ -352,6 +468,7 @@ func (p *Parser) parseExpression(minPrec int) (Expr, error) {
 			Left:     left,
 			Operator: token.Lexeme,
 			Right:    right,
+			Span:     mergeSpans(exprSpan(left), exprSpan(right)),
 		}
 	}
 
@@ -373,15 +490,15 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &UnaryExpr{Operator: token.Lexeme, Right: right}, nil
+		return &UnaryExpr{Operator: token.Lexeme, Right: right, Span: mergeSpans(tokenSpan(token), exprSpan(right))}, nil
 	case TokenIdentifier:
-		return &Identifier{Name: token.Lexeme}, nil
+		return &Identifier{Name: token.Lexeme, Span: tokenSpan(token)}, nil
 	case TokenInteger:
-		return &IntegerLiteral{Value: token.Lexeme}, nil
+		return &IntegerLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, nil
 	case TokenString:
-		return &StringLiteral{Value: token.Lexeme}, nil
+		return &StringLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, nil
 	case TokenUnder:
-		return &PlaceholderExpr{}, nil
+		return &PlaceholderExpr{Span: tokenSpan(token)}, nil
 	case TokenLParen:
 		inner, err := p.parseExpression(0)
 		if err != nil {
@@ -390,10 +507,10 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		if _, err := p.consume(TokenRParen, "expected ')'"); err != nil {
 			return nil, err
 		}
-		return &GroupExpr{Inner: inner}, nil
+		return &GroupExpr{Inner: inner, Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
 	case TokenLBracket:
 		if p.match(TokenRBracket) {
-			return &ListLiteral{}, nil
+			return &ListLiteral{Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
 		}
 		var items []Expr
 		for {
@@ -409,12 +526,13 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		if _, err := p.consume(TokenRBracket, "expected ']'"); err != nil {
 			return nil, err
 		}
-		return &ListLiteral{Elements: items}, nil
+		return &ListLiteral{Elements: items, Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
 	case TokenLBrace:
-		if _, err := p.consume(TokenRBrace, "expected '}' for map literal"); err != nil {
+		end, err := p.consume(TokenRBrace, "expected '}' for map literal")
+		if err != nil {
 			return nil, err
 		}
-		return &MapLiteral{}, nil
+		return &MapLiteral{Span: mergeSpans(tokenSpan(token), tokenSpan(end))}, nil
 	default:
 		return nil, fmt.Errorf("unexpected token %s", token.String())
 	}
@@ -426,8 +544,11 @@ func (p *Parser) parseLambdaIdentifier() (Expr, error) {
 		return nil, err
 	}
 	param := LambdaParameter{Name: name.Lexeme}
+	param.Span = tokenSpan(name)
 	if p.check(TokenIdentifier) && p.checkNext(TokenArrow) {
-		param.Type = p.advance().Lexeme
+		typeToken := p.advance()
+		param.Type = typeToken.Lexeme
+		param.Span = mergeSpans(param.Span, tokenSpan(typeToken))
 	}
 	if _, err := p.consume(TokenArrow, "expected '->' after lambda parameter"); err != nil {
 		return nil, err
@@ -436,7 +557,11 @@ func (p *Parser) parseLambdaIdentifier() (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &LambdaExpr{Parameters: []LambdaParameter{param}, Body: body}, nil
+	return &LambdaExpr{
+		Parameters: []LambdaParameter{param},
+		Body:       body,
+		Span:       mergeSpans(param.Span, exprSpan(body)),
+	}, nil
 }
 
 func (p *Parser) parseLambdaParen() (Expr, error) {
@@ -451,7 +576,11 @@ func (p *Parser) parseLambdaParen() (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &LambdaExpr{Parameters: params, Body: body}, nil
+	startSpan := Span{}
+	if len(params) > 0 {
+		startSpan = params[0].Span
+	}
+	return &LambdaExpr{Parameters: params, Body: body, Span: mergeSpans(startSpan, exprSpan(body))}, nil
 }
 
 func (p *Parser) parseLambdaParams() ([]LambdaParameter, error) {
@@ -466,8 +595,11 @@ func (p *Parser) parseLambdaParams() ([]LambdaParameter, error) {
 				return nil, err
 			}
 			lambdaParam := LambdaParameter{Name: param.Lexeme}
+			lambdaParam.Span = tokenSpan(param)
 			if p.check(TokenIdentifier) {
-				lambdaParam.Type = p.advance().Lexeme
+				typeToken := p.advance()
+				lambdaParam.Type = typeToken.Lexeme
+				lambdaParam.Span = mergeSpans(lambdaParam.Span, tokenSpan(typeToken))
 			}
 			params = append(params, lambdaParam)
 			if !p.match(TokenComma) {
@@ -617,6 +749,10 @@ func (p *Parser) advance() Token {
 	if !p.isAtEnd() {
 		p.pos++
 	}
+	return p.tokens[p.pos-1]
+}
+
+func (p *Parser) previous() Token {
 	return p.tokens[p.pos-1]
 }
 

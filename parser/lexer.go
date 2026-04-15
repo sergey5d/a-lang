@@ -34,99 +34,105 @@ func (l *Lexer) nextToken() (Token, error) {
 
 	startLine, startColumn := l.line, l.column
 	if l.isAtEnd() {
-		return Token{Type: TokenEOF, Line: startLine, Column: startColumn}, nil
+		return Token{
+			Type:      TokenEOF,
+			Line:      startLine,
+			Column:    startColumn,
+			EndLine:   startLine,
+			EndColumn: startColumn,
+		}, nil
 	}
 
 	ch := l.peek()
 	switch ch {
 	case '(':
 		l.advance()
-		return Token{Type: TokenLParen, Lexeme: "(", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenLParen, "(", startLine, startColumn), nil
 	case ')':
 		l.advance()
-		return Token{Type: TokenRParen, Lexeme: ")", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenRParen, ")", startLine, startColumn), nil
 	case '{':
 		l.advance()
-		return Token{Type: TokenLBrace, Lexeme: "{", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenLBrace, "{", startLine, startColumn), nil
 	case '}':
 		l.advance()
-		return Token{Type: TokenRBrace, Lexeme: "}", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenRBrace, "}", startLine, startColumn), nil
 	case '[':
 		l.advance()
-		return Token{Type: TokenLBracket, Lexeme: "[", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenLBracket, "[", startLine, startColumn), nil
 	case ']':
 		l.advance()
-		return Token{Type: TokenRBracket, Lexeme: "]", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenRBracket, "]", startLine, startColumn), nil
 	case ',':
 		l.advance()
-		return Token{Type: TokenComma, Lexeme: ",", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenComma, ",", startLine, startColumn), nil
 	case ':':
 		l.advance()
-		return Token{Type: TokenColon, Lexeme: ":", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenColon, ":", startLine, startColumn), nil
 	case '.':
 		l.advance()
 		if l.match('.') {
-			return Token{Type: TokenRange, Lexeme: "..", Line: startLine, Column: startColumn}, nil
+			return l.token(TokenRange, "..", startLine, startColumn), nil
 		}
-		return Token{Type: TokenDot, Lexeme: ".", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenDot, ".", startLine, startColumn), nil
 	case '+':
 		l.advance()
-		return Token{Type: TokenPlus, Lexeme: "+", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenPlus, "+", startLine, startColumn), nil
 	case '-':
 		l.advance()
 		if l.match('>') {
-			return Token{Type: TokenArrow, Lexeme: "->", Line: startLine, Column: startColumn}, nil
+			return l.token(TokenArrow, "->", startLine, startColumn), nil
 		}
-		return Token{Type: TokenMinus, Lexeme: "-", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenMinus, "-", startLine, startColumn), nil
 	case '*':
 		l.advance()
-		return Token{Type: TokenStar, Lexeme: "*", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenStar, "*", startLine, startColumn), nil
 	case '/':
 		l.advance()
-		return Token{Type: TokenSlash, Lexeme: "/", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenSlash, "/", startLine, startColumn), nil
 	case '%':
 		l.advance()
-		return Token{Type: TokenPercent, Lexeme: "%", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenPercent, "%", startLine, startColumn), nil
 	case '!':
 		l.advance()
 		if l.match('=') {
-			return Token{Type: TokenBangEq, Lexeme: "!=", Line: startLine, Column: startColumn}, nil
+			return l.token(TokenBangEq, "!=", startLine, startColumn), nil
 		}
-		return Token{Type: TokenBang, Lexeme: "!", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenBang, "!", startLine, startColumn), nil
 	case '_':
 		l.advance()
-		return Token{Type: TokenUnder, Lexeme: "_", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenUnder, "_", startLine, startColumn), nil
 	case '=':
 		l.advance()
 		if l.match('=') {
-			return Token{Type: TokenEqEq, Lexeme: "==", Line: startLine, Column: startColumn}, nil
+			return l.token(TokenEqEq, "==", startLine, startColumn), nil
 		}
-		return Token{Type: TokenAssign, Lexeme: "=", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenAssign, "=", startLine, startColumn), nil
 	case '<':
 		l.advance()
 		if l.match('-') {
-			return Token{Type: TokenLeftArrow, Lexeme: "<-", Line: startLine, Column: startColumn}, nil
+			return l.token(TokenLeftArrow, "<-", startLine, startColumn), nil
 		}
 		if l.match('=') {
-			return Token{Type: TokenLTE, Lexeme: "<=", Line: startLine, Column: startColumn}, nil
+			return l.token(TokenLTE, "<=", startLine, startColumn), nil
 		}
-		return Token{Type: TokenLT, Lexeme: "<", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenLT, "<", startLine, startColumn), nil
 	case '>':
 		l.advance()
 		if l.match('=') {
-			return Token{Type: TokenGTE, Lexeme: ">=", Line: startLine, Column: startColumn}, nil
+			return l.token(TokenGTE, ">=", startLine, startColumn), nil
 		}
-		return Token{Type: TokenGT, Lexeme: ">", Line: startLine, Column: startColumn}, nil
+		return l.token(TokenGT, ">", startLine, startColumn), nil
 	case '&':
 		l.advance()
 		if l.match('&') {
-			return Token{Type: TokenAndAnd, Lexeme: "&&", Line: startLine, Column: startColumn}, nil
+			return l.token(TokenAndAnd, "&&", startLine, startColumn), nil
 		}
 		return Token{}, fmt.Errorf("unexpected '&' at %d:%d", startLine, startColumn)
 	case '|':
 		l.advance()
 		if l.match('|') {
-			return Token{Type: TokenOrOr, Lexeme: "||", Line: startLine, Column: startColumn}, nil
+			return l.token(TokenOrOr, "||", startLine, startColumn), nil
 		}
 		return Token{}, fmt.Errorf("unexpected '|' at %d:%d", startLine, startColumn)
 	case '"':
@@ -158,7 +164,7 @@ func (l *Lexer) lexString(line, column int) (Token, error) {
 
 	value := string(l.input[start:l.pos])
 	l.advance()
-	return Token{Type: TokenString, Lexeme: value, Line: line, Column: column}, nil
+	return l.token(TokenString, value, line, column), nil
 }
 
 func (l *Lexer) lexNumber(line, column int) Token {
@@ -166,7 +172,7 @@ func (l *Lexer) lexNumber(line, column int) Token {
 	for !l.isAtEnd() && isDigit(l.peek()) {
 		l.advance()
 	}
-	return Token{Type: TokenInteger, Lexeme: string(l.input[start:l.pos]), Line: line, Column: column}
+	return l.token(TokenInteger, string(l.input[start:l.pos]), line, column)
 }
 
 func (l *Lexer) lexIdentifier(line, column int) Token {
@@ -176,9 +182,20 @@ func (l *Lexer) lexIdentifier(line, column int) Token {
 	}
 	lexeme := string(l.input[start:l.pos])
 	if keyword, ok := keywords[lexeme]; ok {
-		return Token{Type: keyword, Lexeme: lexeme, Line: line, Column: column}
+		return l.token(keyword, lexeme, line, column)
 	}
-	return Token{Type: TokenIdentifier, Lexeme: lexeme, Line: line, Column: column}
+	return l.token(TokenIdentifier, lexeme, line, column)
+}
+
+func (l *Lexer) token(tt TokenType, lexeme string, line, column int) Token {
+	return Token{
+		Type:      tt,
+		Lexeme:    lexeme,
+		Line:      line,
+		Column:    column,
+		EndLine:   l.line,
+		EndColumn: l.column,
+	}
 }
 
 func (l *Lexer) skipWhitespace() {
