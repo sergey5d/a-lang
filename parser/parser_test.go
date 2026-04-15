@@ -152,6 +152,7 @@ func TestParseMutableBindings(t *testing.T) {
 def vars() Bool {
 	mut count Int = 1
 	mut left Int, right Int = 1, 2
+	count = count + 1
 	ret count == right
 }
 `
@@ -179,6 +180,30 @@ def vars() Bool {
 	}
 	if !second.Bindings[1].Mutable {
 		t.Fatalf("expected second binding in second statement to be mutable")
+	}
+}
+
+func TestParseAssignmentStatement(t *testing.T) {
+	src := `
+def vars() Bool {
+	mut counter = 0
+	counter = counter + 1
+	ret counter == 1
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	assign, ok := fn.Body.Statements[1].(*AssignmentStmt)
+	if !ok {
+		t.Fatalf("expected second statement to be assignment, got %T", fn.Body.Statements[1])
+	}
+	if _, ok := assign.Target.(*Identifier); !ok {
+		t.Fatalf("expected assignment target to be identifier, got %T", assign.Target)
 	}
 }
 

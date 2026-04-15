@@ -57,6 +57,14 @@ type Binding struct {
 
 func (*ValStmt) statementNode() {}
 
+type AssignmentStmt struct {
+	Target Expr `json:"target"`
+	Value  Expr `json:"value"`
+	Span   Span `json:"span"`
+}
+
+func (*AssignmentStmt) statementNode() {}
+
 type IfStmt struct {
 	Condition Expr       `json:"condition"`
 	Then      *BlockStmt `json:"then"`

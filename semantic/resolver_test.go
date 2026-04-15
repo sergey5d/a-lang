@@ -20,6 +20,7 @@ func TestAnalyzeValidScopes(t *testing.T) {
 def run(input Int) Bool {
 	let value = helper(input)
 	mut acc = 0
+	acc = acc + 1
 	let item = input
 
 	for item <- [1, 2, 3] {
@@ -146,5 +147,38 @@ def run() Bool {
 	}
 	if diagnostics[0].Code != "duplicate_function" {
 		t.Fatalf("unexpected first diagnostic %#v", diagnostics[0])
+	}
+}
+
+func TestAnalyzeAssignmentToImmutableBinding(t *testing.T) {
+	src := `
+def run() Bool {
+	let value = 1
+	value = 2
+	ret value == 2
+}
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", diagnostics)
+	}
+	if diagnostics[0].Code != "assign_immutable" {
+		t.Fatalf("unexpected diagnostic %#v", diagnostics[0])
+	}
+}
+
+func TestAnalyzeAssignmentToMutableBinding(t *testing.T) {
+	src := `
+def run() Bool {
+	mut value = 1
+	value = value + 1
+	ret value == 2
+}
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", diagnostics)
 	}
 }

@@ -63,6 +63,8 @@ func stmtSpan(stmt Statement) Span {
 	switch s := stmt.(type) {
 	case *ValStmt:
 		return s.Span
+	case *AssignmentStmt:
+		return s.Span
 	case *IfStmt:
 		return s.Span
 	case *ForStmt:
@@ -401,6 +403,17 @@ func (p *Parser) parseExprOrMatchStmt() (Statement, error) {
 	target, err := p.parseExpression(0)
 	if err != nil {
 		return nil, err
+	}
+	if p.match(TokenAssign) {
+		value, err := p.parseExpression(0)
+		if err != nil {
+			return nil, err
+		}
+		return &AssignmentStmt{
+			Target: target,
+			Value:  value,
+			Span:   mergeSpans(exprSpan(target), exprSpan(value)),
+		}, nil
 	}
 	if p.match(TokenMatch) {
 		if _, err := p.consume(TokenLBrace, "expected '{' after 'match'"); err != nil {

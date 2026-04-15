@@ -9,7 +9,12 @@ type Resolver struct {
 	loopDepth   int
 }
 
-type scope map[string]parser.Span
+type symbol struct {
+	span    parser.Span
+	mutable bool
+}
+
+type scope map[string]symbol
 
 func Analyze(program *parser.Program) []Diagnostic {
 	resolver := &Resolver{
@@ -39,7 +44,7 @@ func (r *Resolver) resolveFunction(fn *parser.FunctionDecl) {
 	defer r.popScope()
 
 	for _, param := range fn.Parameters {
-		r.define(param.Name, param.Span, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
+		r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
 	}
 	r.resolveBlock(fn.Body)
 }
@@ -60,8 +65,10 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 			r.resolveExpr(value)
 		}
 		for _, binding := range s.Bindings {
-			r.define(binding.Name, binding.Span, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
+			r.defineMutable(binding.Name, binding.Span, binding.Mutable, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
 		}
+	case *parser.AssignmentStmt:
+		r.resolveAssignment(s)
 	case *parser.IfStmt:
 		r.resolveExpr(s.Condition)
 		r.resolveBlock(s.Then)
@@ -75,7 +82,7 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		r.pushScope()
 		for _, binding := range s.Bindings {
 			r.resolveExpr(binding.Iterable)
-			r.define(binding.Name, binding.Span, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
+			r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
 		}
 		if s.Body != nil {
 			r.loopDepth++
@@ -130,7 +137,7 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 	case *parser.LambdaExpr:
 		r.pushScope()
 		for _, param := range e.Parameters {
-			r.define(param.Name, param.Span, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
+			r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
 		}
 		r.resolveExpr(e.Body)
 		r.popScope()
@@ -144,23 +151,55 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 	}
 }
 
+func (r *Resolver) resolveAssignment(stmt *parser.AssignmentStmt) {
+	switch target := stmt.Target.(type) {
+	case *parser.Identifier:
+		symbol, ok := r.lookup(target.Name)
+		if !ok {
+			r.addDiagnostic("undefined_name", "undefined name '"+target.Name+"'", target.Span)
+		} else if !symbol.mutable {
+			r.addDiagnostic("assign_immutable", "cannot assign to immutable binding '"+target.Name+"'", target.Span)
+		}
+	case *parser.MemberExpr:
+		r.resolveExpr(target.Receiver)
+	default:
+		r.addDiagnostic("invalid_assignment_target", "invalid assignment target", stmt.Span)
+	}
+	r.resolveExpr(stmt.Value)
+}
+
 func (r *Resolver) define(name string, span parser.Span, code, message string) {
 	current := r.currentScope()
 	if previous, exists := current[name]; exists {
 		r.addDiagnostic(code, message, span)
-		r.addDiagnostic(code, "previous declaration of '"+name+"'", previous)
+		r.addDiagnostic(code, "previous declaration of '"+name+"'", previous.span)
 		return
 	}
-	current[name] = span
+	current[name] = symbol{span: span, mutable: true}
+}
+
+func (r *Resolver) defineMutable(name string, span parser.Span, mutable bool, code, message string) {
+	current := r.currentScope()
+	if previous, exists := current[name]; exists {
+		r.addDiagnostic(code, message, span)
+		r.addDiagnostic(code, "previous declaration of '"+name+"'", previous.span)
+		return
+	}
+	current[name] = symbol{span: span, mutable: mutable}
 }
 
 func (r *Resolver) isDefined(name string) bool {
+	_, ok := r.lookup(name)
+	return ok
+}
+
+func (r *Resolver) lookup(name string) (symbol, bool) {
 	for i := len(r.scopes) - 1; i >= 0; i-- {
-		if _, ok := r.scopes[i][name]; ok {
-			return true
+		if sym, ok := r.scopes[i][name]; ok {
+			return sym, true
 		}
 	}
-	return false
+	return symbol{}, false
 }
 
 func (r *Resolver) addDiagnostic(code, message string, span parser.Span) {
