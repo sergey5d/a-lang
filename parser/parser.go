@@ -359,6 +359,13 @@ func (p *Parser) parseExpression(minPrec int) (Expr, error) {
 }
 
 func (p *Parser) parsePrefix() (Expr, error) {
+	if p.isLambdaIdentifierStart() {
+		return p.parseLambdaIdentifier()
+	}
+	if p.check(TokenLParen) && p.isLambdaParenStart() {
+		return p.parseLambdaParen()
+	}
+
 	token := p.advance()
 	switch token.Type {
 	case TokenBang, TokenMinus:
@@ -410,6 +417,113 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		return &MapLiteral{}, nil
 	default:
 		return nil, fmt.Errorf("unexpected token %s", token.String())
+	}
+}
+
+func (p *Parser) parseLambdaIdentifier() (Expr, error) {
+	name, err := p.consume(TokenIdentifier, "expected lambda parameter")
+	if err != nil {
+		return nil, err
+	}
+	param := LambdaParameter{Name: name.Lexeme}
+	if p.check(TokenIdentifier) && p.checkNext(TokenArrow) {
+		param.Type = p.advance().Lexeme
+	}
+	if _, err := p.consume(TokenArrow, "expected '->' after lambda parameter"); err != nil {
+		return nil, err
+	}
+	body, err := p.parseExpression(0)
+	if err != nil {
+		return nil, err
+	}
+	return &LambdaExpr{Parameters: []LambdaParameter{param}, Body: body}, nil
+}
+
+func (p *Parser) parseLambdaParen() (Expr, error) {
+	params, err := p.parseLambdaParams()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.consume(TokenArrow, "expected '->' after lambda parameters"); err != nil {
+		return nil, err
+	}
+	body, err := p.parseExpression(0)
+	if err != nil {
+		return nil, err
+	}
+	return &LambdaExpr{Parameters: params, Body: body}, nil
+}
+
+func (p *Parser) parseLambdaParams() ([]LambdaParameter, error) {
+	if _, err := p.consume(TokenLParen, "expected '('"); err != nil {
+		return nil, err
+	}
+	var params []LambdaParameter
+	if !p.check(TokenRParen) {
+		for {
+			param, err := p.consume(TokenIdentifier, "expected lambda parameter")
+			if err != nil {
+				return nil, err
+			}
+			lambdaParam := LambdaParameter{Name: param.Lexeme}
+			if p.check(TokenIdentifier) {
+				lambdaParam.Type = p.advance().Lexeme
+			}
+			params = append(params, lambdaParam)
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+	}
+	if _, err := p.consume(TokenRParen, "expected ')' after lambda parameters"); err != nil {
+		return nil, err
+	}
+	return params, nil
+}
+
+func (p *Parser) isLambdaIdentifierStart() bool {
+	if !p.check(TokenIdentifier) {
+		return false
+	}
+	if p.checkNext(TokenArrow) {
+		return true
+	}
+	return p.checkNext(TokenIdentifier) && p.checkNth(2, TokenArrow)
+}
+
+func (p *Parser) isLambdaParenStart() bool {
+	if !p.check(TokenLParen) {
+		return false
+	}
+	i := p.pos + 1
+	if p.tokens[p.pos].Type != TokenLParen {
+		return false
+	}
+	if i >= len(p.tokens) {
+		return false
+	}
+	if p.tokens[i].Type == TokenRParen {
+		return i+1 < len(p.tokens) && p.tokens[i+1].Type == TokenArrow
+	}
+	for {
+		if i >= len(p.tokens) || p.tokens[i].Type != TokenIdentifier {
+			return false
+		}
+		i++
+		if i < len(p.tokens) && p.tokens[i].Type == TokenIdentifier {
+			i++
+		}
+		if i >= len(p.tokens) {
+			return false
+		}
+		if p.tokens[i].Type == TokenComma {
+			i++
+			continue
+		}
+		if p.tokens[i].Type == TokenRParen {
+			return i+1 < len(p.tokens) && p.tokens[i+1].Type == TokenArrow
+		}
+		return false
 	}
 }
 
@@ -490,6 +604,13 @@ func (p *Parser) checkNext(tt TokenType) bool {
 		return false
 	}
 	return p.tokens[p.pos+1].Type == tt
+}
+
+func (p *Parser) checkNth(offset int, tt TokenType) bool {
+	if p.pos+offset >= len(p.tokens) {
+		return false
+	}
+	return p.tokens[p.pos+offset].Type == tt
 }
 
 func (p *Parser) advance() Token {

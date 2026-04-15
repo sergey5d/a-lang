@@ -39,6 +39,7 @@ const (
 	TokenStar      TokenType = "*"
 	TokenSlash     TokenType = "/"
 	TokenPercent   TokenType = "%"
+	TokenArrow     TokenType = "->"
 	TokenLeftArrow TokenType = "<-"
 	TokenEqEq      TokenType = "=="
 	TokenBang      TokenType = "!"

@@ -145,6 +145,18 @@ type MemberExpr struct {
 
 func (*MemberExpr) exprNode() {}
 
+type LambdaParameter struct {
+	Name string `json:"name"`
+	Type string `json:"type,omitempty"`
+}
+
+type LambdaExpr struct {
+	Parameters []LambdaParameter `json:"parameters"`
+	Body       Expr              `json:"body"`
+}
+
+func (*LambdaExpr) exprNode() {}
+
 type BinaryExpr struct {
 	Left     Expr   `json:"left"`
 	Operator string `json:"operator"`
