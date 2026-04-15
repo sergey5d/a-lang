@@ -134,6 +134,10 @@ def ops(a Int, b Int) Bool {
 	let d = a <= b
 	let e = a > b
 	let f = a >= b
+	let yes = true
+	let no = false
+	let pi = 1.1
+	let whole = 1.
 	ret a == b || a != b && !(a < b)
 }
 `
@@ -144,6 +148,37 @@ def ops(a Int, b Int) Bool {
 	}
 	if len(program.Functions) != 1 {
 		t.Fatalf("expected 1 function, got %d", len(program.Functions))
+	}
+}
+
+func TestParseBoolAndFloatLiterals(t *testing.T) {
+	src := `
+def literals() Bool {
+	let yes = true
+	let no = false
+	let a = 1.1
+	let b = 1.
+	ret yes == true
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	if _, ok := fn.Body.Statements[0].(*ValStmt).Values[0].(*BoolLiteral); !ok {
+		t.Fatalf("expected true to parse as bool literal")
+	}
+	if _, ok := fn.Body.Statements[1].(*ValStmt).Values[0].(*BoolLiteral); !ok {
+		t.Fatalf("expected false to parse as bool literal")
+	}
+	if _, ok := fn.Body.Statements[2].(*ValStmt).Values[0].(*FloatLiteral); !ok {
+		t.Fatalf("expected 1.1 to parse as float literal")
+	}
+	if literal, ok := fn.Body.Statements[3].(*ValStmt).Values[0].(*FloatLiteral); !ok || literal.Value != "1." {
+		t.Fatalf("expected 1. to parse as float literal, got %#v", fn.Body.Statements[3].(*ValStmt).Values[0])
 	}
 }
 
@@ -188,6 +223,11 @@ func TestParseAssignmentStatement(t *testing.T) {
 def vars() Bool {
 	mut counter = 0
 	counter = counter + 1
+	counter += 2
+	counter -= 1
+	counter *= 3
+	counter /= 2
+	counter %= 2
 	ret counter == 1
 }
 `
@@ -204,6 +244,14 @@ def vars() Bool {
 	}
 	if _, ok := assign.Target.(*Identifier); !ok {
 		t.Fatalf("expected assignment target to be identifier, got %T", assign.Target)
+	}
+	if assign.Operator != "=" {
+		t.Fatalf("expected plain assignment operator, got %q", assign.Operator)
+	}
+
+	compound, ok := fn.Body.Statements[2].(*AssignmentStmt)
+	if !ok || compound.Operator != "+=" {
+		t.Fatalf("expected compound assignment with +=, got %#v", fn.Body.Statements[2])
 	}
 }
 

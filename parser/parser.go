@@ -36,6 +36,10 @@ func exprSpan(expr Expr) Span {
 		return e.Span
 	case *IntegerLiteral:
 		return e.Span
+	case *FloatLiteral:
+		return e.Span
+	case *BoolLiteral:
+		return e.Span
 	case *StringLiteral:
 		return e.Span
 	case *ListLiteral:
@@ -404,15 +408,17 @@ func (p *Parser) parseExprOrMatchStmt() (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	if p.match(TokenAssign) {
+	if isAssignmentOperator(p.peek().Type) {
+		operator := p.advance()
 		value, err := p.parseExpression(0)
 		if err != nil {
 			return nil, err
 		}
 		return &AssignmentStmt{
-			Target: target,
-			Value:  value,
-			Span:   mergeSpans(exprSpan(target), exprSpan(value)),
+			Target:   target,
+			Operator: operator.Lexeme,
+			Value:    value,
+			Span:     mergeSpans(exprSpan(target), exprSpan(value)),
 		}, nil
 	}
 	if p.match(TokenMatch) {
@@ -439,6 +445,15 @@ func (p *Parser) parseExprOrMatchStmt() (Statement, error) {
 		return stmt, nil
 	}
 	return &ExprStmt{Expr: target, Span: exprSpan(target)}, nil
+}
+
+func isAssignmentOperator(tt TokenType) bool {
+	switch tt {
+	case TokenAssign, TokenPlusEq, TokenMinusEq, TokenStarEq, TokenSlashEq, TokenPercentEq:
+		return true
+	default:
+		return false
+	}
 }
 
 func (p *Parser) parseMatchArm() (MatchArm, error) {
@@ -540,6 +555,10 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		return &Identifier{Name: token.Lexeme, Span: tokenSpan(token)}, nil
 	case TokenInteger:
 		return &IntegerLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, nil
+	case TokenFloat:
+		return &FloatLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, nil
+	case TokenBool:
+		return &BoolLiteral{Value: token.Lexeme == "true", Span: tokenSpan(token)}, nil
 	case TokenString:
 		return &StringLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, nil
 	case TokenUnder:

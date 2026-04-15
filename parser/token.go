@@ -10,7 +10,9 @@ const (
 	TokenEOF        TokenType = "EOF"
 	TokenIdentifier TokenType = "IDENT"
 	TokenInteger    TokenType = "INT"
+	TokenFloat      TokenType = "FLOAT"
 	TokenString     TokenType = "STRING"
+	TokenBool       TokenType = "BOOL"
 
 	TokenDef   TokenType = "DEF"
 	TokenLet   TokenType = "LET"
@@ -35,11 +37,18 @@ const (
 	TokenDot    TokenType = "."
 	TokenAssign TokenType = "="
 
-	TokenPlus      TokenType = "+"
-	TokenMinus     TokenType = "-"
-	TokenStar      TokenType = "*"
-	TokenSlash     TokenType = "/"
-	TokenPercent   TokenType = "%"
+	TokenPlus    TokenType = "+"
+	TokenMinus   TokenType = "-"
+	TokenStar    TokenType = "*"
+	TokenSlash   TokenType = "/"
+	TokenPercent TokenType = "%"
+
+	TokenPlusEq    TokenType = "+="
+	TokenMinusEq   TokenType = "-="
+	TokenStarEq    TokenType = "*="
+	TokenSlashEq   TokenType = "/="
+	TokenPercentEq TokenType = "%="
+
 	TokenArrow     TokenType = "->"
 	TokenLeftArrow TokenType = "<-"
 	TokenEqEq      TokenType = "=="
@@ -49,10 +58,12 @@ const (
 	TokenLTE       TokenType = "<="
 	TokenGT        TokenType = ">"
 	TokenGTE       TokenType = ">="
-	TokenAndAnd    TokenType = "&&"
-	TokenOrOr      TokenType = "||"
-	TokenRange     TokenType = ".."
-	TokenUnder     TokenType = "_"
+
+	TokenAndAnd TokenType = "&&"
+	TokenOrOr   TokenType = "||"
+
+	TokenRange TokenType = ".."
+	TokenUnder TokenType = "_"
 )
 
 var keywords = map[string]TokenType{
@@ -66,6 +77,8 @@ var keywords = map[string]TokenType{
 	"match": TokenMatch,
 	"ret":   TokenRet,
 	"break": TokenBreak,
+	"true":  TokenBool,
+	"false": TokenBool,
 }
 
 type Token struct {

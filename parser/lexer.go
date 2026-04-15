@@ -77,21 +77,36 @@ func (l *Lexer) nextToken() (Token, error) {
 		return l.token(TokenDot, ".", startLine, startColumn), nil
 	case '+':
 		l.advance()
+		if l.match('=') {
+			return l.token(TokenPlusEq, "+=", startLine, startColumn), nil
+		}
 		return l.token(TokenPlus, "+", startLine, startColumn), nil
 	case '-':
 		l.advance()
 		if l.match('>') {
 			return l.token(TokenArrow, "->", startLine, startColumn), nil
 		}
+		if l.match('=') {
+			return l.token(TokenMinusEq, "-=", startLine, startColumn), nil
+		}
 		return l.token(TokenMinus, "-", startLine, startColumn), nil
 	case '*':
 		l.advance()
+		if l.match('=') {
+			return l.token(TokenStarEq, "*=", startLine, startColumn), nil
+		}
 		return l.token(TokenStar, "*", startLine, startColumn), nil
 	case '/':
 		l.advance()
+		if l.match('=') {
+			return l.token(TokenSlashEq, "/=", startLine, startColumn), nil
+		}
 		return l.token(TokenSlash, "/", startLine, startColumn), nil
 	case '%':
 		l.advance()
+		if l.match('=') {
+			return l.token(TokenPercentEq, "%=", startLine, startColumn), nil
+		}
 		return l.token(TokenPercent, "%", startLine, startColumn), nil
 	case '!':
 		l.advance()
@@ -171,6 +186,16 @@ func (l *Lexer) lexNumber(line, column int) Token {
 	start := l.pos
 	for !l.isAtEnd() && isDigit(l.peek()) {
 		l.advance()
+	}
+	if !l.isAtEnd() && l.peek() == '.' {
+		nextPos := l.pos + 1
+		if nextPos >= len(l.input) || l.input[nextPos] != '.' {
+			l.advance()
+			for !l.isAtEnd() && isDigit(l.peek()) {
+				l.advance()
+			}
+			return l.token(TokenFloat, string(l.input[start:l.pos]), line, column)
+		}
 	}
 	return l.token(TokenInteger, string(l.input[start:l.pos]), line, column)
 }

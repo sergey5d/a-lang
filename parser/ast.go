@@ -58,9 +58,10 @@ type Binding struct {
 func (*ValStmt) statementNode() {}
 
 type AssignmentStmt struct {
-	Target Expr `json:"target"`
-	Value  Expr `json:"value"`
-	Span   Span `json:"span"`
+	Target   Expr   `json:"target"`
+	Operator string `json:"operator"`
+	Value    Expr   `json:"value"`
+	Span     Span   `json:"span"`
 }
 
 func (*AssignmentStmt) statementNode() {}
@@ -144,6 +145,20 @@ type IntegerLiteral struct {
 }
 
 func (*IntegerLiteral) exprNode() {}
+
+type FloatLiteral struct {
+	Value string `json:"value"`
+	Span  Span   `json:"span"`
+}
+
+func (*FloatLiteral) exprNode() {}
+
+type BoolLiteral struct {
+	Value bool `json:"value"`
+	Span  Span `json:"span"`
+}
+
+func (*BoolLiteral) exprNode() {}
 
 type StringLiteral struct {
 	Value string `json:"value"`

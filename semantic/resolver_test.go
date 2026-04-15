@@ -173,6 +173,11 @@ func TestAnalyzeAssignmentToMutableBinding(t *testing.T) {
 def run() Bool {
 	mut value = 1
 	value = value + 1
+	value += 1
+	value -= 1
+	value *= 2
+	value /= 2
+	value %= 2
 	ret value == 2
 }
 `
