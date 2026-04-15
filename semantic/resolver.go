@@ -335,7 +335,7 @@ func (r *Resolver) isTypeParameter(name string) bool {
 
 func builtinTypeArity(name string) (int, bool) {
 	switch name {
-	case "Int", "Int64", "Bool", "String", "Rune", "Float", "Float64", "int":
+	case "Int", "Int64", "Bool", "String", "Rune", "Float", "Float64":
 		return 0, true
 	case "List", "Set", "Array":
 		return 1, true
