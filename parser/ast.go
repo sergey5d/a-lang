@@ -146,21 +146,6 @@ type ForBinding struct {
 	Span     Span   `json:"span"`
 }
 
-type MatchStmt struct {
-	Target Expr       `json:"target"`
-	Arms   []MatchArm `json:"arms"`
-	Span   Span       `json:"span"`
-}
-
-func (*MatchStmt) statementNode() {}
-
-type MatchArm struct {
-	Pattern     Expr     `json:"pattern"`
-	PatternType *TypeRef `json:"patternType,omitempty"`
-	Result      Expr     `json:"result"`
-	Span        Span     `json:"span"`
-}
-
 type ReturnStmt struct {
 	Value Expr `json:"value"`
 	Span  Span `json:"span"`

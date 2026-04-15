@@ -82,8 +82,6 @@ func stmtSpan(stmt Statement) Span {
 		return s.Span
 	case *ForStmt:
 		return s.Span
-	case *MatchStmt:
-		return s.Span
 	case *ReturnStmt:
 		return s.Span
 	case *BreakStmt:
@@ -420,7 +418,7 @@ func (p *Parser) parseStatement() (Statement, error) {
 		token := p.advance()
 		return &BreakStmt{Span: tokenSpan(token)}, nil
 	default:
-		return p.parseExprOrMatchStmt()
+		return p.parseExprStmt()
 	}
 }
 
@@ -631,7 +629,7 @@ func (p *Parser) parseReturnStmt() (Statement, error) {
 	return &ReturnStmt{Value: value, Span: mergeSpans(tokenSpan(start), exprSpan(value))}, nil
 }
 
-func (p *Parser) parseExprOrMatchStmt() (Statement, error) {
+func (p *Parser) parseExprStmt() (Statement, error) {
 	target, err := p.parseExpression(0)
 	if err != nil {
 		return nil, err
@@ -649,29 +647,6 @@ func (p *Parser) parseExprOrMatchStmt() (Statement, error) {
 			Span:     mergeSpans(exprSpan(target), exprSpan(value)),
 		}, nil
 	}
-	if p.match(TokenMatch) {
-		if _, err := p.consume(TokenLBrace, "expected '{' after 'match'"); err != nil {
-			return nil, err
-		}
-		var arms []MatchArm
-		for !p.check(TokenRBrace) && !p.isAtEnd() {
-			arm, err := p.parseMatchArm()
-			if err != nil {
-				return nil, err
-			}
-			arms = append(arms, arm)
-		}
-		if _, err := p.consume(TokenRBrace, "expected '}' after match arms"); err != nil {
-			return nil, err
-		}
-		stmt := &MatchStmt{Target: target, Arms: arms}
-		if len(arms) > 0 {
-			stmt.Span = mergeSpans(exprSpan(target), arms[len(arms)-1].Span)
-		} else {
-			stmt.Span = exprSpan(target)
-		}
-		return stmt, nil
-	}
 	return &ExprStmt{Expr: target, Span: exprSpan(target)}, nil
 }
 
@@ -682,37 +657,6 @@ func isAssignmentOperator(tt TokenType) bool {
 	default:
 		return false
 	}
-}
-
-func (p *Parser) parseMatchArm() (MatchArm, error) {
-	// Match arms use ':' as a separator, so the pattern must stop before it.
-	pattern, err := p.parseExpression(precedence(TokenColon) + 1)
-	if err != nil {
-		return MatchArm{}, err
-	}
-
-	var patternType *TypeRef
-	if p.check(TokenIdentifier) && p.typeRefFollowedBy(TokenColon) {
-		typeRef, err := p.parseTypeRef()
-		if err != nil {
-			return MatchArm{}, err
-		}
-		patternType = typeRef
-	}
-
-	if _, err := p.consume(TokenColon, "expected ':' after match pattern"); err != nil {
-		return MatchArm{}, err
-	}
-	result, err := p.parseExpression(0)
-	if err != nil {
-		return MatchArm{}, err
-	}
-	return MatchArm{
-		Pattern:     pattern,
-		PatternType: patternType,
-		Result:      result,
-		Span:        mergeSpans(exprSpan(pattern), exprSpan(result)),
-	}, nil
 }
 
 func (p *Parser) parseExpression(minPrec int) (Expr, error) {

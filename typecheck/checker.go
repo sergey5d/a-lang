@@ -282,12 +282,6 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			c.checkBlockStatements(s.YieldBody.Statements)
 		}
 		c.popScope()
-	case *parser.MatchStmt:
-		c.checkExpr(s.Target)
-		for _, arm := range s.Arms {
-			c.checkExpr(arm.Pattern)
-			c.checkExpr(arm.Result)
-		}
 	case *parser.ReturnStmt:
 		valueType := c.checkExpr(s.Value)
 		if len(c.returnTypes) == 0 {

@@ -42,12 +42,6 @@ def doSomeWork(a Int, b Int) Bool {
 		a + c
 	}
 
-	a match {
-		list List: list.append(5)
-		5 : a + 7
-		[0..100].contains(_): a * 5
-	}
-
 	return a == 5
 }
 `
@@ -82,8 +76,8 @@ func TestParseSampleProgram(t *testing.T) {
 	if fn.Name != "doSomeWork" {
 		t.Fatalf("unexpected function name %q", fn.Name)
 	}
-	if got := len(fn.Body.Statements); got != 17 {
-		t.Fatalf("expected 17 statements in body, got %d", got)
+	if got := len(fn.Body.Statements); got != 16 {
+		t.Fatalf("expected 16 statements in body, got %d", got)
 	}
 	if _, ok := fn.Body.Statements[len(fn.Body.Statements)-1].(*ReturnStmt); !ok {
 		t.Fatalf("expected final statement to be return, got %T", fn.Body.Statements[len(fn.Body.Statements)-1])

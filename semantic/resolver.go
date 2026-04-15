@@ -190,13 +190,6 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 			r.resolveBlockStatements(s.YieldBody.Statements)
 		}
 		r.popScope()
-	case *parser.MatchStmt:
-		r.resolveExpr(s.Target)
-		for _, arm := range s.Arms {
-			r.resolveExpr(arm.Pattern)
-			r.resolveTypeRef(arm.PatternType)
-			r.resolveExpr(arm.Result)
-		}
 	case *parser.ReturnStmt:
 		r.resolveExpr(s.Value)
 	case *parser.BreakStmt:
