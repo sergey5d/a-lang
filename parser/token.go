@@ -11,11 +11,11 @@ const (
 	TokenString     TokenType = "STRING"
 
 	TokenDef   TokenType = "DEF"
-	TokenVal   TokenType = "VAL"
+	TokenLet   TokenType = "LET"
+	TokenMut   TokenType = "MUT"
 	TokenIf    TokenType = "IF"
 	TokenElse  TokenType = "ELSE"
 	TokenFor   TokenType = "FOR"
-	TokenFrom  TokenType = "FROM"
 	TokenDo    TokenType = "DO"
 	TokenYield TokenType = "YIELD"
 	TokenMatch TokenType = "MATCH"
@@ -28,37 +28,38 @@ const (
 	TokenRBrace   TokenType = "}"
 	TokenLBracket TokenType = "["
 	TokenRBracket TokenType = "]"
-	TokenComma    TokenType = ","
-	TokenColon    TokenType = ":"
-	TokenDot      TokenType = "."
-	TokenAssign   TokenType = "="
 
-	TokenPlus    TokenType = "+"
-	TokenMinus   TokenType = "-"
-	TokenStar    TokenType = "*"
-	TokenSlash   TokenType = "/"
-	TokenPercent TokenType = "%"
-	TokenArrow   TokenType = "->"
-	TokenEqEq    TokenType = "=="
-	TokenBang    TokenType = "!"
-	TokenBangEq  TokenType = "!="
-	TokenLT      TokenType = "<"
-	TokenLTE     TokenType = "<="
-	TokenGT      TokenType = ">"
-	TokenGTE     TokenType = ">="
-	TokenAndAnd  TokenType = "&&"
-	TokenOrOr    TokenType = "||"
-	TokenRange   TokenType = ".."
-	TokenUnder   TokenType = "_"
+	TokenComma  TokenType = ","
+	TokenColon  TokenType = ":"
+	TokenDot    TokenType = "."
+	TokenAssign TokenType = "="
+
+	TokenPlus      TokenType = "+"
+	TokenMinus     TokenType = "-"
+	TokenStar      TokenType = "*"
+	TokenSlash     TokenType = "/"
+	TokenPercent   TokenType = "%"
+	TokenLeftArrow TokenType = "<-"
+	TokenEqEq      TokenType = "=="
+	TokenBang      TokenType = "!"
+	TokenBangEq    TokenType = "!="
+	TokenLT        TokenType = "<"
+	TokenLTE       TokenType = "<="
+	TokenGT        TokenType = ">"
+	TokenGTE       TokenType = ">="
+	TokenAndAnd    TokenType = "&&"
+	TokenOrOr      TokenType = "||"
+	TokenRange     TokenType = ".."
+	TokenUnder     TokenType = "_"
 )
 
 var keywords = map[string]TokenType{
 	"def":   TokenDef,
-	"val":   TokenVal,
+	"let":   TokenLet,
+	"mut":   TokenMut,
 	"if":    TokenIf,
 	"else":  TokenElse,
 	"for":   TokenFor,
-	"from":  TokenFrom,
 	"do":    TokenDo,
 	"yield": TokenYield,
 	"match": TokenMatch,

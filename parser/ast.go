@@ -34,8 +34,9 @@ type ValStmt struct {
 }
 
 type Binding struct {
-	Name string `json:"name"`
-	Type string `json:"type,omitempty"`
+	Name    string `json:"name"`
+	Type    string `json:"type,omitempty"`
+	Mutable bool   `json:"mutable,omitempty"`
 }
 
 func (*ValStmt) statementNode() {}

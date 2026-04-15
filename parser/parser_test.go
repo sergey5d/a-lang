@@ -5,18 +5,18 @@ import "testing"
 const sampleProgram = `
 def doSomeWork(a Int, b Int) Bool {
 
-	val list = [a, b, c]
-	val set = Set()
-	val map = {}
-	val map2 = Map(a : b)
-	val tuple = Set(a, b)
-	val tuple2 = a -> b -> c
-	val tuple21 = a : b : c
-	val array = Array(1, 2, 3)
-	val string String = "xxx"
-	val a int = 65
+	let list = [a, b, c]
+	let set = Set()
+	let map = {}
+	let map2 = Map(a : b)
+	let tuple = Set(a, b)
+	let tuple2 = a : b : c
+	let tuple21 = a : b : c
+	let array = Array(1, 2, 3)
+	let string String = "xxx"
+	let a int = 65
 
-	val a Int, b Int64 = 1, 3
+	let a Int, b Int64 = 1, 3
 
 	if a == b {
 
@@ -24,20 +24,20 @@ def doSomeWork(a Int, b Int) Bool {
 
 	}
 
-	for a from list {
+	for a <- list {
 
 		if a == 7 {
 			break
 		}
 	}
 
-	for a from [1..100] {
+	for a <- [1..100] {
 
 	}
 
 	do (
-		a from list,
-		c from map
+		a <- list,
+		c <- map
 	) yield {
 		a + c
 	}
@@ -75,13 +75,13 @@ func TestParseSampleProgram(t *testing.T) {
 func TestParseExtendedOperators(t *testing.T) {
 	src := `
 def ops(a Int, b Int) Bool {
-	val x = a - b / 2 * 3 % 5
-	val y = !a == b
-	val z = a != b
-	val c = a < b
-	val d = a <= b
-	val e = a > b
-	val f = a >= b
+	let x = a - b / 2 * 3 % 5
+	let y = !a == b
+	let z = a != b
+	let c = a < b
+	let d = a <= b
+	let e = a > b
+	let f = a >= b
 	ret a == b || a != b && !(a < b)
 }
 `
@@ -92,5 +92,40 @@ def ops(a Int, b Int) Bool {
 	}
 	if len(program.Functions) != 1 {
 		t.Fatalf("expected 1 function, got %d", len(program.Functions))
+	}
+}
+
+func TestParseMutableBindings(t *testing.T) {
+	src := `
+def vars() Bool {
+	let mut count Int = 1
+	let mut left Int, right Int = 1, 2
+	ret count == right
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	first, ok := fn.Body.Statements[0].(*ValStmt)
+	if !ok {
+		t.Fatalf("expected first statement to be let binding, got %T", fn.Body.Statements[0])
+	}
+	if !first.Bindings[0].Mutable {
+		t.Fatalf("expected first binding to be mutable")
+	}
+
+	second, ok := fn.Body.Statements[1].(*ValStmt)
+	if !ok {
+		t.Fatalf("expected second statement to be let binding, got %T", fn.Body.Statements[1])
+	}
+	if !second.Bindings[0].Mutable {
+		t.Fatalf("expected first binding in second statement to be mutable")
+	}
+	if second.Bindings[1].Mutable {
+		t.Fatalf("expected second binding in second statement to be immutable")
 	}
 }

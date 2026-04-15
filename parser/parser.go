@@ -100,8 +100,8 @@ func (p *Parser) parseBlock() (*BlockStmt, error) {
 
 func (p *Parser) parseStatement() (Statement, error) {
 	switch p.peek().Type {
-	case TokenVal:
-		return p.parseValStmt()
+	case TokenLet:
+		return p.parseLetStmt()
 	case TokenIf:
 		return p.parseIfStmt()
 	case TokenFor:
@@ -118,16 +118,21 @@ func (p *Parser) parseStatement() (Statement, error) {
 	}
 }
 
-func (p *Parser) parseValStmt() (Statement, error) {
+func (p *Parser) parseLetStmt() (Statement, error) {
 	p.advance()
 
 	var bindings []Binding
 	for {
+		binding := Binding{}
+		if p.match(TokenMut) {
+			binding.Mutable = true
+		}
+
 		name, err := p.consume(TokenIdentifier, "expected binding name")
 		if err != nil {
 			return nil, err
 		}
-		binding := Binding{Name: name.Lexeme}
+		binding.Name = name.Lexeme
 		if p.check(TokenIdentifier) {
 			binding.Type = p.advance().Lexeme
 		}
@@ -193,7 +198,7 @@ func (p *Parser) parseForStmt() (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := p.consume(TokenFrom, "expected 'from'"); err != nil {
+	if _, err := p.consume(TokenLeftArrow, "expected '<-'"); err != nil {
 		return nil, err
 	}
 	iterable, err := p.parseExpression(0)
@@ -219,7 +224,7 @@ func (p *Parser) parseDoYieldStmt() (Statement, error) {
 			if err != nil {
 				return nil, err
 			}
-			if _, err := p.consume(TokenFrom, "expected 'from'"); err != nil {
+			if _, err := p.consume(TokenLeftArrow, "expected '<-'"); err != nil {
 				return nil, err
 			}
 			iterable, err := p.parseExpression(0)
@@ -438,19 +443,17 @@ func precedence(t TokenType) int {
 		return 5
 	case TokenStar, TokenSlash, TokenPercent:
 		return 6
-	case TokenArrow:
-		return 7
 	case TokenColon:
-		return 8
+		return 7
 	case TokenRange:
-		return 9
+		return 8
 	default:
 		return -1
 	}
 }
 
 func unaryPrecedence() int {
-	return 10
+	return 9
 }
 
 func (p *Parser) consume(tt TokenType, message string) (Token, error) {

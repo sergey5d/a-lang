@@ -74,9 +74,6 @@ func (l *Lexer) nextToken() (Token, error) {
 		return Token{Type: TokenPlus, Lexeme: "+", Line: startLine, Column: startColumn}, nil
 	case '-':
 		l.advance()
-		if l.match('>') {
-			return Token{Type: TokenArrow, Lexeme: "->", Line: startLine, Column: startColumn}, nil
-		}
 		return Token{Type: TokenMinus, Lexeme: "-", Line: startLine, Column: startColumn}, nil
 	case '*':
 		l.advance()
@@ -104,6 +101,9 @@ func (l *Lexer) nextToken() (Token, error) {
 		return Token{Type: TokenAssign, Lexeme: "=", Line: startLine, Column: startColumn}, nil
 	case '<':
 		l.advance()
+		if l.match('-') {
+			return Token{Type: TokenLeftArrow, Lexeme: "<-", Line: startLine, Column: startColumn}, nil
+		}
 		if l.match('=') {
 			return Token{Type: TokenLTE, Lexeme: "<=", Line: startLine, Column: startColumn}, nil
 		}
