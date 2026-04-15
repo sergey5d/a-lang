@@ -414,7 +414,7 @@ func (p *Parser) parseStatement() (Statement, error) {
 		return p.parseIfStmt()
 	case TokenFor:
 		return p.parseForStmt()
-	case TokenRet:
+	case TokenReturn:
 		return p.parseReturnStmt()
 	case TokenBreak:
 		token := p.advance()

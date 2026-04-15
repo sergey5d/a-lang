@@ -49,11 +49,11 @@ def run(input Int) Bool {
 	}
 
 	let mapper = (x Int) -> x + value
-	ret mapper(input) == helper(value)
+	return mapper(input) == helper(value)
 }
 
 def helper(x Int) Int {
-	ret x
+	return x
 }
 `
 
@@ -66,7 +66,7 @@ def helper(x Int) Int {
 func TestAnalyzeUndefinedName(t *testing.T) {
 	src := `
 def run() Bool {
-	ret missing == 1
+	return missing == 1
 }
 `
 
@@ -84,7 +84,7 @@ func TestAnalyzeDuplicateBinding(t *testing.T) {
 def run() Bool {
 	let value = 1
 	let value = 2
-	ret value == 2
+	return value == 2
 }
 `
 
@@ -100,7 +100,7 @@ def run() Bool {
 func TestAnalyzeDuplicateParameter(t *testing.T) {
 	src := `
 def run(value Int, value Int) Bool {
-	ret value == 1
+	return value == 1
 }
 `
 
@@ -117,7 +117,7 @@ func TestAnalyzeBreakOutsideLoop(t *testing.T) {
 	src := `
 def run() Bool {
 	break
-	ret 1 == 1
+	return 1 == 1
 }
 `
 
@@ -133,11 +133,11 @@ def run() Bool {
 func TestAnalyzeDuplicateFunction(t *testing.T) {
 	src := `
 def run() Bool {
-	ret 1 == 1
+	return 1 == 1
 }
 
 def run() Bool {
-	ret 1 == 1
+	return 1 == 1
 }
 `
 
@@ -155,7 +155,7 @@ func TestAnalyzeAssignmentToImmutableBinding(t *testing.T) {
 def run() Bool {
 	let value = 1
 	value = 2
-	ret value == 2
+	return value == 2
 }
 `
 
@@ -178,7 +178,7 @@ def run() Bool {
 	value *= 2
 	value /= 2
 	value %= 2
-	ret value == 2
+	return value == 2
 }
 `
 
@@ -206,7 +206,7 @@ class Box[T] implements Mapper[T, Stringable] {
 	}
 
 	def map(value T) Stringable {
-		ret this
+		return this
 	}
 }
 
@@ -220,11 +220,11 @@ class SolidWork implements Stringable {
 	}
 
 	def toString() String {
-		ret this.buildLabel()
+		return this.buildLabel()
 	}
 
 	private def buildLabel() String {
-		ret this.a.toString()
+		return this.a.toString()
 	}
 }
 
@@ -247,7 +247,7 @@ def useStore(input Map[String, List[Int]]) List[Map[String, Int]] {
 	let store Store[Int] = Store(input)
 	let bad Unknown[Int] = store
 	let wrong List[Int, String] = []
-	ret [Map()]
+	return [Map()]
 }
 `
 

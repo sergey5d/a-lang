@@ -27,7 +27,7 @@ const (
 	TokenFor        TokenType = "FOR"
 	TokenYield      TokenType = "YIELD"
 	TokenMatch      TokenType = "MATCH"
-	TokenRet        TokenType = "RET"
+	TokenReturn     TokenType = "RETURN"
 	TokenBreak      TokenType = "BREAK"
 
 	TokenLParen   TokenType = "("
@@ -84,7 +84,7 @@ var keywords = map[string]TokenType{
 	"for":        TokenFor,
 	"yield":      TokenYield,
 	"match":      TokenMatch,
-	"ret":        TokenRet,
+	"return":     TokenReturn,
 	"break":      TokenBreak,
 	"true":       TokenBool,
 	"false":      TokenBool,

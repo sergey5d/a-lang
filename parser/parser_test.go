@@ -48,7 +48,7 @@ def doSomeWork(a Int, b Int) Bool {
 		[0..100].contains(_): a * 5
 	}
 
-	ret a == 5
+	return a == 5
 }
 `
 
@@ -116,7 +116,7 @@ def loops(input Int, value Int) Bool {
 		x + y
 	}
 
-	ret value == input
+	return value == input
 }
 `
 
@@ -156,7 +156,7 @@ def ops(a Int, b Int) Bool {
 	let no = false
 	let pi = 1.1
 	let whole = 1.
-	ret a == b || a != b && !(a < b)
+	return a == b || a != b && !(a < b)
 }
 `
 
@@ -178,7 +178,7 @@ def literals() Bool {
 	let b = 1.
 	let c = 'x'
 	let d = '\n'
-	ret yes == true
+	return yes == true
 }
 `
 
@@ -226,7 +226,7 @@ class Box[T] implements Mapper[T, Stringable] {
 	}
 
 	def map(key T) Stringable {
-		ret this
+		return this
 	}
 }
 
@@ -310,8 +310,8 @@ let solidWork = SolidWork(1, false)
 
 func TestRejectInvalidRuneLiterals(t *testing.T) {
 	cases := []string{
-		"def bad() Bool { let a = '' ret true }",
-		"def bad() Bool { let a = 'ab' ret true }",
+		"def bad() Bool { let a = '' return true }",
+		"def bad() Bool { let a = 'ab' return true }",
 	}
 
 	for _, src := range cases {
@@ -327,7 +327,7 @@ def vars() Bool {
 	mut count Int = 1
 	mut left Int, right Int = 1, 2
 	count = count + 1
-	ret count == right
+	return count == right
 }
 `
 
@@ -367,7 +367,7 @@ def vars() Bool {
 	counter *= 3
 	counter /= 2
 	counter %= 2
-	ret counter == 1
+	return counter == 1
 }
 `
 
@@ -399,7 +399,7 @@ func TestParseImmutableBindings(t *testing.T) {
 def vars() Bool {
 	let count Int = 1
 	let left Int, right Int = 1, 2
-	ret count == right
+	return count == right
 }
 `
 
@@ -425,7 +425,7 @@ func TestParseUntypedBindings(t *testing.T) {
 def vars() Bool {
 	let a = "some string"
 	mut counter = 0
-	ret counter == 0
+	return counter == 0
 }
 `
 
@@ -457,7 +457,7 @@ func TestParseFunctionInvocationBinding(t *testing.T) {
 	src := `
 def vars(b Int) Bool {
 	let a = function(b)
-	ret a == b
+	return a == b
 }
 `
 
@@ -488,7 +488,7 @@ def vars() Bool {
 	let b = Set(1).map(key -> key.toString())
 	let c = Map(1 : 2).map((key Int, value Int) -> key + value)
 	let d = Set(1).map(key Int -> key.toString())
-	ret 1 == 1
+	return 1 == 1
 }
 `
 
@@ -567,7 +567,7 @@ class Store[T] {
 
 def wrap(input Map[String, List[Int]]) List[Map[String, Int]] {
 	let cache Map[String, List[Int]] = input
-	ret [cache]
+	return [cache]
 }
 `
 
@@ -592,11 +592,11 @@ func TestParseElseIf(t *testing.T) {
 	src := `
 def classify(a Int) Bool {
 	if a == 1 {
-		ret a == 1
+		return a == 1
 	} else if a == 2 {
-		ret a == 2
+		return a == 2
 	} else {
-		ret a == 3
+		return a == 3
 	}
 }
 `
@@ -623,7 +623,7 @@ func TestAttachSourceSpans(t *testing.T) {
 	src := `
 def sample(a Int) Bool {
 	let value = function(a)
-	ret value == a
+	return value == a
 }
 `
 
