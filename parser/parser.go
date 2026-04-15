@@ -101,7 +101,9 @@ func (p *Parser) parseBlock() (*BlockStmt, error) {
 func (p *Parser) parseStatement() (Statement, error) {
 	switch p.peek().Type {
 	case TokenLet:
-		return p.parseLetStmt()
+		return p.parseBindingStmt(false)
+	case TokenMut:
+		return p.parseBindingStmt(true)
 	case TokenIf:
 		return p.parseIfStmt()
 	case TokenFor:
@@ -118,15 +120,12 @@ func (p *Parser) parseStatement() (Statement, error) {
 	}
 }
 
-func (p *Parser) parseLetStmt() (Statement, error) {
+func (p *Parser) parseBindingStmt(mutable bool) (Statement, error) {
 	p.advance()
 
 	var bindings []Binding
 	for {
-		binding := Binding{}
-		if p.match(TokenMut) {
-			binding.Mutable = true
-		}
+		binding := Binding{Mutable: mutable}
 
 		name, err := p.consume(TokenIdentifier, "expected binding name")
 		if err != nil {
@@ -183,6 +182,14 @@ func (p *Parser) parseIfStmt() (Statement, error) {
 	}
 	stmt := &IfStmt{Condition: condition, Then: thenBlock}
 	if p.match(TokenElse) {
+		if p.check(TokenIf) {
+			elseIfStmt, err := p.parseIfStmt()
+			if err != nil {
+				return nil, err
+			}
+			stmt.ElseIf = elseIfStmt.(*IfStmt)
+			return stmt, nil
+		}
 		elseBlock, err := p.parseBlock()
 		if err != nil {
 			return nil, err

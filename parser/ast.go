@@ -44,6 +44,7 @@ func (*ValStmt) statementNode() {}
 type IfStmt struct {
 	Condition Expr       `json:"condition"`
 	Then      *BlockStmt `json:"then"`
+	ElseIf    *IfStmt    `json:"elseIf,omitempty"`
 	Else      *BlockStmt `json:"else,omitempty"`
 }
 

@@ -98,8 +98,8 @@ def ops(a Int, b Int) Bool {
 func TestParseMutableBindings(t *testing.T) {
 	src := `
 def vars() Bool {
-	let mut count Int = 1
-	let mut left Int, right Int = 1, 2
+	mut count Int = 1
+	mut left Int, right Int = 1, 2
 	ret count == right
 }
 `
@@ -112,7 +112,7 @@ def vars() Bool {
 	fn := program.Functions[0]
 	first, ok := fn.Body.Statements[0].(*ValStmt)
 	if !ok {
-		t.Fatalf("expected first statement to be let binding, got %T", fn.Body.Statements[0])
+		t.Fatalf("expected first statement to be binding, got %T", fn.Body.Statements[0])
 	}
 	if !first.Bindings[0].Mutable {
 		t.Fatalf("expected first binding to be mutable")
@@ -120,12 +120,69 @@ def vars() Bool {
 
 	second, ok := fn.Body.Statements[1].(*ValStmt)
 	if !ok {
-		t.Fatalf("expected second statement to be let binding, got %T", fn.Body.Statements[1])
+		t.Fatalf("expected second statement to be binding, got %T", fn.Body.Statements[1])
 	}
 	if !second.Bindings[0].Mutable {
 		t.Fatalf("expected first binding in second statement to be mutable")
 	}
-	if second.Bindings[1].Mutable {
-		t.Fatalf("expected second binding in second statement to be immutable")
+	if !second.Bindings[1].Mutable {
+		t.Fatalf("expected second binding in second statement to be mutable")
+	}
+}
+
+func TestParseImmutableBindings(t *testing.T) {
+	src := `
+def vars() Bool {
+	let count Int = 1
+	let left Int, right Int = 1, 2
+	ret count == right
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	first := fn.Body.Statements[0].(*ValStmt)
+	if first.Bindings[0].Mutable {
+		t.Fatalf("expected let binding to be immutable")
+	}
+
+	second := fn.Body.Statements[1].(*ValStmt)
+	if second.Bindings[0].Mutable || second.Bindings[1].Mutable {
+		t.Fatalf("expected let bindings to be immutable")
+	}
+}
+
+func TestParseElseIf(t *testing.T) {
+	src := `
+def classify(a Int) Bool {
+	if a == 1 {
+		ret a == 1
+	} else if a == 2 {
+		ret a == 2
+	} else {
+		ret a == 3
+	}
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	ifStmt, ok := fn.Body.Statements[0].(*IfStmt)
+	if !ok {
+		t.Fatalf("expected first statement to be if, got %T", fn.Body.Statements[0])
+	}
+	if ifStmt.ElseIf == nil {
+		t.Fatalf("expected else-if branch to be present")
+	}
+	if ifStmt.ElseIf.Else == nil {
+		t.Fatalf("expected final else block on else-if chain")
 	}
 }
