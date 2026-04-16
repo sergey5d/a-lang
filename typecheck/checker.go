@@ -49,13 +49,15 @@ type Result struct {
 }
 
 type Checker struct {
-	diagnostics []semantic.Diagnostic
-	scopes      []scope
-	typeScopes  []typeScope
-	functions   map[string]Signature
-	classes     map[string]classInfo
-	interfaces  map[string]interfaceInfo
-	returnTypes []*Type
+	diagnostics   []semantic.Diagnostic
+	scopes        []scope
+	typeScopes    []typeScope
+	functions     map[string]Signature
+	classes       map[string]classInfo
+	interfaces    map[string]interfaceInfo
+	returnTypes   []*Type
+	currentClass  *parser.ClassDecl
+	currentMethod *parser.MethodDecl
 }
 
 type typeLookup interface {
@@ -159,14 +161,20 @@ func (c *Checker) checkMethod(method *parser.MethodDecl, owner *parser.ClassDecl
 	c.pushScope()
 	defer c.popScope()
 
+	prevClass := c.currentClass
+	prevMethod := c.currentMethod
+	c.currentClass = owner
+	c.currentMethod = method
+	defer func() {
+		c.currentClass = prevClass
+		c.currentMethod = prevMethod
+	}()
+
 	classArgs := make([]*Type, len(owner.TypeParameters))
 	for i, param := range owner.TypeParameters {
 		classArgs[i] = &Type{Kind: TypeParam, Name: param.Name}
 	}
 	c.define("this", &Type{Kind: TypeClass, Name: owner.Name, Args: classArgs}, false)
-	for _, field := range owner.Fields {
-		c.define(field.Name, c.resolveDeclaredType(field.Type), field.Mutable)
-	}
 
 	expectedReturn := unknownType
 	if !method.Constructor {
@@ -452,9 +460,17 @@ func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*
 		}
 		subst := c.substForDecl(info.decl.TypeParameters, receiver.Args)
 		if field, ok := info.fields[name]; ok {
+			if field.decl.Private && !c.canAccessPrivate(info.decl) {
+				c.addDiagnostic("private_access", "cannot access private field '"+name+"' outside class '"+info.decl.Name+"'", span)
+				return unknownType, true
+			}
 			return c.instantiateTypeRef(field.decl.Type, subst), true
 		}
 		if method, ok := info.methods[name]; ok {
+			if method.decl.Private && !c.canAccessPrivate(info.decl) {
+				c.addDiagnostic("private_access", "cannot access private method '"+name+"' outside class '"+info.decl.Name+"'", span)
+				return unknownType, true
+			}
 			sig := c.instantiateMethodSignature(method.decl, info.decl, subst)
 			return functionType(name, sig), true
 		}
@@ -526,12 +542,72 @@ func (c *Checker) checkAssignmentTarget(target parser.Expr, span parser.Span) (*
 		}
 		return b.typ, b.mutable
 	case *parser.MemberExpr:
-		memberType := c.checkMemberExpr(t)
-		return memberType, true
+		receiverType := c.checkExpr(t.Receiver)
+		memberType, mutable, ok := c.checkFieldAssignment(t, receiverType)
+		if ok {
+			return memberType, mutable
+		}
+		return unknownType, false
 	default:
 		c.addDiagnostic("invalid_assignment_target", "invalid assignment target", span)
 		return unknownType, false
 	}
+}
+
+func (c *Checker) checkFieldAssignment(expr *parser.MemberExpr, receiverType *Type) (*Type, bool, bool) {
+	if isUnknown(receiverType) {
+		return unknownType, false, true
+	}
+	if receiverType.Kind != TypeClass {
+		c.addDiagnostic("invalid_assignment_target", "member assignment expects class instance", expr.Span)
+		return unknownType, false, true
+	}
+	info, ok := c.classes[receiverType.Name]
+	if !ok {
+		c.addDiagnostic("invalid_assignment_target", "member assignment expects class instance", expr.Span)
+		return unknownType, false, true
+	}
+	field, ok := info.fields[expr.Name]
+	if !ok {
+		if _, hasMethod := info.methods[expr.Name]; hasMethod {
+			if info.methods[expr.Name].decl.Private && !c.canAccessPrivate(info.decl) {
+				c.addDiagnostic("private_access", "cannot access private method '"+expr.Name+"' outside class '"+info.decl.Name+"'", expr.Span)
+				return unknownType, false, true
+			}
+			c.addDiagnostic("invalid_assignment_target", "cannot assign to method '"+expr.Name+"'", expr.Span)
+			return unknownType, false, true
+		}
+		c.addDiagnostic("unknown_member", "unknown member '"+expr.Name+"'", expr.Span)
+		return unknownType, false, true
+	}
+	if field.decl.Private && !c.canAccessPrivate(info.decl) {
+		c.addDiagnostic("private_access", "cannot access private field '"+expr.Name+"' outside class '"+info.decl.Name+"'", expr.Span)
+		return unknownType, false, true
+	}
+	fieldType := c.instantiateTypeRef(field.decl.Type, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
+	if field.decl.Mutable {
+		return fieldType, true, true
+	}
+	if c.canAssignImmutableField(expr, info.decl) {
+		return fieldType, true, true
+	}
+	c.addDiagnostic("assign_immutable", "cannot assign to immutable field '"+expr.Name+"' outside init", expr.Span)
+	return fieldType, false, true
+}
+
+func (c *Checker) canAssignImmutableField(expr *parser.MemberExpr, owner *parser.ClassDecl) bool {
+	if c.currentClass == nil || c.currentMethod == nil || !c.currentMethod.Constructor {
+		return false
+	}
+	if c.currentClass.Name != owner.Name {
+		return false
+	}
+	ident, ok := expr.Receiver.(*parser.Identifier)
+	return ok && ident.Name == "this"
+}
+
+func (c *Checker) canAccessPrivate(owner *parser.ClassDecl) bool {
+	return c.currentClass != nil && c.currentClass.Name == owner.Name
 }
 
 func (c *Checker) resolveDeclaredType(ref *parser.TypeRef) *Type {

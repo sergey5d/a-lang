@@ -162,3 +162,107 @@ class Bad implements Stringable {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }
+
+func TestAnalyzeImmutableFieldAssignmentInInit(t *testing.T) {
+	src := `
+class Counter {
+	private let count Int
+
+	def init(count Int) {
+		this.count = count
+	}
+
+	def read() Int {
+		return this.count
+	}
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeImmutableFieldAssignmentOutsideInit(t *testing.T) {
+	src := `
+class Counter {
+	private let count Int
+
+	def init(count Int) {
+		this.count = count
+	}
+
+	def bump() Int {
+		this.count = this.count + 1
+		return this.count
+	}
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "assign_immutable" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
+func TestAnalyzePrivateAccessOutsideClass(t *testing.T) {
+	src := `
+class SecretBox {
+	private let value Int
+
+	def init(value Int) {
+		this.value = value
+	}
+
+	private def reveal() Int {
+		return this.value
+	}
+}
+
+def run() Int {
+	let box SecretBox = SecretBox(7)
+	let x Int = box.value
+	return box.reveal()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "private_access" {
+		t.Fatalf("unexpected first diagnostic %#v", result.Diagnostics[0])
+	}
+	if result.Diagnostics[1].Code != "private_access" {
+		t.Fatalf("unexpected second diagnostic %#v", result.Diagnostics[1])
+	}
+}
+
+func TestAnalyzePrivateAccessInsideClass(t *testing.T) {
+	src := `
+class SecretBox {
+	private let value Int
+
+	def init(value Int) {
+		this.value = value
+	}
+
+	private def reveal() Int {
+		return this.value
+	}
+
+	def expose() Int {
+		return this.reveal()
+	}
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
