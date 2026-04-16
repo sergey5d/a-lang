@@ -40,11 +40,6 @@ type instance struct {
 	fields map[string]Value
 }
 
-type boundMethod struct {
-	receiver *instance
-	method   *parser.MethodDecl
-}
-
 type returnSignal struct {
 	value Value
 }
@@ -433,6 +428,9 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 }
 
 func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error) {
+	if member, ok := call.Callee.(*parser.MemberExpr); ok {
+		return in.evalMethodCall(member, call.Args, local)
+	}
 	callee, err := in.evalExpr(call.Callee, local)
 	if err != nil {
 		return nil, err
@@ -456,11 +454,34 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 		return in.construct(class, args, local)
 	case builtinRef:
 		return callBuiltin(fn.name, args, call.Span)
-	case *boundMethod:
-		return in.callMethod(fn.receiver, fn.method, args, local)
 	default:
 		return nil, RuntimeError{Message: "value is not callable", Span: call.Span}
 	}
+}
+
+func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []parser.Expr, local *env) (Value, error) {
+	receiver, err := in.evalExpr(member.Receiver, local)
+	if err != nil {
+		return nil, err
+	}
+	obj, ok := receiver.(*instance)
+	if !ok {
+		return nil, RuntimeError{Message: "member call requires class instance", Span: member.Span}
+	}
+	args := make([]Value, len(argExprs))
+	for i, arg := range argExprs {
+		value, err := in.evalExpr(arg, local)
+		if err != nil {
+			return nil, err
+		}
+		args[i] = value
+	}
+	for _, method := range obj.class.Methods {
+		if method.Name == member.Name && len(method.Parameters) == len(args) {
+			return in.callMethod(obj, method, args, local)
+		}
+	}
+	return nil, RuntimeError{Message: "unknown method '" + member.Name + "'", Span: member.Span}
 }
 
 func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Value, error) {
@@ -471,7 +492,7 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 		}
 		for _, method := range value.class.Methods {
 			if method.Name == expr.Name {
-				return &boundMethod{receiver: value, method: method}, nil
+				return nil, RuntimeError{Message: "method '" + expr.Name + "' must be called with ()", Span: expr.Span}
 			}
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}

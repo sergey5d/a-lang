@@ -330,6 +330,36 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeMethodReferenceWithoutCall(t *testing.T) {
+	src := `
+class Counter {
+	private let count Int
+
+	def init(count Int) {
+		this.count = count
+	}
+
+	def add(value Int) Int {
+		return this.count + value
+	}
+}
+
+def run() Int {
+	let counter Counter = Counter(2)
+	let f Int = counter.add
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "invalid_member_access" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
 func TestAnalyzeDuplicateConstructorOverload(t *testing.T) {
 	src := `
 class Counter {

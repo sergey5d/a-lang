@@ -543,9 +543,6 @@ func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
 	if memberType, ok := c.lookupMember(receiverType, expr.Name, expr.Span); ok {
 		return memberType
 	}
-	if expr.Name == "toString" {
-		return functionType("toString", Signature{ReturnType: builtin("String")})
-	}
 	return unknownType
 }
 
@@ -568,17 +565,12 @@ func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*
 			return c.instantiateTypeRef(field.decl.Type, subst), true
 		}
 		if methods, ok := info.methods[name]; ok && len(methods) > 0 {
-			if len(methods) > 1 {
-				c.addDiagnostic("invalid_member_access", "method '"+name+"' requires a call with arguments to resolve an overload", span)
-				return unknownType, true
-			}
-			method := methods[0]
-			if method.decl.Private && !c.canAccessPrivate(info.decl) {
+			if hasPrivateOnlyMatch(methods, info.decl, c) {
 				c.addDiagnostic("private_access", "cannot access private method '"+name+"' outside class '"+info.decl.Name+"'", span)
 				return unknownType, true
 			}
-			sig := c.instantiateMethodSignature(method.decl, info.decl, subst)
-			return functionType(name, sig), true
+			c.addDiagnostic("invalid_member_access", "method '"+name+"' must be called with ()", span)
+			return unknownType, true
 		}
 	case TypeInterface:
 		info, ok := c.interfaces[receiver.Name]
@@ -587,8 +579,9 @@ func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*
 		}
 		subst := c.substForDecl(info.decl.TypeParameters, receiver.Args)
 		if method, ok := info.methods[name]; ok {
-			sig := c.instantiateInterfaceMethodSignature(method.decl, subst)
-			return functionType(name, sig), true
+			_ = c.instantiateInterfaceMethodSignature(method.decl, subst)
+			c.addDiagnostic("invalid_member_access", "method '"+name+"' must be called with ()", span)
+			return unknownType, true
 		}
 	}
 	return unknownType, false

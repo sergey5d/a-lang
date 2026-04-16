@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"strings"
 	"testing"
 
 	"a-lang/parser"
@@ -100,5 +101,37 @@ def run() Int {
 	}
 	if value != int64(3) {
 		t.Fatalf("expected 3, got %#v", value)
+	}
+}
+
+func TestMethodReferenceRequiresCall(t *testing.T) {
+	src := `
+class Counter {
+	private var count Int
+
+	def init(count Int) {
+		this.count = count
+	}
+
+	def inc() Int {
+		this.count += 1
+		return this.count
+	}
+}
+
+def run() Int {
+	let counter Counter = Counter(1)
+	let bad = counter.inc
+	return 0
+}
+`
+
+	in := New(parseProgram(t, src))
+	_, err := in.Call("run")
+	if err == nil {
+		t.Fatalf("expected runtime error")
+	}
+	if !strings.Contains(err.Error(), "must be called with ()") {
+		t.Fatalf("unexpected runtime error: %v", err)
 	}
 }
