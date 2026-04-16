@@ -46,16 +46,19 @@ type interfaceInfo struct {
 
 type Result struct {
 	Diagnostics []semantic.Diagnostic
+	ExprTypes   map[parser.Expr]*Type
 }
 
 type Checker struct {
 	diagnostics   []semantic.Diagnostic
 	scopes        []scope
 	typeScopes    []typeScope
+	globals       map[string]binding
 	functions     map[string]Signature
 	classes       map[string]classInfo
 	interfaces    map[string]interfaceInfo
 	returnTypes   []*Type
+	exprTypes     map[parser.Expr]*Type
 	currentClass  *parser.ClassDecl
 	currentMethod *parser.MethodDecl
 }
@@ -66,13 +69,15 @@ type typeLookup interface {
 
 func Analyze(program *parser.Program) Result {
 	c := &Checker{
+		globals:    map[string]binding{},
 		functions:  map[string]Signature{},
 		classes:    map[string]classInfo{},
 		interfaces: map[string]interfaceInfo{},
+		exprTypes:  map[parser.Expr]*Type{},
 	}
 	c.collectDecls(program)
 	c.checkProgram(program)
-	return Result{Diagnostics: c.diagnostics}
+	return Result{Diagnostics: c.diagnostics, ExprTypes: c.exprTypes}
 }
 
 func (c *Checker) collectDecls(program *parser.Program) {
@@ -116,11 +121,37 @@ func (c *Checker) collectDecls(program *parser.Program) {
 }
 
 func (c *Checker) checkProgram(program *parser.Program) {
+	c.checkGlobals(program.Statements)
 	for _, fn := range program.Functions {
 		c.checkFunction(fn)
 	}
 	for _, decl := range program.Classes {
 		c.checkClass(decl)
+	}
+}
+
+func (c *Checker) checkGlobals(statements []parser.Statement) {
+	c.pushScope()
+	defer c.popScope()
+	for _, stmt := range statements {
+		switch s := stmt.(type) {
+		case *parser.ValStmt:
+			for i, bindingDecl := range s.Bindings {
+				valueType := unknownType
+				if i < len(s.Values) {
+					valueType = c.checkExpr(s.Values[i])
+				}
+				declType := valueType
+				if bindingDecl.Type != nil {
+					declType = c.resolveDeclaredType(bindingDecl.Type)
+					c.requireAssignable(valueType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+declType.String())
+				}
+				c.globals[bindingDecl.Name] = binding{typ: declType, mutable: bindingDecl.Mutable}
+				c.define(bindingDecl.Name, declType, bindingDecl.Mutable)
+			}
+		default:
+			c.addDiagnostic("unsupported_top_level", "unsupported top-level statement for type checking", stmtSpan(stmt))
+		}
 	}
 }
 
@@ -314,35 +345,41 @@ func (c *Checker) checkBlockStatements(statements []parser.Statement) {
 }
 
 func (c *Checker) checkExpr(expr parser.Expr) *Type {
+	var result *Type
 	switch e := expr.(type) {
 	case *parser.Identifier:
 		if binding, ok := c.lookup(e.Name); ok {
-			return binding.typ
+			result = binding.typ
+			break
 		}
 		if sig, ok := c.functions[e.Name]; ok {
-			return functionType(e.Name, sig)
+			result = functionType(e.Name, sig)
+			break
 		}
 		if _, ok := c.classes[e.Name]; ok {
-			return &Type{Kind: TypeClass, Name: e.Name}
+			result = &Type{Kind: TypeClass, Name: e.Name}
+			break
 		}
 		if isBuiltinValue(e.Name) {
-			return unknownType
+			result = unknownType
+			break
 		}
 		c.addDiagnostic("undefined_name", "undefined name '"+e.Name+"'", e.Span)
-		return unknownType
+		result = unknownType
 	case *parser.IntegerLiteral:
-		return builtin("Int")
+		result = builtin("Int")
 	case *parser.FloatLiteral:
-		return builtin("Float")
+		result = builtin("Float")
 	case *parser.RuneLiteral:
-		return builtin("Rune")
+		result = builtin("Rune")
 	case *parser.BoolLiteral:
-		return builtin("Bool")
+		result = builtin("Bool")
 	case *parser.StringLiteral:
-		return builtin("String")
+		result = builtin("String")
 	case *parser.ListLiteral:
 		if len(e.Elements) == 0 {
-			return &Type{Kind: TypeBuiltin, Name: "List", Args: []*Type{unknownType}}
+			result = &Type{Kind: TypeBuiltin, Name: "List", Args: []*Type{unknownType}}
+			break
 		}
 		elemType := c.checkExpr(e.Elements[0])
 		for _, elem := range e.Elements[1:] {
@@ -351,40 +388,44 @@ func (c *Checker) checkExpr(expr parser.Expr) *Type {
 				c.addDiagnostic("type_mismatch", "list literal elements must have the same type", exprSpan(elem))
 			}
 		}
-		return &Type{Kind: TypeBuiltin, Name: "List", Args: []*Type{elemType}}
+		result = &Type{Kind: TypeBuiltin, Name: "List", Args: []*Type{elemType}}
 	case *parser.MapLiteral:
-		return &Type{Kind: TypeBuiltin, Name: "Map", Args: []*Type{unknownType, unknownType}}
+		result = &Type{Kind: TypeBuiltin, Name: "Map", Args: []*Type{unknownType, unknownType}}
 	case *parser.GroupExpr:
-		return c.checkExpr(e.Inner)
+		result = c.checkExpr(e.Inner)
 	case *parser.UnaryExpr:
 		right := c.checkExpr(e.Right)
 		switch e.Operator {
 		case "!":
 			c.requireAssignable(right, builtin("Bool"), e.Span, "invalid_unary_operand", "operator ! requires Bool")
-			return builtin("Bool")
+			result = builtin("Bool")
 		case "-":
 			if !isNumeric(right) {
 				c.addDiagnostic("invalid_unary_operand", "operator - requires numeric operand", e.Span)
 			}
-			return right
+			result = right
 		default:
-			return unknownType
+			result = unknownType
 		}
 	case *parser.BinaryExpr:
 		left := c.checkExpr(e.Left)
 		right := c.checkExpr(e.Right)
-		return c.checkBinaryOperation(left, right, e.Operator, e.Span)
+		result = c.checkBinaryOperation(left, right, e.Operator, e.Span)
 	case *parser.CallExpr:
-		return c.checkCall(e)
+		result = c.checkCall(e)
 	case *parser.MemberExpr:
-		return c.checkMemberExpr(e)
+		result = c.checkMemberExpr(e)
 	case *parser.LambdaExpr:
-		return unknownType
+		result = unknownType
 	case *parser.PlaceholderExpr:
-		return unknownType
+		result = unknownType
 	default:
-		return unknownType
+		result = unknownType
 	}
+	if expr != nil {
+		c.exprTypes[expr] = result
+	}
+	return result
 }
 
 func (c *Checker) checkCall(call *parser.CallExpr) *Type {
@@ -742,6 +783,9 @@ func (c *Checker) lookup(name string) (binding, bool) {
 			return value, true
 		}
 	}
+	if value, ok := c.globals[name]; ok {
+		return value, true
+	}
 	return binding{}, false
 }
 
@@ -863,6 +907,27 @@ func exprSpan(expr parser.Expr) parser.Span {
 		return e.Span
 	case *parser.GroupExpr:
 		return e.Span
+	default:
+		return parser.Span{}
+	}
+}
+
+func stmtSpan(stmt parser.Statement) parser.Span {
+	switch s := stmt.(type) {
+	case *parser.ValStmt:
+		return s.Span
+	case *parser.AssignmentStmt:
+		return s.Span
+	case *parser.IfStmt:
+		return s.Span
+	case *parser.ForStmt:
+		return s.Span
+	case *parser.ReturnStmt:
+		return s.Span
+	case *parser.BreakStmt:
+		return s.Span
+	case *parser.ExprStmt:
+		return s.Span
 	default:
 		return parser.Span{}
 	}
