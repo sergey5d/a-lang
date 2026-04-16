@@ -18,10 +18,10 @@ func parseProgram(t *testing.T, src string) *parser.Program {
 func TestAnalyzeValidScopes(t *testing.T) {
 	src := `
 def run(input Int) Bool {
-	let value = helper(input)
+	value = helper(input)
 	var acc = 0
 	acc = acc + 1
-	let item = input
+	item = input
 
 	for item <- [1, 2, 3] {
 		if item == input {
@@ -48,7 +48,7 @@ def run(input Int) Bool {
 		x + y
 	}
 
-	let mapper = (x Int) -> x + value
+	mapper = (x Int) -> x + value
 	return mapper(input) == helper(value)
 }
 
@@ -82,8 +82,8 @@ def run() Bool {
 func TestAnalyzeDuplicateBinding(t *testing.T) {
 	src := `
 def run() Bool {
-	let value = 1
-	let value = 2
+	value = 1
+	value Int = 2
 	return value == 2
 }
 `
@@ -153,7 +153,7 @@ def run() Bool {
 func TestAnalyzeAssignmentToImmutableBinding(t *testing.T) {
 	src := `
 def run() Bool {
-	let value = 1
+	value = 1
 	value = 2
 	return value == 2
 }
@@ -190,7 +190,7 @@ def run() Bool {
 
 func TestAnalyzeTopLevelGlobalBinding(t *testing.T) {
 	src := `
-let seed Int = 1
+seed Int = 1
 
 def run() Int {
 	return seed
@@ -243,7 +243,7 @@ class SolidWork with Stringable {
 	}
 }
 
-let solidWork = SolidWork(1, false)
+solidWork = SolidWork(1, false)
 `
 
 	diagnostics := Analyze(parseProgram(t, src))
@@ -259,9 +259,9 @@ class Store[T] {
 }
 
 def useStore(input Map[String, List[Int]]) List[Map[String, Int]] {
-	let store Store[Int] = Store(input)
-	let bad Unknown[Int] = store
-	let wrong List[Int, String] = []
+	store Store[Int] = Store(input)
+	bad Unknown[Int] = store
+	wrong List[Int, String] = []
 	return [Map()]
 }
 `

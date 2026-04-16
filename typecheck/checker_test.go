@@ -22,7 +22,7 @@ def add(a Int, b Int) Int {
 }
 
 def run(input Int) Bool {
-	let total Int = add(input, 1)
+	total Int = add(input, 1)
 	var copy Int = total
 	copy += 1
 
@@ -43,7 +43,7 @@ def run(input Int) Bool {
 func TestAnalyzeTypeMismatch(t *testing.T) {
 	src := `
 def run() Bool {
-	let count Int = "hello"
+	count Int = "hello"
 	return true
 }
 `
@@ -84,8 +84,8 @@ def add(a Int, b Int) Int {
 }
 
 def run() Int {
-	let value Int = add(true)
-	let fixed Int = 1
+	value Int = add(true)
+	fixed Int = 1
 	fixed = 2
 	return value
 }
@@ -122,7 +122,7 @@ class Counter {
 }
 
 def run() Int {
-	let counter Counter = Counter(1)
+	counter Counter = Counter(1)
 	return counter.inc()
 }
 `
@@ -224,8 +224,8 @@ class SecretBox {
 }
 
 def run() Int {
-	let box SecretBox = SecretBox(7)
-	let x Int = box.value
+	box SecretBox = SecretBox(7)
+	x Int = box.value
 	return box.reveal()
 }
 `
@@ -290,7 +290,7 @@ class Counter {
 }
 
 def run() Int {
-	let counter Counter = Counter(2)
+	counter Counter = Counter(2)
 	return counter.add(1)
 }
 `
@@ -316,7 +316,7 @@ class Counter {
 }
 
 def run() Int {
-	let counter Counter = Counter(2)
+	counter Counter = Counter(2)
 	return counter.add(true)
 }
 `
@@ -345,8 +345,8 @@ class Counter {
 }
 
 def run() Int {
-	let counter Counter = Counter(2)
-	let f Int = counter.add
+	counter Counter = Counter(2)
+	f Int = counter.add
 	return 0
 }
 `
@@ -424,7 +424,7 @@ class Counter {
 func TestAnalyzeLambdaFunctionValue(t *testing.T) {
 	src := `
 def run() Int {
-	let add = (x Int) -> x + 1
+	add = (x Int) -> x + 1
 	return add(2)
 }
 `
@@ -438,8 +438,8 @@ def run() Int {
 func TestAnalyzeBlockLambdaFunctionValue(t *testing.T) {
 	src := `
 def run() Int {
-	let add = (x Int) -> {
-		let y Int = x + 1
+	add = (x Int) -> {
+		y Int = x + 1
 		return y
 	}
 	return add(2)
@@ -456,7 +456,7 @@ func TestAnalyzeLambdaCannotCaptureVar(t *testing.T) {
 	src := `
 def run() Int {
 	var total Int = 1
-	let add = (x Int) -> x + total
+	add = (x Int) -> x + total
 	return add(2)
 }
 `
@@ -480,7 +480,7 @@ class Box[T] {
 	}
 
 	def transform() T {
-		let id = (item T) -> item
+		id = (item T) -> item
 		return id(this.value)
 	}
 }
@@ -495,7 +495,7 @@ class Box[T] {
 func TestAnalyzeFunctionTypeBindingAndContextualLambda(t *testing.T) {
 	src := `
 def run() Int {
-	let add (Int) -> Int = x -> x + 1
+	add (Int) -> Int = x -> x + 1
 	return add(2)
 }
 `
@@ -526,7 +526,7 @@ def run() Int {
 func TestAnalyzeUntypedLambdaWithoutContextFails(t *testing.T) {
 	src := `
 def run() Int {
-	let add = x -> x + 1
+	add = x -> x + 1
 	return 0
 }
 `
@@ -555,8 +555,8 @@ class Counter with Eq[Counter] {
 }
 
 def run() Bool {
-	let left Counter = Counter(1)
-	let right Counter = Counter(1)
+	left Counter = Counter(1)
+	right Counter = Counter(1)
 	return left == right
 }
 `
@@ -578,8 +578,8 @@ class Counter {
 }
 
 def run() Bool {
-	let left Counter = Counter(1)
-	let right Counter = Counter(1)
+	left Counter = Counter(1)
+	right Counter = Counter(1)
 	return left == right
 }
 `

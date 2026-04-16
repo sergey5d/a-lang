@@ -8,13 +8,17 @@ func Parse(input string) (*Program, error) {
 		return nil, err
 	}
 
-	parser := &Parser{tokens: tokens}
+	parser := &Parser{
+		tokens: tokens,
+		scopes: []map[string]struct{}{{}},
+	}
 	return parser.parseProgram()
 }
 
 type Parser struct {
 	tokens []Token
 	pos    int
+	scopes []map[string]struct{}
 }
 
 func tokenSpan(token Token) Span {
@@ -164,7 +168,12 @@ func (p *Parser) parseFunction() (*FunctionDecl, error) {
 	if err != nil {
 		return nil, err
 	}
+	p.beginScope()
+	for _, param := range params {
+		p.declare(param.Name)
+	}
 	body, err := p.parseBlock()
+	p.endScope()
 	if err != nil {
 		return nil, err
 	}
@@ -293,6 +302,9 @@ func (p *Parser) parseClass() (*ClassDecl, error) {
 
 func (p *Parser) parseField(private bool) (FieldDecl, error) {
 	start := p.advance()
+	if start.Type != TokenIdentifier && start.Type != TokenVar {
+		return FieldDecl{}, fmt.Errorf("expected field declaration, got %s", start.String())
+	}
 	mutable := start.Type == TokenVar
 	name := start
 	if mutable {
@@ -388,6 +400,8 @@ func (p *Parser) parseBlock() (*BlockStmt, error) {
 	if err != nil {
 		return nil, err
 	}
+	p.beginScope()
+	defer p.endScope()
 	block := &BlockStmt{}
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		stmt, err := p.parseStatement()
@@ -406,8 +420,6 @@ func (p *Parser) parseBlock() (*BlockStmt, error) {
 
 func (p *Parser) parseStatement() (Statement, error) {
 	switch p.peek().Type {
-	case TokenLet:
-		return p.parseBindingStmt(false)
 	case TokenVar:
 		return p.parseBindingStmt(true)
 	case TokenIf:
@@ -420,20 +432,40 @@ func (p *Parser) parseStatement() (Statement, error) {
 		token := p.advance()
 		return &BreakStmt{Span: tokenSpan(token)}, nil
 	default:
+		if p.isBareBindingStart() {
+			return p.parseBareBindingStmt()
+		}
 		return p.parseExprStmt()
 	}
 }
 
 func (p *Parser) parseBindingStmt(mutable bool) (Statement, error) {
 	start := p.advance()
+	return p.parseBindingStmtWithStart(start, mutable, start.Type == TokenIdentifier)
+}
 
+func (p *Parser) parseBareBindingStmt() (Statement, error) {
+	start, err := p.consume(TokenIdentifier, "expected binding name")
+	if err != nil {
+		return nil, err
+	}
+	return p.parseBindingStmtWithStart(start, false, true)
+}
+
+func (p *Parser) parseBindingStmtWithStart(start Token, mutable bool, firstIsName bool) (Statement, error) {
 	var bindings []Binding
+	useStart := start
+	first := true
 	for {
 		binding := Binding{Mutable: mutable}
 
-		name, err := p.consume(TokenIdentifier, "expected binding name")
-		if err != nil {
-			return nil, err
+		name := useStart
+		if !first || !firstIsName {
+			var err error
+			name, err = p.consume(TokenIdentifier, "expected binding name")
+			if err != nil {
+				return nil, err
+			}
 		}
 		binding.Name = name.Lexeme
 		binding.Span = tokenSpan(name)
@@ -449,6 +481,8 @@ func (p *Parser) parseBindingStmt(mutable bool) (Statement, error) {
 		if !p.match(TokenComma) {
 			break
 		}
+		first = false
+		useStart = Token{}
 	}
 
 	if _, err := p.consume(TokenAssign, "expected '=' after bindings"); err != nil {
@@ -465,7 +499,53 @@ func (p *Parser) parseBindingStmt(mutable bool) (Statement, error) {
 	} else {
 		stmt.Span = tokenSpan(start)
 	}
+	for _, binding := range bindings {
+		p.declare(binding.Name)
+	}
 	return stmt, nil
+}
+
+func (p *Parser) isBareBindingStart() bool {
+	if !p.check(TokenIdentifier) {
+		return false
+	}
+
+	if p.checkNext(TokenAssign) {
+		return !p.isDeclared(p.peek().Lexeme)
+	}
+
+	if p.checkNext(TokenIdentifier) || p.checkNext(TokenLParen) || p.checkNext(TokenComma) {
+		return p.bindingListFollowedByAssign(p.pos)
+	}
+
+	return false
+}
+
+func (p *Parser) bindingListFollowedByAssign(start int) bool {
+	i := start
+	for {
+		if i >= len(p.tokens) || p.tokens[i].Type != TokenIdentifier {
+			return false
+		}
+		i++
+		if i < len(p.tokens) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen) {
+			end, ok := p.scanTypeRef(i)
+			if !ok {
+				return false
+			}
+			i = end
+		}
+		if i >= len(p.tokens) {
+			return false
+		}
+		if p.tokens[i].Type == TokenAssign {
+			return true
+		}
+		if p.tokens[i].Type != TokenComma {
+			return false
+		}
+		i++
+	}
 }
 
 func (p *Parser) parseExprList(until TokenType) ([]Expr, error) {
@@ -1252,4 +1332,31 @@ func (p *Parser) peek() Token {
 
 func (p *Parser) isAtEnd() bool {
 	return p.peek().Type == TokenEOF
+}
+
+func (p *Parser) beginScope() {
+	p.scopes = append(p.scopes, map[string]struct{}{})
+}
+
+func (p *Parser) endScope() {
+	if len(p.scopes) == 0 {
+		return
+	}
+	p.scopes = p.scopes[:len(p.scopes)-1]
+}
+
+func (p *Parser) declare(name string) {
+	if len(p.scopes) == 0 {
+		p.scopes = []map[string]struct{}{{}}
+	}
+	p.scopes[len(p.scopes)-1][name] = struct{}{}
+}
+
+func (p *Parser) isDeclared(name string) bool {
+	for i := len(p.scopes) - 1; i >= 0; i-- {
+		if _, ok := p.scopes[i][name]; ok {
+			return true
+		}
+	}
+	return false
 }

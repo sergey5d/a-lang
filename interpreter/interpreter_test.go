@@ -23,7 +23,7 @@ def add(a Int, b Int) Int {
 }
 
 def run(input Int) Int {
-	let total Int = add(input, 2)
+	total Int = add(input, 2)
 	var copy Int = total
 	copy += 3
 
@@ -88,7 +88,7 @@ class Counter {
 }
 
 def run() Int {
-	let counter Counter = Counter(1)
+	counter Counter = Counter(1)
 	counter.inc()
 	return counter.inc()
 }
@@ -120,8 +120,8 @@ class Counter {
 }
 
 def run() Int {
-	let counter Counter = Counter(1)
-	let bad = counter.inc
+	counter Counter = Counter(1)
+	bad = counter.inc
 	return 0
 }
 `
@@ -139,7 +139,7 @@ def run() Int {
 func TestLambdaFunctionValue(t *testing.T) {
 	src := `
 def run() Int {
-	let add = (x Int) -> x + 1
+	add = (x Int) -> x + 1
 	return add(2)
 }
 `
@@ -157,8 +157,8 @@ def run() Int {
 func TestBlockLambdaFunctionValue(t *testing.T) {
 	src := `
 def run() Int {
-	let add = (x Int) -> {
-		let y Int = x + 1
+	add = (x Int) -> {
+		y Int = x + 1
 		return y
 	}
 	return add(2)
@@ -190,8 +190,8 @@ class Counter {
 }
 
 def run() Bool {
-	let left Counter = Counter(1)
-	let right Counter = Counter(1)
+	left Counter = Counter(1)
+	right Counter = Counter(1)
 	return left == right
 }
 `

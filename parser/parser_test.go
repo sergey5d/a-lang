@@ -5,18 +5,18 @@ import "testing"
 const sampleProgram = `
 def doSomeWork(a Int, b Int) Bool {
 
-	let list = [a, b, c]
-	let set = Set()
-	let map = Map()
-	let map2 = Map(a : b)
-	let tuple = Set(a, b)
-	let tuple2 = a : b : c
-	let tuple21 = a : b : c
-	let array = Array(1, 2, 3)
-	let string String = "xxx"
-	let a int = 65
+	list = [a, b, c]
+	set = Set()
+	map = Map()
+	map2 = Map(a : b)
+	tuple = Set(a, b)
+	tuple2 = a : b : c
+	tuple21 = a : b : c
+	array = Array(1, 2, 3)
+	string String = "xxx"
+	a int = 65
 
-	let a Int, b Int64 = 1, 3
+	a Int, b Int64 = 1, 3
 
 	if a == b {
 
@@ -139,17 +139,17 @@ def loops(input Int, value Int) Bool {
 func TestParseExtendedOperators(t *testing.T) {
 	src := `
 def ops(a Int, b Int) Bool {
-	let x = a - b / 2 * 3 % 5
-	let y = !a == b
-	let z = a != b
-	let c = a < b
-	let d = a <= b
-	let e = a > b
-	let f = a >= b
-	let yes = true
-	let no = false
-	let pi = 1.1
-	let whole = 1.
+	x = a - b / 2 * 3 % 5
+	y = !a == b
+	z = a != b
+	c = a < b
+	d = a <= b
+	e = a > b
+	f = a >= b
+	yes = true
+	no = false
+	pi = 1.1
+	whole = 1.
 	return a == b || a != b && !(a < b)
 }
 `
@@ -166,12 +166,12 @@ def ops(a Int, b Int) Bool {
 func TestParseBoolAndFloatLiterals(t *testing.T) {
 	src := `
 def literals() Bool {
-	let yes = true
-	let no = false
-	let a = 1.1
-	let b = 1.
-	let c = 'x'
-	let d = '\n'
+	yes = true
+	no = false
+	a = 1.1
+	b = 1.
+	c = 'x'
+	d = '\n'
 	return yes == true
 }
 `
@@ -248,8 +248,8 @@ class RecordKeeper {
 	private approved Bool
 }
 
-let recordKeeper = RecordKeeper("test record", true)
-let solidWork = SolidWork(1, false)
+recordKeeper = RecordKeeper("test record", true)
+solidWork = SolidWork(1, false)
 `
 
 	program, err := Parse(src)
@@ -304,8 +304,8 @@ let solidWork = SolidWork(1, false)
 
 func TestRejectInvalidRuneLiterals(t *testing.T) {
 	cases := []string{
-		"def bad() Bool { let a = '' return true }",
-		"def bad() Bool { let a = 'ab' return true }",
+		"def bad() Bool { a = '' return true }",
+		"def bad() Bool { a = 'ab' return true }",
 	}
 
 	for _, src := range cases {
@@ -391,8 +391,8 @@ def vars() Bool {
 func TestParseImmutableBindings(t *testing.T) {
 	src := `
 def vars() Bool {
-	let count Int = 1
-	let left Int, right Int = 1, 2
+	count Int = 1
+	left Int, right Int = 1, 2
 	return count == right
 }
 `
@@ -405,19 +405,19 @@ def vars() Bool {
 	fn := program.Functions[0]
 	first := fn.Body.Statements[0].(*ValStmt)
 	if first.Bindings[0].Mutable {
-		t.Fatalf("expected let binding to be immutable")
+		t.Fatalf("expected immutable binding")
 	}
 
 	second := fn.Body.Statements[1].(*ValStmt)
 	if second.Bindings[0].Mutable || second.Bindings[1].Mutable {
-		t.Fatalf("expected let bindings to be immutable")
+		t.Fatalf("expected immutable bindings")
 	}
 }
 
 func TestParseUntypedBindings(t *testing.T) {
 	src := `
 def vars() Bool {
-	let a = "some string"
+	a = "some string"
 	var counter = 0
 	return counter == 0
 }
@@ -432,10 +432,10 @@ def vars() Bool {
 
 	letStmt := fn.Body.Statements[0].(*ValStmt)
 	if letStmt.Bindings[0].Type != nil {
-		t.Fatalf("expected untyped let binding, got type %#v", letStmt.Bindings[0].Type)
+		t.Fatalf("expected untyped immutable binding, got type %#v", letStmt.Bindings[0].Type)
 	}
 	if letStmt.Bindings[0].Mutable {
-		t.Fatalf("expected let binding to be immutable")
+		t.Fatalf("expected immutable binding")
 	}
 
 	varStmt := fn.Body.Statements[1].(*ValStmt)
@@ -450,7 +450,7 @@ def vars() Bool {
 func TestParseFunctionInvocationBinding(t *testing.T) {
 	src := `
 def vars(b Int) Bool {
-	let a = function(b)
+	a = function(b)
 	return a == b
 }
 `
@@ -478,10 +478,10 @@ def vars(b Int) Bool {
 func TestParseLambdaBindings(t *testing.T) {
 	src := `
 def vars() Bool {
-	let a = Map(1 : "string").map((key, value) -> key.toString() + value)
-	let b = Set(1).map(key -> key.toString())
-	let c = Map(1 : 2).map((key Int, value Int) -> key + value)
-	let d = Set(1).map(key Int -> key.toString())
+	a = Map(1 : "string").map((key, value) -> key.toString() + value)
+	b = Set(1).map(key -> key.toString())
+	c = Map(1 : 2).map((key Int, value Int) -> key + value)
+	d = Set(1).map(key Int -> key.toString())
 	return 1 == 1
 }
 `
@@ -549,8 +549,8 @@ def vars() Bool {
 func TestParseBlockLambda(t *testing.T) {
 	src := `
 def vars() Int {
-	let add = (x Int) -> {
-		let y Int = x + 1
+	add = (x Int) -> {
+		y Int = x + 1
 		return y
 	}
 	return add(1)
@@ -590,7 +590,7 @@ class Store[T] {
 }
 
 def wrap(input Map[String, List[Int]]) List[Map[String, Int]] {
-	let cache Map[String, List[Int]] = input
+	cache Map[String, List[Int]] = input
 	return [cache]
 }
 `
@@ -678,7 +678,7 @@ def classify(a Int) Bool {
 func TestAttachSourceSpans(t *testing.T) {
 	src := `
 def sample(a Int) Bool {
-	let value = function(a)
+	value = function(a)
 	return value == a
 }
 `
@@ -699,7 +699,7 @@ def sample(a Int) Bool {
 
 	stmt := fn.Body.Statements[0].(*ValStmt)
 	if stmt.Span.Start.Line != 3 {
-		t.Fatalf("expected let statement to start on line 3, got %#v", stmt.Span)
+		t.Fatalf("expected immutable binding statement to start on line 3, got %#v", stmt.Span)
 	}
 
 	call := stmt.Values[0].(*CallExpr)
