@@ -18,7 +18,7 @@ const (
 	TokenDef        TokenType = "DEF"
 	TokenInterface  TokenType = "INTERFACE"
 	TokenClass      TokenType = "CLASS"
-	TokenImplements TokenType = "IMPLEMENTS"
+	TokenWith       TokenType = "WITH"
 	TokenPrivate    TokenType = "PRIVATE"
 	TokenLet        TokenType = "LET"
 	TokenVar        TokenType = "VAR"
@@ -74,7 +74,7 @@ var keywords = map[string]TokenType{
 	"def":        TokenDef,
 	"interface":  TokenInterface,
 	"class":      TokenClass,
-	"implements": TokenImplements,
+	"with":       TokenWith,
 	"private":    TokenPrivate,
 	"let":        TokenLet,
 	"var":        TokenVar,

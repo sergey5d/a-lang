@@ -213,7 +213,7 @@ interface Stringable {
 	def toString() String
 }
 
-class Box[T] implements Mapper[T, Stringable] {
+class Box[T] with Mapper[T, Stringable] {
 	private let value T
 
 	def init(value T) {
@@ -225,7 +225,7 @@ class Box[T] implements Mapper[T, Stringable] {
 	}
 }
 
-class SolidWork implements Stringable {
+class SolidWork with Stringable {
 	private let a List[Int]
 	private var b Map[String, Bool]
 

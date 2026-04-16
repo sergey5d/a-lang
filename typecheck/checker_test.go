@@ -139,7 +139,7 @@ interface Stringable {
 	def toString() String
 }
 
-class Good implements Stringable {
+class Good with Stringable {
 	def init() {
 	}
 
@@ -148,7 +148,7 @@ class Good implements Stringable {
 	}
 }
 
-class Bad implements Stringable {
+class Bad with Stringable {
 	def init() {
 	}
 }
@@ -542,7 +542,7 @@ def run() Int {
 
 func TestAnalyzeEqSupportsClassEquality(t *testing.T) {
 	src := `
-class Counter implements Eq[Counter] {
+class Counter with Eq[Counter] {
 	private let count Int
 
 	def init(count Int) {

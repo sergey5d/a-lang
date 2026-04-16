@@ -251,7 +251,7 @@ func (p *Parser) parseClass() (*ClassDecl, error) {
 		return nil, err
 	}
 	decl := &ClassDecl{Name: name.Lexeme, TypeParameters: typeParams}
-	if p.match(TokenImplements) {
+	if p.match(TokenWith) {
 		for {
 			target, err := p.parseTypeRef()
 			if err != nil {
