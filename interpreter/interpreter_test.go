@@ -174,3 +174,34 @@ def run() Int {
 		t.Fatalf("expected 3, got %#v", value)
 	}
 }
+
+func TestClassEqualityUsesEquals(t *testing.T) {
+	src := `
+class Counter {
+	private let count Int
+
+	def init(count Int) {
+		this.count = count
+	}
+
+	def equals(other Counter) Bool {
+		return this.count == other.count
+	}
+}
+
+def run() Bool {
+	let left Counter = Counter(1)
+	let right Counter = Counter(1)
+	return left == right
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != true {
+		t.Fatalf("expected true, got %#v", value)
+	}
+}

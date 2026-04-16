@@ -539,3 +539,56 @@ def run() Int {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }
+
+func TestAnalyzeEqSupportsClassEquality(t *testing.T) {
+	src := `
+class Counter implements Eq[Counter] {
+	private let count Int
+
+	def init(count Int) {
+		this.count = count
+	}
+
+	def equals(other Counter) Bool {
+		return this.count == other.count
+	}
+}
+
+def run() Bool {
+	let left Counter = Counter(1)
+	let right Counter = Counter(1)
+	return left == right
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeClassEqualityRequiresEq(t *testing.T) {
+	src := `
+class Counter {
+	private let count Int
+
+	def init(count Int) {
+		this.count = count
+	}
+}
+
+def run() Bool {
+	let left Counter = Counter(1)
+	let right Counter = Counter(1)
+	return left == right
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "invalid_binary_operand" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}

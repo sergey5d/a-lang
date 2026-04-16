@@ -190,6 +190,10 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 		c.checkMethod(method, decl)
 	}
 	for _, impl := range decl.Implements {
+		if impl.Name == "Eq" {
+			c.checkEqImplementation(info, impl)
+			continue
+		}
 		c.checkInterfaceImplementation(info, impl)
 	}
 }
@@ -256,6 +260,27 @@ func (c *Checker) checkInterfaceImplementation(class classInfo, impl *parser.Typ
 		actual := c.instantiateMethodSignature(classMethod.decl, class.decl, nil)
 		c.compareSignatures(actual, expected, classMethod.decl.Span, method.Name)
 	}
+}
+
+func (c *Checker) checkEqImplementation(class classInfo, impl *parser.TypeRef) {
+	if len(impl.Arguments) != 1 {
+		c.addDiagnostic("interface_not_implemented", "Eq requires exactly one type argument", impl.Span)
+		return
+	}
+	expectedSelf := c.instantiateTypeRef(impl.Arguments[0], c.substForDecl(class.decl.TypeParameters, nil))
+	classMethods, ok := class.methods["equals"]
+	if !ok || len(classMethods) == 0 {
+		c.addDiagnostic("interface_not_implemented", "class '"+class.decl.Name+"' does not implement method 'equals' required by Eq", class.decl.Span)
+		return
+	}
+	method, ok := c.findMatchingMethodOverload(class, "equals", []*Type{expectedSelf})
+	if !ok {
+		c.addDiagnostic("interface_not_implemented", "class '"+class.decl.Name+"' does not implement method 'equals' with signature required by Eq", class.decl.Span)
+		return
+	}
+	actual := c.instantiateMethodSignature(method.decl, class.decl, nil)
+	expected := Signature{Parameters: []*Type{expectedSelf}, ReturnType: builtin("Bool")}
+	c.compareSignatures(actual, expected, method.decl.Span, "equals")
 }
 
 func (c *Checker) compareSignatures(actual, expected Signature, span parser.Span, name string) {
@@ -687,6 +712,9 @@ func (c *Checker) checkBinaryOperation(left, right *Type, op string, span parser
 		if !sameType(left, right) {
 			c.addDiagnostic("type_mismatch", "comparison operands must have the same type", span)
 		}
+		if !c.supportsEquality(left) || !c.supportsEquality(right) {
+			c.addDiagnostic("invalid_binary_operand", "equality requires Eq support for this type", span)
+		}
 		return builtin("Bool")
 	case "<", "<=", ">", ">=":
 		if !isOrdered(left) || !isOrdered(right) {
@@ -1098,6 +1126,42 @@ func (c *Checker) iterableElementType(t *Type) *Type {
 	return unknownType
 }
 
+func (c *Checker) supportsEquality(t *Type) bool {
+	if isUnknown(t) {
+		return true
+	}
+	switch t.Kind {
+	case TypeBuiltin:
+		switch t.Name {
+		case "Int", "Int64", "Bool", "String", "Rune", "Float", "Float64":
+			return true
+		default:
+			return false
+		}
+	case TypeClass:
+		return c.classImplementsEq(t)
+	default:
+		return false
+	}
+}
+
+func (c *Checker) classImplementsEq(t *Type) bool {
+	info, ok := c.classes[t.Name]
+	if !ok {
+		return false
+	}
+	for _, impl := range info.decl.Implements {
+		if impl.Name != "Eq" || len(impl.Arguments) != 1 {
+			continue
+		}
+		expected := c.instantiateTypeRef(impl.Arguments[0], c.substForDecl(info.decl.TypeParameters, t.Args))
+		if sameType(expected, t) {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Checker) requireAssignable(actual, expected *Type, span parser.Span, code, message string) {
 	if isUnknown(actual) || isUnknown(expected) {
 		return
@@ -1171,6 +1235,9 @@ func (c *Checker) kindOf(name string) TypeKind {
 	}
 	if isBuiltinType(name) {
 		return TypeBuiltin
+	}
+	if name == "Eq" {
+		return TypeInterface
 	}
 	if _, ok := c.classes[name]; ok {
 		return TypeClass

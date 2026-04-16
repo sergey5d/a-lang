@@ -413,6 +413,16 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		if err != nil {
 			return nil, err
 		}
+		if e.Operator == "==" || e.Operator == "!=" {
+			equal, err := in.valuesEqual(left, right, e.Span, local)
+			if err != nil {
+				return nil, err
+			}
+			if e.Operator == "!=" {
+				return !equal, nil
+			}
+			return equal, nil
+		}
 		return applyBinary(e.Operator, left, right, e.Span)
 	case *parser.CallExpr:
 		return in.evalCall(e, local)
@@ -577,10 +587,6 @@ func applyBinary(op string, left, right Value, span parser.Span) (Value, error) 
 	switch op {
 	case "+", "-", "*", "/", "%":
 		return applyArithmetic(op, left, right, span)
-	case "==":
-		return valuesEqual(left, right), nil
-	case "!=":
-		return !valuesEqual(left, right), nil
 	case "<", "<=", ">", ">=":
 		return compareOrdered(op, left, right, span)
 	case "&&":
@@ -737,25 +743,43 @@ func compareStrings(op, left, right string) bool {
 	}
 }
 
-func valuesEqual(left, right Value) bool {
+func (in *Interpreter) valuesEqual(left, right Value, span parser.Span, local *env) (bool, error) {
 	switch l := left.(type) {
 	case int64:
 		r, ok := right.(int64)
-		return ok && l == r
+		return ok && l == r, nil
 	case float64:
 		r, ok := toFloat(right)
-		return ok && l == r
+		return ok && l == r, nil
 	case bool:
 		r, ok := right.(bool)
-		return ok && l == r
+		return ok && l == r, nil
 	case string:
 		r, ok := right.(string)
-		return ok && l == r
+		return ok && l == r, nil
 	case rune:
 		r, ok := right.(rune)
-		return ok && l == r
+		return ok && l == r, nil
+	case *instance:
+		r, ok := right.(*instance)
+		if !ok || l.class.Name != r.class.Name {
+			return false, nil
+		}
+		for _, method := range l.class.Methods {
+			if method.Name == "equals" && len(method.Parameters) == 1 {
+				value, err := in.callMethod(l, method, []Value{r}, local)
+				if err != nil {
+					return false, err
+				}
+				if result, ok := value.(bool); ok {
+					return result, nil
+				}
+				return false, RuntimeError{Message: "equals must return Bool", Span: span}
+			}
+		}
+		return false, nil
 	default:
-		return left == right
+		return left == right, nil
 	}
 }
 

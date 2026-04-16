@@ -376,6 +376,8 @@ func builtinTypeArity(name string) (int, bool) {
 		return 1, true
 	case "Map":
 		return 2, true
+	case "Eq":
+		return 1, true
 	default:
 		return 0, false
 	}
