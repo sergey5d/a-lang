@@ -614,7 +614,7 @@ def wrap(input Map[String, List[Int]]) List[Map[String, Int]] {
 
 func TestParseFunctionTypeRefs(t *testing.T) {
 	src := `
-def apply(value Int, f (Int) -> Int) Int {
+def apply(value Int, f Int -> Int) Int {
 	return f(value)
 }
 

@@ -495,7 +495,7 @@ class Box[T] {
 func TestAnalyzeFunctionTypeBindingAndContextualLambda(t *testing.T) {
 	src := `
 def run() Int {
-	add (Int) -> Int = x -> x + 1
+	add Int -> Int = x -> x + 1
 	return add(2)
 }
 `
@@ -508,7 +508,7 @@ def run() Int {
 
 func TestAnalyzeContextualLambdaInFunctionCall(t *testing.T) {
 	src := `
-def apply(value Int, f (Int) -> Int) Int {
+def apply(value Int, f Int -> Int) Int {
 	return f(value)
 }
 
