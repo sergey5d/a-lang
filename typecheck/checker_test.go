@@ -166,7 +166,7 @@ class Bad with Stringable {
 func TestAnalyzeImmutableFieldAssignmentInInit(t *testing.T) {
 	src := `
 class Counter {
-	private let count Int
+	private count Int
 
 	def init(count Int) {
 		this.count = count
@@ -187,7 +187,7 @@ class Counter {
 func TestAnalyzeImmutableFieldAssignmentOutsideInit(t *testing.T) {
 	src := `
 class Counter {
-	private let count Int
+	private count Int
 
 	def init(count Int) {
 		this.count = count
@@ -212,7 +212,7 @@ class Counter {
 func TestAnalyzePrivateAccessOutsideClass(t *testing.T) {
 	src := `
 class SecretBox {
-	private let value Int
+	private value Int
 
 	def init(value Int) {
 		this.value = value
@@ -245,7 +245,7 @@ def run() Int {
 func TestAnalyzePrivateAccessInsideClass(t *testing.T) {
 	src := `
 class SecretBox {
-	private let value Int
+	private value Int
 
 	def init(value Int) {
 		this.value = value
@@ -270,7 +270,7 @@ class SecretBox {
 func TestAnalyzeMethodOverloadResolution(t *testing.T) {
 	src := `
 class Counter {
-	private let count Int
+	private count Int
 
 	def init(count Int) {
 		this.count = count
@@ -304,7 +304,7 @@ def run() Int {
 func TestAnalyzeNoMatchingMethodOverload(t *testing.T) {
 	src := `
 class Counter {
-	private let count Int
+	private count Int
 
 	def init(count Int) {
 		this.count = count
@@ -333,7 +333,7 @@ def run() Int {
 func TestAnalyzeMethodReferenceWithoutCall(t *testing.T) {
 	src := `
 class Counter {
-	private let count Int
+	private count Int
 
 	def init(count Int) {
 		this.count = count
@@ -363,7 +363,7 @@ def run() Int {
 func TestAnalyzeDuplicateConstructorOverload(t *testing.T) {
 	src := `
 class Counter {
-	private let count Int
+	private count Int
 
 	def init(count Int) {
 		this.count = count
@@ -387,7 +387,7 @@ class Counter {
 func TestAnalyzeImplicitConstructorRequiresMutableOnlyFields(t *testing.T) {
 	src := `
 class Counter {
-	private let count Int
+	private count Int
 }
 `
 
@@ -403,7 +403,7 @@ class Counter {
 func TestAnalyzeConstructorMustInitializeImmutableFields(t *testing.T) {
 	src := `
 class Counter {
-	private let count Int
+	private count Int
 	private var seen Bool
 
 	def init() {
@@ -473,7 +473,7 @@ def run() Int {
 func TestAnalyzeLambdaCanUseEnclosingGenericType(t *testing.T) {
 	src := `
 class Box[T] {
-	private let value T
+	private value T
 
 	def init(value T) {
 		this.value = value
@@ -543,7 +543,7 @@ def run() Int {
 func TestAnalyzeEqSupportsClassEquality(t *testing.T) {
 	src := `
 class Counter with Eq[Counter] {
-	private let count Int
+	private count Int
 
 	def init(count Int) {
 		this.count = count
@@ -570,7 +570,7 @@ def run() Bool {
 func TestAnalyzeClassEqualityRequiresEq(t *testing.T) {
 	src := `
 class Counter {
-	private let count Int
+	private count Int
 
 	def init(count Int) {
 		this.count = count

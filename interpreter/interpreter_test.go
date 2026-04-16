@@ -178,7 +178,7 @@ def run() Int {
 func TestClassEqualityUsesEquals(t *testing.T) {
 	src := `
 class Counter {
-	private let count Int
+	private count Int
 
 	def init(count Int) {
 		this.count = count

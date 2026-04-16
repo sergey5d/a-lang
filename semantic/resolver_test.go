@@ -214,7 +214,7 @@ interface Stringable {
 }
 
 class Box[T] with Mapper[T, Stringable] {
-	private let value T
+	private value T
 
 	def init(value T) {
 		this.value = value
@@ -226,7 +226,7 @@ class Box[T] with Mapper[T, Stringable] {
 }
 
 class SolidWork with Stringable {
-	private let a List[Int]
+	private a List[Int]
 	private var b Map[String, Bool]
 
 	def init(a Int, b Bool) {
@@ -255,7 +255,7 @@ let solidWork = SolidWork(1, false)
 func TestAnalyzeGenericTypes(t *testing.T) {
 	src := `
 class Store[T] {
-	let values List[T]
+	values List[T]
 }
 
 def useStore(input Map[String, List[Int]]) List[Map[String, Int]] {
