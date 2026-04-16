@@ -19,9 +19,11 @@ type Program struct {
 }
 
 type TypeRef struct {
-	Name      string     `json:"name"`
-	Arguments []*TypeRef `json:"arguments,omitempty"`
-	Span      Span       `json:"span"`
+	Name           string     `json:"name,omitempty"`
+	Arguments      []*TypeRef `json:"arguments,omitempty"`
+	ParameterTypes []*TypeRef `json:"parameterTypes,omitempty"`
+	ReturnType     *TypeRef   `json:"returnType,omitempty"`
+	Span           Span       `json:"span"`
 }
 
 type TypeParameter struct {

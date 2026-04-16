@@ -612,6 +612,38 @@ def wrap(input Map[String, List[Int]]) List[Map[String, Int]] {
 	}
 }
 
+func TestParseFunctionTypeRefs(t *testing.T) {
+	src := `
+def apply(value Int, f (Int) -> Int) Int {
+	return f(value)
+}
+
+def pair(f (Int, String) -> Bool) Bool {
+	return false
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fnType := program.Functions[0].Parameters[1].Type
+	if fnType.ReturnType == nil || len(fnType.ParameterTypes) != 1 {
+		t.Fatalf("expected single-parameter function type, got %#v", fnType)
+	}
+	assertTypeRef(t, fnType.ParameterTypes[0], "Int")
+	assertTypeRef(t, fnType.ReturnType, "Int")
+
+	pairType := program.Functions[1].Parameters[0].Type
+	if pairType.ReturnType == nil || len(pairType.ParameterTypes) != 2 {
+		t.Fatalf("expected two-parameter function type, got %#v", pairType)
+	}
+	assertTypeRef(t, pairType.ParameterTypes[0], "Int")
+	assertTypeRef(t, pairType.ParameterTypes[1], "String")
+	assertTypeRef(t, pairType.ReturnType, "Bool")
+}
+
 func TestParseElseIf(t *testing.T) {
 	src := `
 def classify(a Int) Bool {

@@ -322,6 +322,13 @@ func (r *Resolver) resolveTypeRef(ref *parser.TypeRef) {
 	if ref == nil {
 		return
 	}
+	if ref.ReturnType != nil {
+		for _, param := range ref.ParameterTypes {
+			r.resolveTypeRef(param)
+		}
+		r.resolveTypeRef(ref.ReturnType)
+		return
+	}
 	for _, arg := range ref.Arguments {
 		r.resolveTypeRef(arg)
 	}

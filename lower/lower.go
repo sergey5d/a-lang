@@ -363,6 +363,20 @@ func (l *Lowerer) lowerType(ref *parser.TypeRef) *typecheck.Type {
 	if ref == nil {
 		return nil
 	}
+	if ref.ReturnType != nil {
+		params := make([]*typecheck.Type, len(ref.ParameterTypes))
+		for i, param := range ref.ParameterTypes {
+			params[i] = l.lowerType(param)
+		}
+		return &typecheck.Type{
+			Kind: typecheck.TypeFunction,
+			Name: "func",
+			Signature: &typecheck.Signature{
+				Parameters: params,
+				ReturnType: l.lowerType(ref.ReturnType),
+			},
+		}
+	}
 	args := make([]*typecheck.Type, len(ref.Arguments))
 	for i, arg := range ref.Arguments {
 		args[i] = l.lowerType(arg)

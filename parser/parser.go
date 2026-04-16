@@ -435,7 +435,7 @@ func (p *Parser) parseBindingStmt(mutable bool) (Statement, error) {
 		}
 		binding.Name = name.Lexeme
 		binding.Span = tokenSpan(name)
-		if p.check(TokenIdentifier) {
+		if p.check(TokenIdentifier) || p.check(TokenLParen) {
 			typeRef, err := p.parseTypeRef()
 			if err != nil {
 				return nil, err
@@ -787,8 +787,8 @@ func (p *Parser) parseLambdaIdentifier() (Expr, error) {
 	}
 	param := LambdaParameter{Name: name.Lexeme}
 	param.Span = tokenSpan(name)
-	if p.check(TokenIdentifier) && p.typeRefFollowedBy(TokenArrow) {
-		typeRef, err := p.parseTypeRef()
+	if p.check(TokenIdentifier) && p.simpleTypeRefFollowedBy(TokenArrow) {
+		typeRef, err := p.parseNamedTypeRef()
 		if err != nil {
 			return nil, err
 		}
@@ -857,7 +857,7 @@ func (p *Parser) parseLambdaParams() ([]LambdaParameter, error) {
 			}
 			lambdaParam := LambdaParameter{Name: param.Lexeme}
 			lambdaParam.Span = tokenSpan(param)
-			if p.check(TokenIdentifier) {
+			if (p.check(TokenIdentifier) || p.check(TokenLParen)) && (p.typeRefFollowedBy(TokenComma) || p.typeRefFollowedBy(TokenRParen)) {
 				typeRef, err := p.parseTypeRef()
 				if err != nil {
 					return nil, err
@@ -884,7 +884,7 @@ func (p *Parser) isLambdaIdentifierStart() bool {
 	if p.checkNext(TokenArrow) {
 		return true
 	}
-	return p.checkNext(TokenIdentifier) && p.typeRefFollowedByAt(p.pos+1, TokenArrow)
+	return p.checkNext(TokenIdentifier) && p.simpleTypeRefFollowedByAt(p.pos+1, TokenArrow)
 }
 
 func (p *Parser) isLambdaParenStart() bool {
@@ -951,6 +951,32 @@ func (p *Parser) parseTypeParameters() ([]TypeParameter, error) {
 }
 
 func (p *Parser) parseTypeRef() (*TypeRef, error) {
+	if p.check(TokenLParen) {
+		return p.parseParenFunctionTypeRef()
+	}
+	return p.parseArrowTypeRef()
+}
+
+func (p *Parser) parseArrowTypeRef() (*TypeRef, error) {
+	left, err := p.parseNamedTypeRef()
+	if err != nil {
+		return nil, err
+	}
+	if p.match(TokenArrow) {
+		returnType, err := p.parseTypeRef()
+		if err != nil {
+			return nil, err
+		}
+		return &TypeRef{
+			ParameterTypes: []*TypeRef{left},
+			ReturnType:     returnType,
+			Span:           mergeSpans(left.Span, typeSpan(returnType)),
+		}, nil
+	}
+	return left, nil
+}
+
+func (p *Parser) parseNamedTypeRef() (*TypeRef, error) {
 	name, err := p.consume(TokenIdentifier, "expected type name")
 	if err != nil {
 		return nil, err
@@ -976,8 +1002,47 @@ func (p *Parser) parseTypeRef() (*TypeRef, error) {
 	return ref, nil
 }
 
+func (p *Parser) parseParenFunctionTypeRef() (*TypeRef, error) {
+	start, err := p.consume(TokenLParen, "expected '('")
+	if err != nil {
+		return nil, err
+	}
+	var params []*TypeRef
+	if !p.check(TokenRParen) {
+		for {
+			param, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, param)
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+	}
+	if _, err := p.consume(TokenRParen, "expected ')' after function type parameters"); err != nil {
+		return nil, err
+	}
+	if _, err := p.consume(TokenArrow, "expected '->' after function type parameters"); err != nil {
+		return nil, err
+	}
+	returnType, err := p.parseTypeRef()
+	if err != nil {
+		return nil, err
+	}
+	return &TypeRef{
+		ParameterTypes: params,
+		ReturnType:     returnType,
+		Span:           mergeSpans(tokenSpan(start), typeSpan(returnType)),
+	}, nil
+}
+
 func (p *Parser) typeRefFollowedBy(tt TokenType) bool {
 	return p.typeRefFollowedByAt(p.pos, tt)
+}
+
+func (p *Parser) simpleTypeRefFollowedBy(tt TokenType) bool {
+	return p.simpleTypeRefFollowedByAt(p.pos, tt)
 }
 
 func (p *Parser) typeRefFollowedByAt(start int, tt TokenType) bool {
@@ -988,8 +1053,48 @@ func (p *Parser) typeRefFollowedByAt(start int, tt TokenType) bool {
 	return p.tokens[end].Type == tt
 }
 
+func (p *Parser) simpleTypeRefFollowedByAt(start int, tt TokenType) bool {
+	end, ok := p.scanSimpleTypeRef(start)
+	if !ok || end >= len(p.tokens) {
+		return false
+	}
+	return p.tokens[end].Type == tt
+}
+
 func (p *Parser) scanTypeRef(start int) (int, bool) {
-	if start >= len(p.tokens) || p.tokens[start].Type != TokenIdentifier {
+	if start >= len(p.tokens) {
+		return start, false
+	}
+	if p.tokens[start].Type == TokenLParen {
+		i := start + 1
+		if i < len(p.tokens) && p.tokens[i].Type != TokenRParen {
+			for {
+				var ok bool
+				i, ok = p.scanTypeRef(i)
+				if !ok || i >= len(p.tokens) {
+					return start, false
+				}
+				if p.tokens[i].Type == TokenComma {
+					i++
+					continue
+				}
+				if p.tokens[i].Type == TokenRParen {
+					i++
+					break
+				}
+				return start, false
+			}
+		} else if i < len(p.tokens) && p.tokens[i].Type == TokenRParen {
+			i++
+		} else {
+			return start, false
+		}
+		if i >= len(p.tokens) || p.tokens[i].Type != TokenArrow {
+			return start, false
+		}
+		return p.scanTypeRef(i + 1)
+	}
+	if p.tokens[start].Type != TokenIdentifier {
 		return start, false
 	}
 	i := start + 1
@@ -1002,6 +1107,36 @@ func (p *Parser) scanTypeRef(start int) (int, bool) {
 				return start, false
 			}
 			if i >= len(p.tokens) {
+				return start, false
+			}
+			if p.tokens[i].Type == TokenComma {
+				i++
+				continue
+			}
+			if p.tokens[i].Type == TokenRBracket {
+				i++
+				break
+			}
+			return start, false
+		}
+	}
+	if i < len(p.tokens) && p.tokens[i].Type == TokenArrow {
+		return p.scanTypeRef(i + 1)
+	}
+	return i, true
+}
+
+func (p *Parser) scanSimpleTypeRef(start int) (int, bool) {
+	if start >= len(p.tokens) || p.tokens[start].Type != TokenIdentifier {
+		return start, false
+	}
+	i := start + 1
+	if i < len(p.tokens) && p.tokens[i].Type == TokenLBracket {
+		i++
+		for {
+			var ok bool
+			i, ok = p.scanTypeRef(i)
+			if !ok || i >= len(p.tokens) {
 				return start, false
 			}
 			if p.tokens[i].Type == TokenComma {

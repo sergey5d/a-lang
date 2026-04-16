@@ -140,7 +140,11 @@ func (c *Checker) checkGlobals(statements []parser.Statement) {
 			for i, bindingDecl := range s.Bindings {
 				valueType := unknownType
 				if i < len(s.Values) {
-					valueType = c.checkExpr(s.Values[i])
+					expected := unknownType
+					if bindingDecl.Type != nil {
+						expected = c.resolveDeclaredType(bindingDecl.Type)
+					}
+					valueType = c.checkExprWithExpected(s.Values[i], expected)
 				}
 				declType := valueType
 				if bindingDecl.Type != nil {
@@ -284,7 +288,11 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		for i, bindingDecl := range s.Bindings {
 			valueType := unknownType
 			if i < len(s.Values) {
-				valueType = c.checkExpr(s.Values[i])
+				expected := unknownType
+				if bindingDecl.Type != nil {
+					expected = c.resolveDeclaredType(bindingDecl.Type)
+				}
+				valueType = c.checkExprWithExpected(s.Values[i], expected)
 			}
 			declType := valueType
 			if bindingDecl.Type != nil {
@@ -329,7 +337,11 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		}
 		c.popScope()
 	case *parser.ReturnStmt:
-		valueType := c.checkExpr(s.Value)
+		expectedReturn := unknownType
+		if len(c.returnTypes) > 0 {
+			expectedReturn = c.returnTypes[len(c.returnTypes)-1]
+		}
+		valueType := c.checkExprWithExpected(s.Value, expectedReturn)
 		if len(c.returnTypes) == 0 {
 			c.addDiagnostic("invalid_return", "return used outside callable body", s.Span)
 			return
@@ -356,6 +368,10 @@ func (c *Checker) checkBlockStatements(statements []parser.Statement) {
 }
 
 func (c *Checker) checkExpr(expr parser.Expr) *Type {
+	return c.checkExprWithExpected(expr, nil)
+}
+
+func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type {
 	var result *Type
 	switch e := expr.(type) {
 	case *parser.Identifier:
@@ -430,7 +446,7 @@ func (c *Checker) checkExpr(expr parser.Expr) *Type {
 	case *parser.MemberExpr:
 		result = c.checkMemberExpr(e)
 	case *parser.LambdaExpr:
-		result = c.checkLambdaExpr(e)
+		result = c.checkLambdaExpr(e, expected)
 	case *parser.PlaceholderExpr:
 		result = unknownType
 	default:
@@ -465,10 +481,13 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 		c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %d arguments, got %d", len(sig.Parameters), len(call.Args)), call.Span)
 	}
 	for i, arg := range call.Args {
-		argType := c.checkExpr(arg)
+		var argType *Type
 		if i < len(sig.Parameters) {
+			argType = c.checkExprWithExpected(arg, sig.Parameters[i])
 			c.requireAssignable(argType, sig.Parameters[i], exprSpan(arg), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
+			continue
 		}
+		argType = c.checkExpr(arg)
 	}
 	return sig.ReturnType
 }
@@ -479,7 +498,8 @@ func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *
 		argTypes := c.checkArgTypes(call.Args)
 		if ctor, ok := c.resolveConstructorOverload(class, argTypes, call.Span); ok {
 			sig := c.instantiateMethodSignature(ctor, class.decl, constructorTypeArgs(class.decl, call.Callee))
-			for i, argType := range argTypes {
+			for i := range argTypes {
+				argType := c.checkExprWithExpected(call.Args[i], sig.Parameters[i])
 				if i < len(sig.Parameters) {
 					c.requireAssignable(argType, sig.Parameters[i], exprSpan(call.Args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
 				}
@@ -514,11 +534,12 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr)
 			return unknownType
 		}
 		sig := c.instantiateMethodSignature(method.decl, info.decl, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
-		for i, argType := range argTypes {
-			if i < len(sig.Parameters) {
-				c.requireAssignable(argType, sig.Parameters[i], exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
+			for i := range argTypes {
+				argType := c.checkExprWithExpected(args[i], sig.Parameters[i])
+				if i < len(sig.Parameters) {
+					c.requireAssignable(argType, sig.Parameters[i], exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
+				}
 			}
-		}
 		return sig.ReturnType
 	case TypeInterface:
 		info, ok := c.interfaces[receiverType.Name]
@@ -534,7 +555,8 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr)
 		if len(argTypes) != len(sig.Parameters) {
 			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, len(sig.Parameters), len(argTypes)), member.Span)
 		}
-		for i, argType := range argTypes {
+		for i := range argTypes {
+			argType := c.checkExprWithExpected(args[i], sig.Parameters[i])
 			if i < len(sig.Parameters) {
 				c.requireAssignable(argType, sig.Parameters[i], exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
 			}
@@ -546,7 +568,7 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr)
 	}
 }
 
-func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr) *Type {
+func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr, expected *Type) *Type {
 	c.pushScope()
 	defer c.popScope()
 
@@ -555,10 +577,22 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr) *Type {
 	defer func() { c.lambdaScopes = c.lambdaScopes[:len(c.lambdaScopes)-1] }()
 
 	params := make([]*Type, len(expr.Parameters))
+	expectedSig := (*Signature)(nil)
+	if expected != nil && expected.Kind == TypeFunction && expected.Signature != nil {
+		expectedSig = expected.Signature
+		if len(expectedSig.Parameters) != len(expr.Parameters) {
+			c.addDiagnostic("invalid_lambda_type", "lambda parameter count does not match expected function type", expr.Span)
+			expectedSig = nil
+		}
+	}
 	for i, param := range expr.Parameters {
 		paramType := unknownType
 		if param.Type != nil {
 			paramType = c.resolveDeclaredType(param.Type)
+		} else if expectedSig != nil {
+			paramType = expectedSig.Parameters[i]
+		} else {
+			c.addDiagnostic("invalid_lambda_type", "untyped lambda parameters require a contextual function type", param.Span)
 		}
 		params[i] = paramType
 		c.define(param.Name, paramType, false)
@@ -567,9 +601,17 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr) *Type {
 	returnType := unknownType
 	if expr.Body != nil {
 		returnType = c.checkExpr(expr.Body)
+		if expectedSig != nil && !isUnknown(expectedSig.ReturnType) {
+			c.requireAssignable(returnType, expectedSig.ReturnType, exprSpan(expr.Body), "invalid_lambda_type", "lambda body does not match expected return type")
+			returnType = expectedSig.ReturnType
+		}
 	}
 	if expr.BlockBody != nil {
-		c.returnTypes = append(c.returnTypes, unknownType)
+		expectedReturn := unknownType
+		if expectedSig != nil {
+			expectedReturn = expectedSig.ReturnType
+		}
+		c.returnTypes = append(c.returnTypes, expectedReturn)
 		c.checkBlock(expr.BlockBody)
 		returnType = c.returnTypes[len(c.returnTypes)-1]
 		c.returnTypes = c.returnTypes[:len(c.returnTypes)-1]
@@ -755,6 +797,20 @@ func (c *Checker) resolveDeclaredType(ref *parser.TypeRef) *Type {
 func (c *Checker) instantiateTypeRef(ref *parser.TypeRef, subst map[string]*Type) *Type {
 	if ref == nil {
 		return unknownType
+	}
+	if ref.ReturnType != nil {
+		params := make([]*Type, len(ref.ParameterTypes))
+		for i, param := range ref.ParameterTypes {
+			params[i] = c.instantiateTypeRef(param, subst)
+		}
+		return &Type{
+			Kind: TypeFunction,
+			Name: "func",
+			Signature: &Signature{
+				Parameters: params,
+				ReturnType: c.instantiateTypeRef(ref.ReturnType, subst),
+			},
+		}
 	}
 	if subst != nil {
 		if resolved, ok := subst[ref.Name]; ok && len(ref.Arguments) == 0 {

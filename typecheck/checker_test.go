@@ -491,3 +491,51 @@ class Box[T] {
 		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
 	}
 }
+
+func TestAnalyzeFunctionTypeBindingAndContextualLambda(t *testing.T) {
+	src := `
+def run() Int {
+	let add (Int) -> Int = x -> x + 1
+	return add(2)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeContextualLambdaInFunctionCall(t *testing.T) {
+	src := `
+def apply(value Int, f (Int) -> Int) Int {
+	return f(value)
+}
+
+def run() Int {
+	return apply(2, x -> x + 1)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeUntypedLambdaWithoutContextFails(t *testing.T) {
+	src := `
+def run() Int {
+	let add = x -> x + 1
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "invalid_lambda_type" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
