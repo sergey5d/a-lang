@@ -33,10 +33,10 @@ type interfaceMethodInfo struct {
 }
 
 type classInfo struct {
-	decl        *parser.ClassDecl
-	fields      map[string]fieldInfo
-	methods     map[string]methodInfo
-	constructor *parser.MethodDecl
+	decl         *parser.ClassDecl
+	fields       map[string]fieldInfo
+	methods      map[string][]methodInfo
+	constructors []*parser.MethodDecl
 }
 
 type interfaceInfo struct {
@@ -95,15 +95,15 @@ func (c *Checker) collectDecls(program *parser.Program) {
 		info := classInfo{
 			decl:    decl,
 			fields:  map[string]fieldInfo{},
-			methods: map[string]methodInfo{},
+			methods: map[string][]methodInfo{},
 		}
 		for _, field := range decl.Fields {
 			info.fields[field.Name] = fieldInfo{decl: field}
 		}
 		for _, method := range decl.Methods {
-			info.methods[method.Name] = methodInfo{decl: method}
+			info.methods[method.Name] = append(info.methods[method.Name], methodInfo{decl: method})
 			if method.Constructor {
-				info.constructor = method
+				info.constructors = append(info.constructors, method)
 			}
 		}
 		c.classes[decl.Name] = info
@@ -180,6 +180,7 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 	for _, field := range decl.Fields {
 		c.resolveDeclaredType(field.Type)
 	}
+	c.checkConstructorRules(info)
 	for _, method := range decl.Methods {
 		c.checkMethod(method, decl)
 	}
@@ -236,12 +237,17 @@ func (c *Checker) checkInterfaceImplementation(class classInfo, impl *parser.Typ
 	}
 
 	for _, method := range iface.decl.Methods {
-		classMethod, ok := class.methods[method.Name]
-		if !ok {
+		classMethods, ok := class.methods[method.Name]
+		if !ok || len(classMethods) == 0 {
 			c.addDiagnostic("interface_not_implemented", "class '"+class.decl.Name+"' does not implement method '"+method.Name+"'", class.decl.Span)
 			continue
 		}
 		expected := c.instantiateInterfaceMethodSignature(method, subst)
+		classMethod, ok := c.findMatchingMethodOverload(class, method.Name, expected.Parameters)
+		if !ok {
+			c.addDiagnostic("interface_not_implemented", "class '"+class.decl.Name+"' does not implement method '"+method.Name+"' with matching signature", class.decl.Span)
+			continue
+		}
 		actual := c.instantiateMethodSignature(classMethod.decl, class.decl, nil)
 		c.compareSignatures(actual, expected, classMethod.decl.Span, method.Name)
 	}
@@ -434,6 +440,9 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 			return c.checkConstructorCall(class, call)
 		}
 	}
+	if member, ok := call.Callee.(*parser.MemberExpr); ok {
+		return c.checkMethodCall(member, call.Args)
+	}
 
 	calleeType := c.checkExpr(call.Callee)
 	if calleeType.Kind != TypeFunction || calleeType.Signature == nil {
@@ -458,17 +467,19 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 
 func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *Type {
 	classType := &Type{Kind: TypeClass, Name: class.decl.Name}
-	if ctor := class.constructor; ctor != nil {
-		sig := c.instantiateMethodSignature(ctor, class.decl, constructorTypeArgs(class.decl, call.Callee))
-		if len(call.Args) != len(sig.Parameters) {
-			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("constructor '%s' expects %d arguments, got %d", class.decl.Name, len(sig.Parameters), len(call.Args)), call.Span)
-		}
-		for i, arg := range call.Args {
-			argType := c.checkExpr(arg)
-			if i < len(sig.Parameters) {
-				c.requireAssignable(argType, sig.Parameters[i], exprSpan(arg), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
+	if len(class.constructors) != 0 {
+		argTypes := c.checkArgTypes(call.Args)
+		if ctor, ok := c.resolveConstructorOverload(class, argTypes, call.Span); ok {
+			sig := c.instantiateMethodSignature(ctor, class.decl, constructorTypeArgs(class.decl, call.Callee))
+			for i, argType := range argTypes {
+				if i < len(sig.Parameters) {
+					c.requireAssignable(argType, sig.Parameters[i], exprSpan(call.Args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
+				}
 			}
 		}
+	} else if len(call.Args) != 0 {
+		c.checkArgTypes(call.Args)
+		c.addDiagnostic("invalid_argument_count", fmt.Sprintf("constructor '%s' expects 0 arguments, got %d", class.decl.Name, len(call.Args)), call.Span)
 	}
 	if ident, ok := call.Callee.(*parser.Identifier); ok {
 		if refType, ok := c.lookupTypeInstance(ident.Name); ok {
@@ -476,6 +487,55 @@ func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *
 		}
 	}
 	return classType
+}
+
+func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr) *Type {
+	receiverType := c.checkExpr(member.Receiver)
+	argTypes := c.checkArgTypes(args)
+	if isUnknown(receiverType) {
+		return unknownType
+	}
+	switch receiverType.Kind {
+	case TypeClass:
+		info, ok := c.classes[receiverType.Name]
+		if !ok {
+			return unknownType
+		}
+		method, ok := c.resolveMethodOverload(info, receiverType, member.Name, argTypes, member.Span)
+		if !ok {
+			return unknownType
+		}
+		sig := c.instantiateMethodSignature(method.decl, info.decl, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
+		for i, argType := range argTypes {
+			if i < len(sig.Parameters) {
+				c.requireAssignable(argType, sig.Parameters[i], exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
+			}
+		}
+		return sig.ReturnType
+	case TypeInterface:
+		info, ok := c.interfaces[receiverType.Name]
+		if !ok {
+			return unknownType
+		}
+		method, ok := info.methods[member.Name]
+		if !ok {
+			c.addDiagnostic("unknown_member", "unknown member '"+member.Name+"'", member.Span)
+			return unknownType
+		}
+		sig := c.instantiateInterfaceMethodSignature(method.decl, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
+		if len(argTypes) != len(sig.Parameters) {
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, len(sig.Parameters), len(argTypes)), member.Span)
+		}
+		for i, argType := range argTypes {
+			if i < len(sig.Parameters) {
+				c.requireAssignable(argType, sig.Parameters[i], exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
+			}
+		}
+		return sig.ReturnType
+	default:
+		c.addDiagnostic("invalid_call_target", "member call requires class or interface receiver", member.Span)
+		return unknownType
+	}
 }
 
 func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
@@ -507,7 +567,12 @@ func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*
 			}
 			return c.instantiateTypeRef(field.decl.Type, subst), true
 		}
-		if method, ok := info.methods[name]; ok {
+		if methods, ok := info.methods[name]; ok && len(methods) > 0 {
+			if len(methods) > 1 {
+				c.addDiagnostic("invalid_member_access", "method '"+name+"' requires a call with arguments to resolve an overload", span)
+				return unknownType, true
+			}
+			method := methods[0]
 			if method.decl.Private && !c.canAccessPrivate(info.decl) {
 				c.addDiagnostic("private_access", "cannot access private method '"+name+"' outside class '"+info.decl.Name+"'", span)
 				return unknownType, true
@@ -610,8 +675,8 @@ func (c *Checker) checkFieldAssignment(expr *parser.MemberExpr, receiverType *Ty
 	}
 	field, ok := info.fields[expr.Name]
 	if !ok {
-		if _, hasMethod := info.methods[expr.Name]; hasMethod {
-			if info.methods[expr.Name].decl.Private && !c.canAccessPrivate(info.decl) {
+		if methods, hasMethod := info.methods[expr.Name]; hasMethod && len(methods) > 0 {
+			if len(methods) == 1 && methods[0].decl.Private && !c.canAccessPrivate(info.decl) {
 				c.addDiagnostic("private_access", "cannot access private method '"+expr.Name+"' outside class '"+info.decl.Name+"'", expr.Span)
 				return unknownType, false, true
 			}
@@ -686,6 +751,191 @@ func (c *Checker) instantiateMethodSignature(method *parser.MethodDecl, owner *p
 		result = c.instantiateTypeRef(method.ReturnType, effective)
 	}
 	return Signature{Parameters: params, ReturnType: result}
+}
+
+func (c *Checker) checkConstructorRules(class classInfo) {
+	if len(class.constructors) == 0 {
+		if missing := c.uninitializedLetFields(class.decl, nil); len(missing) > 0 {
+			c.addDiagnostic("constructor_required", "class '"+class.decl.Name+"' requires init to initialize immutable fields: "+joinNames(missing), class.decl.Span)
+		}
+		return
+	}
+	seen := map[string]*parser.MethodDecl{}
+	for _, ctor := range class.constructors {
+		key := methodSignatureKey(ctor)
+		if prev, ok := seen[key]; ok {
+			c.addDiagnostic("duplicate_constructor", "duplicate constructor overload for class '"+class.decl.Name+"'", ctor.Span)
+			c.addDiagnostic("duplicate_constructor", "duplicate constructor overload for class '"+class.decl.Name+"'", prev.Span)
+			continue
+		}
+		seen[key] = ctor
+		if missing := c.uninitializedLetFields(class.decl, ctor); len(missing) > 0 {
+			c.addDiagnostic("uninitialized_field", "constructor 'init' must initialize immutable fields: "+joinNames(missing), ctor.Span)
+		}
+	}
+}
+
+func (c *Checker) uninitializedLetFields(owner *parser.ClassDecl, ctor *parser.MethodDecl) []string {
+	initialized := map[string]bool{}
+	if ctor != nil {
+		c.collectInitializedFields(ctor.Body, initialized)
+	}
+	var missing []string
+	for _, field := range owner.Fields {
+		if field.Mutable {
+			continue
+		}
+		if !initialized[field.Name] {
+			missing = append(missing, field.Name)
+		}
+	}
+	return missing
+}
+
+func (c *Checker) collectInitializedFields(block *parser.BlockStmt, initialized map[string]bool) {
+	if block == nil {
+		return
+	}
+	for _, stmt := range block.Statements {
+		switch s := stmt.(type) {
+		case *parser.AssignmentStmt:
+			if s.Operator != "=" {
+				continue
+			}
+			member, ok := s.Target.(*parser.MemberExpr)
+			if !ok {
+				continue
+			}
+			ident, ok := member.Receiver.(*parser.Identifier)
+			if ok && ident.Name == "this" {
+				initialized[member.Name] = true
+			}
+		case *parser.IfStmt:
+			// Keep constructor rules simple: writes must happen unconditionally in the constructor body.
+		}
+	}
+}
+
+func (c *Checker) checkArgTypes(args []parser.Expr) []*Type {
+	result := make([]*Type, len(args))
+	for i, arg := range args {
+		result[i] = c.checkExpr(arg)
+	}
+	return result
+}
+
+func (c *Checker) resolveConstructorOverload(class classInfo, argTypes []*Type, span parser.Span) (*parser.MethodDecl, bool) {
+	candidates := make([]*parser.MethodDecl, 0, len(class.constructors))
+	for _, ctor := range class.constructors {
+		sig := c.instantiateMethodSignature(ctor, class.decl, nil)
+		if signatureMatches(sig, argTypes) {
+			candidates = append(candidates, ctor)
+		}
+	}
+	if len(candidates) == 1 {
+		return candidates[0], true
+	}
+	if len(candidates) > 1 {
+		c.addDiagnostic("ambiguous_overload", "constructor call for class '"+class.decl.Name+"' is ambiguous", span)
+		return nil, false
+	}
+	c.addDiagnostic("no_matching_overload", fmt.Sprintf("no constructor overload for class '%s' matches %d arguments", class.decl.Name, len(argTypes)), span)
+	return nil, false
+}
+
+func (c *Checker) resolveMethodOverload(class classInfo, receiver *Type, name string, argTypes []*Type, span parser.Span) (methodInfo, bool) {
+	methods, ok := class.methods[name]
+	if !ok || len(methods) == 0 {
+		c.addDiagnostic("unknown_member", "unknown member '"+name+"'", span)
+		return methodInfo{}, false
+	}
+	subst := c.substForDecl(class.decl.TypeParameters, receiver.Args)
+	var matches []methodInfo
+	for _, method := range methods {
+		if method.decl.Private && !c.canAccessPrivate(class.decl) {
+			continue
+		}
+		sig := c.instantiateMethodSignature(method.decl, class.decl, subst)
+		if signatureMatches(sig, argTypes) {
+			matches = append(matches, method)
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0], true
+	}
+	if len(matches) > 1 {
+		c.addDiagnostic("ambiguous_overload", "method call '"+name+"' is ambiguous", span)
+		return methodInfo{}, false
+	}
+	if hasPrivateOnlyMatch(methods, class.decl, c) {
+		c.addDiagnostic("private_access", "cannot access private method '"+name+"' outside class '"+class.decl.Name+"'", span)
+		return methodInfo{}, false
+	}
+	c.addDiagnostic("no_matching_overload", fmt.Sprintf("no overload of method '%s' matches %d arguments", name, len(argTypes)), span)
+	return methodInfo{}, false
+}
+
+func (c *Checker) findMatchingMethodOverload(class classInfo, name string, paramTypes []*Type) (methodInfo, bool) {
+	methods, ok := class.methods[name]
+	if !ok {
+		return methodInfo{}, false
+	}
+	for _, method := range methods {
+		sig := c.instantiateMethodSignature(method.decl, class.decl, nil)
+		if signatureMatches(sig, paramTypes) {
+			return method, true
+		}
+	}
+	return methodInfo{}, false
+}
+
+func signatureMatches(sig Signature, argTypes []*Type) bool {
+	if len(sig.Parameters) != len(argTypes) {
+		return false
+	}
+	for i := range sig.Parameters {
+		if !sameType(sig.Parameters[i], argTypes[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func methodSignatureKey(method *parser.MethodDecl) string {
+	sig := method.Name + "("
+	for i, param := range method.Parameters {
+		if i > 0 {
+			sig += ","
+		}
+		sig += param.Type.Name
+		for _, arg := range param.Type.Arguments {
+			sig += "[" + arg.Name + "]"
+		}
+	}
+	return sig + ")"
+}
+
+func joinNames(names []string) string {
+	result := ""
+	for i, name := range names {
+		if i > 0 {
+			result += ", "
+		}
+		result += name
+	}
+	return result
+}
+
+func hasPrivateOnlyMatch(methods []methodInfo, owner *parser.ClassDecl, c *Checker) bool {
+	if c.canAccessPrivate(owner) {
+		return false
+	}
+	for _, method := range methods {
+		if method.decl.Private {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Checker) instantiateInterfaceMethodSignature(method parser.InterfaceMethod, subst map[string]*Type) Signature {

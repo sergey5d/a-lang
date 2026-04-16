@@ -266,3 +266,127 @@ class SecretBox {
 		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
 	}
 }
+
+func TestAnalyzeMethodOverloadResolution(t *testing.T) {
+	src := `
+class Counter {
+	private let count Int
+
+	def init(count Int) {
+		this.count = count
+	}
+
+	def value() Int {
+		return this.count
+	}
+
+	def add(value Int) Int {
+		return this.count + value
+	}
+
+	def add(left Int, right Int) Int {
+		return left + right
+	}
+}
+
+def run() Int {
+	let counter Counter = Counter(2)
+	return counter.add(1)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeNoMatchingMethodOverload(t *testing.T) {
+	src := `
+class Counter {
+	private let count Int
+
+	def init(count Int) {
+		this.count = count
+	}
+
+	def add(value Int) Int {
+		return this.count + value
+	}
+}
+
+def run() Int {
+	let counter Counter = Counter(2)
+	return counter.add(true)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "no_matching_overload" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
+func TestAnalyzeDuplicateConstructorOverload(t *testing.T) {
+	src := `
+class Counter {
+	private let count Int
+
+	def init(count Int) {
+		this.count = count
+	}
+
+	def init(value Int) {
+		this.count = value
+	}
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected duplicate constructor diagnostics, got none")
+	}
+	if result.Diagnostics[0].Code != "duplicate_constructor" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
+func TestAnalyzeImplicitConstructorRequiresMutableOnlyFields(t *testing.T) {
+	src := `
+class Counter {
+	private let count Int
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "constructor_required" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
+func TestAnalyzeConstructorMustInitializeImmutableFields(t *testing.T) {
+	src := `
+class Counter {
+	private let count Int
+	private var seen Bool
+
+	def init() {
+		this.seen = false
+	}
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "uninitialized_field" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
