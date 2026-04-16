@@ -358,8 +358,6 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			items[i] = value
 		}
 		return items, nil
-	case *parser.MapLiteral:
-		return map[string]Value{}, nil
 	case *parser.GroupExpr:
 		return in.evalExpr(e.Inner, local)
 	case *parser.UnaryExpr:
@@ -819,8 +817,6 @@ func zeroValue(ref *parser.TypeRef) Value {
 		return rune(0)
 	case "List", "Set", "Array":
 		return []Value{}
-	case "Map":
-		return map[string]Value{}
 	default:
 		return nil
 	}
@@ -864,8 +860,6 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.StringLiteral:
 		return e.Span
 	case *parser.ListLiteral:
-		return e.Span
-	case *parser.MapLiteral:
 		return e.Span
 	case *parser.CallExpr:
 		return e.Span

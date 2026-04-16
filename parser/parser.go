@@ -53,8 +53,6 @@ func exprSpan(expr Expr) Span {
 		return e.Span
 	case *ListLiteral:
 		return e.Span
-	case *MapLiteral:
-		return e.Span
 	case *CallExpr:
 		return e.Span
 	case *MemberExpr:
@@ -773,12 +771,6 @@ func (p *Parser) parsePrefix() (Expr, error) {
 			return nil, err
 		}
 		return &ListLiteral{Elements: items, Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
-	case TokenLBrace:
-		end, err := p.consume(TokenRBrace, "expected '}' for map literal")
-		if err != nil {
-			return nil, err
-		}
-		return &MapLiteral{Span: mergeSpans(tokenSpan(token), tokenSpan(end))}, nil
 	default:
 		return nil, fmt.Errorf("unexpected token %s", token.String())
 	}

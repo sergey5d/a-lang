@@ -223,12 +223,6 @@ type ListLiteral struct {
 
 func (*ListLiteral) exprNode() {}
 
-type MapLiteral struct {
-	Span Span `json:"span"`
-}
-
-func (*MapLiteral) exprNode() {}
-
 type CallExpr struct {
 	Callee Expr   `json:"callee"`
 	Args   []Expr `json:"args"`

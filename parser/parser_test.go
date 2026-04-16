@@ -7,7 +7,7 @@ def doSomeWork(a Int, b Int) Bool {
 
 	let list = [a, b, c]
 	let set = Set()
-	let map = {}
+	let map = Map()
 	let map2 = Map(a : b)
 	let tuple = Set(a, b)
 	let tuple2 = a : b : c

@@ -289,8 +289,6 @@ func (l *Lowerer) lowerExpr(expr parser.Expr) (Expr, error) {
 			items[i] = lowered
 		}
 		return &ListLiteral{Elements: items, Type: l.typeOf(expr)}, nil
-	case *parser.MapLiteral:
-		return &BuiltinCall{Name: "MapLiteral", Type: l.typeOf(expr)}, nil
 	case *parser.GroupExpr:
 		return l.lowerExpr(e.Inner)
 	case *parser.UnaryExpr:

@@ -444,8 +444,6 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			}
 		}
 		result = &Type{Kind: TypeBuiltin, Name: "List", Args: []*Type{elemType}}
-	case *parser.MapLiteral:
-		result = &Type{Kind: TypeBuiltin, Name: "Map", Args: []*Type{unknownType, unknownType}}
 	case *parser.GroupExpr:
 		result = c.checkExpr(e.Inner)
 	case *parser.UnaryExpr:
@@ -1313,8 +1311,6 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.StringLiteral:
 		return e.Span
 	case *parser.ListLiteral:
-		return e.Span
-	case *parser.MapLiteral:
 		return e.Span
 	case *parser.CallExpr:
 		return e.Span
