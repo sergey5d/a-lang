@@ -332,7 +332,11 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		if !mutable {
 			return
 		}
-		if s.Operator != "=" {
+		if s.Operator == "=" && !c.allowEqualsAssignment(s.Target) {
+			c.addDiagnostic("invalid_assignment_operator", "use ':=' for mutable reassignment", s.Span)
+			return
+		}
+		if s.Operator != "=" && s.Operator != ":=" {
 			op := s.Operator[:len(s.Operator)-1]
 			c.checkBinaryOperation(targetType, valueType, op, s.Span)
 		}
@@ -758,6 +762,18 @@ func (c *Checker) checkAssignmentTarget(target parser.Expr, span parser.Span) (*
 		c.addDiagnostic("invalid_assignment_target", "invalid assignment target", span)
 		return unknownType, false
 	}
+}
+
+func (c *Checker) allowEqualsAssignment(target parser.Expr) bool {
+	member, ok := target.(*parser.MemberExpr)
+	if !ok {
+		return false
+	}
+	if c.currentMethod == nil || !c.currentMethod.Constructor {
+		return false
+	}
+	ident, ok := member.Receiver.(*parser.Identifier)
+	return ok && ident.Name == "this"
 }
 
 func (c *Checker) checkFieldAssignment(expr *parser.MemberExpr, receiverType *Type) (*Type, bool, bool) {

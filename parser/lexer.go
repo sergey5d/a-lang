@@ -68,6 +68,9 @@ func (l *Lexer) nextToken() (Token, error) {
 		return l.token(TokenComma, ",", startLine, startColumn), nil
 	case ':':
 		l.advance()
+		if l.match('=') {
+			return l.token(TokenColonAssign, ":=", startLine, startColumn), nil
+		}
 		return l.token(TokenColon, ":", startLine, startColumn), nil
 	case '.':
 		l.advance()

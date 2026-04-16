@@ -106,6 +106,24 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeMutableReassignmentRequiresColonAssign(t *testing.T) {
+	src := `
+def run() Int {
+	var value Int = 1
+	value = 2
+	return value
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "invalid_assignment_operator" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
 func TestAnalyzeClassMembersAndConstructors(t *testing.T) {
 	src := `
 class Counter {

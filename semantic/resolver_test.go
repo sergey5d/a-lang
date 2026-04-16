@@ -20,7 +20,7 @@ func TestAnalyzeValidScopes(t *testing.T) {
 def run(input Int) Bool {
 	value = helper(input)
 	var acc = 0
-	acc = acc + 1
+	acc := acc + 1
 	item = input
 
 	for item <- [1, 2, 3] {
@@ -172,7 +172,7 @@ func TestAnalyzeAssignmentToMutableBinding(t *testing.T) {
 	src := `
 def run() Bool {
 	var value = 1
-	value = value + 1
+	value := value + 1
 	value += 1
 	value -= 1
 	value *= 2

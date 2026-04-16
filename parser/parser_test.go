@@ -320,7 +320,7 @@ func TestParseMutableBindings(t *testing.T) {
 def vars() Bool {
 	var count Int = 1
 	var left Int, right Int = 1, 2
-	count = count + 1
+	count := count + 1
 	return count == right
 }
 `
@@ -355,7 +355,7 @@ func TestParseAssignmentStatement(t *testing.T) {
 	src := `
 def vars() Bool {
 	var counter = 0
-	counter = counter + 1
+	counter := counter + 1
 	counter += 2
 	counter -= 1
 	counter *= 3
@@ -378,8 +378,8 @@ def vars() Bool {
 	if _, ok := assign.Target.(*Identifier); !ok {
 		t.Fatalf("expected assignment target to be identifier, got %T", assign.Target)
 	}
-	if assign.Operator != "=" {
-		t.Fatalf("expected plain assignment operator, got %q", assign.Operator)
+	if assign.Operator != ":=" {
+		t.Fatalf("expected mutable assignment operator, got %q", assign.Operator)
 	}
 
 	compound, ok := fn.Body.Statements[2].(*AssignmentStmt)

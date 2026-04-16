@@ -734,7 +734,7 @@ func (p *Parser) parseExprStmt() (Statement, error) {
 
 func isAssignmentOperator(tt TokenType) bool {
 	switch tt {
-	case TokenAssign, TokenPlusEq, TokenMinusEq, TokenStarEq, TokenSlashEq, TokenPercentEq:
+	case TokenAssign, TokenColonAssign, TokenPlusEq, TokenMinusEq, TokenStarEq, TokenSlashEq, TokenPercentEq:
 		return true
 	default:
 		return false

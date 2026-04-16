@@ -39,6 +39,7 @@ const (
 	TokenColon  TokenType = ":"
 	TokenDot    TokenType = "."
 	TokenAssign TokenType = "="
+	TokenColonAssign TokenType = ":="
 
 	TokenPlus    TokenType = "+"
 	TokenMinus   TokenType = "-"

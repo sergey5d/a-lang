@@ -285,7 +285,10 @@ func (in *Interpreter) assign(target parser.Expr, operator string, value Value, 
 		if !current.mutable() {
 			return RuntimeError{Message: "cannot assign to immutable binding '" + t.Name + "'", Span: t.Span}
 		}
-		if operator != "=" {
+		if operator == "=" {
+			return RuntimeError{Message: "use ':=' for mutable reassignment", Span: t.Span}
+		}
+		if operator != ":=" {
 			updated, err := applyBinary(operator[:len(operator)-1], current.value(), value, t.Span)
 			if err != nil {
 				return err
@@ -303,7 +306,7 @@ func (in *Interpreter) assign(target parser.Expr, operator string, value Value, 
 			return RuntimeError{Message: "member assignment expects class instance", Span: t.Span}
 		}
 		current := obj.fields[t.Name]
-		if operator != "=" {
+		if operator != "=" && operator != ":=" {
 			updated, err := applyBinary(operator[:len(operator)-1], current, value, t.Span)
 			if err != nil {
 				return err
