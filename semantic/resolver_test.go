@@ -188,6 +188,21 @@ def run() Bool {
 	}
 }
 
+func TestAnalyzeTopLevelGlobalBinding(t *testing.T) {
+	src := `
+let seed Int = 1
+
+def run() Int {
+	return seed
+}
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", diagnostics)
+	}
+}
+
 func TestAnalyzeClassesAndInterfaces(t *testing.T) {
 	src := `
 interface Mapper[K, V] {

@@ -6,6 +6,7 @@ type Resolver struct {
 	diagnostics []Diagnostic
 	scopes      []scope
 	typeScopes  []typeScope
+	globals     map[string]symbol
 	functions   map[string]parser.Span
 	classes     map[string]parser.Span
 	interfaces  map[string]parser.Span
@@ -29,6 +30,7 @@ type typeDecl struct {
 
 func Analyze(program *parser.Program) []Diagnostic {
 	resolver := &Resolver{
+		globals:    map[string]symbol{},
 		functions:  map[string]parser.Span{},
 		classes:    map[string]parser.Span{},
 		interfaces: map[string]parser.Span{},
@@ -66,6 +68,7 @@ func (r *Resolver) resolveProgram(program *parser.Program) {
 		r.classes[decl.Name] = decl.Span
 		r.classTypes[decl.Name] = typeDecl{span: decl.Span, arity: len(decl.TypeParameters)}
 	}
+	r.resolveGlobals(program.Statements)
 
 	for _, fn := range program.Functions {
 		r.resolveFunction(fn)
@@ -78,9 +81,36 @@ func (r *Resolver) resolveProgram(program *parser.Program) {
 	}
 	r.pushScope()
 	for _, stmt := range program.Statements {
+		if _, ok := stmt.(*parser.ValStmt); ok {
+			continue
+		}
 		r.resolveStatement(stmt)
 	}
 	r.popScope()
+}
+
+func (r *Resolver) resolveGlobals(statements []parser.Statement) {
+	r.pushScope()
+	defer r.popScope()
+	for _, stmt := range statements {
+		valStmt, ok := stmt.(*parser.ValStmt)
+		if !ok {
+			continue
+		}
+		for _, value := range valStmt.Values {
+			r.resolveExpr(value)
+		}
+		for _, binding := range valStmt.Bindings {
+			r.resolveTypeRef(binding.Type)
+			if previous, exists := r.globals[binding.Name]; exists {
+				r.addDiagnostic("duplicate_binding", "duplicate binding '"+binding.Name+"'", binding.Span)
+				r.addDiagnostic("duplicate_binding", "previous declaration of '"+binding.Name+"'", previous.span)
+				continue
+			}
+			r.globals[binding.Name] = symbol{span: binding.Span, mutable: binding.Mutable}
+			r.defineMutable(binding.Name, binding.Span, binding.Mutable, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
+		}
+	}
 }
 
 func (r *Resolver) resolveFunction(fn *parser.FunctionDecl) {
@@ -362,6 +392,9 @@ func (r *Resolver) lookup(name string) (symbol, bool) {
 		if sym, ok := r.scopes[i][name]; ok {
 			return sym, true
 		}
+	}
+	if sym, ok := r.globals[name]; ok {
+		return sym, true
 	}
 	return symbol{}, false
 }
