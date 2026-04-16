@@ -1,11 +1,12 @@
 package main
 
 import (
+	"a-lang/parser"
+	"a-lang/semantic"
+	"a-lang/typecheck"
 	"encoding/json"
 	"fmt"
 	"os"
-
-	"a-lang/parser"
 )
 
 func main() {
@@ -23,6 +24,16 @@ func main() {
 	program, err := parser.Parse(string(src))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "parse error: %v\n", err)
+		os.Exit(1)
+	}
+
+	diagnostics := semantic.Analyze(program)
+	typeResult := typecheck.Analyze(program)
+	diagnostics = append(diagnostics, typeResult.Diagnostics...)
+	if len(diagnostics) > 0 {
+		for _, diagnostic := range diagnostics {
+			fmt.Fprintln(os.Stderr, diagnostic.Error())
+		}
 		os.Exit(1)
 	}
 
