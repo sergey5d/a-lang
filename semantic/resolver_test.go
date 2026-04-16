@@ -29,7 +29,7 @@ def run(input Int) Bool {
 		}
 	}
 
-	for item <- range(1, 5, 2) {
+	for item <- [1, 3] {
 		if item == input {
 			break
 		}

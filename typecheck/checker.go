@@ -61,6 +61,7 @@ type Checker struct {
 	exprTypes     map[parser.Expr]*Type
 	currentClass  *parser.ClassDecl
 	currentMethod *parser.MethodDecl
+	lambdaScopes  []int
 }
 
 type typeLookup interface {
@@ -334,6 +335,10 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			return
 		}
 		expected := c.returnTypes[len(c.returnTypes)-1]
+		if isUnknown(expected) {
+			c.returnTypes[len(c.returnTypes)-1] = valueType
+			return
+		}
 		if !isUnknown(expected) {
 			c.requireAssignable(valueType, expected, s.Span, "invalid_return_type", "cannot return "+valueType.String()+" from function returning "+expected.String())
 		}
@@ -354,7 +359,10 @@ func (c *Checker) checkExpr(expr parser.Expr) *Type {
 	var result *Type
 	switch e := expr.(type) {
 	case *parser.Identifier:
-		if binding, ok := c.lookup(e.Name); ok {
+		if binding, depth, ok := c.lookupWithDepth(e.Name); ok {
+			if c.capturesMutableOuterBinding(binding, depth) {
+				c.addDiagnostic("invalid_lambda_capture", "lambdas cannot capture mutable binding '"+e.Name+"'", e.Span)
+			}
 			result = binding.typ
 			break
 		}
@@ -422,7 +430,7 @@ func (c *Checker) checkExpr(expr parser.Expr) *Type {
 	case *parser.MemberExpr:
 		result = c.checkMemberExpr(e)
 	case *parser.LambdaExpr:
-		result = unknownType
+		result = c.checkLambdaExpr(e)
 	case *parser.PlaceholderExpr:
 		result = unknownType
 	default:
@@ -536,6 +544,37 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr)
 		c.addDiagnostic("invalid_call_target", "member call requires class or interface receiver", member.Span)
 		return unknownType
 	}
+}
+
+func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr) *Type {
+	c.pushScope()
+	defer c.popScope()
+
+	boundary := len(c.scopes) - 1
+	c.lambdaScopes = append(c.lambdaScopes, boundary)
+	defer func() { c.lambdaScopes = c.lambdaScopes[:len(c.lambdaScopes)-1] }()
+
+	params := make([]*Type, len(expr.Parameters))
+	for i, param := range expr.Parameters {
+		paramType := unknownType
+		if param.Type != nil {
+			paramType = c.resolveDeclaredType(param.Type)
+		}
+		params[i] = paramType
+		c.define(param.Name, paramType, false)
+	}
+
+	returnType := unknownType
+	if expr.Body != nil {
+		returnType = c.checkExpr(expr.Body)
+	}
+	if expr.BlockBody != nil {
+		c.returnTypes = append(c.returnTypes, unknownType)
+		c.checkBlock(expr.BlockBody)
+		returnType = c.returnTypes[len(c.returnTypes)-1]
+		c.returnTypes = c.returnTypes[:len(c.returnTypes)-1]
+	}
+	return functionType("<lambda>", Signature{Parameters: params, ReturnType: returnType})
 }
 
 func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
@@ -1021,15 +1060,31 @@ func (c *Checker) define(name string, typ *Type, mutable bool) {
 }
 
 func (c *Checker) lookup(name string) (binding, bool) {
+	b, _, ok := c.lookupWithDepth(name)
+	return b, ok
+}
+
+func (c *Checker) lookupWithDepth(name string) (binding, int, bool) {
 	for i := len(c.scopes) - 1; i >= 0; i-- {
 		if value, ok := c.scopes[i][name]; ok {
-			return value, true
+			return value, i, true
 		}
 	}
 	if value, ok := c.globals[name]; ok {
-		return value, true
+		return value, -1, true
 	}
-	return binding{}, false
+	return binding{}, -1, false
+}
+
+func (c *Checker) capturesMutableOuterBinding(b binding, depth int) bool {
+	if len(c.lambdaScopes) == 0 || !b.mutable {
+		return false
+	}
+	boundary := c.lambdaScopes[len(c.lambdaScopes)-1]
+	if depth == -1 {
+		return true
+	}
+	return depth < boundary
 }
 
 func (c *Checker) pushScope() { c.scopes = append(c.scopes, scope{}) }
@@ -1087,7 +1142,7 @@ func isBuiltinType(name string) bool {
 
 func isBuiltinValue(name string) bool {
 	switch name {
-	case "Map", "Set", "Array", "range":
+	case "Map", "Set", "Array":
 		return true
 	default:
 		return false

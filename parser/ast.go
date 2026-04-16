@@ -251,7 +251,8 @@ type LambdaParameter struct {
 
 type LambdaExpr struct {
 	Parameters []LambdaParameter `json:"parameters"`
-	Body       Expr              `json:"body"`
+	Body       Expr              `json:"body,omitempty"`
+	BlockBody  *BlockStmt        `json:"blockBody,omitempty"`
 	Span       Span              `json:"span"`
 }
 

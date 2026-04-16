@@ -798,14 +798,15 @@ func (p *Parser) parseLambdaIdentifier() (Expr, error) {
 	if _, err := p.consume(TokenArrow, "expected '->' after lambda parameter"); err != nil {
 		return nil, err
 	}
-	body, err := p.parseExpression(0)
+	body, blockBody, endSpan, err := p.parseLambdaBody()
 	if err != nil {
 		return nil, err
 	}
 	return &LambdaExpr{
 		Parameters: []LambdaParameter{param},
 		Body:       body,
-		Span:       mergeSpans(param.Span, exprSpan(body)),
+		BlockBody:  blockBody,
+		Span:       mergeSpans(param.Span, endSpan),
 	}, nil
 }
 
@@ -817,7 +818,7 @@ func (p *Parser) parseLambdaParen() (Expr, error) {
 	if _, err := p.consume(TokenArrow, "expected '->' after lambda parameters"); err != nil {
 		return nil, err
 	}
-	body, err := p.parseExpression(0)
+	body, blockBody, endSpan, err := p.parseLambdaBody()
 	if err != nil {
 		return nil, err
 	}
@@ -825,7 +826,22 @@ func (p *Parser) parseLambdaParen() (Expr, error) {
 	if len(params) > 0 {
 		startSpan = params[0].Span
 	}
-	return &LambdaExpr{Parameters: params, Body: body, Span: mergeSpans(startSpan, exprSpan(body))}, nil
+	return &LambdaExpr{Parameters: params, Body: body, BlockBody: blockBody, Span: mergeSpans(startSpan, endSpan)}, nil
+}
+
+func (p *Parser) parseLambdaBody() (Expr, *BlockStmt, Span, error) {
+	if p.check(TokenLBrace) {
+		block, err := p.parseBlock()
+		if err != nil {
+			return nil, nil, Span{}, err
+		}
+		return nil, block, block.Span, nil
+	}
+	body, err := p.parseExpression(0)
+	if err != nil {
+		return nil, nil, Span{}, err
+	}
+	return body, nil, exprSpan(body), nil
 }
 
 func (p *Parser) parseLambdaParams() ([]LambdaParameter, error) {

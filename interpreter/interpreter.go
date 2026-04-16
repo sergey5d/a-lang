@@ -40,6 +40,13 @@ type instance struct {
 	fields map[string]Value
 }
 
+type closure struct {
+	params    []parser.LambdaParameter
+	body      parser.Expr
+	blockBody *parser.BlockStmt
+	env       *env
+}
+
 type returnSignal struct {
 	value Value
 }
@@ -322,9 +329,6 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		if _, ok := in.classes[e.Name]; ok {
 			return classRef{name: e.Name}, nil
 		}
-		if isBuiltin(e.Name) {
-			return builtinRef{name: e.Name}, nil
-		}
 		return nil, RuntimeError{Message: "undefined name '" + e.Name + "'", Span: e.Span}
 	case *parser.IntegerLiteral:
 		n, err := strconv.ParseInt(e.Value, 10, 64)
@@ -419,7 +423,7 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		}
 		return in.evalMember(receiver, e)
 	case *parser.LambdaExpr:
-		return nil, RuntimeError{Message: "lambdas are not implemented in interpreter yet", Span: e.Span}
+		return &closure{params: e.Parameters, body: e.Body, blockBody: e.BlockBody, env: local}, nil
 	case *parser.PlaceholderExpr:
 		return nil, RuntimeError{Message: "placeholder is not supported here", Span: e.Span}
 	default:
@@ -452,11 +456,35 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 			return nil, RuntimeError{Message: "undefined class '" + fn.name + "'", Span: call.Span}
 		}
 		return in.construct(class, args, local)
-	case builtinRef:
-		return callBuiltin(fn.name, args, call.Span)
+	case *closure:
+		return in.callClosure(fn, args)
 	default:
 		return nil, RuntimeError{Message: "value is not callable", Span: call.Span}
 	}
+}
+
+func (in *Interpreter) callClosure(fn *closure, args []Value) (Value, error) {
+	if len(args) != len(fn.params) {
+		return nil, RuntimeError{Message: fmt.Sprintf("lambda expects %d args, got %d", len(fn.params), len(args)), Span: parser.Span{}}
+	}
+	local := newEnv(fn.env)
+	for i, param := range fn.params {
+		local.define(param.Name, args[i], false)
+	}
+	if fn.body != nil {
+		return in.evalExpr(fn.body, local)
+	}
+	if fn.blockBody != nil {
+		_, signal, err := in.execBlock(fn.blockBody, local, nil)
+		if err != nil {
+			return nil, err
+		}
+		if ret, ok := signal.(returnSignal); ok {
+			return ret.value, nil
+		}
+		return nil, nil
+	}
+	return nil, nil
 }
 
 func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []parser.Expr, local *env) (Value, error) {
@@ -502,7 +530,6 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 }
 
 type classRef struct{ name string }
-type builtinRef struct{ name string }
 
 func newEnv(parent *env) *env {
 	return &env{parent: parent, values: map[string]slot{}}
@@ -546,50 +573,6 @@ func (r *slotRef) set(value Value) error {
 }
 func (r *slotRef) value() Value { return r.owner.values[r.name].value }
 
-func isBuiltin(name string) bool {
-	switch name {
-	case "range":
-		return true
-	default:
-		return false
-	}
-}
-
-func callBuiltin(name string, args []Value, span parser.Span) (Value, error) {
-	switch name {
-	case "range":
-		if len(args) < 2 || len(args) > 3 {
-			return nil, RuntimeError{Message: "range expects 2 or 3 arguments", Span: span}
-		}
-		start, ok1 := args[0].(int64)
-		end, ok2 := args[1].(int64)
-		step := int64(1)
-		if len(args) == 3 {
-			if s, ok := args[2].(int64); ok {
-				step = s
-			} else {
-				return nil, RuntimeError{Message: "range step must be Int", Span: span}
-			}
-		}
-		if !ok1 || !ok2 || step == 0 {
-			return nil, RuntimeError{Message: "range expects integer arguments", Span: span}
-		}
-		var out []Value
-		if step > 0 {
-			for i := start; i < end; i += step {
-				out = append(out, i)
-			}
-		} else {
-			for i := start; i > end; i += step {
-				out = append(out, i)
-			}
-		}
-		return out, nil
-	default:
-		return nil, RuntimeError{Message: "unknown builtin '" + name + "'", Span: span}
-	}
-}
-
 func applyBinary(op string, left, right Value, span parser.Span) (Value, error) {
 	switch op {
 	case "+", "-", "*", "/", "%":
@@ -623,7 +606,22 @@ func applyBinary(op string, left, right Value, span parser.Span) (Value, error) 
 		}
 		return lb || rb, nil
 	case "..":
-		return callBuiltin("range", []Value{left, right}, span)
+		start, ok1 := left.(int64)
+		end, ok2 := right.(int64)
+		if !ok1 || !ok2 {
+			return nil, RuntimeError{Message: "range operands must be Int", Span: span}
+		}
+		var out []Value
+		if start <= end {
+			for i := start; i < end; i++ {
+				out = append(out, i)
+			}
+		} else {
+			for i := start; i > end; i-- {
+				out = append(out, i)
+			}
+		}
+		return out, nil
 	}
 	return nil, RuntimeError{Message: "unsupported operator '" + op + "'", Span: span}
 }

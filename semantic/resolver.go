@@ -264,7 +264,12 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 			r.resolveTypeRef(param.Type)
 			r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
 		}
-		r.resolveExpr(e.Body)
+		if e.Body != nil {
+			r.resolveExpr(e.Body)
+		}
+		if e.BlockBody != nil {
+			r.resolveBlockStatements(e.BlockBody.Statements)
+		}
 		r.popScope()
 	case *parser.BinaryExpr:
 		r.resolveExpr(e.Left)
@@ -439,7 +444,7 @@ func (r *Resolver) currentTypeScope() typeScope {
 
 func isBuiltin(name string) bool {
 	switch name {
-	case "Map", "Set", "Array", "range":
+	case "Map", "Set", "Array":
 		return true
 	default:
 		return false

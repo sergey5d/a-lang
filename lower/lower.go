@@ -340,9 +340,6 @@ func (l *Lowerer) lowerCall(call *parser.CallExpr) (Expr, error) {
 		if _, ok := l.classes[callee.Name]; ok {
 			return &Construct{Class: callee.Name, Args: args, Type: l.typeOf(call)}, nil
 		}
-		if callee.Name == "range" {
-			return &BuiltinCall{Name: callee.Name, Args: args, Type: l.typeOf(call)}, nil
-		}
 		return &FunctionCall{Name: callee.Name, Args: args, Type: l.typeOf(call)}, nil
 	case *parser.MemberExpr:
 		receiver, err := l.lowerExpr(callee.Receiver)

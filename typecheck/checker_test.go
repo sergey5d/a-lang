@@ -420,3 +420,74 @@ class Counter {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }
+
+func TestAnalyzeLambdaFunctionValue(t *testing.T) {
+	src := `
+def run() Int {
+	let add = (x Int) -> x + 1
+	return add(2)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeBlockLambdaFunctionValue(t *testing.T) {
+	src := `
+def run() Int {
+	let add = (x Int) -> {
+		let y Int = x + 1
+		return y
+	}
+	return add(2)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeLambdaCannotCaptureVar(t *testing.T) {
+	src := `
+def run() Int {
+	var total Int = 1
+	let add = (x Int) -> x + total
+	return add(2)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "invalid_lambda_capture" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
+func TestAnalyzeLambdaCanUseEnclosingGenericType(t *testing.T) {
+	src := `
+class Box[T] {
+	private let value T
+
+	def init(value T) {
+		this.value = value
+	}
+
+	def transform() T {
+		let id = (item T) -> item
+		return id(this.value)
+	}
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}

@@ -93,7 +93,7 @@ def loops(input Int, value Int) Bool {
 		}
 	}
 
-	for item <- range(1, 5, 2) {
+	for item <- [1, 3] {
 		if item == input {
 			break
 		}
@@ -543,6 +543,36 @@ def vars() Bool {
 	}
 	if len(fourthLambda.Parameters) != 1 || fourthLambda.Parameters[0].Name != "key" || fourthLambda.Parameters[0].Type == nil || fourthLambda.Parameters[0].Type.Name != "Int" {
 		t.Fatalf("unexpected typed single-parameter lambda: %#v", fourthLambda.Parameters)
+	}
+}
+
+func TestParseBlockLambda(t *testing.T) {
+	src := `
+def vars() Int {
+	let add = (x Int) -> {
+		let y Int = x + 1
+		return y
+	}
+	return add(1)
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	stmt := fn.Body.Statements[0].(*ValStmt)
+	lambda, ok := stmt.Values[0].(*LambdaExpr)
+	if !ok {
+		t.Fatalf("expected lambda expression, got %T", stmt.Values[0])
+	}
+	if lambda.BlockBody == nil || lambda.Body != nil {
+		t.Fatalf("expected block-bodied lambda, got %#v", lambda)
+	}
+	if len(lambda.BlockBody.Statements) != 2 {
+		t.Fatalf("expected 2 statements in lambda block, got %d", len(lambda.BlockBody.Statements))
 	}
 }
 

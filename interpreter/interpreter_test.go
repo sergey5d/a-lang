@@ -45,7 +45,7 @@ def run(input Int) Int {
 	}
 }
 
-func TestForAndRange(t *testing.T) {
+func TestForLoops(t *testing.T) {
 	src := `
 def run() Int {
 	var total Int = 0
@@ -54,7 +54,7 @@ def run() Int {
 		total += item
 	}
 
-	for step <- range(1, 5, 2) {
+	for step <- [1, 3] {
 		total += step
 	}
 
@@ -133,5 +133,44 @@ def run() Int {
 	}
 	if !strings.Contains(err.Error(), "must be called with ()") {
 		t.Fatalf("unexpected runtime error: %v", err)
+	}
+}
+
+func TestLambdaFunctionValue(t *testing.T) {
+	src := `
+def run() Int {
+	let add = (x Int) -> x + 1
+	return add(2)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(3) {
+		t.Fatalf("expected 3, got %#v", value)
+	}
+}
+
+func TestBlockLambdaFunctionValue(t *testing.T) {
+	src := `
+def run() Int {
+	let add = (x Int) -> {
+		let y Int = x + 1
+		return y
+	}
+	return add(2)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(3) {
+		t.Fatalf("expected 3, got %#v", value)
 	}
 }
