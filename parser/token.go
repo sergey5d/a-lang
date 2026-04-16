@@ -20,7 +20,7 @@ const (
 	TokenClass      TokenType = "CLASS"
 	TokenWith       TokenType = "WITH"
 	TokenPrivate    TokenType = "PRIVATE"
-	TokenVar        TokenType = "VAR"
+	TokenDeferred   TokenType = "DEFERRED"
 	TokenIf         TokenType = "IF"
 	TokenElse       TokenType = "ELSE"
 	TokenFor        TokenType = "FOR"
@@ -76,7 +76,7 @@ var keywords = map[string]TokenType{
 	"class":      TokenClass,
 	"with":       TokenWith,
 	"private":    TokenPrivate,
-	"var":        TokenVar,
+	"deferred":   TokenDeferred,
 	"if":         TokenIf,
 	"else":       TokenElse,
 	"for":        TokenFor,

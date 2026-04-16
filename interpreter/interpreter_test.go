@@ -24,7 +24,7 @@ def add(a Int, b Int) Int {
 
 def run(input Int) Int {
 	total Int = add(input, 2)
-	var copy Int = total
+	copy Int := total
 	copy += 3
 
 	if copy > 10 {
@@ -48,7 +48,7 @@ def run(input Int) Int {
 func TestForLoops(t *testing.T) {
 	src := `
 def run() Int {
-	var total Int = 0
+	total Int := 0
 
 	for item <- [1, 2, 3] {
 		total += item
@@ -75,7 +75,7 @@ def run() Int {
 func TestClassesAndMethods(t *testing.T) {
 	src := `
 class Counter {
-	private var count Int
+	private count Int := deferred
 
 	def init(count Int) {
 		this.count = count
@@ -107,7 +107,7 @@ def run() Int {
 func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {
-	private var count Int
+	private count Int := deferred
 
 	def init(count Int) {
 		this.count = count

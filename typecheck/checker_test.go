@@ -23,7 +23,7 @@ def add(a Int, b Int) Int {
 
 def run(input Int) Bool {
 	total Int = add(input, 1)
-	var copy Int = total
+	copy Int := total
 	copy += 1
 
 	if copy > input {
@@ -109,7 +109,7 @@ def run() Int {
 func TestAnalyzeMutableReassignmentRequiresColonAssign(t *testing.T) {
 	src := `
 def run() Int {
-	var value Int = 1
+	value Int := 1
 	value = 2
 	return value
 }
@@ -127,7 +127,7 @@ def run() Int {
 func TestAnalyzeClassMembersAndConstructors(t *testing.T) {
 	src := `
 class Counter {
-	private var count Int
+	private count Int := deferred
 
 	def init(count Int) {
 		this.count = count
@@ -422,7 +422,7 @@ func TestAnalyzeConstructorMustInitializeImmutableFields(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
-	private var seen Bool
+	private seen Bool := deferred
 
 	def init() {
 		this.seen = false
@@ -473,7 +473,7 @@ def run() Int {
 func TestAnalyzeLambdaCannotCaptureVar(t *testing.T) {
 	src := `
 def run() Int {
-	var total Int = 1
+	total Int := 1
 	add = (x Int) -> x + total
 	return add(2)
 }

@@ -61,7 +61,7 @@ func (l *Lowerer) lowerGlobal(stmt parser.Statement) ([]*Global, error) {
 		var globals []*Global
 		for i, binding := range s.Bindings {
 			var init Expr
-			if i < len(s.Values) {
+			if i < len(s.Values) && s.Values[i] != nil {
 				var err error
 				init, err = l.lowerExpr(s.Values[i])
 				if err != nil {
@@ -163,7 +163,7 @@ func (l *Lowerer) lowerStmt(stmt parser.Statement) ([]Stmt, error) {
 		var out []Stmt
 		for i, binding := range s.Bindings {
 			var init Expr
-			if i < len(s.Values) {
+			if i < len(s.Values) && s.Values[i] != nil {
 				var err error
 				init, err = l.lowerExpr(s.Values[i])
 				if err != nil {

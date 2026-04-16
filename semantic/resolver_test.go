@@ -19,7 +19,7 @@ func TestAnalyzeValidScopes(t *testing.T) {
 	src := `
 def run(input Int) Bool {
 	value = helper(input)
-	var acc = 0
+	acc := 0
 	acc := acc + 1
 	item = input
 
@@ -171,7 +171,7 @@ def run() Bool {
 func TestAnalyzeAssignmentToMutableBinding(t *testing.T) {
 	src := `
 def run() Bool {
-	var value = 1
+	value := 1
 	value := value + 1
 	value += 1
 	value -= 1
@@ -227,7 +227,7 @@ class Box[T] with Mapper[T, Stringable] {
 
 class SolidWork with Stringable {
 	private a List[Int]
-	private var b Map[String, Bool]
+	private b Map[String, Bool] := deferred
 
 	def init(a Int, b Bool) {
 		this.a = a

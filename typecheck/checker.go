@@ -139,7 +139,8 @@ func (c *Checker) checkGlobals(statements []parser.Statement) {
 		case *parser.ValStmt:
 			for i, bindingDecl := range s.Bindings {
 				valueType := unknownType
-				if i < len(s.Values) {
+				hasValue := i < len(s.Values) && s.Values[i] != nil
+				if hasValue {
 					expected := unknownType
 					if bindingDecl.Type != nil {
 						expected = c.resolveDeclaredType(bindingDecl.Type)
@@ -149,7 +150,12 @@ func (c *Checker) checkGlobals(statements []parser.Statement) {
 				declType := valueType
 				if bindingDecl.Type != nil {
 					declType = c.resolveDeclaredType(bindingDecl.Type)
-					c.requireAssignable(valueType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+declType.String())
+					if hasValue {
+						c.requireAssignable(valueType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+declType.String())
+					}
+				} else if !hasValue {
+					c.addDiagnostic("invalid_deferred", "deferred binding '"+bindingDecl.Name+"' requires an explicit type", bindingDecl.Span)
+					declType = unknownType
 				}
 				c.globals[bindingDecl.Name] = binding{typ: declType, mutable: bindingDecl.Mutable}
 				c.define(bindingDecl.Name, declType, bindingDecl.Mutable)
@@ -183,7 +189,11 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 	}
 
 	for _, field := range decl.Fields {
-		c.resolveDeclaredType(field.Type)
+		fieldType := c.resolveDeclaredType(field.Type)
+		if field.Initializer != nil {
+			valueType := c.checkExprWithExpected(field.Initializer, fieldType)
+			c.requireAssignable(valueType, fieldType, exprSpan(field.Initializer), "type_mismatch", "cannot assign "+valueType.String()+" to "+fieldType.String())
+		}
 	}
 	c.checkConstructorRules(info)
 	for _, method := range decl.Methods {
@@ -312,7 +322,8 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 	case *parser.ValStmt:
 		for i, bindingDecl := range s.Bindings {
 			valueType := unknownType
-			if i < len(s.Values) {
+			hasValue := i < len(s.Values) && s.Values[i] != nil
+			if hasValue {
 				expected := unknownType
 				if bindingDecl.Type != nil {
 					expected = c.resolveDeclaredType(bindingDecl.Type)
@@ -322,7 +333,12 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			declType := valueType
 			if bindingDecl.Type != nil {
 				declType = c.resolveDeclaredType(bindingDecl.Type)
-				c.requireAssignable(valueType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+declType.String())
+				if hasValue {
+					c.requireAssignable(valueType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+declType.String())
+				}
+			} else if !hasValue {
+				c.addDiagnostic("invalid_deferred", "deferred binding '"+bindingDecl.Name+"' requires an explicit type", bindingDecl.Span)
+				declType = unknownType
 			}
 			c.define(bindingDecl.Name, declType, bindingDecl.Mutable)
 		}
@@ -913,6 +929,9 @@ func (c *Checker) uninitializedLetFields(owner *parser.ClassDecl, ctor *parser.M
 	var missing []string
 	for _, field := range owner.Fields {
 		if field.Mutable {
+			continue
+		}
+		if field.Initializer != nil {
 			continue
 		}
 		if !initialized[field.Name] {

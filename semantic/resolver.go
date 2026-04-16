@@ -98,7 +98,9 @@ func (r *Resolver) resolveGlobals(statements []parser.Statement) {
 			continue
 		}
 		for _, value := range valStmt.Values {
-			r.resolveExpr(value)
+			if value != nil {
+				r.resolveExpr(value)
+			}
 		}
 		for _, binding := range valStmt.Bindings {
 			r.resolveTypeRef(binding.Type)
@@ -150,6 +152,9 @@ func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
 	}
 	for _, field := range decl.Fields {
 		r.resolveTypeRef(field.Type)
+		if field.Initializer != nil {
+			r.resolveExpr(field.Initializer)
+		}
 	}
 
 	r.pushScope()
@@ -188,7 +193,9 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 	switch s := stmt.(type) {
 	case *parser.ValStmt:
 		for _, value := range s.Values {
-			r.resolveExpr(value)
+			if value != nil {
+				r.resolveExpr(value)
+			}
 		}
 		for _, binding := range s.Bindings {
 			r.resolveTypeRef(binding.Type)

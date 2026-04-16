@@ -1,5 +1,5 @@
 class Counter {
-	private var count Int
+	private count Int := deferred
 
 	def init(count Int) {
 		this.count = count

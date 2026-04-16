@@ -10,6 +10,8 @@ import (
 
 type Value any
 
+type deferredValue struct{}
+
 type RuntimeError struct {
 	Message string
 	Span    parser.Span
@@ -134,8 +136,21 @@ func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl,
 
 func (in *Interpreter) construct(class *parser.ClassDecl, args []Value, parent *env) (Value, error) {
 	obj := &instance{class: class, fields: map[string]Value{}}
+	fieldEnv := newEnv(parent)
+	fieldEnv.define("this", obj, false)
 	for _, field := range class.Fields {
-		obj.fields[field.Name] = zeroValue(field.Type)
+		switch {
+		case field.Initializer != nil:
+			value, err := in.evalExpr(field.Initializer, fieldEnv)
+			if err != nil {
+				return nil, err
+			}
+			obj.fields[field.Name] = value
+		case field.Deferred:
+			obj.fields[field.Name] = deferredValue{}
+		default:
+			obj.fields[field.Name] = zeroValue(field.Type)
+		}
 	}
 	for _, method := range class.Methods {
 		if method.Constructor {
@@ -170,6 +185,10 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 	case *parser.ValStmt:
 		values := make([]Value, len(s.Values))
 		for i, expr := range s.Values {
+			if expr == nil {
+				values[i] = deferredValue{}
+				continue
+			}
 			value, err := in.evalExpr(expr, local)
 			if err != nil {
 				return nil, nil, err
@@ -324,6 +343,9 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 	switch e := expr.(type) {
 	case *parser.Identifier:
 		if binding, ok := local.get(e.Name); ok {
+			if _, deferred := binding.value.(deferredValue); deferred {
+				return nil, RuntimeError{Message: "binding '" + e.Name + "' is deferred and has not been assigned", Span: e.Span}
+			}
 			return binding.value, nil
 		}
 		if _, ok := in.functions[e.Name]; ok {
@@ -527,6 +549,9 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 	switch value := receiver.(type) {
 	case *instance:
 		if field, ok := value.fields[expr.Name]; ok {
+			if _, deferred := field.(deferredValue); deferred {
+				return nil, RuntimeError{Message: "field '" + expr.Name + "' is deferred and has not been assigned", Span: expr.Span}
+			}
 			return field, nil
 		}
 		for _, method := range value.class.Methods {

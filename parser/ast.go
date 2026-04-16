@@ -63,11 +63,13 @@ type ClassDecl struct {
 }
 
 type FieldDecl struct {
-	Name    string   `json:"name"`
-	Type    *TypeRef `json:"type"`
-	Mutable bool     `json:"mutable,omitempty"`
-	Private bool     `json:"private,omitempty"`
-	Span    Span     `json:"span"`
+	Name        string   `json:"name"`
+	Type        *TypeRef `json:"type"`
+	Initializer Expr     `json:"initializer,omitempty"`
+	Mutable     bool     `json:"mutable,omitempty"`
+	Deferred    bool     `json:"deferred,omitempty"`
+	Private     bool     `json:"private,omitempty"`
+	Span        Span     `json:"span"`
 }
 
 type MethodDecl struct {
@@ -106,10 +108,11 @@ type ValStmt struct {
 }
 
 type Binding struct {
-	Name    string   `json:"name"`
-	Type    *TypeRef `json:"type,omitempty"`
-	Mutable bool     `json:"mutable,omitempty"`
-	Span    Span     `json:"span"`
+	Name     string   `json:"name"`
+	Type     *TypeRef `json:"type,omitempty"`
+	Mutable  bool     `json:"mutable,omitempty"`
+	Deferred bool     `json:"deferred,omitempty"`
+	Span     Span     `json:"span"`
 }
 
 func (*ValStmt) statementNode() {}

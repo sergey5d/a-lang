@@ -276,7 +276,7 @@ func (p *Parser) parseClass() (*ClassDecl, error) {
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		private := p.match(TokenPrivate)
 		switch p.peek().Type {
-		case TokenIdentifier, TokenVar:
+		case TokenIdentifier:
 			field, err := p.parseField(private)
 			if err != nil {
 				return nil, err
@@ -301,30 +301,40 @@ func (p *Parser) parseClass() (*ClassDecl, error) {
 }
 
 func (p *Parser) parseField(private bool) (FieldDecl, error) {
-	start := p.advance()
-	if start.Type != TokenIdentifier && start.Type != TokenVar {
-		return FieldDecl{}, fmt.Errorf("expected field declaration, got %s", start.String())
+	start, err := p.consume(TokenIdentifier, "expected field name")
+	if err != nil {
+		return FieldDecl{}, err
 	}
-	mutable := start.Type == TokenVar
 	name := start
-	if mutable {
-		var err error
-		name, err = p.consume(TokenIdentifier, "expected field name")
-		if err != nil {
-			return FieldDecl{}, err
-		}
-	}
 	typ, err := p.parseTypeRef()
 	if err != nil {
 		return FieldDecl{}, err
 	}
-	return FieldDecl{
-		Name:    name.Lexeme,
-		Type:    typ,
-		Mutable: mutable,
-		Private: private,
-		Span:    mergeSpans(tokenSpan(start), typeSpan(typ)),
-	}, nil
+	field := FieldDecl{
+		Name:     name.Lexeme,
+		Type:     typ,
+		Deferred: true,
+		Private:  private,
+		Span:     mergeSpans(tokenSpan(start), typeSpan(typ)),
+	}
+	switch p.peek().Type {
+	case TokenAssign, TokenColonAssign:
+		operator := p.advance()
+		field.Mutable = operator.Type == TokenColonAssign
+		if p.match(TokenDeferred) {
+			field.Deferred = true
+			field.Span = mergeSpans(field.Span, tokenSpan(p.previous()))
+			return field, nil
+		}
+		expr, err := p.parseExpression(0)
+		if err != nil {
+			return FieldDecl{}, err
+		}
+		field.Initializer = expr
+		field.Deferred = false
+		field.Span = mergeSpans(field.Span, exprSpan(expr))
+	}
+	return field, nil
 }
 
 func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
@@ -420,8 +430,6 @@ func (p *Parser) parseBlock() (*BlockStmt, error) {
 
 func (p *Parser) parseStatement() (Statement, error) {
 	switch p.peek().Type {
-	case TokenVar:
-		return p.parseBindingStmt(true)
 	case TokenIf:
 		return p.parseIfStmt()
 	case TokenFor:
@@ -439,25 +447,20 @@ func (p *Parser) parseStatement() (Statement, error) {
 	}
 }
 
-func (p *Parser) parseBindingStmt(mutable bool) (Statement, error) {
-	start := p.advance()
-	return p.parseBindingStmtWithStart(start, mutable, start.Type == TokenIdentifier)
-}
-
 func (p *Parser) parseBareBindingStmt() (Statement, error) {
 	start, err := p.consume(TokenIdentifier, "expected binding name")
 	if err != nil {
 		return nil, err
 	}
-	return p.parseBindingStmtWithStart(start, false, true)
+	return p.parseBindingStmtWithStart(start, true)
 }
 
-func (p *Parser) parseBindingStmtWithStart(start Token, mutable bool, firstIsName bool) (Statement, error) {
+func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (Statement, error) {
 	var bindings []Binding
 	useStart := start
 	first := true
 	for {
-		binding := Binding{Mutable: mutable}
+		binding := Binding{}
 
 		name := useStart
 		if !first || !firstIsName {
@@ -485,19 +488,32 @@ func (p *Parser) parseBindingStmtWithStart(start Token, mutable bool, firstIsNam
 		useStart = Token{}
 	}
 
-	if _, err := p.consume(TokenAssign, "expected '=' after bindings"); err != nil {
-		return nil, err
+	operator := p.peek().Type
+	if operator != TokenAssign && operator != TokenColonAssign {
+		return nil, fmt.Errorf("expected '=' or ':=' after bindings, got %s", p.peek().String())
+	}
+	p.advance()
+	mutable := operator == TokenColonAssign
+	for i := range bindings {
+		bindings[i].Mutable = mutable
 	}
 
-	values, err := p.parseExprList(TokenRBrace)
+	values, err := p.parseBindingInitializers(len(bindings))
 	if err != nil {
 		return nil, err
 	}
 	stmt := &ValStmt{Bindings: bindings, Values: values}
-	if len(values) > 0 {
-		stmt.Span = mergeSpans(tokenSpan(start), exprSpan(values[len(values)-1]))
-	} else {
-		stmt.Span = tokenSpan(start)
+	stmt.Span = tokenSpan(start)
+	for i := range bindings {
+		if values[i] != nil {
+			stmt.Span = mergeSpans(stmt.Span, exprSpan(values[i]))
+			continue
+		}
+		bindings[i].Deferred = true
+		stmt.Bindings[i].Deferred = true
+		if i == len(bindings)-1 {
+			stmt.Span = mergeSpans(stmt.Span, bindings[i].Span)
+		}
 	}
 	for _, binding := range bindings {
 		p.declare(binding.Name)
@@ -510,7 +526,7 @@ func (p *Parser) isBareBindingStart() bool {
 		return false
 	}
 
-	if p.checkNext(TokenAssign) {
+	if p.checkNext(TokenAssign) || p.checkNext(TokenColonAssign) {
 		return !p.isDeclared(p.peek().Lexeme)
 	}
 
@@ -538,7 +554,7 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 		if i >= len(p.tokens) {
 			return false
 		}
-		if p.tokens[i].Type == TokenAssign {
+		if p.tokens[i].Type == TokenAssign || p.tokens[i].Type == TokenColonAssign {
 			return true
 		}
 		if p.tokens[i].Type != TokenComma {
@@ -546,6 +562,28 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 		}
 		i++
 	}
+}
+
+func (p *Parser) parseBindingInitializers(count int) ([]Expr, error) {
+	values := make([]Expr, 0, count)
+	for len(values) < count {
+		if p.match(TokenDeferred) {
+			values = append(values, nil)
+		} else {
+			expr, err := p.parseExpression(0)
+			if err != nil {
+				return nil, err
+			}
+			values = append(values, expr)
+		}
+		if len(values) == count {
+			break
+		}
+		if _, err := p.consume(TokenComma, "expected ',' between initializers"); err != nil {
+			return nil, err
+		}
+	}
+	return values, nil
 }
 
 func (p *Parser) parseExprList(until TokenType) ([]Expr, error) {

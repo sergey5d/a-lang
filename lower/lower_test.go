@@ -19,7 +19,7 @@ func parseProgram(t *testing.T, src string) *parser.Program {
 func TestProgramFromAST(t *testing.T) {
 	src := `
 class Counter {
-	private var count Int
+	private count Int := deferred
 
 	def init(count Int) {
 		this.count = count
@@ -73,7 +73,7 @@ def run(input Int) Int {
 	}
 	first, ok := lowered.Functions[0].Body[0].(*VarDecl)
 	if !ok {
-		t.Fatalf("expected first statement to be var decl, got %T", lowered.Functions[0].Body[0])
+		t.Fatalf("expected first statement to be binding decl, got %T", lowered.Functions[0].Body[0])
 	}
 	if _, ok := first.Init.(*Construct); !ok {
 		t.Fatalf("expected constructor init, got %T", first.Init)
