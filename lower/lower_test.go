@@ -93,15 +93,17 @@ def run(input Int) Int {
 	}
 }
 
-func TestProgramFromTypedRejectsUnsupportedYieldLoop(t *testing.T) {
+func TestProgramFromTypedLowersLambdaInvokeAndYieldLoop(t *testing.T) {
 	src := `
 def run(values List[Int]) Int {
+	add Int -> Int = x -> x + 1
 	for {
-		x <- values
+		x <- values,
+		y <- values
 	} yield {
-		x
+		x + y
 	}
-	return 0
+	return add(0)
 }
 `
 
@@ -114,9 +116,45 @@ def run(values List[Int]) Int {
 	if err != nil {
 		t.Fatalf("typed.Build returned error: %v", err)
 	}
-	_, err = ProgramFromTyped(typedProgram)
-	if err == nil {
-		t.Fatalf("expected lowering error for yield loop")
+	lowered, err := ProgramFromTyped(typedProgram)
+	if err != nil {
+		t.Fatalf("ProgramFromTyped returned error: %v", err)
+	}
+	first, ok := lowered.Functions[0].Body[0].(*VarDecl)
+	if !ok {
+		t.Fatalf("expected lambda binding, got %T", lowered.Functions[0].Body[0])
+	}
+	if _, ok := first.Init.(*Lambda); !ok {
+		t.Fatalf("expected lowered lambda, got %T", first.Init)
+	}
+	second, ok := lowered.Functions[0].Body[1].(*VarDecl)
+	if !ok {
+		t.Fatalf("expected yield result temp var, got %T", lowered.Functions[0].Body[1])
+	}
+	if second.Type == nil || second.Type.Name != "List" {
+		t.Fatalf("expected yield temp list type, got %#v", second.Type)
+	}
+	outer, ok := lowered.Functions[0].Body[2].(*ForEach)
+	if !ok {
+		t.Fatalf("expected outer foreach, got %T", lowered.Functions[0].Body[2])
+	}
+	inner, ok := outer.Body[0].(*ForEach)
+	if !ok {
+		t.Fatalf("expected inner foreach, got %T", outer.Body[0])
+	}
+	assign, ok := inner.Body[0].(*Assign)
+	if !ok {
+		t.Fatalf("expected append assignment, got %T", inner.Body[0])
+	}
+	if _, ok := assign.Value.(*BuiltinCall); !ok {
+		t.Fatalf("expected append builtin call, got %T", assign.Value)
+	}
+	ret, ok := lowered.Functions[0].Body[3].(*Return)
+	if !ok {
+		t.Fatalf("expected return statement, got %T", lowered.Functions[0].Body[3])
+	}
+	if _, ok := ret.Value.(*Invoke); !ok {
+		t.Fatalf("expected lowered invoke, got %T", ret.Value)
 	}
 }
 

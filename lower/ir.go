@@ -222,3 +222,20 @@ type MethodCall struct {
 }
 
 func (*MethodCall) exprNode() {}
+
+type Lambda struct {
+	Parameters []Parameter
+	ReturnType *typecheck.Type
+	Body       []Stmt
+	Type       *typecheck.Type
+}
+
+func (*Lambda) exprNode() {}
+
+type Invoke struct {
+	Callee Expr
+	Args   []Expr
+	Type   *typecheck.Type
+}
+
+func (*Invoke) exprNode() {}

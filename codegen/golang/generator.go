@@ -299,7 +299,16 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		}
 		return fmt.Sprintf("%s(%s)", goIdent(e.Name), strings.Join(args, ", ")), nil
 	case *lower.BuiltinCall:
-		return "", fmt.Errorf("builtin calls are not supported by Go generation yet")
+		args, err := g.exprList(e.Args)
+		if err != nil {
+			return "", err
+		}
+		switch e.Name {
+		case "append":
+			return fmt.Sprintf("append(%s)", strings.Join(args, ", ")), nil
+		default:
+			return "", fmt.Errorf("builtin call %q is not supported by Go generation yet", e.Name)
+		}
 	case *lower.Construct:
 		args, err := g.exprList(e.Args)
 		if err != nil {
@@ -332,9 +341,54 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 			return "", err
 		}
 		return fmt.Sprintf("%s.%s(%s)", receiver, goIdent(e.Method), strings.Join(args, ", ")), nil
+	case *lower.Lambda:
+		return g.lambdaExpr(e)
+	case *lower.Invoke:
+		callee, err := g.expr(e.Callee)
+		if err != nil {
+			return "", err
+		}
+		args, err := g.exprList(e.Args)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%s(%s)", callee, strings.Join(args, ", ")), nil
 	default:
 		return "", fmt.Errorf("unsupported lowered expression %T", expr)
 	}
+}
+
+func (g *Generator) lambdaExpr(expr *lower.Lambda) (string, error) {
+	var b strings.Builder
+	b.WriteString("func(")
+	for i, param := range expr.Parameters {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(goIdent(param.Name))
+		b.WriteByte(' ')
+		b.WriteString(goType(param.Type))
+	}
+	b.WriteString(")")
+	if expr.ReturnType != nil {
+		ret := goType(expr.ReturnType)
+		if ret != "" {
+			b.WriteByte(' ')
+			b.WriteString(ret)
+		}
+	}
+	b.WriteString(" {\n")
+
+	sub := &Generator{
+		indent:       1,
+		currentClass: g.currentClass,
+	}
+	if err := sub.writeStmtBlock(expr.Body); err != nil {
+		return "", err
+	}
+	b.WriteString(sub.b.String())
+	b.WriteString("}")
+	return b.String(), nil
 }
 
 func (g *Generator) exprList(exprs []lower.Expr) ([]string, error) {

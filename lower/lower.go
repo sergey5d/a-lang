@@ -9,7 +9,9 @@ import (
 	"a-lang/typed"
 )
 
-type Lowerer struct{}
+type Lowerer struct {
+	tempID int
+}
 
 func ProgramFromTyped(program *typed.Program) (*Program, error) {
 	l := &Lowerer{}
@@ -207,24 +209,48 @@ func (l *Lowerer) lowerStmt(stmt typed.Stmt) ([]Stmt, error) {
 		}
 		return []Stmt{&If{Condition: cond, Then: thenBlock, Else: elseBlock}}, nil
 	case *typed.ForStmt:
-		if s.YieldBody != nil {
-			return nil, fmt.Errorf("yield loops are not supported by lowering yet")
-		}
 		body, err := l.lowerBlock(s.Body)
 		if err != nil {
 			return nil, err
 		}
 		if len(s.Bindings) == 0 {
+			if s.YieldBody != nil {
+				return nil, fmt.Errorf("yield loops without bindings are not supported")
+			}
 			return []Stmt{&Loop{Body: body}}, nil
 		}
-		if len(s.Bindings) != 1 {
-			return nil, fmt.Errorf("multi-binding for loops are not supported by lowering yet")
+		if s.YieldBody != nil {
+			yieldPrefix, yieldExpr, yieldType, err := l.lowerYieldBody(s.YieldBody)
+			if err != nil {
+				return nil, err
+			}
+			resultType := &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "List", Args: []*typecheck.Type{yieldType}}
+			resultName := l.nextTemp("yield")
+			resultRef := &VarRef{Name: resultName, Type: resultType}
+			body = append(body, yieldPrefix...)
+			body = append(body, &Assign{
+				Target:   resultRef,
+				Operator: ":=",
+				Value: &BuiltinCall{
+					Name: "append",
+					Args: []Expr{resultRef, yieldExpr},
+					Type: resultType,
+				},
+			})
+			stmts := []Stmt{&VarDecl{
+				Name:    resultName,
+				Mutable: true,
+				Type:    resultType,
+				Init:    &ListLiteral{Elements: nil, Type: resultType},
+			}}
+			loops, err := l.lowerForBindings(s.Bindings, body)
+			if err != nil {
+				return nil, err
+			}
+			stmts = append(stmts, loops...)
+			return stmts, nil
 		}
-		iterable, err := l.lowerExpr(s.Bindings[0].Iterable)
-		if err != nil {
-			return nil, err
-		}
-		return []Stmt{&ForEach{Name: s.Bindings[0].Name, Iterable: iterable, Body: body}}, nil
+		return l.lowerForBindings(s.Bindings, body)
 	case *typed.ReturnStmt:
 		value, err := l.lowerExpr(s.Value)
 		if err != nil {
@@ -341,14 +367,131 @@ func (l *Lowerer) lowerExpr(expr typed.Expr) (Expr, error) {
 		}
 		return &IndexGet{Receiver: receiver, Index: index, Type: e.GetType()}, nil
 	case *typed.LambdaExpr:
-		return nil, fmt.Errorf("lambdas are not supported by lowering yet")
+		body, err := l.lowerLambdaBody(e)
+		if err != nil {
+			return nil, err
+		}
+		return &Lambda{
+			Parameters: l.lowerLambdaParams(e),
+			ReturnType: lambdaReturnType(e.GetType()),
+			Body:       body,
+			Type:       e.GetType(),
+		}, nil
 	case *typed.PlaceholderExpr:
 		return nil, fmt.Errorf("placeholder expressions are not supported by lowering")
 	case *typed.InvokeExpr:
-		return nil, fmt.Errorf("function value invocation is not supported by lowering yet")
+		callee, err := l.lowerExpr(e.Callee)
+		if err != nil {
+			return nil, err
+		}
+		args, err := l.lowerArgs(e.Args)
+		if err != nil {
+			return nil, err
+		}
+		return &Invoke{Callee: callee, Args: args, Type: e.GetType()}, nil
 	default:
 		return nil, fmt.Errorf("unsupported expression %T during lowering", expr)
 	}
+}
+
+func (l *Lowerer) lowerForBindings(bindings []typed.ForBinding, body []Stmt) ([]Stmt, error) {
+	out := body
+	for i := len(bindings) - 1; i >= 0; i-- {
+		iterable, err := l.lowerExpr(bindings[i].Iterable)
+		if err != nil {
+			return nil, err
+		}
+		out = []Stmt{&ForEach{
+			Name:     bindings[i].Name,
+			Iterable: iterable,
+			Body:     out,
+		}}
+	}
+	return out, nil
+}
+
+func (l *Lowerer) lowerYieldBody(block *typed.BlockStmt) ([]Stmt, Expr, *typecheck.Type, error) {
+	if block == nil || len(block.Statements) == 0 {
+		return nil, nil, unknownType(), fmt.Errorf("yield body must end with an expression")
+	}
+	prefix := block.Statements[:len(block.Statements)-1]
+	last := block.Statements[len(block.Statements)-1]
+	exprStmt, ok := last.(*typed.ExprStmt)
+	if !ok {
+		return nil, nil, unknownType(), fmt.Errorf("yield body must end with an expression statement")
+	}
+	loweredPrefix, err := l.lowerStmtBlock(prefix)
+	if err != nil {
+		return nil, nil, unknownType(), err
+	}
+	yieldExpr, err := l.lowerExpr(exprStmt.Expr)
+	if err != nil {
+		return nil, nil, unknownType(), err
+	}
+	yieldType := exprStmt.Expr.GetType()
+	if yieldType == nil {
+		yieldType = unknownType()
+	}
+	return loweredPrefix, yieldExpr, yieldType, nil
+}
+
+func (l *Lowerer) lowerStmtBlock(stmts []typed.Stmt) ([]Stmt, error) {
+	var out []Stmt
+	for _, stmt := range stmts {
+		lowered, err := l.lowerStmt(stmt)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, lowered...)
+	}
+	return out, nil
+}
+
+func (l *Lowerer) lowerLambdaBody(expr *typed.LambdaExpr) ([]Stmt, error) {
+	if expr.Body != nil {
+		body, err := l.lowerExpr(expr.Body)
+		if err != nil {
+			return nil, err
+		}
+		return []Stmt{&Return{Value: body}}, nil
+	}
+	return l.lowerBlock(expr.BlockBody)
+}
+
+func (l *Lowerer) lowerLambdaParams(expr *typed.LambdaExpr) []Parameter {
+	params := expr.Parameters
+	out := make([]Parameter, len(params))
+	var sig *typecheck.Signature
+	if expr.GetType() != nil && expr.GetType().Kind == typecheck.TypeFunction {
+		sig = expr.GetType().Signature
+	}
+	for i, param := range params {
+		paramType := param.Type
+		if (paramType == nil || paramType.Kind == typecheck.TypeUnknown) && sig != nil && i < len(sig.Parameters) {
+			paramType = sig.Parameters[i]
+		}
+		if paramType == nil {
+			paramType = unknownType()
+		}
+		out[i] = Parameter{Name: param.Name, Type: paramType}
+	}
+	return out
+}
+
+func lambdaReturnType(t *typecheck.Type) *typecheck.Type {
+	if t != nil && t.Kind == typecheck.TypeFunction && t.Signature != nil {
+		return t.Signature.ReturnType
+	}
+	return unknownType()
+}
+
+func (l *Lowerer) nextTemp(prefix string) string {
+	l.tempID++
+	return fmt.Sprintf("__%s%d", prefix, l.tempID)
+}
+
+func unknownType() *typecheck.Type {
+	return &typecheck.Type{Kind: typecheck.TypeUnknown, Name: "<unknown>"}
 }
 
 func (l *Lowerer) lowerArgs(args []typed.Expr) ([]Expr, error) {

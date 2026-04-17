@@ -48,10 +48,17 @@ def sum(values Array[Int]) Int {
 }
 
 def run(values Array[Int]) Int {
+	bump Int -> Int = x -> x + 1
 	counter Counter = Counter(seed)
 	values[0] := values[0] + 1
+	for {
+		left <- values,
+		right <- values
+	} yield {
+		left + right
+	}
 	if values[0] > 0 {
-		return counter.inc(sum(values))
+		return bump(counter.inc(sum(values)))
 	}
 	return seed
 }
