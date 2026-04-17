@@ -8,13 +8,13 @@ import (
 )
 
 type Builder struct {
-	exprTypes  map[parser.Expr]*typecheck.Type
-	functions  map[string]*parser.FunctionDecl
-	classes    map[string]*parser.ClassDecl
-	interfaces map[string]*parser.InterfaceDecl
-	nextID     int
-	scopes     []map[string]SymbolRef
-	thisStack  []SymbolRef
+	exprTypes        map[parser.Expr]*typecheck.Type
+	functions        map[string]*parser.FunctionDecl
+	classes          map[string]*parser.ClassDecl
+	interfaces       map[string]*parser.InterfaceDecl
+	nextID           int
+	scopes           []map[string]SymbolRef
+	thisStack        []SymbolRef
 	functionSymbols  map[string]SymbolRef
 	classSymbols     map[string]SymbolRef
 	interfaceSymbols map[string]SymbolRef
@@ -29,10 +29,10 @@ type methodSymbol struct {
 
 func Build(program *parser.Program, info typecheck.Result) (*Program, error) {
 	b := &Builder{
-		exprTypes:  info.ExprTypes,
-		functions:  map[string]*parser.FunctionDecl{},
-		classes:    map[string]*parser.ClassDecl{},
-		interfaces: map[string]*parser.InterfaceDecl{},
+		exprTypes:        info.ExprTypes,
+		functions:        map[string]*parser.FunctionDecl{},
+		classes:          map[string]*parser.ClassDecl{},
+		interfaces:       map[string]*parser.InterfaceDecl{},
 		functionSymbols:  map[string]SymbolRef{},
 		classSymbols:     map[string]SymbolRef{},
 		interfaceSymbols: map[string]SymbolRef{},
@@ -286,9 +286,9 @@ func (b *Builder) buildBlock(block *parser.BlockStmt) (*BlockStmt, error) {
 
 func (b *Builder) buildStmt(stmt parser.Statement) (Stmt, error) {
 	switch s := stmt.(type) {
-		case *parser.ValStmt:
-			bindings := make([]BindingDecl, len(s.Bindings))
-			for i, binding := range s.Bindings {
+	case *parser.ValStmt:
+		bindings := make([]BindingDecl, len(s.Bindings))
+		for i, binding := range s.Bindings {
 			var init Expr
 			var err error
 			if i < len(s.Values) && s.Values[i] != nil {
@@ -297,19 +297,19 @@ func (b *Builder) buildStmt(stmt parser.Statement) (Stmt, error) {
 					return nil, err
 				}
 			}
-				symbol := b.newSymbol(SymbolBinding, binding.Name, "", binding.Span)
-				bindings[i] = BindingDecl{
-					Name:     binding.Name,
-					Type:     b.bindingType(binding, init),
-					Mode:     modeFromMutable(binding.Mutable),
-					InitMode: initMode(binding.Deferred, init),
-					Init:     init,
-					Symbol:   symbol,
-					Span:     binding.Span,
-				}
-				b.defineSymbol(symbol)
+			symbol := b.newSymbol(SymbolBinding, binding.Name, "", binding.Span)
+			bindings[i] = BindingDecl{
+				Name:     binding.Name,
+				Type:     b.bindingType(binding, init),
+				Mode:     modeFromMutable(binding.Mutable),
+				InitMode: initMode(binding.Deferred, init),
+				Init:     init,
+				Symbol:   symbol,
+				Span:     binding.Span,
 			}
-			return &BindingStmt{Bindings: bindings, Span: s.Span}, nil
+			b.defineSymbol(symbol)
+		}
+		return &BindingStmt{Bindings: bindings, Span: s.Span}, nil
 	case *parser.AssignmentStmt:
 		target, err := b.buildExpr(s.Target)
 		if err != nil {
@@ -342,40 +342,40 @@ func (b *Builder) buildStmt(stmt parser.Statement) (Stmt, error) {
 			return nil, err
 		}
 		return &IfStmt{Condition: cond, Then: thenBlock, ElseIf: elseIf, Else: elseBlock, Span: s.Span}, nil
-		case *parser.ForStmt:
-			bindings := make([]ForBinding, len(s.Bindings))
-			for i, binding := range s.Bindings {
-				iterable, err := b.buildExpr(binding.Iterable)
+	case *parser.ForStmt:
+		bindings := make([]ForBinding, len(s.Bindings))
+		for i, binding := range s.Bindings {
+			iterable, err := b.buildExpr(binding.Iterable)
 			if err != nil {
 				return nil, err
 			}
-				symbol := b.newSymbol(SymbolBinding, binding.Name, "", binding.Span)
-				bindings[i] = ForBinding{
-					Name:     binding.Name,
-					Type:     elementType(iterable.GetType()),
-					Iterable: iterable,
-					Symbol:   symbol,
-					Span:     binding.Span,
-				}
+			symbol := b.newSymbol(SymbolBinding, binding.Name, "", binding.Span)
+			bindings[i] = ForBinding{
+				Name:     binding.Name,
+				Type:     elementType(iterable.GetType()),
+				Iterable: iterable,
+				Symbol:   symbol,
+				Span:     binding.Span,
 			}
-			b.pushScope()
-			for _, binding := range bindings {
-				b.defineSymbol(binding.Symbol)
-			}
-			body, err := b.buildBlock(s.Body)
-			b.popScope()
-			if err != nil {
-				return nil, err
-			}
-			b.pushScope()
-			for _, binding := range bindings {
-				b.defineSymbol(binding.Symbol)
-			}
-			yieldBody, err := b.buildBlock(s.YieldBody)
-			b.popScope()
-			if err != nil {
-				return nil, err
-			}
+		}
+		b.pushScope()
+		for _, binding := range bindings {
+			b.defineSymbol(binding.Symbol)
+		}
+		body, err := b.buildBlock(s.Body)
+		b.popScope()
+		if err != nil {
+			return nil, err
+		}
+		b.pushScope()
+		for _, binding := range bindings {
+			b.defineSymbol(binding.Symbol)
+		}
+		yieldBody, err := b.buildBlock(s.YieldBody)
+		b.popScope()
+		if err != nil {
+			return nil, err
+		}
 		return &ForStmt{Bindings: bindings, Body: body, YieldBody: yieldBody, Span: s.Span}, nil
 	case *parser.ReturnStmt:
 		value, err := b.buildExpr(s.Value)
@@ -456,6 +456,16 @@ func (b *Builder) buildExpr(expr parser.Expr) (Expr, error) {
 		field := &FieldExpr{baseExpr: b.base(expr), Receiver: receiver, Name: e.Name}
 		field.Field = b.resolveFieldSymbol(receiver.GetType(), e.Name)
 		return field, nil
+	case *parser.IndexExpr:
+		receiver, err := b.buildExpr(e.Receiver)
+		if err != nil {
+			return nil, err
+		}
+		index, err := b.buildExpr(e.Index)
+		if err != nil {
+			return nil, err
+		}
+		return &IndexExpr{baseExpr: b.base(expr), Receiver: receiver, Index: index}, nil
 	case *parser.CallExpr:
 		return b.buildCallExpr(e)
 	case *parser.LambdaExpr:
@@ -499,10 +509,10 @@ func (b *Builder) buildCallExpr(call *parser.CallExpr) (Expr, error) {
 	case *parser.Identifier:
 		if _, ok := b.classes[callee.Name]; ok {
 			expr := &ConstructorCallExpr{
-				baseExpr:    b.base(call),
-				Class:       callee.Name,
-				Args:        args,
-				Dispatch:    DispatchConstruct,
+				baseExpr: b.base(call),
+				Class:    callee.Name,
+				Args:     args,
+				Dispatch: DispatchConstruct,
 			}
 			if symbol, ok := b.classSymbols[callee.Name]; ok {
 				expr.ClassSymbol = &symbol
@@ -614,6 +624,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.CallExpr:
 		return e.Span
 	case *parser.MemberExpr:
+		return e.Span
+	case *parser.IndexExpr:
 		return e.Span
 	case *parser.LambdaExpr:
 		return e.Span

@@ -124,6 +124,44 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeArrayIndexing(t *testing.T) {
+	src := `
+def run(values Array[Int]) Int {
+	first Int = values[0]
+	values[1] := first + 2
+	return values[1]
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeInvalidIndexing(t *testing.T) {
+	src := `
+def fromList(values List[Int]) Int {
+	return values[0]
+}
+
+def fromArray(values Array[Int]) Int {
+	return values[true]
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "invalid_index_target" {
+		t.Fatalf("unexpected first diagnostic %#v", result.Diagnostics[0])
+	}
+	if result.Diagnostics[1].Code != "invalid_index_type" {
+		t.Fatalf("unexpected second diagnostic %#v", result.Diagnostics[1])
+	}
+}
+
 func TestAnalyzeClassMembersAndConstructors(t *testing.T) {
 	src := `
 class Counter {

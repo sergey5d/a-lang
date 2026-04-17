@@ -62,10 +62,10 @@ type TypeParameter struct {
 }
 
 type Parameter struct {
-	Name string
-	Type *typecheck.Type
+	Name   string
+	Type   *typecheck.Type
 	Symbol SymbolRef
-	Span parser.Span
+	Span   parser.Span
 }
 
 type FunctionDecl struct {
@@ -155,7 +155,7 @@ type BindingStmt struct {
 	Span     parser.Span
 }
 
-func (*BindingStmt) stmtNode() {}
+func (*BindingStmt) stmtNode()              {}
 func (s *BindingStmt) GetSpan() parser.Span { return s.Span }
 
 type AssignmentStmt struct {
@@ -165,7 +165,7 @@ type AssignmentStmt struct {
 	Span     parser.Span
 }
 
-func (*AssignmentStmt) stmtNode() {}
+func (*AssignmentStmt) stmtNode()              {}
 func (s *AssignmentStmt) GetSpan() parser.Span { return s.Span }
 
 type IfStmt struct {
@@ -176,7 +176,7 @@ type IfStmt struct {
 	Span      parser.Span
 }
 
-func (*IfStmt) stmtNode() {}
+func (*IfStmt) stmtNode()              {}
 func (s *IfStmt) GetSpan() parser.Span { return s.Span }
 
 type ForBinding struct {
@@ -194,7 +194,7 @@ type ForStmt struct {
 	Span      parser.Span
 }
 
-func (*ForStmt) stmtNode() {}
+func (*ForStmt) stmtNode()              {}
 func (s *ForStmt) GetSpan() parser.Span { return s.Span }
 
 type ReturnStmt struct {
@@ -202,14 +202,14 @@ type ReturnStmt struct {
 	Span  parser.Span
 }
 
-func (*ReturnStmt) stmtNode() {}
+func (*ReturnStmt) stmtNode()              {}
 func (s *ReturnStmt) GetSpan() parser.Span { return s.Span }
 
 type BreakStmt struct {
 	Span parser.Span
 }
 
-func (*BreakStmt) stmtNode() {}
+func (*BreakStmt) stmtNode()              {}
 func (s *BreakStmt) GetSpan() parser.Span { return s.Span }
 
 type ExprStmt struct {
@@ -217,7 +217,7 @@ type ExprStmt struct {
 	Span parser.Span
 }
 
-func (*ExprStmt) stmtNode() {}
+func (*ExprStmt) stmtNode()              {}
 func (s *ExprStmt) GetSpan() parser.Span { return s.Span }
 
 type baseExpr struct {
@@ -230,7 +230,7 @@ func (e *baseExpr) GetSpan() parser.Span     { return e.Span }
 
 type IdentifierExpr struct {
 	baseExpr
-	Name string
+	Name   string
 	Symbol *SymbolRef
 }
 
@@ -317,10 +317,18 @@ type FieldExpr struct {
 
 func (*FieldExpr) exprNode() {}
 
+type IndexExpr struct {
+	baseExpr
+	Receiver Expr
+	Index    Expr
+}
+
+func (*IndexExpr) exprNode() {}
+
 type FunctionCallExpr struct {
 	baseExpr
-	Name string
-	Args []Expr
+	Name     string
+	Args     []Expr
 	Function *SymbolRef
 }
 
@@ -328,11 +336,11 @@ func (*FunctionCallExpr) exprNode() {}
 
 type ConstructorCallExpr struct {
 	baseExpr
-	Class string
-	Args  []Expr
-	ClassSymbol  *SymbolRef
-	Constructor  *SymbolRef
-	Dispatch     CallDispatch
+	Class       string
+	Args        []Expr
+	ClassSymbol *SymbolRef
+	Constructor *SymbolRef
+	Dispatch    CallDispatch
 }
 
 func (*ConstructorCallExpr) exprNode() {}
@@ -357,10 +365,10 @@ type InvokeExpr struct {
 func (*InvokeExpr) exprNode() {}
 
 type LambdaParameter struct {
-	Name string
-	Type *typecheck.Type
+	Name   string
+	Type   *typecheck.Type
 	Symbol SymbolRef
-	Span parser.Span
+	Span   parser.Span
 }
 
 type LambdaExpr struct {

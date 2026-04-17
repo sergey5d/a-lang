@@ -334,6 +334,38 @@ func (in *Interpreter) assign(target parser.Expr, operator string, value Value, 
 		}
 		obj.fields[t.Name] = value
 		return nil
+	case *parser.IndexExpr:
+		receiver, err := in.evalExpr(t.Receiver, local)
+		if err != nil {
+			return err
+		}
+		items, ok := receiver.([]Value)
+		if !ok {
+			return RuntimeError{Message: "index assignment requires array-like value", Span: t.Span}
+		}
+		indexValue, err := in.evalExpr(t.Index, local)
+		if err != nil {
+			return err
+		}
+		index, ok := indexValue.(int64)
+		if !ok {
+			return RuntimeError{Message: "index expression must be Int", Span: exprSpan(t.Index)}
+		}
+		if index < 0 || index >= int64(len(items)) {
+			return RuntimeError{Message: "index out of bounds", Span: t.Span}
+		}
+		if operator == "=" {
+			return RuntimeError{Message: "use ':=' for mutable reassignment", Span: t.Span}
+		}
+		if operator != "=" && operator != ":=" {
+			updated, err := applyBinary(operator[:len(operator)-1], items[index], value, t.Span)
+			if err != nil {
+				return err
+			}
+			value = updated
+		}
+		items[index] = value
+		return nil
 	default:
 		return RuntimeError{Message: "invalid assignment target", Span: exprSpan(target)}
 	}
@@ -455,6 +487,27 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			return nil, err
 		}
 		return in.evalMember(receiver, e)
+	case *parser.IndexExpr:
+		receiver, err := in.evalExpr(e.Receiver, local)
+		if err != nil {
+			return nil, err
+		}
+		items, ok := receiver.([]Value)
+		if !ok {
+			return nil, RuntimeError{Message: "indexing requires array-like value", Span: e.Span}
+		}
+		indexValue, err := in.evalExpr(e.Index, local)
+		if err != nil {
+			return nil, err
+		}
+		index, ok := indexValue.(int64)
+		if !ok {
+			return nil, RuntimeError{Message: "index expression must be Int", Span: exprSpan(e.Index)}
+		}
+		if index < 0 || index >= int64(len(items)) {
+			return nil, RuntimeError{Message: "index out of bounds", Span: e.Span}
+		}
+		return items[index], nil
 	case *parser.LambdaExpr:
 		return &closure{params: e.Parameters, body: e.Body, blockBody: e.BlockBody, env: local}, nil
 	case *parser.PlaceholderExpr:
@@ -892,6 +945,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.CallExpr:
 		return e.Span
 	case *parser.MemberExpr:
+		return e.Span
+	case *parser.IndexExpr:
 		return e.Span
 	case *parser.LambdaExpr:
 		return e.Span

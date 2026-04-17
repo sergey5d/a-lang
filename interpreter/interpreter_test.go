@@ -72,6 +72,25 @@ def run() Int {
 	}
 }
 
+func TestIndexing(t *testing.T) {
+	src := `
+def run() Int {
+	values = [1, 2, 3]
+	values[1] := values[0] + 4
+	return values[1]
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(5) {
+		t.Fatalf("expected 5, got %#v", value)
+	}
+}
+
 func TestClassesAndMethods(t *testing.T) {
 	src := `
 class Counter {

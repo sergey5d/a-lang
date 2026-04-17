@@ -206,6 +206,14 @@ type FieldGet struct {
 
 func (*FieldGet) exprNode() {}
 
+type IndexGet struct {
+	Receiver Expr
+	Index    Expr
+	Type     *typecheck.Type
+}
+
+func (*IndexGet) exprNode() {}
+
 type MethodCall struct {
 	Receiver Expr
 	Method   string

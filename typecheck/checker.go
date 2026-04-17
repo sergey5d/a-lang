@@ -488,6 +488,8 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		result = c.checkCall(e)
 	case *parser.MemberExpr:
 		result = c.checkMemberExpr(e)
+	case *parser.IndexExpr:
+		result = c.checkIndexExpr(e)
 	case *parser.LambdaExpr:
 		result = c.checkLambdaExpr(e, expected)
 	case *parser.PlaceholderExpr:
@@ -535,6 +537,20 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 	return sig.ReturnType
 }
 
+func (c *Checker) checkIndexExpr(expr *parser.IndexExpr) *Type {
+	receiverType := c.checkExpr(expr.Receiver)
+	indexType := c.checkExpr(expr.Index)
+	c.requireAssignable(indexType, builtin("Int"), exprSpan(expr.Index), "invalid_index_type", "index expression must be Int")
+	if isUnknown(receiverType) {
+		return unknownType
+	}
+	if receiverType.Kind == TypeBuiltin && receiverType.Name == "Array" && len(receiverType.Args) == 1 {
+		return receiverType.Args[0]
+	}
+	c.addDiagnostic("invalid_index_target", "indexing requires Array[T]", expr.Span)
+	return unknownType
+}
+
 func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *Type {
 	classType := &Type{Kind: TypeClass, Name: class.decl.Name}
 	if len(class.constructors) != 0 {
@@ -577,12 +593,12 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr)
 			return unknownType
 		}
 		sig := c.instantiateMethodSignature(method.decl, info.decl, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
-			for i := range argTypes {
-				argType := c.checkExprWithExpected(args[i], sig.Parameters[i])
-				if i < len(sig.Parameters) {
-					c.requireAssignable(argType, sig.Parameters[i], exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
-				}
+		for i := range argTypes {
+			argType := c.checkExprWithExpected(args[i], sig.Parameters[i])
+			if i < len(sig.Parameters) {
+				c.requireAssignable(argType, sig.Parameters[i], exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
 			}
+		}
 		return sig.ReturnType
 	case TypeInterface:
 		info, ok := c.interfaces[receiverType.Name]
@@ -774,6 +790,12 @@ func (c *Checker) checkAssignmentTarget(target parser.Expr, span parser.Span) (*
 			return memberType, mutable
 		}
 		return unknownType, false
+	case *parser.IndexExpr:
+		elemType := c.checkIndexExpr(t)
+		if isUnknown(elemType) {
+			return unknownType, false
+		}
+		return elemType, true
 	default:
 		c.addDiagnostic("invalid_assignment_target", "invalid assignment target", span)
 		return unknownType, false
@@ -1350,6 +1372,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.CallExpr:
 		return e.Span
 	case *parser.MemberExpr:
+		return e.Span
+	case *parser.IndexExpr:
 		return e.Span
 	case *parser.LambdaExpr:
 		return e.Span

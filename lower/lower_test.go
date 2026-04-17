@@ -119,3 +119,34 @@ def run(values List[Int]) Int {
 		t.Fatalf("expected lowering error for yield loop")
 	}
 }
+
+func TestProgramFromTypedLowersIndexing(t *testing.T) {
+	src := `
+def run(values Array[Int]) Int {
+	return values[0]
+}
+`
+
+	program := parseProgram(t, src)
+	types := typecheck.Analyze(program)
+	if len(types.Diagnostics) != 0 {
+		t.Fatalf("expected no type diagnostics, got %#v", types.Diagnostics)
+	}
+	typedProgram, err := typed.Build(program, types)
+	if err != nil {
+		t.Fatalf("typed.Build returned error: %v", err)
+	}
+
+	lowered, err := ProgramFromTyped(typedProgram)
+	if err != nil {
+		t.Fatalf("ProgramFromTyped returned error: %v", err)
+	}
+
+	ret, ok := lowered.Functions[0].Body[0].(*Return)
+	if !ok {
+		t.Fatalf("expected return statement, got %T", lowered.Functions[0].Body[0])
+	}
+	if _, ok := ret.Value.(*IndexGet); !ok {
+		t.Fatalf("expected lowered index get, got %T", ret.Value)
+	}
+}

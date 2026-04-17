@@ -242,6 +242,14 @@ type MemberExpr struct {
 
 func (*MemberExpr) exprNode() {}
 
+type IndexExpr struct {
+	Receiver Expr `json:"receiver"`
+	Index    Expr `json:"index"`
+	Span     Span `json:"span"`
+}
+
+func (*IndexExpr) exprNode() {}
+
 type LambdaParameter struct {
 	Name string   `json:"name"`
 	Type *TypeRef `json:"type,omitempty"`

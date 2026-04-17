@@ -61,6 +61,8 @@ func exprSpan(expr Expr) Span {
 		return e.Span
 	case *MemberExpr:
 		return e.Span
+	case *IndexExpr:
+		return e.Span
 	case *LambdaExpr:
 		return e.Span
 	case *BinaryExpr:
@@ -806,6 +808,18 @@ func (p *Parser) parseExpression(minPrec int) (Expr, error) {
 				return nil, err
 			}
 			left = &MemberExpr{Receiver: left, Name: name.Lexeme, Span: mergeSpans(exprSpan(left), tokenSpan(name))}
+			continue
+		}
+		if p.match(TokenLBracket) {
+			index, err := p.parseExpression(0)
+			if err != nil {
+				return nil, err
+			}
+			end, err := p.consume(TokenRBracket, "expected ']' after index expression")
+			if err != nil {
+				return nil, err
+			}
+			left = &IndexExpr{Receiver: left, Index: index, Span: mergeSpans(exprSpan(left), tokenSpan(end))}
 			continue
 		}
 

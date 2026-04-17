@@ -330,6 +330,16 @@ func (l *Lowerer) lowerExpr(expr typed.Expr) (Expr, error) {
 			return nil, err
 		}
 		return &FieldGet{Receiver: receiver, Name: e.Name, Type: e.GetType()}, nil
+	case *typed.IndexExpr:
+		receiver, err := l.lowerExpr(e.Receiver)
+		if err != nil {
+			return nil, err
+		}
+		index, err := l.lowerExpr(e.Index)
+		if err != nil {
+			return nil, err
+		}
+		return &IndexGet{Receiver: receiver, Index: index, Type: e.GetType()}, nil
 	case *typed.LambdaExpr:
 		return nil, fmt.Errorf("lambdas are not supported by lowering yet")
 	case *typed.PlaceholderExpr:

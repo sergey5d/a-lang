@@ -265,6 +265,9 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 		}
 	case *parser.MemberExpr:
 		r.resolveExpr(e.Receiver)
+	case *parser.IndexExpr:
+		r.resolveExpr(e.Receiver)
+		r.resolveExpr(e.Index)
 	case *parser.LambdaExpr:
 		r.pushScope()
 		for _, param := range e.Parameters {
@@ -301,6 +304,9 @@ func (r *Resolver) resolveAssignment(stmt *parser.AssignmentStmt) {
 		}
 	case *parser.MemberExpr:
 		r.resolveExpr(target.Receiver)
+	case *parser.IndexExpr:
+		r.resolveExpr(target.Receiver)
+		r.resolveExpr(target.Index)
 	default:
 		r.addDiagnostic("invalid_assignment_target", "invalid assignment target", stmt.Span)
 	}

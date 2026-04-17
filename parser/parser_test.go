@@ -388,6 +388,45 @@ def vars() Bool {
 	}
 }
 
+func TestParseIndexExpressionAndAssignment(t *testing.T) {
+	src := `
+def run(values Array[Int]) Int {
+	item Int = values[0]
+	values[1] := item
+	return values[1]
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	first, ok := fn.Body.Statements[0].(*ValStmt)
+	if !ok {
+		t.Fatalf("expected first statement to be binding, got %T", fn.Body.Statements[0])
+	}
+	index, ok := first.Values[0].(*IndexExpr)
+	if !ok {
+		t.Fatalf("expected binding value to be index expression, got %T", first.Values[0])
+	}
+	if _, ok := index.Receiver.(*Identifier); !ok {
+		t.Fatalf("expected index receiver to be identifier, got %T", index.Receiver)
+	}
+
+	assign, ok := fn.Body.Statements[1].(*AssignmentStmt)
+	if !ok {
+		t.Fatalf("expected second statement to be assignment, got %T", fn.Body.Statements[1])
+	}
+	if _, ok := assign.Target.(*IndexExpr); !ok {
+		t.Fatalf("expected assignment target to be index expression, got %T", assign.Target)
+	}
+	if assign.Operator != ":=" {
+		t.Fatalf("expected mutable assignment operator, got %q", assign.Operator)
+	}
+}
+
 func TestParseImmutableBindings(t *testing.T) {
 	src := `
 def vars() Bool {
