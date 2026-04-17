@@ -11,6 +11,7 @@ type exprBuilder struct {
 	ctx    *buildContext
 	types  *typeRefBuilder
 	blocks Builder[*parser.BlockStmt, *BlockStmt]
+	calls  Builder[*parser.CallExpr, Expr]
 }
 
 // Build converts a parser expression into a typed expression node.
@@ -85,7 +86,7 @@ func (b *exprBuilder) Build(expr parser.Expr) (Expr, error) {
 		}
 		return &IndexExpr{baseExpr: b.base(expr), Receiver: receiver, Index: index}, nil
 	case *parser.CallExpr:
-		return b.buildCall(e)
+		return b.calls.Build(e)
 	case *parser.LambdaExpr:
 		b.ctx.pushScope()
 		defer b.ctx.popScope()
@@ -119,56 +120,6 @@ func (b *exprBuilder) Build(expr parser.Expr) (Expr, error) {
 	default:
 		return nil, fmt.Errorf("unsupported expression type %T", expr)
 	}
-}
-
-// buildCall classifies a parser call as function, constructor, method, or invoke.
-func (b *exprBuilder) buildCall(call *parser.CallExpr) (Expr, error) {
-	args := make([]Expr, len(call.Args))
-	for i, arg := range call.Args {
-		built, err := b.Build(arg)
-		if err != nil {
-			return nil, err
-		}
-		args[i] = built
-	}
-
-	switch callee := call.Callee.(type) {
-	case *parser.Identifier:
-		if _, ok := b.ctx.classes[callee.Name]; ok {
-			expr := &ConstructorCallExpr{
-				baseExpr: b.base(call),
-				Class:    callee.Name,
-				Args:     args,
-				Dispatch: DispatchConstruct,
-			}
-			if symbol, ok := b.ctx.classSymbols[callee.Name]; ok {
-				expr.ClassSymbol = &symbol
-			}
-			expr.Constructor = b.types.resolveConstructorSymbol(callee.Name, args)
-			return expr, nil
-		}
-		if _, ok := b.ctx.functions[callee.Name]; ok {
-			expr := &FunctionCallExpr{baseExpr: b.base(call), Name: callee.Name, Args: args}
-			if symbol, ok := b.ctx.functionSymbols[callee.Name]; ok {
-				expr.Function = &symbol
-			}
-			return expr, nil
-		}
-	case *parser.MemberExpr:
-		receiver, err := b.Build(callee.Receiver)
-		if err != nil {
-			return nil, err
-		}
-		method := &MethodCallExpr{baseExpr: b.base(call), Receiver: receiver, Method: callee.Name, Args: args}
-		method.Target, method.Dispatch = b.types.resolveMethodTarget(receiver.GetType(), callee.Name, args)
-		return method, nil
-	}
-
-	calleeExpr, err := b.Build(call.Callee)
-	if err != nil {
-		return nil, err
-	}
-	return &InvokeExpr{baseExpr: b.base(call), Callee: calleeExpr, Args: args}, nil
 }
 
 // base constructs the common typed expression metadata for a parser expression.

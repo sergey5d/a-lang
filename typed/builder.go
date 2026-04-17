@@ -42,7 +42,17 @@ func Build(program *parser.Program, info typecheck.Result) (*Program, error) {
 
 	blocks := &blockBuilder{ctx: ctx}
 	exprs := &exprBuilder{ctx: ctx, types: typeRefs, blocks: blocks}
-	stmts := &stmtBuilder{ctx: ctx, exprs: exprs, blocks: blocks}
+	calls := &callExprBuilder{ctx: ctx, exprs: exprs, types: typeRefs}
+	exprs.calls = calls
+	stmts := &stmtBuilder{
+		bindings:    &bindingStmtBuilder{ctx: ctx, exprs: exprs, types: typeRefs},
+		assignments: &assignmentStmtBuilder{exprs: exprs},
+		ifs:         &ifStmtBuilder{exprs: exprs, blocks: blocks},
+		fors:        &forStmtBuilder{ctx: ctx, exprs: exprs, blocks: blocks},
+		returns:     &returnStmtBuilder{exprs: exprs},
+		breaks:      &breakStmtBuilder{},
+		exprs:       &exprStmtBuilder{exprs: exprs},
+	}
 	blocks.stmts = stmts
 
 	functions := &functionBuilder{ctx: ctx, params: params, blocks: blocks, types: typeRefs}
