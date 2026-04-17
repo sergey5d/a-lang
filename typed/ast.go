@@ -19,6 +19,35 @@ const (
 	InitDeferred  InitMode = "deferred"
 )
 
+type SymbolKind string
+
+const (
+	SymbolBinding   SymbolKind = "binding"
+	SymbolParameter SymbolKind = "parameter"
+	SymbolField     SymbolKind = "field"
+	SymbolMethod    SymbolKind = "method"
+	SymbolFunction  SymbolKind = "function"
+	SymbolClass     SymbolKind = "class"
+	SymbolInterface SymbolKind = "interface"
+	SymbolThis      SymbolKind = "this"
+)
+
+type CallDispatch string
+
+const (
+	DispatchStatic    CallDispatch = "static"
+	DispatchVirtual   CallDispatch = "virtual"
+	DispatchConstruct CallDispatch = "construct"
+)
+
+type SymbolRef struct {
+	ID    int
+	Kind  SymbolKind
+	Name  string
+	Owner string
+	Span  parser.Span
+}
+
 type Program struct {
 	Functions  []*FunctionDecl
 	Interfaces []*InterfaceDecl
@@ -35,6 +64,7 @@ type TypeParameter struct {
 type Parameter struct {
 	Name string
 	Type *typecheck.Type
+	Symbol SymbolRef
 	Span parser.Span
 }
 
@@ -43,6 +73,7 @@ type FunctionDecl struct {
 	Parameters []Parameter
 	ReturnType *typecheck.Type
 	Body       *BlockStmt
+	Symbol     SymbolRef
 	Span       parser.Span
 }
 
@@ -57,6 +88,7 @@ type InterfaceDecl struct {
 	Name           string
 	TypeParameters []TypeParameter
 	Methods        []InterfaceMethod
+	Symbol         SymbolRef
 	Span           parser.Span
 }
 
@@ -67,6 +99,7 @@ type FieldDecl struct {
 	InitMode InitMode
 	Init     Expr
 	Private  bool
+	Symbol   SymbolRef
 	Span     parser.Span
 }
 
@@ -77,6 +110,7 @@ type MethodDecl struct {
 	Body        *BlockStmt
 	Private     bool
 	Constructor bool
+	Symbol      SymbolRef
 	Span        parser.Span
 }
 
@@ -86,6 +120,7 @@ type ClassDecl struct {
 	Interfaces     []*typecheck.Type
 	Fields         []FieldDecl
 	Methods        []*MethodDecl
+	Symbol         SymbolRef
 	Span           parser.Span
 }
 
@@ -111,6 +146,7 @@ type BindingDecl struct {
 	Mode     BindingMode
 	InitMode InitMode
 	Init     Expr
+	Symbol   SymbolRef
 	Span     parser.Span
 }
 
@@ -147,6 +183,7 @@ type ForBinding struct {
 	Name     string
 	Type     *typecheck.Type
 	Iterable Expr
+	Symbol   SymbolRef
 	Span     parser.Span
 }
 
@@ -194,6 +231,7 @@ func (e *baseExpr) GetSpan() parser.Span     { return e.Span }
 type IdentifierExpr struct {
 	baseExpr
 	Name string
+	Symbol *SymbolRef
 }
 
 func (*IdentifierExpr) exprNode() {}
@@ -274,6 +312,7 @@ type FieldExpr struct {
 	baseExpr
 	Receiver Expr
 	Name     string
+	Field    *SymbolRef
 }
 
 func (*FieldExpr) exprNode() {}
@@ -282,6 +321,7 @@ type FunctionCallExpr struct {
 	baseExpr
 	Name string
 	Args []Expr
+	Function *SymbolRef
 }
 
 func (*FunctionCallExpr) exprNode() {}
@@ -290,6 +330,9 @@ type ConstructorCallExpr struct {
 	baseExpr
 	Class string
 	Args  []Expr
+	ClassSymbol  *SymbolRef
+	Constructor  *SymbolRef
+	Dispatch     CallDispatch
 }
 
 func (*ConstructorCallExpr) exprNode() {}
@@ -299,6 +342,8 @@ type MethodCallExpr struct {
 	Receiver Expr
 	Method   string
 	Args     []Expr
+	Target   *SymbolRef
+	Dispatch CallDispatch
 }
 
 func (*MethodCallExpr) exprNode() {}
@@ -314,6 +359,7 @@ func (*InvokeExpr) exprNode() {}
 type LambdaParameter struct {
 	Name string
 	Type *typecheck.Type
+	Symbol SymbolRef
 	Span parser.Span
 }
 

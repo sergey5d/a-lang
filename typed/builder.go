@@ -12,6 +12,19 @@ type Builder struct {
 	functions  map[string]*parser.FunctionDecl
 	classes    map[string]*parser.ClassDecl
 	interfaces map[string]*parser.InterfaceDecl
+	nextID     int
+	scopes     []map[string]SymbolRef
+	thisStack  []SymbolRef
+	functionSymbols  map[string]SymbolRef
+	classSymbols     map[string]SymbolRef
+	interfaceSymbols map[string]SymbolRef
+	fieldSymbols     map[string]map[string]SymbolRef
+	methodSymbols    map[string]map[string][]methodSymbol
+}
+
+type methodSymbol struct {
+	decl   *parser.MethodDecl
+	symbol SymbolRef
 }
 
 func Build(program *parser.Program, info typecheck.Result) (*Program, error) {
@@ -20,6 +33,11 @@ func Build(program *parser.Program, info typecheck.Result) (*Program, error) {
 		functions:  map[string]*parser.FunctionDecl{},
 		classes:    map[string]*parser.ClassDecl{},
 		interfaces: map[string]*parser.InterfaceDecl{},
+		functionSymbols:  map[string]SymbolRef{},
+		classSymbols:     map[string]SymbolRef{},
+		interfaceSymbols: map[string]SymbolRef{},
+		fieldSymbols:     map[string]map[string]SymbolRef{},
+		methodSymbols:    map[string]map[string][]methodSymbol{},
 	}
 	for _, fn := range program.Functions {
 		b.functions[fn.Name] = fn
@@ -30,11 +48,75 @@ func Build(program *parser.Program, info typecheck.Result) (*Program, error) {
 	for _, iface := range program.Interfaces {
 		b.interfaces[iface.Name] = iface
 	}
+	b.collectSymbols(program)
 	return b.buildProgram(program)
+}
+
+func (b *Builder) collectSymbols(program *parser.Program) {
+	for _, fn := range program.Functions {
+		b.functionSymbols[fn.Name] = b.newSymbol(SymbolFunction, fn.Name, "", fn.Span)
+	}
+	for _, iface := range program.Interfaces {
+		b.interfaceSymbols[iface.Name] = b.newSymbol(SymbolInterface, iface.Name, "", iface.Span)
+	}
+	for _, class := range program.Classes {
+		b.classSymbols[class.Name] = b.newSymbol(SymbolClass, class.Name, "", class.Span)
+		fields := map[string]SymbolRef{}
+		methods := map[string][]methodSymbol{}
+		for _, field := range class.Fields {
+			fields[field.Name] = b.newSymbol(SymbolField, field.Name, class.Name, field.Span)
+		}
+		for _, method := range class.Methods {
+			sym := b.newSymbol(SymbolMethod, method.Name, class.Name, method.Span)
+			methods[method.Name] = append(methods[method.Name], methodSymbol{decl: method, symbol: sym})
+		}
+		b.fieldSymbols[class.Name] = fields
+		b.methodSymbols[class.Name] = methods
+	}
+}
+
+func (b *Builder) newSymbol(kind SymbolKind, name, owner string, span parser.Span) SymbolRef {
+	b.nextID++
+	return SymbolRef{ID: b.nextID, Kind: kind, Name: name, Owner: owner, Span: span}
+}
+
+func (b *Builder) pushScope() {
+	b.scopes = append(b.scopes, map[string]SymbolRef{})
+}
+
+func (b *Builder) popScope() {
+	b.scopes = b.scopes[:len(b.scopes)-1]
+}
+
+func (b *Builder) defineSymbol(symbol SymbolRef) {
+	if len(b.scopes) == 0 {
+		b.pushScope()
+	}
+	b.scopes[len(b.scopes)-1][symbol.Name] = symbol
+}
+
+func (b *Builder) lookupSymbol(name string) (*SymbolRef, bool) {
+	for i := len(b.scopes) - 1; i >= 0; i-- {
+		if symbol, ok := b.scopes[i][name]; ok {
+			return &symbol, true
+		}
+	}
+	if symbol, ok := b.functionSymbols[name]; ok {
+		return &symbol, true
+	}
+	if symbol, ok := b.classSymbols[name]; ok {
+		return &symbol, true
+	}
+	if symbol, ok := b.interfaceSymbols[name]; ok {
+		return &symbol, true
+	}
+	return nil, false
 }
 
 func (b *Builder) buildProgram(program *parser.Program) (*Program, error) {
 	out := &Program{Span: program.Span}
+	b.pushScope()
+	defer b.popScope()
 
 	for _, stmt := range program.Statements {
 		built, err := b.buildStmt(stmt)
@@ -72,15 +154,22 @@ func (b *Builder) buildProgram(program *parser.Program) (*Program, error) {
 }
 
 func (b *Builder) buildFunction(fn *parser.FunctionDecl) (*FunctionDecl, error) {
+	b.pushScope()
+	defer b.popScope()
+	params := b.buildParameters(fn.Parameters)
+	for _, param := range params {
+		b.defineSymbol(param.Symbol)
+	}
 	body, err := b.buildBlock(fn.Body)
 	if err != nil {
 		return nil, err
 	}
 	return &FunctionDecl{
 		Name:       fn.Name,
-		Parameters: b.buildParameters(fn.Parameters),
+		Parameters: params,
 		ReturnType: b.typeFromRef(fn.ReturnType),
 		Body:       body,
+		Symbol:     b.functionSymbols[fn.Name],
 		Span:       fn.Span,
 	}, nil
 }
@@ -100,11 +189,21 @@ func (b *Builder) buildInterface(iface *parser.InterfaceDecl) (*InterfaceDecl, e
 		Name:           iface.Name,
 		TypeParameters: b.buildTypeParameters(iface.TypeParameters),
 		Methods:        methods,
+		Symbol:         b.interfaceSymbols[iface.Name],
 		Span:           iface.Span,
 	}, nil
 }
 
 func (b *Builder) buildClass(class *parser.ClassDecl) (*ClassDecl, error) {
+	b.pushScope()
+	defer b.popScope()
+	thisSymbol := b.newSymbol(SymbolThis, "this", class.Name, class.Span)
+	b.thisStack = append(b.thisStack, thisSymbol)
+	defer func() { b.thisStack = b.thisStack[:len(b.thisStack)-1] }()
+	b.defineSymbol(thisSymbol)
+	for _, field := range class.Fields {
+		b.defineSymbol(b.fieldSymbols[class.Name][field.Name])
+	}
 	fields := make([]FieldDecl, len(class.Fields))
 	for i, field := range class.Fields {
 		var init Expr
@@ -122,23 +221,32 @@ func (b *Builder) buildClass(class *parser.ClassDecl) (*ClassDecl, error) {
 			InitMode: initMode(field.Deferred, init),
 			Init:     init,
 			Private:  field.Private,
+			Symbol:   b.fieldSymbols[class.Name][field.Name],
 			Span:     field.Span,
 		}
 	}
 
 	methods := make([]*MethodDecl, len(class.Methods))
 	for i, method := range class.Methods {
+		b.pushScope()
+		b.defineSymbol(thisSymbol)
+		params := b.buildParameters(method.Parameters)
+		for _, param := range params {
+			b.defineSymbol(param.Symbol)
+		}
 		body, err := b.buildBlock(method.Body)
+		b.popScope()
 		if err != nil {
 			return nil, err
 		}
 		methods[i] = &MethodDecl{
 			Name:        method.Name,
-			Parameters:  b.buildParameters(method.Parameters),
+			Parameters:  params,
 			ReturnType:  b.typeFromRef(method.ReturnType),
 			Body:        body,
 			Private:     method.Private,
 			Constructor: method.Constructor,
+			Symbol:      b.lookupMethodSymbol(class.Name, method),
 			Span:        method.Span,
 		}
 	}
@@ -154,6 +262,7 @@ func (b *Builder) buildClass(class *parser.ClassDecl) (*ClassDecl, error) {
 		Interfaces:     implements,
 		Fields:         fields,
 		Methods:        methods,
+		Symbol:         b.classSymbols[class.Name],
 		Span:           class.Span,
 	}, nil
 }
@@ -162,6 +271,8 @@ func (b *Builder) buildBlock(block *parser.BlockStmt) (*BlockStmt, error) {
 	if block == nil {
 		return nil, nil
 	}
+	b.pushScope()
+	defer b.popScope()
 	statements := make([]Stmt, len(block.Statements))
 	for i, stmt := range block.Statements {
 		built, err := b.buildStmt(stmt)
@@ -175,9 +286,9 @@ func (b *Builder) buildBlock(block *parser.BlockStmt) (*BlockStmt, error) {
 
 func (b *Builder) buildStmt(stmt parser.Statement) (Stmt, error) {
 	switch s := stmt.(type) {
-	case *parser.ValStmt:
-		bindings := make([]BindingDecl, len(s.Bindings))
-		for i, binding := range s.Bindings {
+		case *parser.ValStmt:
+			bindings := make([]BindingDecl, len(s.Bindings))
+			for i, binding := range s.Bindings {
 			var init Expr
 			var err error
 			if i < len(s.Values) && s.Values[i] != nil {
@@ -186,16 +297,19 @@ func (b *Builder) buildStmt(stmt parser.Statement) (Stmt, error) {
 					return nil, err
 				}
 			}
-			bindings[i] = BindingDecl{
-				Name:     binding.Name,
-				Type:     b.bindingType(binding, init),
-				Mode:     modeFromMutable(binding.Mutable),
-				InitMode: initMode(binding.Deferred, init),
-				Init:     init,
-				Span:     binding.Span,
+				symbol := b.newSymbol(SymbolBinding, binding.Name, "", binding.Span)
+				bindings[i] = BindingDecl{
+					Name:     binding.Name,
+					Type:     b.bindingType(binding, init),
+					Mode:     modeFromMutable(binding.Mutable),
+					InitMode: initMode(binding.Deferred, init),
+					Init:     init,
+					Symbol:   symbol,
+					Span:     binding.Span,
+				}
+				b.defineSymbol(symbol)
 			}
-		}
-		return &BindingStmt{Bindings: bindings, Span: s.Span}, nil
+			return &BindingStmt{Bindings: bindings, Span: s.Span}, nil
 	case *parser.AssignmentStmt:
 		target, err := b.buildExpr(s.Target)
 		if err != nil {
@@ -228,28 +342,40 @@ func (b *Builder) buildStmt(stmt parser.Statement) (Stmt, error) {
 			return nil, err
 		}
 		return &IfStmt{Condition: cond, Then: thenBlock, ElseIf: elseIf, Else: elseBlock, Span: s.Span}, nil
-	case *parser.ForStmt:
-		bindings := make([]ForBinding, len(s.Bindings))
-		for i, binding := range s.Bindings {
-			iterable, err := b.buildExpr(binding.Iterable)
+		case *parser.ForStmt:
+			bindings := make([]ForBinding, len(s.Bindings))
+			for i, binding := range s.Bindings {
+				iterable, err := b.buildExpr(binding.Iterable)
 			if err != nil {
 				return nil, err
 			}
-			bindings[i] = ForBinding{
-				Name:     binding.Name,
-				Type:     elementType(iterable.GetType()),
-				Iterable: iterable,
-				Span:     binding.Span,
+				symbol := b.newSymbol(SymbolBinding, binding.Name, "", binding.Span)
+				bindings[i] = ForBinding{
+					Name:     binding.Name,
+					Type:     elementType(iterable.GetType()),
+					Iterable: iterable,
+					Symbol:   symbol,
+					Span:     binding.Span,
+				}
 			}
-		}
-		body, err := b.buildBlock(s.Body)
-		if err != nil {
-			return nil, err
-		}
-		yieldBody, err := b.buildBlock(s.YieldBody)
-		if err != nil {
-			return nil, err
-		}
+			b.pushScope()
+			for _, binding := range bindings {
+				b.defineSymbol(binding.Symbol)
+			}
+			body, err := b.buildBlock(s.Body)
+			b.popScope()
+			if err != nil {
+				return nil, err
+			}
+			b.pushScope()
+			for _, binding := range bindings {
+				b.defineSymbol(binding.Symbol)
+			}
+			yieldBody, err := b.buildBlock(s.YieldBody)
+			b.popScope()
+			if err != nil {
+				return nil, err
+			}
 		return &ForStmt{Bindings: bindings, Body: body, YieldBody: yieldBody, Span: s.Span}, nil
 	case *parser.ReturnStmt:
 		value, err := b.buildExpr(s.Value)
@@ -273,7 +399,11 @@ func (b *Builder) buildStmt(stmt parser.Statement) (Stmt, error) {
 func (b *Builder) buildExpr(expr parser.Expr) (Expr, error) {
 	switch e := expr.(type) {
 	case *parser.Identifier:
-		return &IdentifierExpr{baseExpr: b.base(expr), Name: e.Name}, nil
+		ident := &IdentifierExpr{baseExpr: b.base(expr), Name: e.Name}
+		if symbol, ok := b.lookupSymbol(e.Name); ok {
+			ident.Symbol = symbol
+		}
+		return ident, nil
 	case *parser.PlaceholderExpr:
 		return &PlaceholderExpr{baseExpr: b.base(expr)}, nil
 	case *parser.IntegerLiteral:
@@ -323,13 +453,19 @@ func (b *Builder) buildExpr(expr parser.Expr) (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &FieldExpr{baseExpr: b.base(expr), Receiver: receiver, Name: e.Name}, nil
+		field := &FieldExpr{baseExpr: b.base(expr), Receiver: receiver, Name: e.Name}
+		field.Field = b.resolveFieldSymbol(receiver.GetType(), e.Name)
+		return field, nil
 	case *parser.CallExpr:
 		return b.buildCallExpr(e)
 	case *parser.LambdaExpr:
+		b.pushScope()
+		defer b.popScope()
 		params := make([]LambdaParameter, len(e.Parameters))
 		for i, param := range e.Parameters {
-			params[i] = LambdaParameter{Name: param.Name, Type: b.typeFromRef(param.Type), Span: param.Span}
+			symbol := b.newSymbol(SymbolParameter, param.Name, "", param.Span)
+			params[i] = LambdaParameter{Name: param.Name, Type: b.typeFromRef(param.Type), Symbol: symbol, Span: param.Span}
+			b.defineSymbol(symbol)
 		}
 		var body Expr
 		var err error
@@ -362,17 +498,33 @@ func (b *Builder) buildCallExpr(call *parser.CallExpr) (Expr, error) {
 	switch callee := call.Callee.(type) {
 	case *parser.Identifier:
 		if _, ok := b.classes[callee.Name]; ok {
-			return &ConstructorCallExpr{baseExpr: b.base(call), Class: callee.Name, Args: args}, nil
+			expr := &ConstructorCallExpr{
+				baseExpr:    b.base(call),
+				Class:       callee.Name,
+				Args:        args,
+				Dispatch:    DispatchConstruct,
+			}
+			if symbol, ok := b.classSymbols[callee.Name]; ok {
+				expr.ClassSymbol = &symbol
+			}
+			expr.Constructor = b.resolveConstructorSymbol(callee.Name, args)
+			return expr, nil
 		}
 		if _, ok := b.functions[callee.Name]; ok {
-			return &FunctionCallExpr{baseExpr: b.base(call), Name: callee.Name, Args: args}, nil
+			expr := &FunctionCallExpr{baseExpr: b.base(call), Name: callee.Name, Args: args}
+			if symbol, ok := b.functionSymbols[callee.Name]; ok {
+				expr.Function = &symbol
+			}
+			return expr, nil
 		}
 	case *parser.MemberExpr:
 		receiver, err := b.buildExpr(callee.Receiver)
 		if err != nil {
 			return nil, err
 		}
-		return &MethodCallExpr{baseExpr: b.base(call), Receiver: receiver, Method: callee.Name, Args: args}, nil
+		method := &MethodCallExpr{baseExpr: b.base(call), Receiver: receiver, Method: callee.Name, Args: args}
+		method.Target, method.Dispatch = b.resolveMethodTarget(receiver.GetType(), callee.Name, args)
+		return method, nil
 	}
 
 	calleeExpr, err := b.buildExpr(call.Callee)
@@ -385,7 +537,12 @@ func (b *Builder) buildCallExpr(call *parser.CallExpr) (Expr, error) {
 func (b *Builder) buildParameters(params []parser.Parameter) []Parameter {
 	out := make([]Parameter, len(params))
 	for i, param := range params {
-		out[i] = Parameter{Name: param.Name, Type: b.typeFromRef(param.Type), Span: param.Span}
+		out[i] = Parameter{
+			Name:   param.Name,
+			Type:   b.typeFromRef(param.Type),
+			Symbol: b.newSymbol(SymbolParameter, param.Name, "", param.Span),
+			Span:   param.Span,
+		}
 	}
 	return out
 }
@@ -508,4 +665,160 @@ func (b *Builder) kindOf(name string) typecheck.TypeKind {
 		return typecheck.TypeInterface
 	}
 	return typecheck.TypeUnknown
+}
+
+func (b *Builder) lookupMethodSymbol(className string, method *parser.MethodDecl) SymbolRef {
+	for _, candidate := range b.methodSymbols[className][method.Name] {
+		if candidate.decl == method {
+			return candidate.symbol
+		}
+	}
+	return SymbolRef{}
+}
+
+func (b *Builder) resolveFieldSymbol(receiverType *typecheck.Type, name string) *SymbolRef {
+	if receiverType == nil || receiverType.Kind != typecheck.TypeClass {
+		return nil
+	}
+	if fields, ok := b.fieldSymbols[receiverType.Name]; ok {
+		if symbol, ok := fields[name]; ok {
+			return &symbol
+		}
+	}
+	return nil
+}
+
+func (b *Builder) resolveConstructorSymbol(className string, args []Expr) *SymbolRef {
+	class, ok := b.classes[className]
+	if !ok {
+		return nil
+	}
+	subst := b.substForClass(class, nil)
+	for _, candidate := range b.methodSymbols[className]["init"] {
+		if b.methodMatches(candidate.decl, class, subst, args) {
+			symbol := candidate.symbol
+			return &symbol
+		}
+	}
+	return nil
+}
+
+func (b *Builder) resolveMethodTarget(receiverType *typecheck.Type, name string, args []Expr) (*SymbolRef, CallDispatch) {
+	if receiverType == nil {
+		return nil, DispatchStatic
+	}
+	switch receiverType.Kind {
+	case typecheck.TypeClass:
+		class, ok := b.classes[receiverType.Name]
+		if !ok {
+			return nil, DispatchStatic
+		}
+		subst := b.substForClass(class, receiverType.Args)
+		for _, candidate := range b.methodSymbols[receiverType.Name][name] {
+			if b.methodMatches(candidate.decl, class, subst, args) {
+				symbol := candidate.symbol
+				return &symbol, DispatchStatic
+			}
+		}
+	case typecheck.TypeInterface:
+		if iface, ok := b.interfaces[receiverType.Name]; ok {
+			for _, method := range iface.Methods {
+				if method.Name == name {
+					symbol := b.newSymbol(SymbolMethod, method.Name, iface.Name, method.Span)
+					return &symbol, DispatchVirtual
+				}
+			}
+		}
+	}
+	return nil, DispatchStatic
+}
+
+func (b *Builder) methodMatches(method *parser.MethodDecl, owner *parser.ClassDecl, subst map[string]*typecheck.Type, args []Expr) bool {
+	if len(method.Parameters) != len(args) {
+		return false
+	}
+	for i, param := range method.Parameters {
+		paramType := b.instantiateTypeRef(param.Type, subst)
+		if !sameType(paramType, args[i].GetType()) {
+			return false
+		}
+	}
+	return true
+}
+
+func (b *Builder) substForClass(class *parser.ClassDecl, args []*typecheck.Type) map[string]*typecheck.Type {
+	if len(class.TypeParameters) == 0 {
+		return nil
+	}
+	subst := map[string]*typecheck.Type{}
+	for i, param := range class.TypeParameters {
+		if i < len(args) && args[i] != nil {
+			subst[param.Name] = args[i]
+			continue
+		}
+		subst[param.Name] = &typecheck.Type{Kind: typecheck.TypeParam, Name: param.Name}
+	}
+	return subst
+}
+
+func (b *Builder) instantiateTypeRef(ref *parser.TypeRef, subst map[string]*typecheck.Type) *typecheck.Type {
+	if ref == nil {
+		return &typecheck.Type{Kind: typecheck.TypeUnknown, Name: "<unknown>"}
+	}
+	if ref.ReturnType != nil {
+		params := make([]*typecheck.Type, len(ref.ParameterTypes))
+		for i, param := range ref.ParameterTypes {
+			params[i] = b.instantiateTypeRef(param, subst)
+		}
+		return &typecheck.Type{
+			Kind: typecheck.TypeFunction,
+			Name: "func",
+			Signature: &typecheck.Signature{
+				Parameters: params,
+				ReturnType: b.instantiateTypeRef(ref.ReturnType, subst),
+			},
+		}
+	}
+	if subst != nil {
+		if resolved, ok := subst[ref.Name]; ok && len(ref.Arguments) == 0 {
+			return resolved
+		}
+	}
+	args := make([]*typecheck.Type, len(ref.Arguments))
+	for i, arg := range ref.Arguments {
+		args[i] = b.instantiateTypeRef(arg, subst)
+	}
+	return &typecheck.Type{Kind: b.kindOf(ref.Name), Name: ref.Name, Args: args}
+}
+
+func sameType(left, right *typecheck.Type) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	if left.Kind == typecheck.TypeUnknown || right.Kind == typecheck.TypeUnknown {
+		return true
+	}
+	if left.Kind != right.Kind || left.Name != right.Name || len(left.Args) != len(right.Args) {
+		if left.Kind == typecheck.TypeFunction && right.Kind == typecheck.TypeFunction {
+			if left.Signature == nil || right.Signature == nil {
+				return left.Signature == right.Signature
+			}
+			if len(left.Signature.Parameters) != len(right.Signature.Parameters) {
+				return false
+			}
+			for i := range left.Signature.Parameters {
+				if !sameType(left.Signature.Parameters[i], right.Signature.Parameters[i]) {
+					return false
+				}
+			}
+			return sameType(left.Signature.ReturnType, right.Signature.ReturnType)
+		}
+		return false
+	}
+	for i := range left.Args {
+		if !sameType(left.Args[i], right.Args[i]) {
+			return false
+		}
+	}
+	return true
 }
