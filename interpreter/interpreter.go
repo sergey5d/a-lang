@@ -247,10 +247,10 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 }
 
 func (in *Interpreter) execFor(stmt *parser.ForStmt, local *env, self *instance) (Value, any, error) {
-	if stmt.YieldBody != nil {
-		return nil, nil, RuntimeError{Message: "yield loops are not implemented in interpreter yet", Span: stmt.Span}
-	}
 	if len(stmt.Bindings) == 0 {
+		if stmt.YieldBody != nil {
+			return nil, nil, RuntimeError{Message: "yield loops without bindings are not supported", Span: stmt.Span}
+		}
 		for {
 			_, signal, err := in.execBlock(stmt.Body, local, self)
 			if err != nil {
@@ -265,33 +265,92 @@ func (in *Interpreter) execFor(stmt *parser.ForStmt, local *env, self *instance)
 			}
 		}
 	}
-	if len(stmt.Bindings) != 1 {
-		return nil, nil, RuntimeError{Message: "multi-binding for loops are not implemented in interpreter yet", Span: stmt.Span}
-	}
-	iterable, err := in.evalExpr(stmt.Bindings[0].Iterable, local)
-	if err != nil {
-		return nil, nil, err
-	}
-	items, ok := iterable.([]Value)
-	if !ok {
-		return nil, nil, RuntimeError{Message: "for loop expects iterable list value", Span: stmt.Bindings[0].Span}
-	}
-	for _, item := range items {
-		loopEnv := newEnv(local)
-		loopEnv.define(stmt.Bindings[0].Name, item, false)
-		_, signal, err := in.execBlock(stmt.Body, loopEnv, self)
+	if stmt.YieldBody != nil {
+		var yielded []Value
+		signal, err := in.execForBindings(stmt.Bindings, 0, local, self, func(loopEnv *env) (any, error) {
+			value, signal, err := in.evalYieldBody(stmt.YieldBody, loopEnv, self)
+			if err != nil {
+				return nil, err
+			}
+			if signal == nil {
+				yielded = append(yielded, value)
+			}
+			return signal, nil
+		})
 		if err != nil {
 			return nil, nil, err
 		}
 		switch signal.(type) {
 		case nil:
+			return yielded, nil, nil
 		case breakSignal:
-			return nil, nil, nil
+			return yielded, nil, nil
 		default:
 			return nil, signal, nil
 		}
 	}
-	return nil, nil, nil
+	signal, err := in.execForBindings(stmt.Bindings, 0, local, self, func(loopEnv *env) (any, error) {
+		_, signal, err := in.execBlock(stmt.Body, loopEnv, self)
+		return signal, err
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	switch signal.(type) {
+	case nil, breakSignal:
+		return nil, nil, nil
+	default:
+		return nil, signal, nil
+	}
+}
+
+func (in *Interpreter) execForBindings(bindings []parser.ForBinding, index int, local *env, self *instance, body func(*env) (any, error)) (any, error) {
+	if index == len(bindings) {
+		return body(local)
+	}
+	iterable, err := in.evalExpr(bindings[index].Iterable, local)
+	if err != nil {
+		return nil, err
+	}
+	items, ok := iterableToSlice(iterable)
+	if !ok {
+		return nil, RuntimeError{Message: "for loop expects iterable list value", Span: bindings[index].Span}
+	}
+	for _, item := range items {
+		loopEnv := newEnv(local)
+		loopEnv.define(bindings[index].Name, item, false)
+		signal, err := in.execForBindings(bindings, index+1, loopEnv, self, body)
+		if err != nil {
+			return nil, err
+		}
+		switch signal.(type) {
+		case nil:
+		case breakSignal:
+			return breakSignal{}, nil
+		default:
+			return signal, nil
+		}
+	}
+	return nil, nil
+}
+
+func (in *Interpreter) evalYieldBody(block *parser.BlockStmt, local *env, self *instance) (Value, any, error) {
+	if block == nil || len(block.Statements) == 0 {
+		return nil, nil, RuntimeError{Message: "yield body must end with an expression", Span: parser.Span{}}
+	}
+	for i := 0; i < len(block.Statements)-1; i++ {
+		_, signal, err := in.execStmt(block.Statements[i], local, self)
+		if err != nil || signal != nil {
+			return nil, signal, err
+		}
+	}
+	last := block.Statements[len(block.Statements)-1]
+	exprStmt, ok := last.(*parser.ExprStmt)
+	if !ok {
+		return nil, nil, RuntimeError{Message: "yield body must end with an expression", Span: stmtSpan(last)}
+	}
+	value, err := in.evalExpr(exprStmt.Expr, local)
+	return value, nil, err
 }
 
 func (in *Interpreter) assign(target parser.Expr, operator string, value Value, local *env) error {
@@ -879,6 +938,11 @@ func asBool(value Value, span parser.Span) (bool, error) {
 		return false, RuntimeError{Message: "expected Bool", Span: span}
 	}
 	return b, nil
+}
+
+func iterableToSlice(value Value) ([]Value, bool) {
+	items, ok := value.([]Value)
+	return items, ok
 }
 
 func zeroValue(ref *parser.TypeRef) Value {

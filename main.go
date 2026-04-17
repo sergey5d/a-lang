@@ -1,6 +1,7 @@
 package main
 
 import (
+	"a-lang/interpreter"
 	"a-lang/parser"
 	"a-lang/semantic"
 	"a-lang/typecheck"
@@ -11,7 +12,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: a-lang-parser <file>")
+		fmt.Fprintln(os.Stderr, "usage: a-lang <file> [run [entry]|ast]")
 		os.Exit(1)
 	}
 
@@ -37,11 +38,35 @@ func main() {
 		os.Exit(1)
 	}
 
-	out, err := json.MarshalIndent(program, "", "  ")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "marshal ast: %v\n", err)
-		os.Exit(1)
+	mode := "run"
+	if len(os.Args) >= 3 {
+		mode = os.Args[2]
 	}
 
-	fmt.Println(string(out))
+	switch mode {
+	case "ast":
+		out, err := json.MarshalIndent(program, "", "  ")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "marshal ast: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(string(out))
+	case "run":
+		entry := "run"
+		if len(os.Args) >= 4 {
+			entry = os.Args[3]
+		}
+		in := interpreter.New(program)
+		value, err := in.Call(entry)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if value != nil {
+			fmt.Println(value)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "unknown mode %q\n", mode)
+		os.Exit(1)
+	}
 }
