@@ -43,7 +43,9 @@ func Build(program *parser.Program, info typecheck.Result) (*Program, error) {
 	blocks := &blockBuilder{ctx: ctx}
 	exprs := &exprBuilder{ctx: ctx, types: typeRefs, blocks: blocks}
 	calls := &callExprBuilder{ctx: ctx, exprs: exprs, types: typeRefs}
+	lambdas := &lambdaExprBuilder{ctx: ctx, exprs: exprs, blocks: blocks, types: typeRefs}
 	exprs.calls = calls
+	exprs.lambdas = lambdas
 	stmts := &stmtBuilder{
 		bindings:    &bindingStmtBuilder{ctx: ctx, exprs: exprs, types: typeRefs},
 		assignments: &assignmentStmtBuilder{exprs: exprs},

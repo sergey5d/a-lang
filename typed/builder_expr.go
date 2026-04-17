@@ -8,10 +8,11 @@ import (
 
 // exprBuilder builds typed expressions and depends only on type conversion and blocks.
 type exprBuilder struct {
-	ctx    *buildContext
-	types  *typeRefBuilder
-	blocks Builder[*parser.BlockStmt, *BlockStmt]
-	calls  Builder[*parser.CallExpr, Expr]
+	ctx     *buildContext
+	types   *typeRefBuilder
+	blocks  Builder[*parser.BlockStmt, *BlockStmt]
+	calls   Builder[*parser.CallExpr, Expr]
+	lambdas Builder[*parser.LambdaExpr, Expr]
 }
 
 // Build converts a parser expression into a typed expression node.
@@ -88,35 +89,7 @@ func (b *exprBuilder) Build(expr parser.Expr) (Expr, error) {
 	case *parser.CallExpr:
 		return b.calls.Build(e)
 	case *parser.LambdaExpr:
-		b.ctx.pushScope()
-		defer b.ctx.popScope()
-
-		params := make([]LambdaParameter, len(e.Parameters))
-		for i, param := range e.Parameters {
-			symbol := b.ctx.newSymbol(SymbolParameter, param.Name, "", param.Span)
-			params[i] = LambdaParameter{
-				Name:   param.Name,
-				Type:   b.types.BuildType(param.Type),
-				Symbol: symbol,
-				Span:   param.Span,
-			}
-			b.ctx.defineSymbol(symbol)
-		}
-
-		var body Expr
-		var err error
-		if e.Body != nil {
-			body, err = b.Build(e.Body)
-			if err != nil {
-				return nil, err
-			}
-		}
-		blockBody, err := b.blocks.Build(e.BlockBody)
-		if err != nil {
-			return nil, err
-		}
-
-		return &LambdaExpr{baseExpr: b.base(expr), Parameters: params, Body: body, BlockBody: blockBody}, nil
+		return b.lambdas.Build(e)
 	default:
 		return nil, fmt.Errorf("unsupported expression type %T", expr)
 	}
