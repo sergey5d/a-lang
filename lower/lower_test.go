@@ -5,6 +5,7 @@ import (
 
 	"a-lang/parser"
 	"a-lang/typecheck"
+	"a-lang/typed"
 )
 
 func parseProgram(t *testing.T, src string) *parser.Program {
@@ -16,7 +17,7 @@ func parseProgram(t *testing.T, src string) *parser.Program {
 	return program
 }
 
-func TestProgramFromAST(t *testing.T) {
+func TestProgramFromTyped(t *testing.T) {
 	src := `
 class Counter {
 	private count Int := deferred
@@ -48,9 +49,14 @@ def run(input Int) Int {
 		t.Fatalf("expected no type diagnostics, got %#v", types.Diagnostics)
 	}
 
-	lowered, err := ProgramFromAST(program, types)
+	typedProgram, err := typed.Build(program, types)
 	if err != nil {
-		t.Fatalf("ProgramFromAST returned error: %v", err)
+		t.Fatalf("typed.Build returned error: %v", err)
+	}
+
+	lowered, err := ProgramFromTyped(typedProgram)
+	if err != nil {
+		t.Fatalf("ProgramFromTyped returned error: %v", err)
 	}
 
 	if len(lowered.Globals) != 1 {
@@ -87,7 +93,7 @@ def run(input Int) Int {
 	}
 }
 
-func TestProgramFromASTRejectsUnsupportedYieldLoop(t *testing.T) {
+func TestProgramFromTypedRejectsUnsupportedYieldLoop(t *testing.T) {
 	src := `
 def run(values List[Int]) Int {
 	for {
@@ -101,7 +107,14 @@ def run(values List[Int]) Int {
 
 	program := parseProgram(t, src)
 	types := typecheck.Analyze(program)
-	_, err := ProgramFromAST(program, types)
+	if len(types.Diagnostics) != 0 {
+		t.Fatalf("expected no type diagnostics, got %#v", types.Diagnostics)
+	}
+	typedProgram, err := typed.Build(program, types)
+	if err != nil {
+		t.Fatalf("typed.Build returned error: %v", err)
+	}
+	_, err = ProgramFromTyped(typedProgram)
 	if err == nil {
 		t.Fatalf("expected lowering error for yield loop")
 	}

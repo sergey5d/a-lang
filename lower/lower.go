@@ -6,40 +6,35 @@ import (
 
 	"a-lang/parser"
 	"a-lang/typecheck"
+	"a-lang/typed"
 )
 
-type Lowerer struct {
-	typeInfo  map[parser.Expr]*typecheck.Type
-	functions map[string]*parser.FunctionDecl
-	classes   map[string]*parser.ClassDecl
-}
+type Lowerer struct{}
 
-func ProgramFromAST(program *parser.Program, types typecheck.Result) (*Program, error) {
-	l := &Lowerer{
-		typeInfo:  types.ExprTypes,
-		functions: map[string]*parser.FunctionDecl{},
-		classes:   map[string]*parser.ClassDecl{},
-	}
-	for _, fn := range program.Functions {
-		l.functions[fn.Name] = fn
-	}
-	for _, class := range program.Classes {
-		l.classes[class.Name] = class
-	}
+func ProgramFromTyped(program *typed.Program) (*Program, error) {
+	l := &Lowerer{}
 	return l.lowerProgram(program)
 }
 
-func (l *Lowerer) lowerProgram(program *parser.Program) (*Program, error) {
+func ProgramFromAST(program *parser.Program, types typecheck.Result) (*Program, error) {
+	typedProgram, err := typed.Build(program, types)
+	if err != nil {
+		return nil, err
+	}
+	return ProgramFromTyped(typedProgram)
+}
+
+func (l *Lowerer) lowerProgram(program *typed.Program) (*Program, error) {
 	out := &Program{}
-	for _, stmt := range program.Statements {
-		global, err := l.lowerGlobal(stmt)
+	for _, stmt := range program.Globals {
+		globals, err := l.lowerGlobal(stmt)
 		if err != nil {
 			return nil, err
 		}
-		out.Globals = append(out.Globals, global...)
+		out.Globals = append(out.Globals, globals...)
 	}
 	for _, fn := range program.Functions {
-		lowered, err := l.lowerFunction(fn, "", false, false)
+		lowered, err := l.lowerFunction(fn)
 		if err != nil {
 			return nil, err
 		}
@@ -55,23 +50,23 @@ func (l *Lowerer) lowerProgram(program *parser.Program) (*Program, error) {
 	return out, nil
 }
 
-func (l *Lowerer) lowerGlobal(stmt parser.Statement) ([]*Global, error) {
+func (l *Lowerer) lowerGlobal(stmt typed.Stmt) ([]*Global, error) {
 	switch s := stmt.(type) {
-	case *parser.ValStmt:
+	case *typed.BindingStmt:
 		var globals []*Global
-		for i, binding := range s.Bindings {
+		for _, binding := range s.Bindings {
 			var init Expr
-			if i < len(s.Values) && s.Values[i] != nil {
-				var err error
-				init, err = l.lowerExpr(s.Values[i])
+			var err error
+			if binding.Init != nil {
+				init, err = l.lowerExpr(binding.Init)
 				if err != nil {
 					return nil, err
 				}
 			}
 			globals = append(globals, &Global{
 				Name:    binding.Name,
-				Mutable: binding.Mutable,
-				Type:    l.lowerType(binding.Type),
+				Mutable: binding.Mode == typed.BindingMutable,
+				Type:    binding.Type,
 				Init:    init,
 			})
 		}
@@ -81,18 +76,18 @@ func (l *Lowerer) lowerGlobal(stmt parser.Statement) ([]*Global, error) {
 	}
 }
 
-func (l *Lowerer) lowerClass(class *parser.ClassDecl) (*Class, error) {
+func (l *Lowerer) lowerClass(class *typed.ClassDecl) (*Class, error) {
 	out := &Class{Name: class.Name}
 	for _, field := range class.Fields {
 		out.Fields = append(out.Fields, &Field{
 			Name:    field.Name,
-			Mutable: field.Mutable,
+			Mutable: field.Mode == typed.BindingMutable,
 			Private: field.Private,
-			Type:    l.lowerType(field.Type),
+			Type:    field.Type,
 		})
 	}
 	for _, method := range class.Methods {
-		lowered, err := l.lowerFunction(method, class.Name, method.Private, method.Constructor)
+		lowered, err := l.lowerMethod(class.Name, method)
 		if err != nil {
 			return nil, err
 		}
@@ -105,47 +100,47 @@ func (l *Lowerer) lowerClass(class *parser.ClassDecl) (*Class, error) {
 	return out, nil
 }
 
-func (l *Lowerer) lowerFunction(fn any, receiver string, private, constructor bool) (*Function, error) {
-	switch decl := fn.(type) {
-	case *parser.FunctionDecl:
-		body, err := l.lowerBlock(decl.Body)
-		if err != nil {
-			return nil, err
-		}
-		return &Function{
-			Name:       decl.Name,
-			Parameters: l.lowerParams(decl.Parameters),
-			ReturnType: l.lowerType(decl.ReturnType),
-			Body:       body,
-		}, nil
-	case *parser.MethodDecl:
-		body, err := l.lowerBlock(decl.Body)
-		if err != nil {
-			return nil, err
-		}
-		return &Function{
-			Name:        decl.Name,
-			Parameters:  l.lowerParams(decl.Parameters),
-			ReturnType:  l.lowerType(decl.ReturnType),
-			Body:        body,
-			Receiver:    receiver,
-			Private:     private,
-			Constructor: constructor,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported function declaration %T", fn)
+func (l *Lowerer) lowerFunction(fn *typed.FunctionDecl) (*Function, error) {
+	body, err := l.lowerBlock(fn.Body)
+	if err != nil {
+		return nil, err
 	}
+	return &Function{
+		Name:       fn.Name,
+		Parameters: l.lowerParams(fn.Parameters),
+		ReturnType: fn.ReturnType,
+		Body:       body,
+	}, nil
 }
 
-func (l *Lowerer) lowerParams(params []parser.Parameter) []Parameter {
+func (l *Lowerer) lowerMethod(receiver string, method *typed.MethodDecl) (*Function, error) {
+	body, err := l.lowerBlock(method.Body)
+	if err != nil {
+		return nil, err
+	}
+	return &Function{
+		Name:        method.Name,
+		Parameters:  l.lowerParams(method.Parameters),
+		ReturnType:  method.ReturnType,
+		Body:        body,
+		Receiver:    receiver,
+		Private:     method.Private,
+		Constructor: method.Constructor,
+	}, nil
+}
+
+func (l *Lowerer) lowerParams(params []typed.Parameter) []Parameter {
 	out := make([]Parameter, len(params))
 	for i, param := range params {
-		out[i] = Parameter{Name: param.Name, Type: l.lowerType(param.Type)}
+		out[i] = Parameter{Name: param.Name, Type: param.Type}
 	}
 	return out
 }
 
-func (l *Lowerer) lowerBlock(block *parser.BlockStmt) ([]Stmt, error) {
+func (l *Lowerer) lowerBlock(block *typed.BlockStmt) ([]Stmt, error) {
+	if block == nil {
+		return nil, nil
+	}
 	var out []Stmt
 	for _, stmt := range block.Statements {
 		lowered, err := l.lowerStmt(stmt)
@@ -157,28 +152,28 @@ func (l *Lowerer) lowerBlock(block *parser.BlockStmt) ([]Stmt, error) {
 	return out, nil
 }
 
-func (l *Lowerer) lowerStmt(stmt parser.Statement) ([]Stmt, error) {
+func (l *Lowerer) lowerStmt(stmt typed.Stmt) ([]Stmt, error) {
 	switch s := stmt.(type) {
-	case *parser.ValStmt:
+	case *typed.BindingStmt:
 		var out []Stmt
-		for i, binding := range s.Bindings {
+		for _, binding := range s.Bindings {
 			var init Expr
-			if i < len(s.Values) && s.Values[i] != nil {
-				var err error
-				init, err = l.lowerExpr(s.Values[i])
+			var err error
+			if binding.Init != nil {
+				init, err = l.lowerExpr(binding.Init)
 				if err != nil {
 					return nil, err
 				}
 			}
 			out = append(out, &VarDecl{
 				Name:    binding.Name,
-				Mutable: binding.Mutable,
-				Type:    l.lowerType(binding.Type),
+				Mutable: binding.Mode == typed.BindingMutable,
+				Type:    binding.Type,
 				Init:    init,
 			})
 		}
 		return out, nil
-	case *parser.AssignmentStmt:
+	case *typed.AssignmentStmt:
 		target, err := l.lowerExpr(s.Target)
 		if err != nil {
 			return nil, err
@@ -188,7 +183,7 @@ func (l *Lowerer) lowerStmt(stmt parser.Statement) ([]Stmt, error) {
 			return nil, err
 		}
 		return []Stmt{&Assign{Target: target, Operator: s.Operator, Value: value}}, nil
-	case *parser.IfStmt:
+	case *typed.IfStmt:
 		cond, err := l.lowerExpr(s.Condition)
 		if err != nil {
 			return nil, err
@@ -211,7 +206,7 @@ func (l *Lowerer) lowerStmt(stmt parser.Statement) ([]Stmt, error) {
 			}
 		}
 		return []Stmt{&If{Condition: cond, Then: thenBlock, Else: elseBlock}}, nil
-	case *parser.ForStmt:
+	case *typed.ForStmt:
 		if s.YieldBody != nil {
 			return nil, fmt.Errorf("yield loops are not supported by lowering yet")
 		}
@@ -230,15 +225,15 @@ func (l *Lowerer) lowerStmt(stmt parser.Statement) ([]Stmt, error) {
 			return nil, err
 		}
 		return []Stmt{&ForEach{Name: s.Bindings[0].Name, Iterable: iterable, Body: body}}, nil
-	case *parser.ReturnStmt:
+	case *typed.ReturnStmt:
 		value, err := l.lowerExpr(s.Value)
 		if err != nil {
 			return nil, err
 		}
 		return []Stmt{&Return{Value: value}}, nil
-	case *parser.BreakStmt:
+	case *typed.BreakStmt:
 		return []Stmt{&Break{}}, nil
-	case *parser.ExprStmt:
+	case *typed.ExprStmt:
 		expr, err := l.lowerExpr(s.Expr)
 		if err != nil {
 			return nil, err
@@ -249,37 +244,37 @@ func (l *Lowerer) lowerStmt(stmt parser.Statement) ([]Stmt, error) {
 	}
 }
 
-func (l *Lowerer) lowerExpr(expr parser.Expr) (Expr, error) {
+func (l *Lowerer) lowerExpr(expr typed.Expr) (Expr, error) {
 	switch e := expr.(type) {
-	case *parser.Identifier:
+	case *typed.IdentifierExpr:
 		if e.Name == "this" {
-			return &ThisRef{Type: l.typeOf(expr)}, nil
+			return &ThisRef{Type: e.GetType()}, nil
 		}
-		return &VarRef{Name: e.Name, Type: l.typeOf(expr)}, nil
-	case *parser.IntegerLiteral:
+		return &VarRef{Name: e.Name, Type: e.GetType()}, nil
+	case *typed.IntegerLiteral:
 		v, err := strconv.ParseInt(e.Value, 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		return &IntLiteral{Value: v, Type: l.typeOf(expr)}, nil
-	case *parser.FloatLiteral:
+		return &IntLiteral{Value: v, Type: e.GetType()}, nil
+	case *typed.FloatLiteral:
 		v, err := strconv.ParseFloat(e.Value, 64)
 		if err != nil {
 			return nil, err
 		}
-		return &FloatLiteral{Value: v, Type: l.typeOf(expr)}, nil
-	case *parser.BoolLiteral:
-		return &BoolLiteral{Value: e.Value, Type: l.typeOf(expr)}, nil
-	case *parser.StringLiteral:
-		return &StringLiteral{Value: e.Value, Type: l.typeOf(expr)}, nil
-	case *parser.RuneLiteral:
+		return &FloatLiteral{Value: v, Type: e.GetType()}, nil
+	case *typed.BoolLiteral:
+		return &BoolLiteral{Value: e.Value, Type: e.GetType()}, nil
+	case *typed.StringLiteral:
+		return &StringLiteral{Value: e.Value, Type: e.GetType()}, nil
+	case *typed.RuneLiteral:
 		runes := []rune(e.Value)
 		var value rune
 		if len(runes) > 0 {
 			value = runes[0]
 		}
-		return &RuneLiteral{Value: value, Type: l.typeOf(expr)}, nil
-	case *parser.ListLiteral:
+		return &RuneLiteral{Value: value, Type: e.GetType()}, nil
+	case *typed.ListLiteral:
 		items := make([]Expr, len(e.Elements))
 		for i, item := range e.Elements {
 			lowered, err := l.lowerExpr(item)
@@ -288,16 +283,16 @@ func (l *Lowerer) lowerExpr(expr parser.Expr) (Expr, error) {
 			}
 			items[i] = lowered
 		}
-		return &ListLiteral{Elements: items, Type: l.typeOf(expr)}, nil
-	case *parser.GroupExpr:
+		return &ListLiteral{Elements: items, Type: e.GetType()}, nil
+	case *typed.GroupExpr:
 		return l.lowerExpr(e.Inner)
-	case *parser.UnaryExpr:
+	case *typed.UnaryExpr:
 		right, err := l.lowerExpr(e.Right)
 		if err != nil {
 			return nil, err
 		}
-		return &Unary{Operator: e.Operator, Right: right, Type: l.typeOf(expr)}, nil
-	case *parser.BinaryExpr:
+		return &Unary{Operator: e.Operator, Right: right, Type: e.GetType()}, nil
+	case *typed.BinaryExpr:
 		left, err := l.lowerExpr(e.Left)
 		if err != nil {
 			return nil, err
@@ -306,89 +301,54 @@ func (l *Lowerer) lowerExpr(expr parser.Expr) (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &Binary{Left: left, Operator: e.Operator, Right: right, Type: l.typeOf(expr)}, nil
-	case *parser.CallExpr:
-		return l.lowerCall(e)
-	case *parser.MemberExpr:
+		return &Binary{Left: left, Operator: e.Operator, Right: right, Type: e.GetType()}, nil
+	case *typed.FunctionCallExpr:
+		args, err := l.lowerArgs(e.Args)
+		if err != nil {
+			return nil, err
+		}
+		return &FunctionCall{Name: e.Name, Args: args, Type: e.GetType()}, nil
+	case *typed.ConstructorCallExpr:
+		args, err := l.lowerArgs(e.Args)
+		if err != nil {
+			return nil, err
+		}
+		return &Construct{Class: e.Class, Args: args, Type: e.GetType()}, nil
+	case *typed.MethodCallExpr:
 		receiver, err := l.lowerExpr(e.Receiver)
 		if err != nil {
 			return nil, err
 		}
-		return &FieldGet{Receiver: receiver, Name: e.Name, Type: l.typeOf(expr)}, nil
-	case *parser.LambdaExpr:
+		args, err := l.lowerArgs(e.Args)
+		if err != nil {
+			return nil, err
+		}
+		return &MethodCall{Receiver: receiver, Method: e.Method, Args: args, Type: e.GetType()}, nil
+	case *typed.FieldExpr:
+		receiver, err := l.lowerExpr(e.Receiver)
+		if err != nil {
+			return nil, err
+		}
+		return &FieldGet{Receiver: receiver, Name: e.Name, Type: e.GetType()}, nil
+	case *typed.LambdaExpr:
 		return nil, fmt.Errorf("lambdas are not supported by lowering yet")
-	case *parser.PlaceholderExpr:
+	case *typed.PlaceholderExpr:
 		return nil, fmt.Errorf("placeholder expressions are not supported by lowering")
+	case *typed.InvokeExpr:
+		return nil, fmt.Errorf("function value invocation is not supported by lowering yet")
 	default:
 		return nil, fmt.Errorf("unsupported expression %T during lowering", expr)
 	}
 }
 
-func (l *Lowerer) lowerCall(call *parser.CallExpr) (Expr, error) {
-	args := make([]Expr, len(call.Args))
-	for i, arg := range call.Args {
+func (l *Lowerer) lowerArgs(args []typed.Expr) ([]Expr, error) {
+	out := make([]Expr, len(args))
+	for i, arg := range args {
 		lowered, err := l.lowerExpr(arg)
 		if err != nil {
 			return nil, err
 		}
-		args[i] = lowered
+		out[i] = lowered
 	}
-	switch callee := call.Callee.(type) {
-	case *parser.Identifier:
-		if _, ok := l.classes[callee.Name]; ok {
-			return &Construct{Class: callee.Name, Args: args, Type: l.typeOf(call)}, nil
-		}
-		return &FunctionCall{Name: callee.Name, Args: args, Type: l.typeOf(call)}, nil
-	case *parser.MemberExpr:
-		receiver, err := l.lowerExpr(callee.Receiver)
-		if err != nil {
-			return nil, err
-		}
-		return &MethodCall{Receiver: receiver, Method: callee.Name, Args: args, Type: l.typeOf(call)}, nil
-	default:
-		return nil, fmt.Errorf("unsupported callee %T during lowering", call.Callee)
-	}
-}
-
-func (l *Lowerer) typeOf(expr parser.Expr) *typecheck.Type {
-	if l.typeInfo == nil {
-		return nil
-	}
-	return l.typeInfo[expr]
-}
-
-func (l *Lowerer) lowerType(ref *parser.TypeRef) *typecheck.Type {
-	if ref == nil {
-		return nil
-	}
-	if ref.ReturnType != nil {
-		params := make([]*typecheck.Type, len(ref.ParameterTypes))
-		for i, param := range ref.ParameterTypes {
-			params[i] = l.lowerType(param)
-		}
-		return &typecheck.Type{
-			Kind: typecheck.TypeFunction,
-			Name: "func",
-			Signature: &typecheck.Signature{
-				Parameters: params,
-				ReturnType: l.lowerType(ref.ReturnType),
-			},
-		}
-	}
-	args := make([]*typecheck.Type, len(ref.Arguments))
-	for i, arg := range ref.Arguments {
-		args[i] = l.lowerType(arg)
-	}
-	kind := typecheck.TypeBuiltin
-	switch ref.Name {
-	case "Int", "Int64", "Bool", "String", "Rune", "Float", "Float64", "List", "Set", "Array", "Map":
-		kind = typecheck.TypeBuiltin
-	default:
-		if _, ok := l.classes[ref.Name]; ok {
-			kind = typecheck.TypeClass
-		} else {
-			kind = typecheck.TypeInterface
-		}
-	}
-	return &typecheck.Type{Kind: kind, Name: ref.Name, Args: args}
+	return out, nil
 }
