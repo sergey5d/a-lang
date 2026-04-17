@@ -5,6 +5,7 @@ import (
 	"a-lang/typecheck"
 )
 
+// BindingMode records whether a typed binding is immutable or mutable.
 type BindingMode string
 
 const (
@@ -12,6 +13,7 @@ const (
 	BindingMutable   BindingMode = "mutable"
 )
 
+// InitMode records whether a binding/field is initialized immediately or later.
 type InitMode string
 
 const (
@@ -19,6 +21,7 @@ const (
 	InitDeferred  InitMode = "deferred"
 )
 
+// SymbolKind classifies the semantic identity attached to a typed node.
 type SymbolKind string
 
 const (
@@ -32,6 +35,7 @@ const (
 	SymbolThis      SymbolKind = "this"
 )
 
+// CallDispatch records how a resolved call should dispatch at runtime.
 type CallDispatch string
 
 const (
@@ -40,6 +44,7 @@ const (
 	DispatchConstruct CallDispatch = "construct"
 )
 
+// SymbolRef is a durable semantic reference for a resolved declaration.
 type SymbolRef struct {
 	ID    int
 	Kind  SymbolKind
@@ -48,6 +53,7 @@ type SymbolRef struct {
 	Span  parser.Span
 }
 
+// Program is the typed semantic root built from a parser program.
 type Program struct {
 	Functions  []*FunctionDecl
 	Interfaces []*InterfaceDecl
@@ -56,11 +62,13 @@ type Program struct {
 	Span       parser.Span
 }
 
+// TypeParameter carries a generic type parameter name through the typed tree.
 type TypeParameter struct {
 	Name string
 	Span parser.Span
 }
 
+// Parameter is a typed callable parameter with an attached symbol.
 type Parameter struct {
 	Name   string
 	Type   *typecheck.Type
@@ -68,6 +76,7 @@ type Parameter struct {
 	Span   parser.Span
 }
 
+// FunctionDecl is a typed top-level function declaration.
 type FunctionDecl struct {
 	Name       string
 	Parameters []Parameter
@@ -77,6 +86,7 @@ type FunctionDecl struct {
 	Span       parser.Span
 }
 
+// InterfaceMethod is a typed interface method signature.
 type InterfaceMethod struct {
 	Name       string
 	Parameters []Parameter
@@ -84,6 +94,7 @@ type InterfaceMethod struct {
 	Span       parser.Span
 }
 
+// InterfaceDecl is a typed interface declaration.
 type InterfaceDecl struct {
 	Name           string
 	TypeParameters []TypeParameter
@@ -92,6 +103,7 @@ type InterfaceDecl struct {
 	Span           parser.Span
 }
 
+// FieldDecl is a typed class field declaration.
 type FieldDecl struct {
 	Name     string
 	Type     *typecheck.Type
@@ -103,6 +115,7 @@ type FieldDecl struct {
 	Span     parser.Span
 }
 
+// MethodDecl is a typed class method or constructor declaration.
 type MethodDecl struct {
 	Name        string
 	Parameters  []Parameter
@@ -114,6 +127,7 @@ type MethodDecl struct {
 	Span        parser.Span
 }
 
+// ClassDecl is a typed class declaration including resolved interface types.
 type ClassDecl struct {
 	Name           string
 	TypeParameters []TypeParameter
@@ -124,22 +138,26 @@ type ClassDecl struct {
 	Span           parser.Span
 }
 
+// Stmt is implemented by all typed statement nodes.
 type Stmt interface {
 	stmtNode()
 	GetSpan() parser.Span
 }
 
+// Expr is implemented by all typed expression nodes.
 type Expr interface {
 	exprNode()
 	GetSpan() parser.Span
 	GetType() *typecheck.Type
 }
 
+// BlockStmt is a typed block of statements.
 type BlockStmt struct {
 	Statements []Stmt
 	Span       parser.Span
 }
 
+// BindingDecl is a typed declaration of a single named binding.
 type BindingDecl struct {
 	Name     string
 	Type     *typecheck.Type
@@ -150,6 +168,7 @@ type BindingDecl struct {
 	Span     parser.Span
 }
 
+// BindingStmt groups one or more typed binding declarations.
 type BindingStmt struct {
 	Bindings []BindingDecl
 	Span     parser.Span
@@ -158,6 +177,7 @@ type BindingStmt struct {
 func (*BindingStmt) stmtNode()              {}
 func (s *BindingStmt) GetSpan() parser.Span { return s.Span }
 
+// AssignmentStmt is a typed write to an assignment target.
 type AssignmentStmt struct {
 	Target   Expr
 	Operator string
@@ -168,6 +188,7 @@ type AssignmentStmt struct {
 func (*AssignmentStmt) stmtNode()              {}
 func (s *AssignmentStmt) GetSpan() parser.Span { return s.Span }
 
+// IfStmt is a typed if / else-if / else chain.
 type IfStmt struct {
 	Condition Expr
 	Then      *BlockStmt
@@ -179,6 +200,7 @@ type IfStmt struct {
 func (*IfStmt) stmtNode()              {}
 func (s *IfStmt) GetSpan() parser.Span { return s.Span }
 
+// ForBinding is a typed loop binding with an inferred element type.
 type ForBinding struct {
 	Name     string
 	Type     *typecheck.Type
@@ -187,6 +209,7 @@ type ForBinding struct {
 	Span     parser.Span
 }
 
+// ForStmt is a typed loop including optional yield-body form.
 type ForStmt struct {
 	Bindings  []ForBinding
 	Body      *BlockStmt
@@ -197,6 +220,7 @@ type ForStmt struct {
 func (*ForStmt) stmtNode()              {}
 func (s *ForStmt) GetSpan() parser.Span { return s.Span }
 
+// ReturnStmt is a typed return statement.
 type ReturnStmt struct {
 	Value Expr
 	Span  parser.Span
@@ -205,6 +229,7 @@ type ReturnStmt struct {
 func (*ReturnStmt) stmtNode()              {}
 func (s *ReturnStmt) GetSpan() parser.Span { return s.Span }
 
+// BreakStmt exits the nearest loop in the typed tree.
 type BreakStmt struct {
 	Span parser.Span
 }
@@ -212,6 +237,7 @@ type BreakStmt struct {
 func (*BreakStmt) stmtNode()              {}
 func (s *BreakStmt) GetSpan() parser.Span { return s.Span }
 
+// ExprStmt wraps a typed expression used for side effects.
 type ExprStmt struct {
 	Expr Expr
 	Span parser.Span
@@ -220,6 +246,7 @@ type ExprStmt struct {
 func (*ExprStmt) stmtNode()              {}
 func (s *ExprStmt) GetSpan() parser.Span { return s.Span }
 
+// baseExpr provides common type/span behavior for typed expressions.
 type baseExpr struct {
 	Type *typecheck.Type
 	Span parser.Span
@@ -228,6 +255,7 @@ type baseExpr struct {
 func (e *baseExpr) GetType() *typecheck.Type { return e.Type }
 func (e *baseExpr) GetSpan() parser.Span     { return e.Span }
 
+// IdentifierExpr is a typed identifier reference.
 type IdentifierExpr struct {
 	baseExpr
 	Name   string
@@ -236,12 +264,14 @@ type IdentifierExpr struct {
 
 func (*IdentifierExpr) exprNode() {}
 
+// PlaceholderExpr is a typed `_` placeholder expression.
 type PlaceholderExpr struct {
 	baseExpr
 }
 
 func (*PlaceholderExpr) exprNode() {}
 
+// IntegerLiteral is a typed integer literal.
 type IntegerLiteral struct {
 	baseExpr
 	Value string
@@ -249,6 +279,7 @@ type IntegerLiteral struct {
 
 func (*IntegerLiteral) exprNode() {}
 
+// FloatLiteral is a typed floating-point literal.
 type FloatLiteral struct {
 	baseExpr
 	Value string
@@ -256,6 +287,7 @@ type FloatLiteral struct {
 
 func (*FloatLiteral) exprNode() {}
 
+// RuneLiteral is a typed rune literal.
 type RuneLiteral struct {
 	baseExpr
 	Value string
@@ -263,6 +295,7 @@ type RuneLiteral struct {
 
 func (*RuneLiteral) exprNode() {}
 
+// BoolLiteral is a typed boolean literal.
 type BoolLiteral struct {
 	baseExpr
 	Value bool
@@ -270,6 +303,7 @@ type BoolLiteral struct {
 
 func (*BoolLiteral) exprNode() {}
 
+// StringLiteral is a typed string literal.
 type StringLiteral struct {
 	baseExpr
 	Value string
@@ -277,6 +311,7 @@ type StringLiteral struct {
 
 func (*StringLiteral) exprNode() {}
 
+// ListLiteral is a typed list literal.
 type ListLiteral struct {
 	baseExpr
 	Elements []Expr
@@ -284,6 +319,7 @@ type ListLiteral struct {
 
 func (*ListLiteral) exprNode() {}
 
+// GroupExpr preserves a parenthesized typed expression.
 type GroupExpr struct {
 	baseExpr
 	Inner Expr
@@ -291,6 +327,7 @@ type GroupExpr struct {
 
 func (*GroupExpr) exprNode() {}
 
+// UnaryExpr is a typed unary operator application.
 type UnaryExpr struct {
 	baseExpr
 	Operator string
@@ -299,6 +336,7 @@ type UnaryExpr struct {
 
 func (*UnaryExpr) exprNode() {}
 
+// BinaryExpr is a typed binary operator application.
 type BinaryExpr struct {
 	baseExpr
 	Left     Expr
@@ -308,6 +346,7 @@ type BinaryExpr struct {
 
 func (*BinaryExpr) exprNode() {}
 
+// FieldExpr is a typed field read with an optional resolved field symbol.
 type FieldExpr struct {
 	baseExpr
 	Receiver Expr
@@ -317,6 +356,7 @@ type FieldExpr struct {
 
 func (*FieldExpr) exprNode() {}
 
+// IndexExpr is a typed indexing operation.
 type IndexExpr struct {
 	baseExpr
 	Receiver Expr
@@ -325,6 +365,7 @@ type IndexExpr struct {
 
 func (*IndexExpr) exprNode() {}
 
+// FunctionCallExpr is a typed call to a named top-level function.
 type FunctionCallExpr struct {
 	baseExpr
 	Name     string
@@ -334,6 +375,7 @@ type FunctionCallExpr struct {
 
 func (*FunctionCallExpr) exprNode() {}
 
+// ConstructorCallExpr is a typed class construction call.
 type ConstructorCallExpr struct {
 	baseExpr
 	Class       string
@@ -345,6 +387,7 @@ type ConstructorCallExpr struct {
 
 func (*ConstructorCallExpr) exprNode() {}
 
+// MethodCallExpr is a typed method invocation on a receiver.
 type MethodCallExpr struct {
 	baseExpr
 	Receiver Expr
@@ -356,6 +399,7 @@ type MethodCallExpr struct {
 
 func (*MethodCallExpr) exprNode() {}
 
+// InvokeExpr is a typed call through a function value expression.
 type InvokeExpr struct {
 	baseExpr
 	Callee Expr
@@ -364,6 +408,7 @@ type InvokeExpr struct {
 
 func (*InvokeExpr) exprNode() {}
 
+// LambdaParameter is a typed lambda parameter with its symbol.
 type LambdaParameter struct {
 	Name   string
 	Type   *typecheck.Type
@@ -371,6 +416,7 @@ type LambdaParameter struct {
 	Span   parser.Span
 }
 
+// LambdaExpr is a typed lambda expression.
 type LambdaExpr struct {
 	baseExpr
 	Parameters []LambdaParameter

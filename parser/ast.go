@@ -1,15 +1,18 @@
 package parser
 
+// Position identifies a source location using 1-based line and column numbers.
 type Position struct {
 	Line   int `json:"line"`
 	Column int `json:"column"`
 }
 
+// Span describes the source range covered by a parsed node.
 type Span struct {
 	Start Position `json:"start"`
 	End   Position `json:"end"`
 }
 
+// Program is the root parser AST node for a source file.
 type Program struct {
 	Functions  []*FunctionDecl  `json:"functions"`
 	Interfaces []*InterfaceDecl `json:"interfaces,omitempty"`
@@ -18,6 +21,7 @@ type Program struct {
 	Span       Span             `json:"span"`
 }
 
+// TypeRef represents a named, generic, or function type in source.
 type TypeRef struct {
 	Name           string     `json:"name,omitempty"`
 	Arguments      []*TypeRef `json:"arguments,omitempty"`
@@ -26,11 +30,13 @@ type TypeRef struct {
 	Span           Span       `json:"span"`
 }
 
+// TypeParameter declares a generic type parameter name.
 type TypeParameter struct {
 	Name string `json:"name"`
 	Span Span   `json:"span"`
 }
 
+// FunctionDecl describes a top-level function declaration.
 type FunctionDecl struct {
 	Name       string      `json:"name"`
 	Parameters []Parameter `json:"parameters"`
@@ -39,6 +45,7 @@ type FunctionDecl struct {
 	Span       Span        `json:"span"`
 }
 
+// InterfaceDecl describes an interface declaration and its methods.
 type InterfaceDecl struct {
 	Name           string            `json:"name"`
 	TypeParameters []TypeParameter   `json:"typeParameters,omitempty"`
@@ -46,6 +53,7 @@ type InterfaceDecl struct {
 	Span           Span              `json:"span"`
 }
 
+// InterfaceMethod describes a method signature inside an interface.
 type InterfaceMethod struct {
 	Name       string      `json:"name"`
 	Parameters []Parameter `json:"parameters"`
@@ -53,6 +61,7 @@ type InterfaceMethod struct {
 	Span       Span        `json:"span"`
 }
 
+// ClassDecl describes a class declaration, its fields, and its methods.
 type ClassDecl struct {
 	Name           string          `json:"name"`
 	TypeParameters []TypeParameter `json:"typeParameters,omitempty"`
@@ -62,6 +71,7 @@ type ClassDecl struct {
 	Span           Span            `json:"span"`
 }
 
+// FieldDecl describes a class field declaration.
 type FieldDecl struct {
 	Name        string   `json:"name"`
 	Type        *TypeRef `json:"type"`
@@ -72,6 +82,7 @@ type FieldDecl struct {
 	Span        Span     `json:"span"`
 }
 
+// MethodDecl describes a class method or constructor declaration.
 type MethodDecl struct {
 	Name        string      `json:"name"`
 	Parameters  []Parameter `json:"parameters"`
@@ -82,31 +93,37 @@ type MethodDecl struct {
 	Span        Span        `json:"span"`
 }
 
+// Parameter describes a named typed parameter in a callable signature.
 type Parameter struct {
 	Name string   `json:"name"`
 	Type *TypeRef `json:"type"`
 	Span Span     `json:"span"`
 }
 
+// BlockStmt is a braced sequence of statements.
 type BlockStmt struct {
 	Statements []Statement `json:"statements"`
 	Span       Span        `json:"span"`
 }
 
+// Statement is implemented by all parser AST statement nodes.
 type Statement interface {
 	statementNode()
 }
 
+// Expr is implemented by all parser AST expression nodes.
 type Expr interface {
 	exprNode()
 }
 
+// ValStmt declares one or more bindings with matching initializer expressions.
 type ValStmt struct {
 	Bindings []Binding `json:"bindings"`
 	Values   []Expr    `json:"values"`
 	Span     Span      `json:"span"`
 }
 
+// Binding describes a single declared name in a binding statement.
 type Binding struct {
 	Name     string   `json:"name"`
 	Type     *TypeRef `json:"type,omitempty"`
@@ -117,6 +134,7 @@ type Binding struct {
 
 func (*ValStmt) statementNode() {}
 
+// AssignmentStmt writes a value to an existing assignment target.
 type AssignmentStmt struct {
 	Target   Expr   `json:"target"`
 	Operator string `json:"operator"`
@@ -126,6 +144,7 @@ type AssignmentStmt struct {
 
 func (*AssignmentStmt) statementNode() {}
 
+// IfStmt represents an if / else-if / else chain.
 type IfStmt struct {
 	Condition Expr       `json:"condition"`
 	Then      *BlockStmt `json:"then"`
@@ -136,6 +155,7 @@ type IfStmt struct {
 
 func (*IfStmt) statementNode() {}
 
+// ForStmt represents loop forms including foreach, infinite, and yield-style loops.
 type ForStmt struct {
 	Bindings  []ForBinding `json:"bindings,omitempty"`
 	Body      *BlockStmt   `json:"body,omitempty"`
@@ -145,12 +165,14 @@ type ForStmt struct {
 
 func (*ForStmt) statementNode() {}
 
+// ForBinding binds a loop variable to an iterable expression.
 type ForBinding struct {
 	Name     string `json:"name"`
 	Iterable Expr   `json:"iterable"`
 	Span     Span   `json:"span"`
 }
 
+// ReturnStmt returns a value from a callable body.
 type ReturnStmt struct {
 	Value Expr `json:"value"`
 	Span  Span `json:"span"`
@@ -158,12 +180,14 @@ type ReturnStmt struct {
 
 func (*ReturnStmt) statementNode() {}
 
+// BreakStmt exits the nearest loop.
 type BreakStmt struct {
 	Span Span `json:"span"`
 }
 
 func (*BreakStmt) statementNode() {}
 
+// ExprStmt wraps an expression used as a statement.
 type ExprStmt struct {
 	Expr Expr `json:"expr"`
 	Span Span `json:"span"`
@@ -171,6 +195,7 @@ type ExprStmt struct {
 
 func (*ExprStmt) statementNode() {}
 
+// Identifier is a name reference expression.
 type Identifier struct {
 	Name string `json:"name"`
 	Span Span   `json:"span"`
@@ -178,12 +203,14 @@ type Identifier struct {
 
 func (*Identifier) exprNode() {}
 
+// PlaceholderExpr represents the `_` placeholder expression.
 type PlaceholderExpr struct {
 	Span Span `json:"span"`
 }
 
 func (*PlaceholderExpr) exprNode() {}
 
+// IntegerLiteral is a source integer literal.
 type IntegerLiteral struct {
 	Value string `json:"value"`
 	Span  Span   `json:"span"`
@@ -191,6 +218,7 @@ type IntegerLiteral struct {
 
 func (*IntegerLiteral) exprNode() {}
 
+// FloatLiteral is a source floating-point literal.
 type FloatLiteral struct {
 	Value string `json:"value"`
 	Span  Span   `json:"span"`
@@ -198,6 +226,7 @@ type FloatLiteral struct {
 
 func (*FloatLiteral) exprNode() {}
 
+// RuneLiteral is a source rune literal.
 type RuneLiteral struct {
 	Value string `json:"value"`
 	Span  Span   `json:"span"`
@@ -205,6 +234,7 @@ type RuneLiteral struct {
 
 func (*RuneLiteral) exprNode() {}
 
+// BoolLiteral is a source boolean literal.
 type BoolLiteral struct {
 	Value bool `json:"value"`
 	Span  Span `json:"span"`
@@ -212,6 +242,7 @@ type BoolLiteral struct {
 
 func (*BoolLiteral) exprNode() {}
 
+// StringLiteral is a source string literal.
 type StringLiteral struct {
 	Value string `json:"value"`
 	Span  Span   `json:"span"`
@@ -219,6 +250,7 @@ type StringLiteral struct {
 
 func (*StringLiteral) exprNode() {}
 
+// ListLiteral is a bracketed list literal expression.
 type ListLiteral struct {
 	Elements []Expr `json:"elements"`
 	Span     Span   `json:"span"`
@@ -226,6 +258,7 @@ type ListLiteral struct {
 
 func (*ListLiteral) exprNode() {}
 
+// CallExpr applies a callee expression to argument expressions.
 type CallExpr struct {
 	Callee Expr   `json:"callee"`
 	Args   []Expr `json:"args"`
@@ -234,6 +267,7 @@ type CallExpr struct {
 
 func (*CallExpr) exprNode() {}
 
+// MemberExpr reads a named member from a receiver expression.
 type MemberExpr struct {
 	Receiver Expr   `json:"receiver"`
 	Name     string `json:"name"`
@@ -242,6 +276,7 @@ type MemberExpr struct {
 
 func (*MemberExpr) exprNode() {}
 
+// IndexExpr indexes into a receiver expression with another expression.
 type IndexExpr struct {
 	Receiver Expr `json:"receiver"`
 	Index    Expr `json:"index"`
@@ -250,12 +285,14 @@ type IndexExpr struct {
 
 func (*IndexExpr) exprNode() {}
 
+// LambdaParameter describes a single lambda parameter.
 type LambdaParameter struct {
 	Name string   `json:"name"`
 	Type *TypeRef `json:"type,omitempty"`
 	Span Span     `json:"span"`
 }
 
+// LambdaExpr represents an expression-bodied or block-bodied lambda.
 type LambdaExpr struct {
 	Parameters []LambdaParameter `json:"parameters"`
 	Body       Expr              `json:"body,omitempty"`
@@ -265,6 +302,7 @@ type LambdaExpr struct {
 
 func (*LambdaExpr) exprNode() {}
 
+// BinaryExpr applies a binary operator to two expressions.
 type BinaryExpr struct {
 	Left     Expr   `json:"left"`
 	Operator string `json:"operator"`
@@ -274,6 +312,7 @@ type BinaryExpr struct {
 
 func (*BinaryExpr) exprNode() {}
 
+// UnaryExpr applies a unary operator to one expression.
 type UnaryExpr struct {
 	Operator string `json:"operator"`
 	Right    Expr   `json:"right"`
@@ -282,6 +321,7 @@ type UnaryExpr struct {
 
 func (*UnaryExpr) exprNode() {}
 
+// GroupExpr preserves parenthesized expression structure.
 type GroupExpr struct {
 	Inner Expr `json:"inner"`
 	Span  Span `json:"span"`
