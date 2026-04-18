@@ -44,11 +44,12 @@ type instance struct {
 }
 
 type closure struct {
-	params    []string
-	variadic  bool
-	body      parser.Expr
-	blockBody *parser.BlockStmt
-	env       *env
+	params     []string
+	variadic   bool
+	body       parser.Expr
+	blockBody  *parser.BlockStmt
+	returnType *parser.TypeRef
+	env        *env
 }
 
 type builtinRef struct{ name string }
@@ -151,12 +152,12 @@ func (in *Interpreter) callFunction(fn *parser.FunctionDecl, args []Value, paren
 		return nil, err
 	}
 	if ret, ok := signal.(returnSignal); ok {
-		return ret.value, nil
+		return in.coerceValueForTypeRef(fn.ReturnType, ret.value), nil
 	}
 	if fn.ReturnType == nil {
 		return nil, nil
 	}
-	return value, nil
+	return in.coerceValueForTypeRef(fn.ReturnType, value), nil
 }
 
 func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl, args []Value, parent *env) (Value, error) {
@@ -177,12 +178,12 @@ func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl,
 		return nil, err
 	}
 	if ret, ok := signal.(returnSignal); ok {
-		return ret.value, nil
+		return in.coerceValueForTypeRef(method.ReturnType, ret.value), nil
 	}
 	if method.ReturnType == nil {
 		return nil, nil
 	}
-	return value, nil
+	return in.coerceValueForTypeRef(method.ReturnType, value), nil
 }
 
 func (in *Interpreter) construct(class *parser.ClassDecl, args []Value, parent *env) (Value, error) {
@@ -253,7 +254,7 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 		for i, param := range s.Function.Parameters {
 			params[i] = param.Name
 		}
-		local.define(s.Function.Name, &closure{params: params, variadic: len(s.Function.Parameters) > 0 && s.Function.Parameters[len(s.Function.Parameters)-1].Variadic, blockBody: s.Function.Body, env: local}, false)
+		local.define(s.Function.Name, &closure{params: params, variadic: len(s.Function.Parameters) > 0 && s.Function.Parameters[len(s.Function.Parameters)-1].Variadic, blockBody: s.Function.Body, returnType: s.Function.ReturnType, env: local}, false)
 		return nil, nil, nil
 	case *parser.AssignmentStmt:
 		value, err := in.evalExpr(s.Value, local)
@@ -776,7 +777,11 @@ func (in *Interpreter) callClosure(fn *closure, args []Value) (Value, error) {
 		local.define(param, args[i], false)
 	}
 	if fn.body != nil {
-		return in.evalExpr(fn.body, local)
+		value, err := in.evalExpr(fn.body, local)
+		if err != nil {
+			return nil, err
+		}
+		return in.coerceValueForTypeRef(fn.returnType, value), nil
 	}
 	if fn.blockBody != nil {
 		value, signal, err := in.execBlock(fn.blockBody, local, nil)
@@ -784,9 +789,9 @@ func (in *Interpreter) callClosure(fn *closure, args []Value) (Value, error) {
 			return nil, err
 		}
 		if ret, ok := signal.(returnSignal); ok {
-			return ret.value, nil
+			return in.coerceValueForTypeRef(fn.returnType, ret.value), nil
 		}
-		return value, nil
+		return in.coerceValueForTypeRef(fn.returnType, value), nil
 	}
 	return nil, nil
 }
@@ -1596,6 +1601,10 @@ func bindingTypeRef(bindings []parser.Binding, index int) *parser.TypeRef {
 }
 
 func (in *Interpreter) coerceValueForBinding(ref *parser.TypeRef, value Value) Value {
+	return in.coerceValueForTypeRef(ref, value)
+}
+
+func (in *Interpreter) coerceValueForTypeRef(ref *parser.TypeRef, value Value) Value {
 	if ref == nil {
 		return value
 	}

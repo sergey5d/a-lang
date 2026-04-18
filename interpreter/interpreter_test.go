@@ -364,6 +364,29 @@ def run() Int {
 	}
 }
 
+func TestNamedTupleAccessAfterMethodReturn(t *testing.T) {
+	src := `
+class Counter {
+	def pair() (value Int, size Int) = (2, 3)
+}
+
+def run() Int {
+	counter = Counter()
+	pair = counter.pair()
+	return pair.value + pair.size
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(5) {
+		t.Fatalf("expected 5, got %#v", value)
+	}
+}
+
 func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {

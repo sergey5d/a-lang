@@ -28,6 +28,10 @@ class Adder {
     def tupleFun() (Int, String) = (1, "fun")
 
     def tupleFun2() (amount Int, descr String) = (2, "fun2")
+
+    def tupleFun3() (amount Int, descr String) {
+        return (2, "fun2")
+    }
 }
 
 class Bucket {
@@ -102,6 +106,8 @@ def run() Int {
 	tuple2 = adder.tupleFun2()
     t21, t22 := tuple2
     Term.println("tuple2", t21, t22, tuple2.amount, tuple2.descr)
+
+    Term.println("tuple3", adder.tupleFun3().amount, adder.tupleFun3().descr)
 
 	methodResult Int = adder.add(lambdaResult)
 
