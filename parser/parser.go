@@ -57,6 +57,8 @@ func exprSpan(expr Expr) Span {
 		return e.Span
 	case *ListLiteral:
 		return e.Span
+	case *TupleLiteral:
+		return e.Span
 	case *CallExpr:
 		return e.Span
 	case *MemberExpr:
@@ -552,8 +554,11 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 	stmt := &ValStmt{Bindings: bindings, Values: values}
 	stmt.Span = tokenSpan(start)
 	for i := range bindings {
-		if values[i] != nil {
+		if i < len(values) && values[i] != nil {
 			stmt.Span = mergeSpans(stmt.Span, exprSpan(values[i]))
+			continue
+		}
+		if i >= len(values) {
 			continue
 		}
 		bindings[i].Deferred = true
@@ -625,23 +630,37 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 }
 
 func (p *Parser) parseBindingInitializers(count int) ([]Expr, error) {
-	values := make([]Expr, 0, count)
-	for len(values) < count {
+	if count <= 0 {
+		return nil, nil
+	}
+	if p.match(TokenDeferred) {
+		values := []Expr{nil}
+		for len(values) < count && p.match(TokenComma) {
+			if !p.match(TokenDeferred) {
+				return nil, fmt.Errorf("expected 'deferred' after ',' in initializer list, got %s", p.peek().String())
+			}
+			values = append(values, nil)
+		}
+		return values, nil
+	}
+	first, err := p.parseExpression(0)
+	if err != nil {
+		return nil, err
+	}
+	values := []Expr{first}
+	if count > 1 && !p.check(TokenComma) {
+		return values, nil
+	}
+	for len(values) < count && p.match(TokenComma) {
 		if p.match(TokenDeferred) {
 			values = append(values, nil)
-		} else {
-			expr, err := p.parseExpression(0)
-			if err != nil {
-				return nil, err
-			}
-			values = append(values, expr)
+			continue
 		}
-		if len(values) == count {
-			break
-		}
-		if _, err := p.consume(TokenComma, "expected ',' between initializers"); err != nil {
+		expr, err := p.parseExpression(0)
+		if err != nil {
 			return nil, err
 		}
+		values = append(values, expr)
 	}
 	return values, nil
 }
@@ -988,14 +1007,7 @@ func (p *Parser) parsePrefix() (Expr, error) {
 	case TokenUnder:
 		return &PlaceholderExpr{Span: tokenSpan(token)}, nil
 	case TokenLParen:
-		inner, err := p.parseExpression(0)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := p.consume(TokenRParen, "expected ')'"); err != nil {
-			return nil, err
-		}
-		return &GroupExpr{Inner: inner, Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
+		return p.parseParenExpr(token)
 	case TokenLBracket:
 		if p.match(TokenRBracket) {
 			return &ListLiteral{Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
@@ -1242,7 +1254,7 @@ func (p *Parser) parseTypeParameters() ([]TypeParameter, error) {
 
 func (p *Parser) parseTypeRef() (*TypeRef, error) {
 	if p.check(TokenLParen) {
-		return p.parseParenFunctionTypeRef()
+		return p.parseParenTypeRef()
 	}
 	return p.parseArrowTypeRef()
 }
@@ -1292,7 +1304,7 @@ func (p *Parser) parseNamedTypeRef() (*TypeRef, error) {
 	return ref, nil
 }
 
-func (p *Parser) parseParenFunctionTypeRef() (*TypeRef, error) {
+func (p *Parser) parseParenTypeRef() (*TypeRef, error) {
 	start, err := p.consume(TokenLParen, "expected '('")
 	if err != nil {
 		return nil, err
@@ -1313,8 +1325,15 @@ func (p *Parser) parseParenFunctionTypeRef() (*TypeRef, error) {
 	if _, err := p.consume(TokenRParen, "expected ')' after function type parameters"); err != nil {
 		return nil, err
 	}
-	if _, err := p.consume(TokenArrow, "expected '->' after function type parameters"); err != nil {
-		return nil, err
+	if !p.match(TokenArrow) {
+		if len(params) == 1 {
+			return params[0], nil
+		}
+		return &TypeRef{
+			Name:          "Tuple",
+			TupleElements: params,
+			Span:          mergeSpans(tokenSpan(start), tokenSpan(p.previous())),
+		}, nil
 	}
 	returnType, err := p.parseTypeRef()
 	if err != nil {
@@ -1379,10 +1398,10 @@ func (p *Parser) scanTypeRef(start int) (int, bool) {
 		} else {
 			return start, false
 		}
-		if i >= len(p.tokens) || p.tokens[i].Type != TokenArrow {
-			return start, false
+		if i < len(p.tokens) && p.tokens[i].Type == TokenArrow {
+			return p.scanTypeRef(i + 1)
 		}
-		return p.scanTypeRef(i + 1)
+		return i, true
 	}
 	if p.tokens[start].Type != TokenIdentifier {
 		return start, false
@@ -1487,6 +1506,37 @@ func precedence(t TokenType) int {
 	default:
 		return -1
 	}
+}
+
+func (p *Parser) parseParenExpr(start Token) (Expr, error) {
+	if p.check(TokenRParen) {
+		return nil, fmt.Errorf("unexpected token %s", p.peek().String())
+	}
+	first, err := p.parseExpression(0)
+	if err != nil {
+		return nil, err
+	}
+	if !p.match(TokenComma) {
+		if _, err := p.consume(TokenRParen, "expected ')'"); err != nil {
+			return nil, err
+		}
+		return &GroupExpr{Inner: first, Span: mergeSpans(tokenSpan(start), tokenSpan(p.previous()))}, nil
+	}
+	elements := []Expr{first}
+	for {
+		expr, err := p.parseExpression(0)
+		if err != nil {
+			return nil, err
+		}
+		elements = append(elements, expr)
+		if !p.match(TokenComma) {
+			break
+		}
+	}
+	if _, err := p.consume(TokenRParen, "expected ')'"); err != nil {
+		return nil, err
+	}
+	return &TupleLiteral{Elements: elements, Span: mergeSpans(tokenSpan(start), tokenSpan(p.previous()))}, nil
 }
 
 func unaryPrecedence() int {

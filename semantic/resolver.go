@@ -378,6 +378,12 @@ func (r *Resolver) resolveTypeRef(ref *parser.TypeRef) {
 		r.resolveTypeRef(ref.ReturnType)
 		return
 	}
+	if len(ref.TupleElements) > 0 {
+		for _, elem := range ref.TupleElements {
+			r.resolveTypeRef(elem)
+		}
+		return
+	}
 	for _, arg := range ref.Arguments {
 		r.resolveTypeRef(arg)
 	}

@@ -441,25 +441,89 @@ func (c *Checker) checkBlock(block *parser.BlockStmt) *Type {
 	return unknownType
 }
 
+func (c *Checker) bindingValueTypes(bindings []parser.Binding, values []parser.Expr, span parser.Span) []*Type {
+	if len(bindings) == 0 || len(values) == 0 {
+		return nil
+	}
+	if len(bindings) == len(values) {
+		out := make([]*Type, len(values))
+		for i, value := range values {
+			if value == nil {
+				out[i] = nil
+				continue
+			}
+			expected := unknownType
+			if bindings[i].Type != nil {
+				expected = c.resolveDeclaredType(bindings[i].Type)
+			}
+			out[i] = c.checkExprWithExpected(value, expected)
+		}
+		return out
+	}
+	if len(values) == 1 {
+		tupleType := c.checkExpr(values[0])
+		if tupleType.Kind != TypeTuple {
+			c.addDiagnostic("invalid_binding_count", fmt.Sprintf("binding expects %d values, got 1", len(bindings)), span)
+			return []*Type{tupleType}
+		}
+		if len(tupleType.Args) != len(bindings) {
+			c.addDiagnostic("invalid_binding_count", fmt.Sprintf("binding expects %d tuple values, got %d", len(bindings), len(tupleType.Args)), span)
+		}
+		return tupleType.Args
+	}
+	for _, value := range values {
+		c.checkExpr(value)
+	}
+	c.addDiagnostic("invalid_binding_count", fmt.Sprintf("binding expects %d values, got %d", len(bindings), len(values)), span)
+	return nil
+}
+
+func (c *Checker) assignmentValueTypes(targetCount int, values []parser.Expr, span parser.Span) []*Type {
+	if targetCount == len(values) {
+		out := make([]*Type, len(values))
+		for i, value := range values {
+			out[i] = c.checkExpr(value)
+		}
+		return out
+	}
+	if len(values) == 1 {
+		tupleType := c.checkExpr(values[0])
+		if tupleType.Kind != TypeTuple {
+			c.addDiagnostic("invalid_assignment_count", fmt.Sprintf("assignment expects %d values, got 1", targetCount), span)
+			return []*Type{tupleType}
+		}
+		if len(tupleType.Args) != targetCount {
+			c.addDiagnostic("invalid_assignment_count", fmt.Sprintf("assignment expects %d tuple values, got %d", targetCount, len(tupleType.Args)), span)
+		}
+		return tupleType.Args
+	}
+	for _, value := range values {
+		c.checkExpr(value)
+	}
+	c.addDiagnostic("invalid_assignment_count", fmt.Sprintf("assignment expects %d values, got %d", targetCount, len(values)), span)
+	return nil
+}
+
 func (c *Checker) checkStmt(stmt parser.Statement) {
 	switch s := stmt.(type) {
 	case *parser.ValStmt:
+		valueTypes := c.bindingValueTypes(s.Bindings, s.Values, s.Span)
 		for i, bindingDecl := range s.Bindings {
 			valueType := unknownType
-			hasValue := i < len(s.Values) && s.Values[i] != nil
+			hasValue := i < len(valueTypes) && valueTypes[i] != nil
 			if hasValue {
 				expected := unknownType
 				if bindingDecl.Type != nil {
 					expected = c.resolveDeclaredType(bindingDecl.Type)
 				}
-				valueType = c.checkExprWithExpected(s.Values[i], expected)
+				valueType = valueTypes[i]
+				if expected != nil && !isUnknown(expected) {
+					c.requireAssignable(valueType, expected, bindingDecl.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+expected.String())
+				}
 			}
 			declType := valueType
 			if bindingDecl.Type != nil {
 				declType = c.resolveDeclaredType(bindingDecl.Type)
-				if hasValue {
-					c.requireAssignable(valueType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+declType.String())
-				}
 			} else if !hasValue {
 				c.addDiagnostic("invalid_deferred", "deferred binding '"+bindingDecl.Name+"' requires an explicit type", bindingDecl.Span)
 				declType = unknownType
@@ -504,16 +568,14 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		}
 		c.requireAssignable(valueType, targetType, s.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+targetType.String())
 	case *parser.MultiAssignmentStmt:
-		if len(s.Targets) != len(s.Values) {
-			c.addDiagnostic("invalid_assignment_count", fmt.Sprintf("assignment expects %d values, got %d", len(s.Targets), len(s.Values)), s.Span)
-		}
+		valueTypes := c.assignmentValueTypes(len(s.Targets), s.Values, s.Span)
 		count := len(s.Targets)
-		if len(s.Values) < count {
-			count = len(s.Values)
+		if len(valueTypes) < count {
+			count = len(valueTypes)
 		}
 		for i := 0; i < count; i++ {
 			targetType, mutable := c.checkAssignmentTarget(s.Targets[i], s.Span)
-			valueType := c.checkExpr(s.Values[i])
+			valueType := valueTypes[i]
 			if !mutable {
 				continue
 			}
@@ -529,9 +591,6 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		}
 		for i := count; i < len(s.Targets); i++ {
 			c.checkAssignmentTarget(s.Targets[i], s.Span)
-		}
-		for i := count; i < len(s.Values); i++ {
-			c.checkExpr(s.Values[i])
 		}
 	case *parser.IfStmt:
 		condType := c.checkExpr(s.Condition)
@@ -664,6 +723,12 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			}
 		}
 		result = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{elemType}}
+	case *parser.TupleLiteral:
+		elements := make([]*Type, len(e.Elements))
+		for i, elem := range e.Elements {
+			elements[i] = c.checkExpr(elem)
+		}
+		result = &Type{Kind: TypeTuple, Name: "Tuple", Args: elements}
 	case *parser.GroupExpr:
 		result = c.checkExpr(e.Inner)
 	case *parser.UnaryExpr:
@@ -1255,6 +1320,13 @@ func (c *Checker) instantiateTypeRef(ref *parser.TypeRef, subst map[string]*Type
 				ReturnType: c.instantiateTypeRef(ref.ReturnType, subst),
 			},
 		}
+	}
+	if len(ref.TupleElements) > 0 {
+		args := make([]*Type, len(ref.TupleElements))
+		for i, arg := range ref.TupleElements {
+			args[i] = c.instantiateTypeRef(arg, subst)
+		}
+		return &Type{Kind: TypeTuple, Name: "Tuple", Args: args}
 	}
 	if subst != nil {
 		if resolved, ok := subst[ref.Name]; ok && len(ref.Arguments) == 0 {

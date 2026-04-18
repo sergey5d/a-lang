@@ -343,6 +343,26 @@ def run() Int {
 	}
 }
 
+func TestTupleDestructuring(t *testing.T) {
+	src := `
+def run() Int {
+	pair = (2, 3)
+	left Int, right Int := pair
+	left, right := right, left + right
+	left + right
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(8) {
+		t.Fatalf("expected 8, got %#v", value)
+	}
+}
+
 func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {

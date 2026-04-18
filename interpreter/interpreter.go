@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 
 	"a-lang/parser"
 )
@@ -54,6 +55,7 @@ type builtinRef struct{ name string }
 
 type nativeList struct{ items []Value }
 type nativeArray struct{ items []Value }
+type nativeTuple struct{ items []Value }
 type nativeOption struct {
 	value Value
 	set   bool
@@ -74,6 +76,14 @@ type returnSignal struct {
 }
 
 type breakSignal struct{}
+
+func (t *nativeTuple) String() string {
+	parts := make([]string, len(t.items))
+	for i, item := range t.items {
+		parts[i] = fmt.Sprint(item)
+	}
+	return "(" + strings.Join(parts, ", ") + ")"
+}
 
 func New(program *parser.Program) *Interpreter {
 	in := &Interpreter{
@@ -219,17 +229,9 @@ func (in *Interpreter) execBlock(block *parser.BlockStmt, parent *env, self *ins
 func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instance) (Value, any, error) {
 	switch s := stmt.(type) {
 	case *parser.ValStmt:
-		values := make([]Value, len(s.Values))
-		for i, expr := range s.Values {
-			if expr == nil {
-				values[i] = deferredValue{}
-				continue
-			}
-			value, err := in.evalExpr(expr, local)
-			if err != nil {
-				return nil, nil, err
-			}
-			values[i] = value
+		values, err := in.bindingValues(s.Bindings, s.Values, local, s.Span)
+		if err != nil {
+			return nil, nil, err
 		}
 		for i, binding := range s.Bindings {
 			var value Value
@@ -253,16 +255,9 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 		}
 		return nil, nil, in.assign(s.Target, s.Operator, value, local)
 	case *parser.MultiAssignmentStmt:
-		if len(s.Targets) != len(s.Values) {
-			return nil, nil, RuntimeError{Message: fmt.Sprintf("assignment expects %d values, got %d", len(s.Targets), len(s.Values)), Span: s.Span}
-		}
-		values := make([]Value, len(s.Values))
-		for i, expr := range s.Values {
-			value, err := in.evalExpr(expr, local)
-			if err != nil {
-				return nil, nil, err
-			}
-			values[i] = value
+		values, err := in.assignmentValues(len(s.Targets), s.Values, local, s.Span)
+		if err != nil {
+			return nil, nil, err
 		}
 		for i, target := range s.Targets {
 			if err := in.assign(target, s.Operator, values[i], local); err != nil {
@@ -561,6 +556,16 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			items[i] = value
 		}
 		return &nativeList{items: items}, nil
+	case *parser.TupleLiteral:
+		items := make([]Value, len(e.Elements))
+		for i, item := range e.Elements {
+			value, err := in.evalExpr(item, local)
+			if err != nil {
+				return nil, err
+			}
+			items[i] = value
+		}
+		return &nativeTuple{items: items}, nil
 	case *parser.IfExpr:
 		cond, err := in.evalExpr(e.Condition, local)
 		if err != nil {
@@ -1272,7 +1277,14 @@ func runtimeValueMatchesType(value Value, ref *parser.TypeRef) bool {
 	case "Array":
 		_, ok := value.(*nativeArray)
 		return ok
+	case "Tuple":
+		tuple, ok := value.(*nativeTuple)
+		return ok && len(ref.TupleElements) == len(tuple.items)
 	default:
+		if len(ref.TupleElements) > 0 {
+			tuple, ok := value.(*nativeTuple)
+			return ok && len(ref.TupleElements) == len(tuple.items)
+		}
 		if instanceValue, ok := value.(*instance); ok {
 			return instanceValue.class.Name == ref.Name
 		}
@@ -1518,6 +1530,74 @@ func iterableToSlice(value Value) ([]Value, bool) {
 	}
 }
 
+func (in *Interpreter) bindingValues(bindings []parser.Binding, values []parser.Expr, local *env, span parser.Span) ([]Value, error) {
+	if len(bindings) == 0 || len(values) == 0 {
+		return nil, nil
+	}
+	if len(bindings) == len(values) {
+		out := make([]Value, len(values))
+		for i, expr := range values {
+			if expr == nil {
+				out[i] = deferredValue{}
+				continue
+			}
+			value, err := in.evalExpr(expr, local)
+			if err != nil {
+				return nil, err
+			}
+			out[i] = value
+		}
+		return out, nil
+	}
+	if len(values) == 1 {
+		if values[0] == nil {
+			return nil, RuntimeError{Message: "cannot destructure deferred value", Span: span}
+		}
+		value, err := in.evalExpr(values[0], local)
+		if err != nil {
+			return nil, err
+		}
+		tuple, ok := value.(*nativeTuple)
+		if !ok {
+			return nil, RuntimeError{Message: fmt.Sprintf("binding expects %d values, got 1", len(bindings)), Span: span}
+		}
+		if len(tuple.items) != len(bindings) {
+			return nil, RuntimeError{Message: fmt.Sprintf("binding expects %d tuple values, got %d", len(bindings), len(tuple.items)), Span: span}
+		}
+		return append([]Value(nil), tuple.items...), nil
+	}
+	return nil, RuntimeError{Message: fmt.Sprintf("binding expects %d values, got %d", len(bindings), len(values)), Span: span}
+}
+
+func (in *Interpreter) assignmentValues(targetCount int, values []parser.Expr, local *env, span parser.Span) ([]Value, error) {
+	if targetCount == len(values) {
+		out := make([]Value, len(values))
+		for i, expr := range values {
+			value, err := in.evalExpr(expr, local)
+			if err != nil {
+				return nil, err
+			}
+			out[i] = value
+		}
+		return out, nil
+	}
+	if len(values) == 1 {
+		value, err := in.evalExpr(values[0], local)
+		if err != nil {
+			return nil, err
+		}
+		tuple, ok := value.(*nativeTuple)
+		if !ok {
+			return nil, RuntimeError{Message: fmt.Sprintf("assignment expects %d values, got 1", targetCount), Span: span}
+		}
+		if len(tuple.items) != targetCount {
+			return nil, RuntimeError{Message: fmt.Sprintf("assignment expects %d tuple values, got %d", targetCount, len(tuple.items)), Span: span}
+		}
+		return append([]Value(nil), tuple.items...), nil
+	}
+	return nil, RuntimeError{Message: fmt.Sprintf("assignment expects %d values, got %d", targetCount, len(values)), Span: span}
+}
+
 func indexedItems(value Value) ([]Value, bool) {
 	switch items := value.(type) {
 	case []Value:
@@ -1554,6 +1634,12 @@ func zeroValue(ref *parser.TypeRef) Value {
 		return &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: []string{}}
 	case "Array":
 		return &nativeArray{items: []Value{}}
+	case "Tuple":
+		items := make([]Value, len(ref.TupleElements))
+		for i, elem := range ref.TupleElements {
+			items[i] = zeroValue(elem)
+		}
+		return &nativeTuple{items: items}
 	case "Option":
 		return &nativeOption{set: false}
 	case "Term":
@@ -1603,6 +1689,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.StringLiteral:
 		return e.Span
 	case *parser.ListLiteral:
+		return e.Span
+	case *parser.TupleLiteral:
 		return e.Span
 	case *parser.CallExpr:
 		return e.Span

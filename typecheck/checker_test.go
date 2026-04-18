@@ -128,6 +128,21 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeTupleDestructuring(t *testing.T) {
+	src := `
+def run() Int {
+	pair (Int, String) = (1, "ok")
+	left Int, right String = pair
+	return left
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeArrayIndexing(t *testing.T) {
 	src := `
 def run(values Array[Int]) Int {

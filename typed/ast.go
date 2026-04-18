@@ -330,6 +330,14 @@ type ListLiteral struct {
 
 func (*ListLiteral) exprNode() {}
 
+// TupleLiteral is a typed tuple literal.
+type TupleLiteral struct {
+	baseExpr
+	Elements []Expr
+}
+
+func (*TupleLiteral) exprNode() {}
+
 // GroupExpr preserves a parenthesized typed expression.
 type GroupExpr struct {
 	baseExpr

@@ -364,6 +364,32 @@ def run() Int {
 	}
 }
 
+func TestParseTupleLiteralAndType(t *testing.T) {
+	src := `
+def run() (Int, String) {
+	pair (Int, String) = (1, "ok")
+	pair
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	if fn.ReturnType == nil || len(fn.ReturnType.TupleElements) != 2 {
+		t.Fatalf("expected tuple return type, got %#v", fn.ReturnType)
+	}
+	stmt := fn.Body.Statements[0].(*ValStmt)
+	if stmt.Bindings[0].Type == nil || len(stmt.Bindings[0].Type.TupleElements) != 2 {
+		t.Fatalf("expected tuple binding type, got %#v", stmt.Bindings[0].Type)
+	}
+	if _, ok := stmt.Values[0].(*TupleLiteral); !ok {
+		t.Fatalf("expected tuple literal, got %T", stmt.Values[0])
+	}
+}
+
 func TestParseExtendedOperators(t *testing.T) {
 	src := `
 def ops(a Int, b Int) Bool {

@@ -15,6 +15,7 @@ const (
 	TypeInterface TypeKind = "interface"
 	TypeParam     TypeKind = "type_param"
 	TypeFunction  TypeKind = "function"
+	TypeTuple     TypeKind = "tuple"
 )
 
 type Type struct {
@@ -36,6 +37,13 @@ func (t *Type) String() string {
 			parts[i] = param.String()
 		}
 		return "(" + strings.Join(parts, ", ") + ") -> " + t.Signature.ReturnType.String()
+	}
+	if t.Kind == TypeTuple {
+		parts := make([]string, len(t.Args))
+		for i, arg := range t.Args {
+			parts[i] = arg.String()
+		}
+		return "(" + strings.Join(parts, ", ") + ")"
 	}
 	if len(t.Args) == 0 {
 		return t.Name
@@ -72,6 +80,17 @@ func sameType(left, right *Type) bool {
 		}
 		return sameType(left.Signature.ReturnType, right.Signature.ReturnType)
 	}
+	if left.Kind == TypeTuple {
+		if len(left.Args) != len(right.Args) {
+			return false
+		}
+		for i := range left.Args {
+			if !sameType(left.Args[i], right.Args[i]) {
+				return false
+			}
+		}
+		return true
+	}
 	if left.Name != right.Name || len(left.Args) != len(right.Args) {
 		return false
 	}
@@ -100,6 +119,13 @@ func fromTypeRef(ref *parser.TypeRef, lookup typeLookup) *Type {
 				ReturnType: fromTypeRef(ref.ReturnType, lookup),
 			},
 		}
+	}
+	if len(ref.TupleElements) > 0 {
+		args := make([]*Type, len(ref.TupleElements))
+		for i, arg := range ref.TupleElements {
+			args[i] = fromTypeRef(arg, lookup)
+		}
+		return &Type{Kind: TypeTuple, Name: "Tuple", Args: args}
 	}
 	args := make([]*Type, len(ref.Arguments))
 	for i, arg := range ref.Arguments {

@@ -25,6 +25,7 @@ type Program struct {
 type TypeRef struct {
 	Name           string     `json:"name,omitempty"`
 	Arguments      []*TypeRef `json:"arguments,omitempty"`
+	TupleElements  []*TypeRef `json:"tupleElements,omitempty"`
 	ParameterTypes []*TypeRef `json:"parameterTypes,omitempty"`
 	ReturnType     *TypeRef   `json:"returnType,omitempty"`
 	Span           Span       `json:"span"`
@@ -155,10 +156,10 @@ func (*AssignmentStmt) statementNode() {}
 
 // MultiAssignmentStmt writes multiple values to multiple existing assignment targets.
 type MultiAssignmentStmt struct {
-	Targets  []Expr  `json:"targets"`
-	Operator string  `json:"operator"`
-	Values   []Expr  `json:"values"`
-	Span     Span    `json:"span"`
+	Targets  []Expr `json:"targets"`
+	Operator string `json:"operator"`
+	Values   []Expr `json:"values"`
+	Span     Span   `json:"span"`
 }
 
 func (*MultiAssignmentStmt) statementNode() {}
@@ -276,6 +277,14 @@ type ListLiteral struct {
 }
 
 func (*ListLiteral) exprNode() {}
+
+// TupleLiteral is a parenthesized tuple literal expression.
+type TupleLiteral struct {
+	Elements []Expr `json:"elements"`
+	Span     Span   `json:"span"`
+}
+
+func (*TupleLiteral) exprNode() {}
 
 // CallExpr applies a callee expression to argument expressions.
 type CallExpr struct {

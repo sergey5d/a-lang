@@ -63,6 +63,13 @@ func (b *typeRefBuilder) BuildType(ref *parser.TypeRef) *typecheck.Type {
 			},
 		}
 	}
+	if len(ref.TupleElements) > 0 {
+		args := make([]*typecheck.Type, len(ref.TupleElements))
+		for i, arg := range ref.TupleElements {
+			args[i] = b.BuildType(arg)
+		}
+		return &typecheck.Type{Kind: typecheck.TypeTuple, Name: "Tuple", Args: args}
+	}
 	args := make([]*typecheck.Type, len(ref.Arguments))
 	for i, arg := range ref.Arguments {
 		args[i] = b.BuildType(arg)
@@ -208,6 +215,13 @@ func (b *typeRefBuilder) instantiateTypeRef(ref *parser.TypeRef, subst map[strin
 			},
 		}
 	}
+	if len(ref.TupleElements) > 0 {
+		args := make([]*typecheck.Type, len(ref.TupleElements))
+		for i, arg := range ref.TupleElements {
+			args[i] = b.instantiateTypeRef(arg, subst)
+		}
+		return &typecheck.Type{Kind: typecheck.TypeTuple, Name: "Tuple", Args: args}
+	}
 	if subst != nil {
 		if resolved, ok := subst[ref.Name]; ok && len(ref.Arguments) == 0 {
 			return resolved
@@ -271,6 +285,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 		return e.Span
 	case *parser.ListLiteral:
 		return e.Span
+	case *parser.TupleLiteral:
+		return e.Span
 	case *parser.CallExpr:
 		return e.Span
 	case *parser.MemberExpr:
@@ -300,6 +316,17 @@ func sameType(left, right *typecheck.Type) bool {
 		return left == right
 	}
 	if left.Kind == typecheck.TypeUnknown || right.Kind == typecheck.TypeUnknown {
+		return true
+	}
+	if left.Kind == typecheck.TypeTuple && right.Kind == typecheck.TypeTuple {
+		if len(left.Args) != len(right.Args) {
+			return false
+		}
+		for i := range left.Args {
+			if !sameType(left.Args[i], right.Args[i]) {
+				return false
+			}
+		}
 		return true
 	}
 	if left.Kind != right.Kind || left.Name != right.Name || len(left.Args) != len(right.Args) {
