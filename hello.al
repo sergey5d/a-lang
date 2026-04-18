@@ -24,6 +24,10 @@ class Adder {
     	        }
     	    }
     }
+
+    def tupleFun() (Int, String) = (1, "fun")
+
+    def tupleFun2() (amount Int, descr String) = (2, "fun2")
 }
 
 class Bucket {
@@ -89,6 +93,15 @@ def run() Int {
 	adder.alterThemAll(4, 5, 9)
 	adder.add(5)
 	adder.add("hehe")
+
+	tuple1 = adder.tupleFun()
+	t1, t2 := tuple1
+
+	Term.println("tuple1", t1, t2)
+
+	tuple2 = adder.tupleFun2()
+    t21, t22 := tuple2
+    Term.println("tuple2", t21, t22, tuple2.amount, tuple2.descr)
 
 	methodResult Int = adder.add(lambdaResult)
 

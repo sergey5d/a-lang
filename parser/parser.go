@@ -1310,13 +1310,25 @@ func (p *Parser) parseParenTypeRef() (*TypeRef, error) {
 		return nil, err
 	}
 	var params []*TypeRef
+	var names []string
+	hasNames := false
 	if !p.check(TokenRParen) {
 		for {
+			name := ""
+			if p.isNamedTupleElementStartAt(p.pos) {
+				nameToken, err := p.consume(TokenIdentifier, "expected tuple element name")
+				if err != nil {
+					return nil, err
+				}
+				name = nameToken.Lexeme
+				hasNames = true
+			}
 			param, err := p.parseTypeRef()
 			if err != nil {
 				return nil, err
 			}
 			params = append(params, param)
+			names = append(names, name)
 			if !p.match(TokenComma) {
 				break
 			}
@@ -1326,12 +1338,17 @@ func (p *Parser) parseParenTypeRef() (*TypeRef, error) {
 		return nil, err
 	}
 	if !p.match(TokenArrow) {
-		if len(params) == 1 {
+		if len(params) == 1 && !hasNames {
 			return params[0], nil
+		}
+		tupleNames := []string(nil)
+		if hasNames {
+			tupleNames = names
 		}
 		return &TypeRef{
 			Name:          "Tuple",
 			TupleElements: params,
+			TupleNames:    tupleNames,
 			Span:          mergeSpans(tokenSpan(start), tokenSpan(p.previous())),
 		}, nil
 	}
@@ -1344,6 +1361,24 @@ func (p *Parser) parseParenTypeRef() (*TypeRef, error) {
 		ReturnType:     returnType,
 		Span:           mergeSpans(tokenSpan(start), typeSpan(returnType)),
 	}, nil
+}
+
+func (p *Parser) isNamedTupleElementStartAt(start int) bool {
+	if start >= len(p.tokens) || p.tokens[start].Type != TokenIdentifier {
+		return false
+	}
+	next := start + 1
+	if next >= len(p.tokens) {
+		return false
+	}
+	if p.tokens[next].Type != TokenIdentifier && p.tokens[next].Type != TokenLParen {
+		return false
+	}
+	end, ok := p.scanTypeRef(next)
+	if !ok || end >= len(p.tokens) {
+		return false
+	}
+	return p.tokens[end].Type == TokenComma || p.tokens[end].Type == TokenRParen
 }
 
 func (p *Parser) typeRefFollowedBy(tt TokenType) bool {
@@ -1378,6 +1413,9 @@ func (p *Parser) scanTypeRef(start int) (int, bool) {
 		i := start + 1
 		if i < len(p.tokens) && p.tokens[i].Type != TokenRParen {
 			for {
+				if p.isNamedTupleElementStartAt(i) {
+					i++
+				}
 				var ok bool
 				i, ok = p.scanTypeRef(i)
 				if !ok || i >= len(p.tokens) {

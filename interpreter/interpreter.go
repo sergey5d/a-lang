@@ -55,7 +55,10 @@ type builtinRef struct{ name string }
 
 type nativeList struct{ items []Value }
 type nativeArray struct{ items []Value }
-type nativeTuple struct{ items []Value }
+type nativeTuple struct {
+	items []Value
+	names []string
+}
 type nativeOption struct {
 	value Value
 	set   bool
@@ -80,7 +83,11 @@ type breakSignal struct{}
 func (t *nativeTuple) String() string {
 	parts := make([]string, len(t.items))
 	for i, item := range t.items {
-		parts[i] = fmt.Sprint(item)
+		if i < len(t.names) && t.names[i] != "" {
+			parts[i] = t.names[i] + "=" + fmt.Sprint(item)
+		} else {
+			parts[i] = fmt.Sprint(item)
+		}
 	}
 	return "(" + strings.Join(parts, ", ") + ")"
 }
@@ -449,6 +456,7 @@ func (in *Interpreter) assign(target parser.Expr, operator string, value Value, 
 			}
 			value = updated
 		}
+		value = preserveTupleNames(current.value(), value)
 		return current.set(value)
 	case *parser.MemberExpr:
 		receiver, err := in.evalExpr(t.Receiver, local)
@@ -829,6 +837,16 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 	case *nativeList, *nativeArray, *nativeOption, *nativeSet, *nativeMap, *nativeTerm:
 		if in.nativeHasMethod(receiver, expr.Name) {
 			return nil, RuntimeError{Message: "method '" + expr.Name + "' must be called with ()", Span: expr.Span}
+		}
+		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
+	case *nativeTuple:
+		for i, name := range value.names {
+			if name == expr.Name {
+				if i < len(value.items) {
+					return value.items[i], nil
+				}
+				break
+			}
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
 	default:
@@ -1545,6 +1563,7 @@ func (in *Interpreter) bindingValues(bindings []parser.Binding, values []parser.
 			if err != nil {
 				return nil, err
 			}
+			value = in.coerceValueForBinding(bindingTypeRef(bindings, i), value)
 			out[i] = value
 		}
 		return out, nil
@@ -1567,6 +1586,37 @@ func (in *Interpreter) bindingValues(bindings []parser.Binding, values []parser.
 		return append([]Value(nil), tuple.items...), nil
 	}
 	return nil, RuntimeError{Message: fmt.Sprintf("binding expects %d values, got %d", len(bindings), len(values)), Span: span}
+}
+
+func bindingTypeRef(bindings []parser.Binding, index int) *parser.TypeRef {
+	if index < 0 || index >= len(bindings) {
+		return nil
+	}
+	return bindings[index].Type
+}
+
+func (in *Interpreter) coerceValueForBinding(ref *parser.TypeRef, value Value) Value {
+	if ref == nil {
+		return value
+	}
+	tuple, ok := value.(*nativeTuple)
+	if !ok || len(ref.TupleElements) == 0 {
+		return value
+	}
+	renamed := append([]string(nil), ref.TupleNames...)
+	return &nativeTuple{items: append([]Value(nil), tuple.items...), names: renamed}
+}
+
+func preserveTupleNames(current Value, next Value) Value {
+	currentTuple, ok := current.(*nativeTuple)
+	if !ok {
+		return next
+	}
+	nextTuple, ok := next.(*nativeTuple)
+	if !ok {
+		return next
+	}
+	return &nativeTuple{items: append([]Value(nil), nextTuple.items...), names: append([]string(nil), currentTuple.names...)}
 }
 
 func (in *Interpreter) assignmentValues(targetCount int, values []parser.Expr, local *env, span parser.Span) ([]Value, error) {
@@ -1639,7 +1689,7 @@ func zeroValue(ref *parser.TypeRef) Value {
 		for i, elem := range ref.TupleElements {
 			items[i] = zeroValue(elem)
 		}
-		return &nativeTuple{items: items}
+		return &nativeTuple{items: items, names: append([]string(nil), ref.TupleNames...)}
 	case "Option":
 		return &nativeOption{set: false}
 	case "Term":

@@ -26,6 +26,7 @@ type TypeRef struct {
 	Name           string     `json:"name,omitempty"`
 	Arguments      []*TypeRef `json:"arguments,omitempty"`
 	TupleElements  []*TypeRef `json:"tupleElements,omitempty"`
+	TupleNames     []string   `json:"tupleNames,omitempty"`
 	ParameterTypes []*TypeRef `json:"parameterTypes,omitempty"`
 	ReturnType     *TypeRef   `json:"returnType,omitempty"`
 	Span           Span       `json:"span"`

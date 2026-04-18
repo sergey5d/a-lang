@@ -83,6 +83,7 @@ The syntax is still evolving, but the current codebase supports a meaningful sub
 - generics on classes and interfaces
 - lambdas, including block-bodied lambdas
 - function types like `Int -> Int`
+- tuples, including named tuple fields
 - indexing syntax `arr[i]`
 - `for` loops, including yield-style loops
 - typed equality rules via `Eq[T]`
@@ -97,7 +98,38 @@ addOne Int -> Int = x -> x + 1
 
 values = [1, 2, 3]
 values[1] := values[0] + 4
+
+pair (value Int, size Int) = (1, 2)
+renamed (left Int, right Int) = pair
+total Int = pair.value + renamed.left
 ```
+
+## Tuple Rules
+
+The current tuple model is structural by element type and order:
+
+- unnamed tuple types use `(Int, String)`
+- named tuple types use `(value Int, label String)`
+- tuple literals use `(1, "ok")`
+- tuples can be destructured into multiple bindings
+
+Tuple names are preserved on the current typed view of a value:
+
+```txt
+a (value Int, size Int) = (1, 2)
+b (Int, Int) = a
+c = a
+d (left Int, right Int) = a
+```
+
+With these rules:
+
+- `a.value` is valid
+- `b.value` is invalid
+- `c.value` is valid because inferred bindings keep tuple names from the initializer
+- `d.left` is valid because an explicit destination type can rename tuple fields
+- assignment compatibility ignores tuple field names and only checks element count and element types
+- duplicate names inside one named tuple type are invalid
 
 ## Repository Layout
 

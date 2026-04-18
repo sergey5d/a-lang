@@ -1093,12 +1093,24 @@ func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
 	if memberType, ok := c.lookupMember(receiverType, expr.Name, expr.Span); ok {
 		return memberType
 	}
+	c.addDiagnostic("unknown_member", "unknown member '"+expr.Name+"'", expr.Span)
 	return unknownType
 }
 
 func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*Type, bool) {
 	if isUnknown(receiver) {
 		return unknownType, true
+	}
+	if receiver.Kind == TypeTuple {
+		for i, tupleName := range receiver.TupleNames {
+			if tupleName == name {
+				if i < len(receiver.Args) {
+					return receiver.Args[i], true
+				}
+				return unknownType, true
+			}
+		}
+		return unknownType, false
 	}
 	if receiver.Kind == TypeBuiltin && receiver.Name == "Array" {
 		if name == "size" {
@@ -1326,7 +1338,7 @@ func (c *Checker) instantiateTypeRef(ref *parser.TypeRef, subst map[string]*Type
 		for i, arg := range ref.TupleElements {
 			args[i] = c.instantiateTypeRef(arg, subst)
 		}
-		return &Type{Kind: TypeTuple, Name: "Tuple", Args: args}
+		return &Type{Kind: TypeTuple, Name: "Tuple", Args: args, TupleNames: append([]string(nil), ref.TupleNames...)}
 	}
 	if subst != nil {
 		if resolved, ok := subst[ref.Name]; ok && len(ref.Arguments) == 0 {

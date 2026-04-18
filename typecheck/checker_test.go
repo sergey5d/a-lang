@@ -131,15 +131,24 @@ def run() Int {
 func TestAnalyzeTupleDestructuring(t *testing.T) {
 	src := `
 def run() Int {
-	pair (Int, String) = (1, "ok")
-	left Int, right String = pair
-	return left
+	a (value Int, size Int) = (1, 2)
+	b (Int, Int) = a
+	c = a
+	d (left Int, right Int) = a
+	x Int = a.value
+	y Int = c.value
+	z Int = d.left
+	b.value
+	return x + y + z
 }
 `
 
 	result := Analyze(parseProgram(t, src))
-	if len(result.Diagnostics) != 0 {
-		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "unknown_member" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }
 

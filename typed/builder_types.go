@@ -68,7 +68,7 @@ func (b *typeRefBuilder) BuildType(ref *parser.TypeRef) *typecheck.Type {
 		for i, arg := range ref.TupleElements {
 			args[i] = b.BuildType(arg)
 		}
-		return &typecheck.Type{Kind: typecheck.TypeTuple, Name: "Tuple", Args: args}
+		return &typecheck.Type{Kind: typecheck.TypeTuple, Name: "Tuple", Args: args, TupleNames: append([]string(nil), ref.TupleNames...)}
 	}
 	args := make([]*typecheck.Type, len(ref.Arguments))
 	for i, arg := range ref.Arguments {
@@ -220,7 +220,7 @@ func (b *typeRefBuilder) instantiateTypeRef(ref *parser.TypeRef, subst map[strin
 		for i, arg := range ref.TupleElements {
 			args[i] = b.instantiateTypeRef(arg, subst)
 		}
-		return &typecheck.Type{Kind: typecheck.TypeTuple, Name: "Tuple", Args: args}
+		return &typecheck.Type{Kind: typecheck.TypeTuple, Name: "Tuple", Args: args, TupleNames: append([]string(nil), ref.TupleNames...)}
 	}
 	if subst != nil {
 		if resolved, ok := subst[ref.Name]; ok && len(ref.Arguments) == 0 {

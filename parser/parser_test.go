@@ -366,8 +366,8 @@ def run() Int {
 
 func TestParseTupleLiteralAndType(t *testing.T) {
 	src := `
-def run() (Int, String) {
-	pair (Int, String) = (1, "ok")
+def run() (value Int, label String) {
+	pair (value Int, label String) = (1, "ok")
 	pair
 }
 `
@@ -381,9 +381,15 @@ def run() (Int, String) {
 	if fn.ReturnType == nil || len(fn.ReturnType.TupleElements) != 2 {
 		t.Fatalf("expected tuple return type, got %#v", fn.ReturnType)
 	}
+	if fn.ReturnType.TupleNames[0] != "value" || fn.ReturnType.TupleNames[1] != "label" {
+		t.Fatalf("expected tuple names to be preserved, got %#v", fn.ReturnType.TupleNames)
+	}
 	stmt := fn.Body.Statements[0].(*ValStmt)
 	if stmt.Bindings[0].Type == nil || len(stmt.Bindings[0].Type.TupleElements) != 2 {
 		t.Fatalf("expected tuple binding type, got %#v", stmt.Bindings[0].Type)
+	}
+	if stmt.Bindings[0].Type.TupleNames[0] != "value" || stmt.Bindings[0].Type.TupleNames[1] != "label" {
+		t.Fatalf("expected named tuple binding type, got %#v", stmt.Bindings[0].Type.TupleNames)
 	}
 	if _, ok := stmt.Values[0].(*TupleLiteral); !ok {
 		t.Fatalf("expected tuple literal, got %T", stmt.Values[0])

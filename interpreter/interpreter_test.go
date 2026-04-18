@@ -346,10 +346,11 @@ def run() Int {
 func TestTupleDestructuring(t *testing.T) {
 	src := `
 def run() Int {
-	pair = (2, 3)
-	left Int, right Int := pair
-	left, right := right, left + right
-	left + right
+	a (value Int, size Int) = (1, 2)
+	b (Int, Int) = a
+	c = a
+	d (left Int, right Int) = a
+	a.value + c.value + d.left + d.right
 }
 `
 
@@ -358,8 +359,8 @@ def run() Int {
 	if err != nil {
 		t.Fatalf("Call returned error: %v", err)
 	}
-	if value != int64(8) {
-		t.Fatalf("expected 8, got %#v", value)
+	if value != int64(5) {
+		t.Fatalf("expected 5, got %#v", value)
 	}
 }
 

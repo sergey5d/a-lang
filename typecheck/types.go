@@ -19,10 +19,11 @@ const (
 )
 
 type Type struct {
-	Kind      TypeKind
-	Name      string
-	Args      []*Type
-	Signature *Signature
+	Kind       TypeKind
+	Name       string
+	Args       []*Type
+	TupleNames []string
+	Signature  *Signature
 }
 
 var unknownType = &Type{Kind: TypeUnknown, Name: "<unknown>"}
@@ -41,7 +42,11 @@ func (t *Type) String() string {
 	if t.Kind == TypeTuple {
 		parts := make([]string, len(t.Args))
 		for i, arg := range t.Args {
-			parts[i] = arg.String()
+			if i < len(t.TupleNames) && t.TupleNames[i] != "" {
+				parts[i] = t.TupleNames[i] + " " + arg.String()
+			} else {
+				parts[i] = arg.String()
+			}
 		}
 		return "(" + strings.Join(parts, ", ") + ")"
 	}
@@ -125,7 +130,7 @@ func fromTypeRef(ref *parser.TypeRef, lookup typeLookup) *Type {
 		for i, arg := range ref.TupleElements {
 			args[i] = fromTypeRef(arg, lookup)
 		}
-		return &Type{Kind: TypeTuple, Name: "Tuple", Args: args}
+		return &Type{Kind: TypeTuple, Name: "Tuple", Args: args, TupleNames: append([]string(nil), ref.TupleNames...)}
 	}
 	args := make([]*Type, len(ref.Arguments))
 	for i, arg := range ref.Arguments {
