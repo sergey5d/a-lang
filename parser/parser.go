@@ -419,10 +419,15 @@ func (p *Parser) parseParameters() ([]Parameter, error) {
 			if err != nil {
 				return nil, err
 			}
+			variadic := p.match(TokenEllipsis)
+			if variadic && !p.check(TokenRParen) {
+				return nil, fmt.Errorf("variadic parameter must be the last parameter at %d:%d", p.previous().Line, p.previous().Column)
+			}
 			params = append(params, Parameter{
-				Name: paramName.Lexeme,
-				Type: paramType,
-				Span: mergeSpans(tokenSpan(paramName), typeSpan(paramType)),
+				Name:     paramName.Lexeme,
+				Type:     paramType,
+				Variadic: variadic,
+				Span:     mergeSpans(tokenSpan(paramName), typeSpan(paramType)),
 			})
 			if !p.match(TokenComma) {
 				break

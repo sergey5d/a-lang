@@ -119,7 +119,7 @@ def run() Int {
 	}
 
 	for item <- newList {
-        Term.println("item " + item)
+        Term.println("item", item)
     }
 
     bucket Bucket = Bucket(10)

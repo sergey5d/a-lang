@@ -210,7 +210,7 @@ interface Mapper[K, V] {
 }
 
 interface Stringable {
-	def toString() String
+	def show() String
 }
 
 class Box[T] with Mapper[T, Stringable] {
@@ -234,12 +234,12 @@ class SolidWork with Stringable {
 		this.b = b
 	}
 
-	def toString() String {
+	def show() String {
 		return this.buildLabel()
 	}
 
 	private def buildLabel() String {
-		return this.a.toString()
+		return this.a.show()
 	}
 }
 

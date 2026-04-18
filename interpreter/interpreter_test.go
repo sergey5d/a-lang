@@ -265,6 +265,36 @@ def run() Int {
 	}
 }
 
+func TestVariadicFunctionAndMethod(t *testing.T) {
+	src := `
+class Printer {
+	def count(values String...) Int = values.size()
+}
+
+def sum(values Int...) Int {
+	total Int := 0
+	for value <- values {
+		total += value
+	}
+	total
+}
+
+def run() Int {
+	printer Printer = Printer()
+	return sum(1, 2, 3) + printer.count("a", "b")
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(8) {
+		t.Fatalf("expected 8, got %#v", value)
+	}
+}
+
 func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {
@@ -378,7 +408,7 @@ def run() Int {
 
 	seen = Set(1, 2)
 	if seen.contains(2) {
-		Term.println("ok")
+		Term.println("ok", "done")
 	}
 
 	return items.get(0).getOr(0) + values.get("a").getOr(0) + values.size() + seen.size()
@@ -407,7 +437,7 @@ def run() Int {
 	if value != int64(6) {
 		t.Fatalf("expected 6, got %#v", value)
 	}
-	if strings.TrimSpace(string(output)) != "ok" {
+	if strings.TrimSpace(string(output)) != "ok done" {
 		t.Fatalf("expected Term output 'ok', got %q", string(output))
 	}
 }

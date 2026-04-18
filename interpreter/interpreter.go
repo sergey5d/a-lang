@@ -44,6 +44,7 @@ type instance struct {
 
 type closure struct {
 	params    []string
+	variadic  bool
 	body      parser.Expr
 	blockBody *parser.BlockStmt
 	env       *env
@@ -117,11 +118,15 @@ func (in *Interpreter) callFunctionByName(name string, args []Value, parent *env
 }
 
 func (in *Interpreter) callFunction(fn *parser.FunctionDecl, args []Value, parent *env) (Value, error) {
-	if len(args) != len(fn.Parameters) {
-		return nil, RuntimeError{Message: fmt.Sprintf("function '%s' expects %d args, got %d", fn.Name, len(fn.Parameters), len(args)), Span: fn.Span}
+	if !acceptsArgCount(fn.Parameters, len(args)) {
+		return nil, RuntimeError{Message: fmt.Sprintf("function '%s' expects %s args, got %d", fn.Name, expectedCallableArgs(fn.Parameters), len(args)), Span: fn.Span}
 	}
 	local := newEnv(parent)
 	for i, param := range fn.Parameters {
+		if param.Variadic {
+			local.define(param.Name, &nativeList{items: append([]Value{}, args[i:]...)}, false)
+			break
+		}
 		local.define(param.Name, args[i], false)
 	}
 	value, signal, err := in.execBlock(fn.Body, local, nil)
@@ -138,12 +143,16 @@ func (in *Interpreter) callFunction(fn *parser.FunctionDecl, args []Value, paren
 }
 
 func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl, args []Value, parent *env) (Value, error) {
-	if len(args) != len(method.Parameters) {
-		return nil, RuntimeError{Message: fmt.Sprintf("method '%s' expects %d args, got %d", method.Name, len(method.Parameters), len(args)), Span: method.Span}
+	if !acceptsArgCount(method.Parameters, len(args)) {
+		return nil, RuntimeError{Message: fmt.Sprintf("method '%s' expects %s args, got %d", method.Name, expectedCallableArgs(method.Parameters), len(args)), Span: method.Span}
 	}
 	local := newEnv(parent)
 	local.define("this", receiver, false)
 	for i, param := range method.Parameters {
+		if param.Variadic {
+			local.define(param.Name, &nativeList{items: append([]Value{}, args[i:]...)}, false)
+			break
+		}
 		local.define(param.Name, args[i], false)
 	}
 	value, signal, err := in.execBlock(method.Body, local, receiver)
@@ -235,7 +244,7 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 		for i, param := range s.Function.Parameters {
 			params[i] = param.Name
 		}
-		local.define(s.Function.Name, &closure{params: params, blockBody: s.Function.Body, env: local}, false)
+		local.define(s.Function.Name, &closure{params: params, variadic: len(s.Function.Parameters) > 0 && s.Function.Parameters[len(s.Function.Parameters)-1].Variadic, blockBody: s.Function.Body, env: local}, false)
 		return nil, nil, nil
 	case *parser.AssignmentStmt:
 		value, err := in.evalExpr(s.Value, local)
@@ -724,11 +733,15 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 }
 
 func (in *Interpreter) callClosure(fn *closure, args []Value) (Value, error) {
-	if len(args) != len(fn.params) {
-		return nil, RuntimeError{Message: fmt.Sprintf("lambda expects %d args, got %d", len(fn.params), len(args)), Span: parser.Span{}}
+	if !acceptsClosureArgCount(fn, len(args)) {
+		return nil, RuntimeError{Message: fmt.Sprintf("lambda expects %s args, got %d", expectedClosureArgs(fn), len(args)), Span: parser.Span{}}
 	}
 	local := newEnv(fn.env)
 	for i, param := range fn.params {
+		if fn.variadic && i == len(fn.params)-1 {
+			local.define(param, &nativeList{items: append([]Value{}, args[i:]...)}, false)
+			break
+		}
 		local.define(param, args[i], false)
 	}
 	if fn.body != nil {
@@ -768,7 +781,7 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 		return nil, RuntimeError{Message: "member call requires class instance", Span: member.Span}
 	}
 	for _, method := range obj.class.Methods {
-		if method.Name == member.Name && len(method.Parameters) == len(args) {
+		if method.Name == member.Name && acceptsArgCount(method.Parameters, len(args)) {
 			return in.callMethod(obj, method, args, local)
 		}
 	}
@@ -1079,10 +1092,11 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 			fmt.Print(fmt.Sprint(args[0]))
 			return nativeCallResult{value: value}, true
 		case "println":
-			if len(args) != 1 {
-				return nativeCallResult{err: RuntimeError{Message: "println expects 1 argument", Span: span}}, true
+			parts := make([]any, len(args))
+			for i, arg := range args {
+				parts[i] = fmt.Sprint(arg)
 			}
-			fmt.Println(fmt.Sprint(args[0]))
+			fmt.Println(parts...)
 			return nativeCallResult{value: value}, true
 		}
 	}
@@ -1154,6 +1168,37 @@ func (r *slotRef) set(value Value) error {
 	return nil
 }
 func (r *slotRef) value() Value { return r.owner.values[r.name].value }
+
+func acceptsArgCount(params []parser.Parameter, count int) bool {
+	if len(params) == 0 {
+		return count == 0
+	}
+	if params[len(params)-1].Variadic {
+		return count >= len(params)-1
+	}
+	return count == len(params)
+}
+
+func expectedCallableArgs(params []parser.Parameter) string {
+	if len(params) > 0 && params[len(params)-1].Variadic {
+		return fmt.Sprintf("at least %d", len(params)-1)
+	}
+	return fmt.Sprintf("%d", len(params))
+}
+
+func acceptsClosureArgCount(fn *closure, count int) bool {
+	if fn.variadic {
+		return count >= len(fn.params)-1
+	}
+	return count == len(fn.params)
+}
+
+func expectedClosureArgs(fn *closure) string {
+	if fn.variadic {
+		return fmt.Sprintf("at least %d", len(fn.params)-1)
+	}
+	return fmt.Sprintf("%d", len(fn.params))
+}
 
 func applyBinary(op string, left, right Value, span parser.Span) (Value, error) {
 	switch op {

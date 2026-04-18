@@ -38,6 +38,7 @@ const (
 	TokenComma  TokenType = ","
 	TokenColon  TokenType = ":"
 	TokenDot    TokenType = "."
+	TokenEllipsis TokenType = "..."
 	TokenAssign TokenType = "="
 	TokenColonAssign TokenType = ":="
 

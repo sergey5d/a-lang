@@ -75,6 +75,9 @@ func (l *Lexer) nextToken() (Token, error) {
 	case '.':
 		l.advance()
 		if l.match('.') {
+			if l.match('.') {
+				return l.token(TokenEllipsis, "...", startLine, startColumn), nil
+			}
 			return l.token(TokenRange, "..", startLine, startColumn), nil
 		}
 		return l.token(TokenDot, ".", startLine, startColumn), nil

@@ -192,14 +192,14 @@ def run() Int {
 func TestAnalyzeInterfaceImplementation(t *testing.T) {
 	src := `
 interface Stringable {
-	def toString() String
+	def show() String
 }
 
 class Good with Stringable {
 	def init() {
 	}
 
-	def toString() String {
+	def show() String {
 		return "ok"
 	}
 }
@@ -673,6 +673,20 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeTermPrintlnAnyTypes(t *testing.T) {
+	src := `
+def run() Int {
+	Term.println("count", 10, true)
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeOptionConstructorsAndMethods(t *testing.T) {
 	src := `
 def run() Int {
@@ -752,6 +766,27 @@ def run() Int {
 	boost Int = 2
 	def add(value Int) Int = value + boost
 	add(5)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeVariadicFunction(t *testing.T) {
+	src := `
+def sum(values Int...) Int {
+	total Int := 0
+	for value <- values {
+		total += value
+	}
+	total
+}
+
+def run() Int {
+	sum(1, 2, 3)
 }
 `
 

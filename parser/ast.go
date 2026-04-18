@@ -95,9 +95,10 @@ type MethodDecl struct {
 
 // Parameter describes a named typed parameter in a callable signature.
 type Parameter struct {
-	Name string   `json:"name"`
-	Type *TypeRef `json:"type"`
-	Span Span     `json:"span"`
+	Name     string   `json:"name"`
+	Type     *TypeRef `json:"type"`
+	Variadic bool     `json:"variadic,omitempty"`
+	Span     Span     `json:"span"`
 }
 
 // BlockStmt is a braced sequence of statements.

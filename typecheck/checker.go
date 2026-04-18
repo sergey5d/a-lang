@@ -10,6 +10,7 @@ import (
 type Signature struct {
 	Parameters []*Type
 	ReturnType *Type
+	Variadic   bool
 }
 
 type binding struct {
@@ -142,7 +143,7 @@ func builtinInterfaceInfos() map[string]interfaceInfo {
 		Name: "Term",
 		Methods: []parser.InterfaceMethod{
 			{Name: "print", Parameters: []parser.Parameter{{Name: "value", Type: namedType("String")}}, ReturnType: namedType("Term")},
-			{Name: "println", Parameters: []parser.Parameter{{Name: "value", Type: namedType("String")}}, ReturnType: namedType("Term")},
+			{Name: "println", Parameters: []parser.Parameter{{Name: "value", Type: namedType("String"), Variadic: true}}, ReturnType: namedType("Term")},
 		},
 	}
 	out["Term"] = interfaceInfo{decl: termDecl, methods: map[string]interfaceMethodInfo{
@@ -216,6 +217,7 @@ func (c *Checker) collectDecls(program *parser.Program) {
 		c.functions[fn.Name] = Signature{
 			Parameters: params,
 			ReturnType: fromTypeRef(fn.ReturnType, c),
+			Variadic:   len(fn.Parameters) > 0 && fn.Parameters[len(fn.Parameters)-1].Variadic,
 		}
 	}
 }
@@ -273,7 +275,11 @@ func (c *Checker) checkFunction(fn *parser.FunctionDecl) {
 	defer func() { c.returnTypes = c.returnTypes[:len(c.returnTypes)-1] }()
 
 	for _, param := range fn.Parameters {
-		c.define(param.Name, fromTypeRef(param.Type, c), false)
+		paramType := fromTypeRef(param.Type, c)
+		if param.Variadic {
+			paramType = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{paramType}}
+		}
+		c.define(param.Name, paramType, false)
 	}
 	implicitReturn := c.checkBlock(fn.Body)
 	if fn.ReturnType != nil && !isUnknown(implicitReturn) {
@@ -337,7 +343,11 @@ func (c *Checker) checkMethod(method *parser.MethodDecl, owner *parser.ClassDecl
 	defer func() { c.returnTypes = c.returnTypes[:len(c.returnTypes)-1] }()
 
 	for _, param := range method.Parameters {
-		c.define(param.Name, c.resolveDeclaredType(param.Type), false)
+		paramType := c.resolveDeclaredType(param.Type)
+		if param.Variadic {
+			paramType = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{paramType}}
+		}
+		c.define(param.Name, paramType, false)
 	}
 	implicitReturn := c.checkBlock(method.Body)
 	if !method.Constructor && method.ReturnType != nil && !isUnknown(implicitReturn) {
@@ -457,7 +467,7 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			c.define(bindingDecl.Name, declType, bindingDecl.Mutable)
 		}
 	case *parser.LocalFunctionStmt:
-		sig := Signature{Parameters: make([]*Type, len(s.Function.Parameters)), ReturnType: fromTypeRef(s.Function.ReturnType, c)}
+		sig := Signature{Parameters: make([]*Type, len(s.Function.Parameters)), ReturnType: fromTypeRef(s.Function.ReturnType, c), Variadic: len(s.Function.Parameters) > 0 && s.Function.Parameters[len(s.Function.Parameters)-1].Variadic}
 		for i, param := range s.Function.Parameters {
 			sig.Parameters[i] = fromTypeRef(param.Type, c)
 		}
@@ -468,7 +478,11 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		c.returnTypes = append(c.returnTypes, expectedReturn)
 		defer func() { c.returnTypes = c.returnTypes[:len(c.returnTypes)-1] }()
 		for _, param := range s.Function.Parameters {
-			c.define(param.Name, fromTypeRef(param.Type, c), false)
+			paramType := fromTypeRef(param.Type, c)
+			if param.Variadic {
+				paramType = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{paramType}}
+			}
+			c.define(param.Name, paramType, false)
 		}
 		implicitReturn := c.checkBlock(s.Function.Body)
 		if s.Function.ReturnType != nil && !isUnknown(implicitReturn) {
@@ -702,14 +716,14 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 	}
 
 	sig := *calleeType.Signature
-	if len(call.Args) != len(sig.Parameters) {
-		c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %d arguments, got %d", len(sig.Parameters), len(call.Args)), call.Span)
+	if !validArgCount(sig, len(call.Args)) {
+		c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(sig), len(call.Args)), call.Span)
 	}
 	for i, arg := range call.Args {
 		var argType *Type
-		if i < len(sig.Parameters) {
-			argType = c.checkExprWithExpected(arg, sig.Parameters[i])
-			c.requireAssignable(argType, sig.Parameters[i], exprSpan(arg), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
+		if expected, ok := paramTypeForArg(sig, i); ok {
+			argType = c.checkExprWithExpected(arg, expected)
+			c.requireAssignable(argType, expected, exprSpan(arg), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
 			continue
 		}
 		argType = c.checkExpr(arg)
@@ -828,9 +842,11 @@ func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *
 		if ctor, ok := c.resolveConstructorOverload(class, argTypes, call.Span); ok {
 			sig := c.instantiateMethodSignature(ctor, class.decl, constructorTypeArgs(class.decl, call.Callee))
 			for i := range argTypes {
-				argType := c.checkExprWithExpected(call.Args[i], sig.Parameters[i])
-				if i < len(sig.Parameters) {
-					c.requireAssignable(argType, sig.Parameters[i], exprSpan(call.Args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
+				if expected, ok := paramTypeForArg(sig, i); ok {
+					argType := c.checkExprWithExpected(call.Args[i], expected)
+					c.requireAssignable(argType, expected, exprSpan(call.Args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+				} else {
+					c.checkExpr(call.Args[i])
 				}
 			}
 		}
@@ -876,13 +892,21 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr)
 		}
 		sig := c.instantiateMethodSignature(method.decl, info.decl, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
 		for i := range argTypes {
-			argType := c.checkExprWithExpected(args[i], sig.Parameters[i])
-			if i < len(sig.Parameters) {
-				c.requireAssignable(argType, sig.Parameters[i], exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
+			if expected, ok := paramTypeForArg(sig, i); ok {
+				argType := c.checkExprWithExpected(args[i], expected)
+				c.requireAssignable(argType, expected, exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+			} else {
+				c.checkExpr(args[i])
 			}
 		}
 		return sig.ReturnType
 	case TypeInterface:
+		if receiverType.Name == "Term" && (member.Name == "println" || member.Name == "print") {
+			for _, arg := range args {
+				c.checkExpr(arg)
+			}
+			return receiverType
+		}
 		info, ok := c.interfaces[receiverType.Name]
 		if !ok {
 			return unknownType
@@ -893,13 +917,15 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr)
 			return unknownType
 		}
 		sig := c.instantiateInterfaceMethodSignature(method.decl, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
-		if len(argTypes) != len(sig.Parameters) {
-			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, len(sig.Parameters), len(argTypes)), member.Span)
+		if !validArgCount(sig, len(argTypes)) {
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %s arguments, got %d", member.Name, expectedArgCount(sig), len(argTypes)), member.Span)
 		}
 		for i := range argTypes {
-			argType := c.checkExprWithExpected(args[i], sig.Parameters[i])
-			if i < len(sig.Parameters) {
-				c.requireAssignable(argType, sig.Parameters[i], exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+sig.Parameters[i].String())
+			if expected, ok := paramTypeForArg(sig, i); ok {
+				argType := c.checkExprWithExpected(args[i], expected)
+				c.requireAssignable(argType, expected, exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+			} else {
+				c.checkExpr(args[i])
 			}
 		}
 		return sig.ReturnType
@@ -1226,7 +1252,7 @@ func (c *Checker) instantiateMethodSignature(method *parser.MethodDecl, owner *p
 	if !method.Constructor {
 		result = c.instantiateTypeRef(method.ReturnType, effective)
 	}
-	return Signature{Parameters: params, ReturnType: result}
+	return Signature{Parameters: params, ReturnType: result, Variadic: len(method.Parameters) > 0 && method.Parameters[len(method.Parameters)-1].Variadic}
 }
 
 func (c *Checker) checkConstructorRules(class classInfo) {
@@ -1369,11 +1395,12 @@ func (c *Checker) findMatchingMethodOverload(class classInfo, name string, param
 }
 
 func signatureMatches(sig Signature, argTypes []*Type) bool {
-	if len(sig.Parameters) != len(argTypes) {
+	if !validArgCount(sig, len(argTypes)) {
 		return false
 	}
-	for i := range sig.Parameters {
-		if !sameType(sig.Parameters[i], argTypes[i]) {
+	for i := range argTypes {
+		expected, ok := paramTypeForArg(sig, i)
+		if !ok || !sameType(expected, argTypes[i]) {
 			return false
 		}
 	}
@@ -1387,11 +1414,45 @@ func methodSignatureKey(method *parser.MethodDecl) string {
 			sig += ","
 		}
 		sig += param.Type.Name
+		if param.Variadic {
+			sig += "..."
+		}
 		for _, arg := range param.Type.Arguments {
 			sig += "[" + arg.Name + "]"
 		}
 	}
 	return sig + ")"
+}
+
+func validArgCount(sig Signature, count int) bool {
+	if sig.Variadic {
+		return count >= len(sig.Parameters)-1
+	}
+	return count == len(sig.Parameters)
+}
+
+func expectedArgCount(sig Signature) string {
+	if sig.Variadic {
+		return fmt.Sprintf("at least %d", len(sig.Parameters)-1)
+	}
+	return fmt.Sprintf("%d", len(sig.Parameters))
+}
+
+func paramTypeForArg(sig Signature, index int) (*Type, bool) {
+	if !sig.Variadic {
+		if index < len(sig.Parameters) {
+			return sig.Parameters[index], true
+		}
+		return nil, false
+	}
+	if len(sig.Parameters) == 0 {
+		return nil, false
+	}
+	last := len(sig.Parameters) - 1
+	if index < last {
+		return sig.Parameters[index], true
+	}
+	return sig.Parameters[last], true
 }
 
 func joinNames(names []string) string {
@@ -1425,6 +1486,7 @@ func (c *Checker) instantiateInterfaceMethodSignature(method parser.InterfaceMet
 	return Signature{
 		Parameters: params,
 		ReturnType: c.instantiateTypeRef(method.ReturnType, subst),
+		Variadic:   len(method.Parameters) > 0 && method.Parameters[len(method.Parameters)-1].Variadic,
 	}
 }
 

@@ -304,6 +304,24 @@ def run() {
 	}
 }
 
+func TestParseVariadicParameter(t *testing.T) {
+	src := `
+def printAll(values String...) {
+	values.size()
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	param := program.Functions[0].Parameters[0]
+	if !param.Variadic {
+		t.Fatalf("expected parameter to be variadic")
+	}
+}
+
 func TestParseExtendedOperators(t *testing.T) {
 	src := `
 def ops(a Int, b Int) Bool {
@@ -377,7 +395,7 @@ interface Mapper[K, V] {
 }
 
 interface Stringable {
-	def toString() String
+	def show() String
 }
 
 class Box[T] with Mapper[T, Stringable] {
@@ -401,7 +419,7 @@ class SolidWork with Stringable {
 		this.b = b
 	}
 
-	def toString() String {
+	def show() String {
 	}
 
 	def addOne(one Int) Int {
@@ -685,10 +703,10 @@ def vars(b Int) Bool {
 func TestParseLambdaBindings(t *testing.T) {
 	src := `
 def vars() Bool {
-	a = Map(1 : "string").map((key, value) -> key.toString() + value)
-	b = Set(1).map(key -> key.toString())
+	a = Map(1 : "string").map((key, value) -> key.show() + value)
+	b = Set(1).map(key -> key.show())
 	c = Map(1 : 2).map((key Int, value Int) -> key + value)
-	d = Set(1).map(key Int -> key.toString())
+	d = Set(1).map(key Int -> key.show())
 	return 1 == 1
 }
 `
