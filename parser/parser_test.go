@@ -192,6 +192,55 @@ class Counter {
 	}
 }
 
+func TestParseExpressionBodiedDefs(t *testing.T) {
+	src := `
+def suffix(value String) String = value + "!"
+
+class Counter {
+	def value() Int = 1
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	if len(fn.Body.Statements) != 1 {
+		t.Fatalf("expected 1 statement in function body, got %d", len(fn.Body.Statements))
+	}
+	if _, ok := fn.Body.Statements[0].(*ExprStmt); !ok {
+		t.Fatalf("expected expression-bodied function to parse as ExprStmt block, got %T", fn.Body.Statements[0])
+	}
+
+	method := program.Classes[0].Methods[0]
+	if len(method.Body.Statements) != 1 {
+		t.Fatalf("expected 1 statement in method body, got %d", len(method.Body.Statements))
+	}
+	if _, ok := method.Body.Statements[0].(*ExprStmt); !ok {
+		t.Fatalf("expected expression-bodied method to parse as ExprStmt block, got %T", method.Body.Statements[0])
+	}
+}
+
+func TestParseFunctionWithoutReturnType(t *testing.T) {
+	src := `
+def printIt() {
+	1
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	if fn.ReturnType != nil {
+		t.Fatalf("expected omitted return type, got %#v", fn.ReturnType)
+	}
+}
+
 func TestParseExtendedOperators(t *testing.T) {
 	src := `
 def ops(a Int, b Int) Bool {

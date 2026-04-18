@@ -6,9 +6,25 @@ class Adder {
 	}
 
 	def add(value Int) Int {
-		return this.base + value
+		this.base + value
 	}
 }
+
+class Bucket {
+    base Int := deferred
+
+    def init(a Int) {
+        this.base = a
+    }
+
+    def print() {
+        Term.println("base " + this.base)
+    }
+
+    def print2() = Term.println("base " + this.base)
+
+    def get2() Int = 5
+ }
 
 third := "some string"
 
@@ -20,14 +36,28 @@ def suckItAll2(val String) String {
     val + " - hehe 2"
 }
 
+def suckItAll23(val String) Int {
+    23
+}
+
 def run() Int {
 	first Int = 5
 	second Int = 7
+	third2 = 56
+	Term.println("third2 " + third2)
+
 	counter Int := first
 	counter += second
 
 	boost Int = 3
 	addBoost = (value Int) -> value + boost
+
+	addBoost2 = value Int -> {
+	    value + boost
+	}
+
+	Term.println("boost2 " + addBoost2(4))
+
 	lambdaResult Int = addBoost(counter)
 
 	adder Adder = Adder(10)
@@ -41,6 +71,7 @@ def run() Int {
 
 	Term.println(suckItAll("haha"))
 	Term.println(suckItAll2("haha 2"))
+	Term.println("lalala " + suckItAll23("haha 2"))
 
 	result = if first == 5 {
 	    Term.println("YES it's 5!!!")
@@ -81,6 +112,12 @@ def run() Int {
 	for item <- newList {
         Term.println("item " + item)
     }
+
+    bucket Bucket = Bucket(10)
+
+    bucket.print()
+
+    Term.println("bucket.get2 " + bucket.get2())
 
 	return methodResult
 }

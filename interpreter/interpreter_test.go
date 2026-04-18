@@ -182,6 +182,28 @@ def run() Bool {
 	}
 }
 
+func TestExpressionBodiedMethod(t *testing.T) {
+	src := `
+class Counter {
+	def value() Int = 7
+}
+
+def run() Int {
+	counter Counter = Counter()
+	counter.value()
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(7) {
+		t.Fatalf("expected 7, got %#v", value)
+	}
+}
+
 func TestFunctionImplicitReturn(t *testing.T) {
 	src := `
 def suffix(value String) String {
@@ -200,6 +222,27 @@ def run() String {
 	}
 	if value != "hello!" {
 		t.Fatalf("expected hello!, got %#v", value)
+	}
+}
+
+func TestFunctionWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
+	src := `
+def suffix(value String) {
+	value + "!"
+}
+
+def run() Bool {
+	return suffix("hello") == "hello!"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != false {
+		t.Fatalf("expected false, got %#v", value)
 	}
 }
 

@@ -131,6 +131,9 @@ func (in *Interpreter) callFunction(fn *parser.FunctionDecl, args []Value, paren
 	if ret, ok := signal.(returnSignal); ok {
 		return ret.value, nil
 	}
+	if fn.ReturnType == nil {
+		return nil, nil
+	}
 	return value, nil
 }
 

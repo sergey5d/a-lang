@@ -170,15 +170,18 @@ func (p *Parser) parseFunction() (*FunctionDecl, error) {
 	if err != nil {
 		return nil, err
 	}
-	returnType, err := p.parseTypeRef()
-	if err != nil {
-		return nil, err
+	var returnType *TypeRef
+	if !p.check(TokenAssign) && !p.check(TokenLBrace) {
+		returnType, err = p.parseTypeRef()
+		if err != nil {
+			return nil, err
+		}
 	}
 	p.beginScope()
 	for _, param := range params {
 		p.declare(param.Name)
 	}
-	body, err := p.parseBlock()
+	body, err := p.parseCallableBody()
 	p.endScope()
 	if err != nil {
 		return nil, err
@@ -358,14 +361,14 @@ func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
 	}
 	constructor := name.Lexeme == "init"
 	var returnType *TypeRef
-	if !constructor && !p.check(TokenLBrace) {
+	if !constructor && !p.check(TokenLBrace) && !p.check(TokenAssign) {
 		typ, err := p.parseTypeRef()
 		if err != nil {
 			return nil, err
 		}
 		returnType = typ
 	}
-	body, err := p.parseBlock()
+	body, err := p.parseCallableBody()
 	if err != nil {
 		return nil, err
 	}
@@ -378,6 +381,22 @@ func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
 		Constructor: constructor,
 		Span:        mergeSpans(tokenSpan(start), body.Span),
 	}, nil
+}
+
+func (p *Parser) parseCallableBody() (*BlockStmt, error) {
+	if p.match(TokenAssign) {
+		assign := p.previous()
+		expr, err := p.parseExpression(0)
+		if err != nil {
+			return nil, err
+		}
+		stmt := &ExprStmt{Expr: expr, Span: exprSpan(expr)}
+		return &BlockStmt{
+			Statements: []Statement{stmt},
+			Span:       mergeSpans(tokenSpan(assign), exprSpan(expr)),
+		}, nil
+	}
+	return p.parseBlock()
 }
 
 func (p *Parser) parseParameters() ([]Parameter, error) {
