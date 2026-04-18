@@ -63,6 +63,10 @@ func exprSpan(expr Expr) Span {
 		return e.Span
 	case *IndexExpr:
 		return e.Span
+	case *IfExpr:
+		return e.Span
+	case *ForYieldExpr:
+		return e.Span
 	case *LambdaExpr:
 		return e.Span
 	case *BinaryExpr:
@@ -608,6 +612,10 @@ func (p *Parser) parseExprList(until TokenType) ([]Expr, error) {
 
 func (p *Parser) parseIfStmt() (Statement, error) {
 	start := p.advance()
+	return p.parseIfStmtAfterStart(start)
+}
+
+func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
 	condition, err := p.parseExpression(0)
 	if err != nil {
 		return nil, err
@@ -641,6 +649,10 @@ func (p *Parser) parseIfStmt() (Statement, error) {
 
 func (p *Parser) parseForStmt() (Statement, error) {
 	start := p.advance()
+	return p.parseForStmtAfterStart(start)
+}
+
+func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 	if p.check(TokenIdentifier) && p.checkNext(TokenLeftArrow) {
 		binding, err := p.parseForBinding()
 		if err != nil {
@@ -712,9 +724,13 @@ func (p *Parser) parseForBindingsBlock() ([]ForBinding, error) {
 				return nil, err
 			}
 			bindings = append(bindings, binding)
-			if !p.match(TokenComma) {
-				break
+			if p.match(TokenComma) {
+				continue
 			}
+			if p.check(TokenIdentifier) && p.checkNext(TokenLeftArrow) {
+				continue
+			}
+			break
 		}
 	}
 	if _, err := p.consume(TokenRBrace, "expected '}' after for bindings"); err != nil {
@@ -903,9 +919,59 @@ func (p *Parser) parsePrefix() (Expr, error) {
 			return nil, err
 		}
 		return &ListLiteral{Elements: items, Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
+	case TokenIf:
+		return p.parseIfExprAfterStart(token)
+	case TokenFor:
+		return p.parseForYieldExprAfterStart(token)
 	default:
 		return nil, fmt.Errorf("unexpected token %s", token.String())
 	}
+}
+
+func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
+	condition, err := p.parseExpression(0)
+	if err != nil {
+		return nil, err
+	}
+	thenBlock, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.consume(TokenElse, "expected 'else' in if expression"); err != nil {
+		return nil, err
+	}
+	elseBlock, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &IfExpr{
+		Condition: condition,
+		Then:      thenBlock,
+		Else:      elseBlock,
+		Span:      mergeSpans(tokenSpan(start), elseBlock.Span),
+	}, nil
+}
+
+func (p *Parser) parseForYieldExprAfterStart(start Token) (Expr, error) {
+	if !p.check(TokenLBrace) || !p.isForYieldStart() {
+		return nil, fmt.Errorf("for expression requires 'for { ... } yield { ... }'")
+	}
+	bindings, err := p.parseForBindingsBlock()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.consume(TokenYield, "expected 'yield' after for bindings"); err != nil {
+		return nil, err
+	}
+	yieldBody, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ForYieldExpr{
+		Bindings:  bindings,
+		YieldBody: yieldBody,
+		Span:      mergeSpans(tokenSpan(start), yieldBody.Span),
+	}, nil
 }
 
 func (p *Parser) parseLambdaIdentifier() (Expr, error) {

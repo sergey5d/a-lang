@@ -372,6 +372,26 @@ func (in *Interpreter) evalYieldBody(block *parser.BlockStmt, local *env, self *
 	return value, nil, err
 }
 
+func (in *Interpreter) evalBlockValue(block *parser.BlockStmt, local *env, self *instance, message string) (Value, any, error) {
+	if block == nil || len(block.Statements) == 0 {
+		return nil, nil, RuntimeError{Message: message, Span: parser.Span{}}
+	}
+	blockEnv := newEnv(local)
+	for i := 0; i < len(block.Statements)-1; i++ {
+		_, signal, err := in.execStmt(block.Statements[i], blockEnv, self)
+		if err != nil || signal != nil {
+			return nil, signal, err
+		}
+	}
+	last := block.Statements[len(block.Statements)-1]
+	exprStmt, ok := last.(*parser.ExprStmt)
+	if !ok {
+		return nil, nil, RuntimeError{Message: message, Span: stmtSpan(last)}
+	}
+	value, err := in.evalExpr(exprStmt.Expr, blockEnv)
+	return value, nil, err
+}
+
 func (in *Interpreter) assign(target parser.Expr, operator string, value Value, local *env) error {
 	switch t := target.(type) {
 	case *parser.Identifier:
@@ -499,6 +519,54 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			items[i] = value
 		}
 		return &nativeList{items: items}, nil
+	case *parser.IfExpr:
+		cond, err := in.evalExpr(e.Condition, local)
+		if err != nil {
+			return nil, err
+		}
+		truthy, err := asBool(cond, exprSpan(e.Condition))
+		if err != nil {
+			return nil, err
+		}
+		if truthy {
+			value, signal, err := in.evalBlockValue(e.Then, local, nil, "if expression branches must end with an expression")
+			if err != nil {
+				return nil, err
+			}
+			if signal != nil {
+				return nil, RuntimeError{Message: "unexpected control flow in if expression", Span: e.Span}
+			}
+			return value, nil
+		}
+		value, signal, err := in.evalBlockValue(e.Else, local, nil, "if expression branches must end with an expression")
+		if err != nil {
+			return nil, err
+		}
+		if signal != nil {
+			return nil, RuntimeError{Message: "unexpected control flow in if expression", Span: e.Span}
+		}
+		return value, nil
+	case *parser.ForYieldExpr:
+		var yielded []Value
+		signal, err := in.execForBindings(e.Bindings, 0, local, nil, func(loopEnv *env) (any, error) {
+			value, signal, err := in.evalYieldBody(e.YieldBody, loopEnv, nil)
+			if err != nil {
+				return nil, err
+			}
+			if signal == nil {
+				yielded = append(yielded, value)
+			}
+			return signal, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		switch signal.(type) {
+		case nil, breakSignal:
+			return &nativeList{items: yielded}, nil
+		default:
+			return nil, RuntimeError{Message: "unexpected control flow in yield expression", Span: e.Span}
+		}
 	case *parser.GroupExpr:
 		return in.evalExpr(e.Inner, local)
 	case *parser.UnaryExpr:

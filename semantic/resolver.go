@@ -268,6 +268,22 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 	case *parser.IndexExpr:
 		r.resolveExpr(e.Receiver)
 		r.resolveExpr(e.Index)
+	case *parser.IfExpr:
+		r.resolveExpr(e.Condition)
+		r.pushScope()
+		r.resolveBlockStatements(e.Then.Statements)
+		r.popScope()
+		r.pushScope()
+		r.resolveBlockStatements(e.Else.Statements)
+		r.popScope()
+	case *parser.ForYieldExpr:
+		r.pushScope()
+		for _, binding := range e.Bindings {
+			r.resolveExpr(binding.Iterable)
+			r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
+		}
+		r.resolveBlockStatements(e.YieldBody.Statements)
+		r.popScope()
 	case *parser.LambdaExpr:
 		r.pushScope()
 		for _, param := range e.Parameters {

@@ -247,6 +247,11 @@ func elementType(typ *typecheck.Type) *typecheck.Type {
 	return &typecheck.Type{Kind: typecheck.TypeUnknown, Name: "<unknown>"}
 }
 
+// iterableElementType extracts the item type for iterable runtime values.
+func (b *typeRefBuilder) iterableElementType(typ *typecheck.Type) *typecheck.Type {
+	return elementType(typ)
+}
+
 // exprSpan returns the parser span for a parser expression node.
 func exprSpan(expr parser.Expr) parser.Span {
 	switch e := expr.(type) {
@@ -271,6 +276,10 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.MemberExpr:
 		return e.Span
 	case *parser.IndexExpr:
+		return e.Span
+	case *parser.IfExpr:
+		return e.Span
+	case *parser.ForYieldExpr:
 		return e.Span
 	case *parser.LambdaExpr:
 		return e.Span

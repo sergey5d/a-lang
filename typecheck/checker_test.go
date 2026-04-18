@@ -705,6 +705,30 @@ def run() String {
 	}
 }
 
+func TestAnalyzeIfAndForYieldExpressions(t *testing.T) {
+	src := `
+def run(values List[Int], flag Bool) Int {
+	label Int = if flag {
+		1
+	} else {
+		2
+	}
+	items List[Int] = for {
+		x <- values,
+		y <- values
+	} yield {
+		x + y
+	}
+	return label + items.size()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeArrayConstructorAndSize(t *testing.T) {
 	src := `
 def run() Int {

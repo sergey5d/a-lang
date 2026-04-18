@@ -285,6 +285,25 @@ type IndexExpr struct {
 
 func (*IndexExpr) exprNode() {}
 
+// IfExpr is an if / else expression whose value comes from the chosen branch.
+type IfExpr struct {
+	Condition Expr       `json:"condition"`
+	Then      *BlockStmt `json:"then"`
+	Else      *BlockStmt `json:"else"`
+	Span      Span       `json:"span"`
+}
+
+func (*IfExpr) exprNode() {}
+
+// ForYieldExpr is a yield-style for expression that evaluates to a list.
+type ForYieldExpr struct {
+	Bindings  []ForBinding `json:"bindings"`
+	YieldBody *BlockStmt   `json:"yieldBody"`
+	Span      Span         `json:"span"`
+}
+
+func (*ForYieldExpr) exprNode() {}
+
 // LambdaParameter describes a single lambda parameter.
 type LambdaParameter struct {
 	Name string   `json:"name"`

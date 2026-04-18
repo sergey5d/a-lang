@@ -37,11 +37,43 @@ def run() Int {
 
 	Term.println(suckItAll("haha"))
 
-	if first == 5 {
+	result = if first == 5 {
 	    Term.println("YES it's 5!!!")
+	    6
 	} else {
 	    Term.println("NONONO")
+	    8
 	}
+
+	Term.println("result " + result)
+
+	for {
+	    if counter < 20 {
+	        Term.println("counter " + counter)
+	    } else {
+	        break
+	    }
+	    counter += 1
+	}
+
+	list = [1, 2, 3, 8]
+
+	for item <- list {
+	    Term.println("item " + item)
+	}
+
+	Term.println("item end")
+
+	newList = for {
+	    item <- list
+	    item2 <- list
+	} yield {
+	    item + item2
+	}
+
+	for item <- newList {
+        Term.println("item " + item)
+    }
 
 	return methodResult
 }

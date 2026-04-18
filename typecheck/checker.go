@@ -511,6 +511,26 @@ func (c *Checker) checkBlockStatements(statements []parser.Statement) {
 	}
 }
 
+func (c *Checker) checkBlockResult(block *parser.BlockStmt, code, message string) *Type {
+	if block == nil || len(block.Statements) == 0 {
+		c.addDiagnostic(code, message, blockSpan(block))
+		return unknownType
+	}
+	c.pushScope()
+	defer c.popScope()
+	for i := 0; i < len(block.Statements)-1; i++ {
+		c.checkStmt(block.Statements[i])
+	}
+	last := block.Statements[len(block.Statements)-1]
+	exprStmt, ok := last.(*parser.ExprStmt)
+	if !ok {
+		c.checkStmt(last)
+		c.addDiagnostic(code, message, stmtSpan(last))
+		return unknownType
+	}
+	return c.checkExpr(exprStmt.Expr)
+}
+
 func (c *Checker) checkExpr(expr parser.Expr) *Type {
 	return c.checkExprWithExpected(expr, nil)
 }
@@ -593,6 +613,27 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		result = c.checkMemberExpr(e)
 	case *parser.IndexExpr:
 		result = c.checkIndexExpr(e)
+	case *parser.IfExpr:
+		condType := c.checkExpr(e.Condition)
+		c.requireAssignable(condType, builtin("Bool"), exprSpan(e.Condition), "invalid_condition_type", "if condition must be Bool")
+		thenType := c.checkBlockResult(e.Then, "invalid_if_expression", "if expression branches must end with an expression")
+		elseType := c.checkBlockResult(e.Else, "invalid_if_expression", "if expression branches must end with an expression")
+		if !sameType(thenType, elseType) {
+			c.addDiagnostic("type_mismatch", "if expression branches must have the same type", e.Span)
+			result = unknownType
+			break
+		}
+		result = thenType
+	case *parser.ForYieldExpr:
+		c.pushScope()
+		for _, binding := range e.Bindings {
+			iterType := c.checkExpr(binding.Iterable)
+			elemType := c.iterableElementType(iterType)
+			c.define(binding.Name, elemType, false)
+		}
+		yieldType := c.checkBlockResult(e.YieldBody, "invalid_yield_expression", "yield body must end with an expression")
+		c.popScope()
+		result = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{yieldType}}
 	case *parser.LambdaExpr:
 		result = c.checkLambdaExpr(e, expected)
 	case *parser.PlaceholderExpr:
@@ -1611,6 +1652,10 @@ func exprSpan(expr parser.Expr) parser.Span {
 		return e.Span
 	case *parser.IndexExpr:
 		return e.Span
+	case *parser.IfExpr:
+		return e.Span
+	case *parser.ForYieldExpr:
+		return e.Span
 	case *parser.LambdaExpr:
 		return e.Span
 	case *parser.BinaryExpr:
@@ -1622,6 +1667,13 @@ func exprSpan(expr parser.Expr) parser.Span {
 	default:
 		return parser.Span{}
 	}
+}
+
+func blockSpan(block *parser.BlockStmt) parser.Span {
+	if block == nil {
+		return parser.Span{}
+	}
+	return block.Span
 }
 
 func stmtSpan(stmt parser.Statement) parser.Span {

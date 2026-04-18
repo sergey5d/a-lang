@@ -365,6 +365,25 @@ type IndexExpr struct {
 
 func (*IndexExpr) exprNode() {}
 
+// IfExpr is a typed if / else expression.
+type IfExpr struct {
+	baseExpr
+	Condition Expr
+	Then      *BlockStmt
+	Else      *BlockStmt
+}
+
+func (*IfExpr) exprNode() {}
+
+// ForYieldExpr is a typed yield-style loop expression.
+type ForYieldExpr struct {
+	baseExpr
+	Bindings  []ForBinding
+	YieldBody *BlockStmt
+}
+
+func (*ForYieldExpr) exprNode() {}
+
 // FunctionCallExpr is a typed call to a named top-level function.
 type FunctionCallExpr struct {
 	baseExpr

@@ -136,6 +136,42 @@ def loops(input Int, value Int) Bool {
 	}
 }
 
+func TestParseIfAndForYieldExpressions(t *testing.T) {
+	src := `
+def run(values List[Int], flag Bool) Int {
+	label = if flag {
+		1
+	} else {
+		2
+	}
+
+	items = for {
+		x <- values,
+		y <- values
+	} yield {
+		x + y
+	}
+
+	return label
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	first := fn.Body.Statements[0].(*ValStmt)
+	if _, ok := first.Values[0].(*IfExpr); !ok {
+		t.Fatalf("expected first binding value to be if expression, got %T", first.Values[0])
+	}
+	second := fn.Body.Statements[1].(*ValStmt)
+	if _, ok := second.Values[0].(*ForYieldExpr); !ok {
+		t.Fatalf("expected second binding value to be yield expression, got %T", second.Values[0])
+	}
+}
+
 func TestParseExtendedOperators(t *testing.T) {
 	src := `
 def ops(a Int, b Int) Bool {

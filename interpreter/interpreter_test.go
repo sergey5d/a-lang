@@ -339,6 +339,53 @@ def run() String {
 	}
 }
 
+func TestIfAndForYieldExpressions(t *testing.T) {
+	src := `
+def run() Int {
+	values = [1, 2, 3]
+	label Int = if true {
+		10
+	} else {
+		20
+	}
+	items = for {
+		x <- values,
+		y <- values
+	} yield {
+		x + y
+	}
+	Term.println("items " + items.size())
+	return label + items.size()
+}
+`
+
+	in := New(parseProgram(t, src))
+
+	oldStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe returned error: %v", err)
+	}
+	os.Stdout = writer
+
+	value, callErr := in.Call("run")
+
+	_ = writer.Close()
+	os.Stdout = oldStdout
+	output, _ := io.ReadAll(reader)
+	_ = reader.Close()
+
+	if callErr != nil {
+		t.Fatalf("Call returned error: %v", callErr)
+	}
+	if value != int64(19) {
+		t.Fatalf("expected 19, got %#v", value)
+	}
+	if strings.TrimSpace(string(output)) != "items 9" {
+		t.Fatalf("expected output %q, got %q", "items 9", string(output))
+	}
+}
+
 func TestArrayConstructorAndSize(t *testing.T) {
 	src := `
 def run() Int {

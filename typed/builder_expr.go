@@ -86,6 +86,47 @@ func (b *exprBuilder) Build(expr parser.Expr) (Expr, error) {
 			return nil, err
 		}
 		return &IndexExpr{baseExpr: b.base(expr), Receiver: receiver, Index: index}, nil
+	case *parser.IfExpr:
+		condition, err := b.Build(e.Condition)
+		if err != nil {
+			return nil, err
+		}
+		thenBlock, err := b.blocks.Build(e.Then)
+		if err != nil {
+			return nil, err
+		}
+		elseBlock, err := b.blocks.Build(e.Else)
+		if err != nil {
+			return nil, err
+		}
+		return &IfExpr{baseExpr: b.base(expr), Condition: condition, Then: thenBlock, Else: elseBlock}, nil
+	case *parser.ForYieldExpr:
+		bindings := make([]ForBinding, len(e.Bindings))
+		b.ctx.pushScope()
+		for i, binding := range e.Bindings {
+			iterable, err := b.Build(binding.Iterable)
+			if err != nil {
+				b.ctx.popScope()
+				return nil, err
+			}
+			boundType := b.ctx.exprTypes[binding.Iterable]
+			elemType := b.types.iterableElementType(boundType)
+			boundSymbol := b.ctx.newSymbol(SymbolBinding, binding.Name, "", binding.Span)
+			b.ctx.defineSymbol(boundSymbol)
+			bindings[i] = ForBinding{
+				Name:     binding.Name,
+				Type:     elemType,
+				Iterable: iterable,
+				Symbol:   boundSymbol,
+				Span:     binding.Span,
+			}
+		}
+		yieldBody, err := b.blocks.Build(e.YieldBody)
+		b.ctx.popScope()
+		if err != nil {
+			return nil, err
+		}
+		return &ForYieldExpr{baseExpr: b.base(expr), Bindings: bindings, YieldBody: yieldBody}, nil
 	case *parser.CallExpr:
 		return b.calls.Build(e)
 	case *parser.LambdaExpr:
