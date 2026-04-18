@@ -53,6 +53,10 @@ type builtinRef struct{ name string }
 
 type nativeList struct{ items []Value }
 type nativeArray struct{ items []Value }
+type nativeOption struct {
+	value Value
+	set   bool
+}
 type nativeSet struct {
 	keys  map[string]Value
 	order []string
@@ -458,7 +462,7 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			return e.Name, nil
 		}
 		switch e.Name {
-		case "List", "Set", "Map", "Array":
+		case "List", "Set", "Map", "Array", "Some", "None":
 			return builtinRef{name: e.Name}, nil
 		case "Term":
 			return &nativeTerm{}, nil
@@ -699,7 +703,7 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 			}
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
-	case *nativeList, *nativeSet, *nativeMap, *nativeTerm:
+	case *nativeList, *nativeArray, *nativeOption, *nativeSet, *nativeMap, *nativeTerm:
 		if in.nativeHasMethod(receiver, expr.Name) {
 			return nil, RuntimeError{Message: "method '" + expr.Name + "' must be called with ()", Span: expr.Span}
 		}
@@ -773,6 +777,26 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.Expr, args []V
 			s.keys[key] = arg
 		}
 		return s, nil
+	case "Some":
+		if len(argExprs) != 1 {
+			return nil, RuntimeError{Message: fmt.Sprintf("Some constructor expects 1 argument, got %d", len(argExprs)), Span: span}
+		}
+		if args == nil {
+			args = make([]Value, len(argExprs))
+			for i, arg := range argExprs {
+				value, err := in.evalExpr(arg, local)
+				if err != nil {
+					return nil, err
+				}
+				args[i] = value
+			}
+		}
+		return &nativeOption{value: args[0], set: true}, nil
+	case "None":
+		if len(argExprs) != 0 {
+			return nil, RuntimeError{Message: fmt.Sprintf("None constructor expects 0 arguments, got %d", len(argExprs)), Span: span}
+		}
+		return &nativeOption{set: false}, nil
 	case "Map":
 		m := &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: []string{}}
 		for _, argExpr := range argExprs {
@@ -810,6 +834,8 @@ func (in *Interpreter) nativeHasMethod(receiver Value, name string) bool {
 		return name == "append" || name == "get" || name == "size"
 	case *nativeArray:
 		return name == "size"
+	case *nativeOption:
+		return name == "isSet" || name == "get" || name == "getOr"
 	case *nativeSet:
 		return name == "add" || name == "contains" || name == "size"
 	case *nativeMap:
@@ -840,9 +866,9 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 				return nativeCallResult{err: RuntimeError{Message: "get index must be Int", Span: span}}, true
 			}
 			if index < 0 || index >= int64(len(value.items)) {
-				return nativeCallResult{err: RuntimeError{Message: "index out of bounds", Span: span}}, true
+				return nativeCallResult{value: &nativeOption{set: false}}, true
 			}
-			return nativeCallResult{value: value.items[index]}, true
+			return nativeCallResult{value: &nativeOption{value: value.items[index], set: true}}, true
 		case "size":
 			if len(args) != 0 {
 				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
@@ -856,6 +882,30 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
 			}
 			return nativeCallResult{value: int64(len(value.items))}, true
+		}
+	case *nativeOption:
+		switch name {
+		case "isSet":
+			if len(args) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "isSet expects 0 arguments", Span: span}}, true
+			}
+			return nativeCallResult{value: value.set}, true
+		case "get":
+			if len(args) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "get expects 0 arguments", Span: span}}, true
+			}
+			if !value.set {
+				return nativeCallResult{err: RuntimeError{Message: "Option has no value", Span: span}}, true
+			}
+			return nativeCallResult{value: value.value}, true
+		case "getOr":
+			if len(args) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "getOr expects 1 argument", Span: span}}, true
+			}
+			if value.set {
+				return nativeCallResult{value: value.value}, true
+			}
+			return nativeCallResult{value: args[0]}, true
 		}
 	case *nativeSet:
 		switch name {
@@ -914,9 +964,9 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 			}
 			result, ok := value.items[key]
 			if !ok {
-				return nativeCallResult{err: RuntimeError{Message: "missing map key", Span: span}}, true
+				return nativeCallResult{value: &nativeOption{set: false}}, true
 			}
-			return nativeCallResult{value: result}, true
+			return nativeCallResult{value: &nativeOption{value: result, set: true}}, true
 		case "contains":
 			if len(args) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "contains expects 1 argument", Span: span}}, true
@@ -1292,6 +1342,8 @@ func zeroValue(ref *parser.TypeRef) Value {
 		return &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: []string{}}
 	case "Array":
 		return &nativeArray{items: []Value{}}
+	case "Option":
+		return &nativeOption{set: false}
 	case "Term":
 		return &nativeTerm{}
 	default:

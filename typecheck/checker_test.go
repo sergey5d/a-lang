@@ -663,7 +663,25 @@ def run() Int {
 		Term.println("ok")
 	}
 
-	return items.size() + values.get("a")
+	return items.get(0).getOr(0) + values.get("a").getOr(0)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeOptionConstructorsAndMethods(t *testing.T) {
+	src := `
+def run() Int {
+	found Option[Int] = Some(5)
+	missing Option[Int] = None()
+	if found.isSet() {
+		return found.get()
+	}
+	return missing.getOr(7)
 }
 `
 

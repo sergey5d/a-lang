@@ -96,7 +96,7 @@ func builtinInterfaceInfos() map[string]interfaceInfo {
 		TypeParameters: []parser.TypeParameter{{Name: "T"}},
 		Methods: []parser.InterfaceMethod{
 			{Name: "append", Parameters: []parser.Parameter{{Name: "value", Type: namedType("T")}}, ReturnType: genericType("List", "T")},
-			{Name: "get", Parameters: []parser.Parameter{{Name: "index", Type: namedType("Int")}}, ReturnType: namedType("T")},
+			{Name: "get", Parameters: []parser.Parameter{{Name: "index", Type: namedType("Int")}}, ReturnType: genericType("Option", "T")},
 			{Name: "size", Parameters: nil, ReturnType: namedType("Int")},
 		},
 	}
@@ -126,7 +126,7 @@ func builtinInterfaceInfos() map[string]interfaceInfo {
 		TypeParameters: []parser.TypeParameter{{Name: "K"}, {Name: "V"}},
 		Methods: []parser.InterfaceMethod{
 			{Name: "set", Parameters: []parser.Parameter{{Name: "key", Type: namedType("K")}, {Name: "value", Type: namedType("V")}}, ReturnType: genericType("Map", "K", "V")},
-			{Name: "get", Parameters: []parser.Parameter{{Name: "key", Type: namedType("K")}}, ReturnType: namedType("V")},
+			{Name: "get", Parameters: []parser.Parameter{{Name: "key", Type: namedType("K")}}, ReturnType: genericType("Option", "V")},
 			{Name: "contains", Parameters: []parser.Parameter{{Name: "key", Type: namedType("K")}}, ReturnType: namedType("Bool")},
 			{Name: "size", Parameters: nil, ReturnType: namedType("Int")},
 		},
@@ -148,6 +148,21 @@ func builtinInterfaceInfos() map[string]interfaceInfo {
 	out["Term"] = interfaceInfo{decl: termDecl, methods: map[string]interfaceMethodInfo{
 		"print":   {decl: termDecl.Methods[0]},
 		"println": {decl: termDecl.Methods[1]},
+	}}
+
+	optionDecl := &parser.InterfaceDecl{
+		Name:           "Option",
+		TypeParameters: []parser.TypeParameter{{Name: "T"}},
+		Methods: []parser.InterfaceMethod{
+			{Name: "isSet", Parameters: nil, ReturnType: namedType("Bool")},
+			{Name: "get", Parameters: nil, ReturnType: namedType("T")},
+			{Name: "getOr", Parameters: []parser.Parameter{{Name: "defaultValue", Type: namedType("T")}}, ReturnType: namedType("T")},
+		},
+	}
+	out["Option"] = interfaceInfo{decl: optionDecl, methods: map[string]interfaceMethodInfo{
+		"isSet": {decl: optionDecl.Methods[0]},
+		"get":   {decl: optionDecl.Methods[1]},
+		"getOr": {decl: optionDecl.Methods[2]},
 	}}
 
 	return out
@@ -692,6 +707,24 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 		lengthType := c.checkExpr(call.Args[0])
 		c.requireAssignable(lengthType, builtin("Int"), exprSpan(call.Args[0]), "invalid_argument_type", "Array constructor length must be Int")
 		return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
+	case "Some":
+		if len(call.Args) != 1 {
+			for _, arg := range call.Args {
+				c.checkExpr(arg)
+			}
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Some constructor expects 1 argument, got %d", len(call.Args)), call.Span)
+			return &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
+		}
+		valueType := c.checkExpr(call.Args[0])
+		return &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{valueType}}
+	case "None":
+		if len(call.Args) != 0 {
+			for _, arg := range call.Args {
+				c.checkExpr(arg)
+			}
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("None constructor expects 0 arguments, got %d", len(call.Args)), call.Span)
+		}
+		return &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
 	default:
 		for _, arg := range call.Args {
 			c.checkExpr(arg)
@@ -1502,7 +1535,7 @@ func isBuiltinType(name string) bool {
 
 func isBuiltinInterfaceType(name string) bool {
 	switch name {
-	case "Eq", "List", "Set", "Map", "Term":
+	case "Eq", "List", "Set", "Map", "Term", "Option":
 		return true
 	default:
 		return false
@@ -1511,7 +1544,7 @@ func isBuiltinInterfaceType(name string) bool {
 
 func isBuiltinValue(name string) bool {
 	switch name {
-	case "List", "Map", "Set", "Array":
+	case "List", "Map", "Set", "Array", "Some", "None":
 		return true
 	default:
 		return false

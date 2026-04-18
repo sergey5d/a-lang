@@ -268,7 +268,7 @@ def run() Int {
 		Term.println("ok")
 	}
 
-	return items.size() + values.get("a") + values.size() + seen.size()
+	return items.get(0).getOr(0) + values.get("a").getOr(0) + values.size() + seen.size()
 }
 `
 
@@ -291,11 +291,33 @@ def run() Int {
 	if callErr != nil {
 		t.Fatalf("Call returned error: %v", callErr)
 	}
-	if value != int64(8) {
-		t.Fatalf("expected 8, got %#v", value)
+	if value != int64(6) {
+		t.Fatalf("expected 6, got %#v", value)
 	}
 	if strings.TrimSpace(string(output)) != "ok" {
 		t.Fatalf("expected Term output 'ok', got %q", string(output))
+	}
+}
+
+func TestOptionRuntime(t *testing.T) {
+	src := `
+def run() Int {
+	found = Some(5)
+	missing = None()
+	if found.isSet() {
+		return found.get() + missing.getOr(2)
+	}
+	return 0
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(7) {
+		t.Fatalf("expected 7, got %#v", value)
 	}
 }
 
