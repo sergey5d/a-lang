@@ -275,7 +275,10 @@ func (c *Checker) checkFunction(fn *parser.FunctionDecl) {
 	for _, param := range fn.Parameters {
 		c.define(param.Name, fromTypeRef(param.Type, c), false)
 	}
-	c.checkBlock(fn.Body)
+	implicitReturn := c.checkBlock(fn.Body)
+	if fn.ReturnType != nil && !isUnknown(implicitReturn) {
+		c.requireAssignable(implicitReturn, expectedReturn, fn.Body.Span, "invalid_return_type", "cannot implicitly return "+implicitReturn.String()+" from function returning "+expectedReturn.String())
+	}
 }
 
 func (c *Checker) checkClass(decl *parser.ClassDecl) {
@@ -336,7 +339,10 @@ func (c *Checker) checkMethod(method *parser.MethodDecl, owner *parser.ClassDecl
 	for _, param := range method.Parameters {
 		c.define(param.Name, c.resolveDeclaredType(param.Type), false)
 	}
-	c.checkBlock(method.Body)
+	implicitReturn := c.checkBlock(method.Body)
+	if !method.Constructor && method.ReturnType != nil && !isUnknown(implicitReturn) {
+		c.requireAssignable(implicitReturn, expectedReturn, method.Body.Span, "invalid_return_type", "cannot implicitly return "+implicitReturn.String()+" from method returning "+expectedReturn.String())
+	}
 }
 
 func (c *Checker) checkInterfaceImplementation(class classInfo, impl *parser.TypeRef) {
@@ -408,12 +414,21 @@ func (c *Checker) compareSignatures(actual, expected Signature, span parser.Span
 	}
 }
 
-func (c *Checker) checkBlock(block *parser.BlockStmt) {
+func (c *Checker) checkBlock(block *parser.BlockStmt) *Type {
 	c.pushScope()
 	defer c.popScope()
-	for _, stmt := range block.Statements {
-		c.checkStmt(stmt)
+	if block == nil || len(block.Statements) == 0 {
+		return unknownType
 	}
+	for i := 0; i < len(block.Statements)-1; i++ {
+		c.checkStmt(block.Statements[i])
+	}
+	last := block.Statements[len(block.Statements)-1]
+	if exprStmt, ok := last.(*parser.ExprStmt); ok {
+		return c.checkExpr(exprStmt.Expr)
+	}
+	c.checkStmt(last)
+	return unknownType
 }
 
 func (c *Checker) checkStmt(stmt parser.Statement) {
@@ -459,12 +474,12 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 	case *parser.IfStmt:
 		condType := c.checkExpr(s.Condition)
 		c.requireAssignable(condType, builtin("Bool"), exprSpan(s.Condition), "invalid_condition_type", "if condition must be Bool")
-		c.checkBlock(s.Then)
+		_ = c.checkBlock(s.Then)
 		if s.ElseIf != nil {
 			c.checkStmt(s.ElseIf)
 		}
 		if s.Else != nil {
-			c.checkBlock(s.Else)
+			_ = c.checkBlock(s.Else)
 		}
 	case *parser.ForStmt:
 		c.pushScope()
@@ -920,9 +935,16 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr, expected *Type) *Type
 			expectedReturn = expectedSig.ReturnType
 		}
 		c.returnTypes = append(c.returnTypes, expectedReturn)
-		c.checkBlock(expr.BlockBody)
+		implicitReturn := c.checkBlock(expr.BlockBody)
 		returnType = c.returnTypes[len(c.returnTypes)-1]
 		c.returnTypes = c.returnTypes[:len(c.returnTypes)-1]
+		if !isUnknown(implicitReturn) {
+			if isUnknown(returnType) {
+				returnType = implicitReturn
+			} else {
+				c.requireAssignable(implicitReturn, returnType, expr.BlockBody.Span, "invalid_lambda_type", "lambda body does not match expected return type")
+			}
+		}
 	}
 	return functionType("<lambda>", Signature{Parameters: params, ReturnType: returnType})
 }

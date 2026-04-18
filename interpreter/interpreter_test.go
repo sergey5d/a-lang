@@ -152,6 +152,57 @@ def run() Int {
 	}
 }
 
+func TestMethodWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
+	src := `
+class Counter {
+	private count Int := deferred
+
+	def init(count Int) {
+		this.count = count
+	}
+
+	def touch() {
+		this.count + 1
+	}
+}
+
+def run() Bool {
+	counter Counter = Counter(1)
+	return counter.touch() == 2
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != false {
+		t.Fatalf("expected false, got %#v", value)
+	}
+}
+
+func TestFunctionImplicitReturn(t *testing.T) {
+	src := `
+def suffix(value String) String {
+	value + "!"
+}
+
+def run() String {
+	suffix("hello")
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "hello!" {
+		t.Fatalf("expected hello!, got %#v", value)
+	}
+}
+
 func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {

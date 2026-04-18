@@ -16,6 +16,10 @@ def suckItAll(val String) String {
     return val + " - hehe"
 }
 
+def suckItAll2(val String) String {
+    val + " - hehe 2"
+}
+
 def run() Int {
 	first Int = 5
 	second Int = 7
@@ -36,6 +40,7 @@ def run() Int {
 	Term.println("global " + third)
 
 	Term.println(suckItAll("haha"))
+	Term.println(suckItAll2("haha 2"))
 
 	result = if first == 5 {
 	    Term.println("YES it's 5!!!")
@@ -58,11 +63,13 @@ def run() Int {
 
 	list = [1, 2, 3, 8]
 
+    crapper := 0
 	for item <- list {
 	    Term.println("item " + item)
+	    crapper += item
 	}
 
-	Term.println("item end")
+	Term.println("item end " + crapper)
 
 	newList = for {
 	    item <- list

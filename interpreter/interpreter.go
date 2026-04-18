@@ -143,14 +143,17 @@ func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl,
 	for i, param := range method.Parameters {
 		local.define(param.Name, args[i], false)
 	}
-	_, signal, err := in.execBlock(method.Body, local, receiver)
+	value, signal, err := in.execBlock(method.Body, local, receiver)
 	if err != nil {
 		return nil, err
 	}
 	if ret, ok := signal.(returnSignal); ok {
 		return ret.value, nil
 	}
-	return nil, nil
+	if method.ReturnType == nil {
+		return nil, nil
+	}
+	return value, nil
 }
 
 func (in *Interpreter) construct(class *parser.ClassDecl, args []Value, parent *env) (Value, error) {
@@ -190,13 +193,15 @@ func (in *Interpreter) execBlock(block *parser.BlockStmt, parent *env, self *ins
 	if self != nil {
 		local.define("this", self, false)
 	}
+	var lastValue Value
 	for _, stmt := range block.Statements {
 		value, signal, err := in.execStmt(stmt, local, self)
 		if err != nil || signal != nil {
 			return value, signal, err
 		}
+		lastValue = value
 	}
-	return nil, nil, nil
+	return lastValue, nil, nil
 }
 
 func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instance) (Value, any, error) {
@@ -716,14 +721,14 @@ func (in *Interpreter) callClosure(fn *closure, args []Value) (Value, error) {
 		return in.evalExpr(fn.body, local)
 	}
 	if fn.blockBody != nil {
-		_, signal, err := in.execBlock(fn.blockBody, local, nil)
+		value, signal, err := in.execBlock(fn.blockBody, local, nil)
 		if err != nil {
 			return nil, err
 		}
 		if ret, ok := signal.(returnSignal); ok {
 			return ret.value, nil
 		}
-		return nil, nil
+		return value, nil
 	}
 	return nil, nil
 }

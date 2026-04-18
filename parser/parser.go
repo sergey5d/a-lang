@@ -358,7 +358,7 @@ func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
 	}
 	constructor := name.Lexeme == "init"
 	var returnType *TypeRef
-	if !constructor {
+	if !constructor && !p.check(TokenLBrace) {
 		typ, err := p.parseTypeRef()
 		if err != nil {
 			return nil, err

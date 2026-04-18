@@ -729,6 +729,23 @@ def run(values List[Int], flag Bool) Int {
 	}
 }
 
+func TestAnalyzeFunctionImplicitReturn(t *testing.T) {
+	src := `
+def suffix(value String) String {
+	value + "!"
+}
+
+def run() String {
+	suffix("hello")
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeArrayConstructorAndSize(t *testing.T) {
 	src := `
 def run() Int {

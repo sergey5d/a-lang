@@ -172,6 +172,26 @@ def run(values List[Int], flag Bool) Int {
 	}
 }
 
+func TestParseMethodWithoutReturnType(t *testing.T) {
+	src := `
+class Counter {
+	def touch() {
+		1
+	}
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	method := program.Classes[0].Methods[0]
+	if method.ReturnType != nil {
+		t.Fatalf("expected omitted return type, got %#v", method.ReturnType)
+	}
+}
+
 func TestParseExtendedOperators(t *testing.T) {
 	src := `
 def ops(a Int, b Int) Bool {
