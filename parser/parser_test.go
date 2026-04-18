@@ -182,6 +182,10 @@ def run(values List[Int], flag Bool) Int {
 		x + y
 	}
 
+	items2 = for item <- values yield {
+		item + 1
+	}
+
 	return label
 }
 `
@@ -199,6 +203,12 @@ def run(values List[Int], flag Bool) Int {
 	second := fn.Body.Statements[1].(*ValStmt)
 	if _, ok := second.Values[0].(*ForYieldExpr); !ok {
 		t.Fatalf("expected second binding value to be yield expression, got %T", second.Values[0])
+	}
+	third := fn.Body.Statements[2].(*ValStmt)
+	if yieldExpr, ok := third.Values[0].(*ForYieldExpr); !ok {
+		t.Fatalf("expected third binding value to be short yield expression, got %T", third.Values[0])
+	} else if len(yieldExpr.Bindings) != 1 {
+		t.Fatalf("expected short yield expression to have 1 binding, got %d", len(yieldExpr.Bindings))
 	}
 }
 

@@ -665,8 +665,11 @@ def run() Int {
 	} yield {
 		x + y
 	}
-	Term.println("items " + items.size())
-	return label + items.size()
+	items2 = for item <- values yield {
+		item + 1
+	}
+	Term.println("items " + items.size() + " " + items2.size())
+	return label + items.size() + items2.size()
 }
 `
 
@@ -689,11 +692,11 @@ def run() Int {
 	if callErr != nil {
 		t.Fatalf("Call returned error: %v", callErr)
 	}
-	if value != int64(19) {
-		t.Fatalf("expected 19, got %#v", value)
+	if value != int64(22) {
+		t.Fatalf("expected 22, got %#v", value)
 	}
-	if strings.TrimSpace(string(output)) != "items 9" {
-		t.Fatalf("expected output %q, got %q", "items 9", string(output))
+	if strings.TrimSpace(string(output)) != "items 9 3" {
+		t.Fatalf("expected output %q, got %q", "items 9 3", string(output))
 	}
 }
 

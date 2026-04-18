@@ -151,8 +151,26 @@ func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
 }
 
 func (p *Parser) parseForYieldExprAfterStart(start Token) (Expr, error) {
+	if p.check(TokenIdentifier) && p.checkNext(TokenLeftArrow) {
+		binding, err := p.parseForBinding()
+		if err != nil {
+			return nil, err
+		}
+		if _, err := p.consume(TokenYield, "expected 'yield' after for binding"); err != nil {
+			return nil, err
+		}
+		yieldBody, err := p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
+		return &ForYieldExpr{
+			Bindings:  []ForBinding{binding},
+			YieldBody: yieldBody,
+			Span:      mergeSpans(tokenSpan(start), yieldBody.Span),
+		}, nil
+	}
 	if !p.check(TokenLBrace) || !p.isForYieldStart() {
-		return nil, fmt.Errorf("for expression requires 'for { ... } yield { ... }'")
+		return nil, fmt.Errorf("for expression requires 'for item <- items yield { ... }' or 'for { ... } yield { ... }'")
 	}
 	bindings, err := p.parseForBindingsBlock()
 	if err != nil {

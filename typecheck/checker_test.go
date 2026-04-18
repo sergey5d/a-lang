@@ -761,7 +761,10 @@ def run(values List[Int], flag Bool) Int {
 	} yield {
 		x + y
 	}
-	return label + items.size()
+	items2 List[Int] = for item <- values yield {
+		item + 1
+	}
+	return label + items.size() + items2.size()
 }
 `
 
