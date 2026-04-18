@@ -746,6 +746,21 @@ def run() String {
 	}
 }
 
+func TestAnalyzeLocalFunctionStmt(t *testing.T) {
+	src := `
+def run() Int {
+	boost Int = 2
+	def add(value Int) Int = value + boost
+	add(5)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeArrayConstructorAndSize(t *testing.T) {
 	src := `
 def run() Int {

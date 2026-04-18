@@ -84,6 +84,8 @@ func stmtSpan(stmt Statement) Span {
 	switch s := stmt.(type) {
 	case *ValStmt:
 		return s.Span
+	case *LocalFunctionStmt:
+		return s.Span
 	case *AssignmentStmt:
 		return s.Span
 	case *IfStmt:
@@ -385,6 +387,9 @@ func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
 
 func (p *Parser) parseCallableBody() (*BlockStmt, error) {
 	if p.match(TokenAssign) {
+		if p.check(TokenLBrace) {
+			return p.parseBlock()
+		}
 		assign := p.previous()
 		expr, err := p.parseExpression(0)
 		if err != nil {
@@ -459,6 +464,8 @@ func (p *Parser) parseStatement() (Statement, error) {
 		return p.parseIfStmt()
 	case TokenFor:
 		return p.parseForStmt()
+	case TokenDef:
+		return p.parseLocalFunctionStmt()
 	case TokenReturn:
 		return p.parseReturnStmt()
 	case TokenBreak:
@@ -470,6 +477,14 @@ func (p *Parser) parseStatement() (Statement, error) {
 		}
 		return p.parseExprStmt()
 	}
+}
+
+func (p *Parser) parseLocalFunctionStmt() (Statement, error) {
+	fn, err := p.parseFunction()
+	if err != nil {
+		return nil, err
+	}
+	return &LocalFunctionStmt{Function: fn, Span: fn.Span}, nil
 }
 
 func (p *Parser) parseBareBindingStmt() (Statement, error) {

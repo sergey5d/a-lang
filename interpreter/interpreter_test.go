@@ -246,6 +246,25 @@ def run() Bool {
 	}
 }
 
+func TestLocalFunctionStmt(t *testing.T) {
+	src := `
+def run() Int {
+	boost Int = 2
+	def add(value Int) Int = value + boost
+	add(5)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(7) {
+		t.Fatalf("expected 7, got %#v", value)
+	}
+}
+
 func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {

@@ -201,6 +201,16 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 			r.resolveTypeRef(binding.Type)
 			r.defineMutable(binding.Name, binding.Span, binding.Mutable, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
 		}
+	case *parser.LocalFunctionStmt:
+		r.defineMutable(s.Function.Name, s.Span, false, "duplicate_binding", "duplicate binding '"+s.Function.Name+"'")
+		r.resolveTypeRef(s.Function.ReturnType)
+		r.pushScope()
+		for _, param := range s.Function.Parameters {
+			r.resolveTypeRef(param.Type)
+			r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
+		}
+		r.resolveBlockStatements(s.Function.Body.Statements)
+		r.popScope()
 	case *parser.AssignmentStmt:
 		r.resolveAssignment(s)
 	case *parser.IfStmt:

@@ -46,6 +46,15 @@ def run() Int {
 	third2 = 56
 	Term.println("third2 " + third2)
 
+	def x(term Int) = Term.println("xexe" + term)
+
+	def lala() = {
+	    Term.println("lala")
+	}
+
+	x(5)
+	lala()
+
 	counter Int := first
 	counter += second
 

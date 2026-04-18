@@ -43,7 +43,7 @@ type instance struct {
 }
 
 type closure struct {
-	params    []parser.LambdaParameter
+	params    []string
 	body      parser.Expr
 	blockBody *parser.BlockStmt
 	env       *env
@@ -229,6 +229,13 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			}
 			local.define(binding.Name, value, binding.Mutable)
 		}
+		return nil, nil, nil
+	case *parser.LocalFunctionStmt:
+		params := make([]string, len(s.Function.Parameters))
+		for i, param := range s.Function.Parameters {
+			params[i] = param.Name
+		}
+		local.define(s.Function.Name, &closure{params: params, blockBody: s.Function.Body, env: local}, false)
 		return nil, nil, nil
 	case *parser.AssignmentStmt:
 		value, err := in.evalExpr(s.Value, local)
@@ -669,7 +676,11 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		}
 		return items[index], nil
 	case *parser.LambdaExpr:
-		return &closure{params: e.Parameters, body: e.Body, blockBody: e.BlockBody, env: local}, nil
+		params := make([]string, len(e.Parameters))
+		for i, param := range e.Parameters {
+			params[i] = param.Name
+		}
+		return &closure{params: params, body: e.Body, blockBody: e.BlockBody, env: local}, nil
 	case *parser.PlaceholderExpr:
 		return nil, RuntimeError{Message: "placeholder is not supported here", Span: e.Span}
 	default:
@@ -718,7 +729,7 @@ func (in *Interpreter) callClosure(fn *closure, args []Value) (Value, error) {
 	}
 	local := newEnv(fn.env)
 	for i, param := range fn.params {
-		local.define(param.Name, args[i], false)
+		local.define(param, args[i], false)
 	}
 	if fn.body != nil {
 		return in.evalExpr(fn.body, local)

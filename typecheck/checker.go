@@ -456,6 +456,24 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			}
 			c.define(bindingDecl.Name, declType, bindingDecl.Mutable)
 		}
+	case *parser.LocalFunctionStmt:
+		sig := Signature{Parameters: make([]*Type, len(s.Function.Parameters)), ReturnType: fromTypeRef(s.Function.ReturnType, c)}
+		for i, param := range s.Function.Parameters {
+			sig.Parameters[i] = fromTypeRef(param.Type, c)
+		}
+		c.define(s.Function.Name, functionType(s.Function.Name, sig), false)
+		c.pushScope()
+		defer c.popScope()
+		expectedReturn := fromTypeRef(s.Function.ReturnType, c)
+		c.returnTypes = append(c.returnTypes, expectedReturn)
+		defer func() { c.returnTypes = c.returnTypes[:len(c.returnTypes)-1] }()
+		for _, param := range s.Function.Parameters {
+			c.define(param.Name, fromTypeRef(param.Type, c), false)
+		}
+		implicitReturn := c.checkBlock(s.Function.Body)
+		if s.Function.ReturnType != nil && !isUnknown(implicitReturn) {
+			c.requireAssignable(implicitReturn, expectedReturn, s.Function.Body.Span, "invalid_return_type", "cannot implicitly return "+implicitReturn.String()+" from function returning "+expectedReturn.String())
+		}
 	case *parser.AssignmentStmt:
 		targetType, mutable := c.checkAssignmentTarget(s.Target, s.Span)
 		valueType := c.checkExpr(s.Value)
@@ -1701,6 +1719,8 @@ func blockSpan(block *parser.BlockStmt) parser.Span {
 func stmtSpan(stmt parser.Statement) parser.Span {
 	switch s := stmt.(type) {
 	case *parser.ValStmt:
+		return s.Span
+	case *parser.LocalFunctionStmt:
 		return s.Span
 	case *parser.AssignmentStmt:
 		return s.Span

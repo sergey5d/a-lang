@@ -241,6 +241,69 @@ def printIt() {
 	}
 }
 
+func TestParseLocalFunctionStmt(t *testing.T) {
+	src := `
+def run() Int {
+	def x(term Int) = term + 1
+	x(5)
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	if len(fn.Body.Statements) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(fn.Body.Statements))
+	}
+	if _, ok := fn.Body.Statements[0].(*LocalFunctionStmt); !ok {
+		t.Fatalf("expected first statement to be local function, got %T", fn.Body.Statements[0])
+	}
+}
+
+func TestParseEqualsBlockBodiedDefs(t *testing.T) {
+	src := `
+def top() = {
+	1
+}
+
+class Counter {
+	def method() = {
+		1
+	}
+}
+
+def run() {
+	def local() = {
+		1
+	}
+	local()
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	if len(program.Functions[0].Body.Statements) != 1 {
+		t.Fatalf("expected top function block body to contain 1 statement, got %d", len(program.Functions[0].Body.Statements))
+	}
+	if len(program.Classes[0].Methods[0].Body.Statements) != 1 {
+		t.Fatalf("expected method block body to contain 1 statement, got %d", len(program.Classes[0].Methods[0].Body.Statements))
+	}
+	run := program.Functions[1]
+	localStmt, ok := run.Body.Statements[0].(*LocalFunctionStmt)
+	if !ok {
+		t.Fatalf("expected first run statement to be local function, got %T", run.Body.Statements[0])
+	}
+	if len(localStmt.Function.Body.Statements) != 1 {
+		t.Fatalf("expected local function block body to contain 1 statement, got %d", len(localStmt.Function.Body.Statements))
+	}
+}
+
 func TestParseExtendedOperators(t *testing.T) {
 	src := `
 def ops(a Int, b Int) Bool {

@@ -111,6 +111,14 @@ type Statement interface {
 	statementNode()
 }
 
+// LocalFunctionStmt declares a named local function inside a block.
+type LocalFunctionStmt struct {
+	Function *FunctionDecl `json:"function"`
+	Span     Span          `json:"span"`
+}
+
+func (*LocalFunctionStmt) statementNode() {}
+
 // Expr is implemented by all parser AST expression nodes.
 type Expr interface {
 	exprNode()
