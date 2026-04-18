@@ -34,6 +34,8 @@ class Adder {
     }
 }
 
+# this is comment!!!
+
 class Bucket {
     base Int := deferred
 
@@ -77,7 +79,7 @@ suck231()
 suck232()
 suck233()
 
-def run() Int {
+def main() Int {
 	first Int = 5
 	second Int = 7
 	third2 = 56

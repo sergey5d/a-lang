@@ -13,7 +13,7 @@ class Counter {
 
 seed Int = 1
 
-def run(input Int) Int {
+def main(input Int) Int {
 	counter Counter = Counter(input)
 	if input > 0 {
 		return counter.inc()

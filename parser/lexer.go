@@ -269,9 +269,17 @@ func (l *Lexer) skipWhitespace() {
 			l.advance()
 		case '\n':
 			l.advance()
+		case '#':
+			l.skipComment()
 		default:
 			return
 		}
+	}
+}
+
+func (l *Lexer) skipComment() {
+	for !l.isAtEnd() && l.peek() != '\n' {
+		l.advance()
 	}
 }
 

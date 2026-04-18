@@ -16,7 +16,7 @@ The interpreter is the most practical execution path right now.
 
 ## Current CLI
 
-Run a program by calling its `run` function:
+Run a program by calling its `main` function:
 
 ```bash
 go run . example.al
@@ -59,7 +59,7 @@ class Counter {
 
 seed Int = 1
 
-def run(input Int) Int {
+def main(input Int) Int {
 	counter Counter = Counter(input)
 	if input > 0 {
 		return counter.inc()

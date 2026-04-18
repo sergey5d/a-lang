@@ -34,7 +34,7 @@ def sumFirstTwo(values Array[Int]) Int {
 	return first + second
 }
 
-def run() Bool {
+def main() Bool {
 	addOne Int -> Int = x -> x + 1
 	addTwo = (x Int) -> {
 		y Int = x + 2
@@ -60,4 +60,3 @@ def run() Bool {
 
 	return false
 }
-

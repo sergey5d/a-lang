@@ -84,6 +84,36 @@ func TestParseSampleProgram(t *testing.T) {
 	}
 }
 
+func TestParseHashComments(t *testing.T) {
+	src := `
+# top-level comment
+def run() Int {
+	# before binding
+	value Int = 1 # trailing comment
+	# before return
+	return value
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Functions) != 1 {
+		t.Fatalf("expected 1 function, got %d", len(program.Functions))
+	}
+	fn := program.Functions[0]
+	if got := len(fn.Body.Statements); got != 2 {
+		t.Fatalf("expected 2 statements in body, got %d", got)
+	}
+	if _, ok := fn.Body.Statements[0].(*ValStmt); !ok {
+		t.Fatalf("expected first statement to be binding, got %T", fn.Body.Statements[0])
+	}
+	if _, ok := fn.Body.Statements[1].(*ReturnStmt); !ok {
+		t.Fatalf("expected second statement to be return, got %T", fn.Body.Statements[1])
+	}
+}
+
 func TestParseForForms(t *testing.T) {
 	src := `
 def loops(input Int, value Int) Bool {

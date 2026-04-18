@@ -8,7 +8,7 @@ import (
 
 func TestParseCLIArgsScalars(t *testing.T) {
 	fn := &parser.FunctionDecl{
-		Name: "run",
+		Name: "main",
 		Parameters: []parser.Parameter{
 			{Name: "count", Type: &parser.TypeRef{Name: "Int"}},
 			{Name: "ratio", Type: &parser.TypeRef{Name: "Float"}},
@@ -44,7 +44,7 @@ func TestParseCLIArgsScalars(t *testing.T) {
 
 func TestParseCLIArgsRejectsUnsupportedType(t *testing.T) {
 	fn := &parser.FunctionDecl{
-		Name: "run",
+		Name: "main",
 		Parameters: []parser.Parameter{
 			{Name: "items", Type: &parser.TypeRef{Name: "List", Arguments: []*parser.TypeRef{{Name: "Int"}}}},
 		},
@@ -58,7 +58,7 @@ func TestParseCLIArgsRejectsUnsupportedType(t *testing.T) {
 
 func TestParseCLIArgsRejectsWrongArity(t *testing.T) {
 	fn := &parser.FunctionDecl{
-		Name: "run",
+		Name: "main",
 		Parameters: []parser.Parameter{
 			{Name: "count", Type: &parser.TypeRef{Name: "Int"}},
 		},

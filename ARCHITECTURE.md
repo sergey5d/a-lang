@@ -231,7 +231,7 @@ Files in `interpreter/` implement a tree-walking runtime.
 
 ### Current output
 
-- runtime values from calling an entry function
+- runtime values from calling an entry function, which defaults to `main` in the CLI
 
 ### Why it still uses parser AST
 
@@ -305,7 +305,7 @@ It is intentionally thin and mostly just wires packages together.
 
 ### Current modes
 
-- `run`
+- `run` (executes the `main` entry function by default)
 - `ast`
 
 ### Current execution path
@@ -316,7 +316,7 @@ It is intentionally thin and mostly just wires packages together.
 2. semantic analyze
 3. type check
 4. build interpreter
-5. call entry function
+5. call entry function (default `main`)
 
 `ast` mode:
 
