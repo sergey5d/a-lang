@@ -49,6 +49,21 @@ type closure struct {
 	env       *env
 }
 
+type builtinRef struct{ name string }
+
+type nativeList struct{ items []Value }
+type nativeArray struct{ items []Value }
+type nativeSet struct {
+	keys  map[string]Value
+	order []string
+}
+type nativeMap struct {
+	items map[string]Value
+	keys  map[string]Value
+	order []string
+}
+type nativeTerm struct{}
+
 type returnSignal struct {
 	value Value
 }
@@ -398,7 +413,7 @@ func (in *Interpreter) assign(target parser.Expr, operator string, value Value, 
 		if err != nil {
 			return err
 		}
-		items, ok := receiver.([]Value)
+		items, ok := indexedItems(receiver)
 		if !ok {
 			return RuntimeError{Message: "index assignment requires array-like value", Span: t.Span}
 		}
@@ -442,6 +457,12 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		if _, ok := in.functions[e.Name]; ok {
 			return e.Name, nil
 		}
+		switch e.Name {
+		case "List", "Set", "Map", "Array":
+			return builtinRef{name: e.Name}, nil
+		case "Term":
+			return &nativeTerm{}, nil
+		}
 		if _, ok := in.classes[e.Name]; ok {
 			return classRef{name: e.Name}, nil
 		}
@@ -473,7 +494,7 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			}
 			items[i] = value
 		}
-		return items, nil
+		return &nativeList{items: items}, nil
 	case *parser.GroupExpr:
 		return in.evalExpr(e.Inner, local)
 	case *parser.UnaryExpr:
@@ -551,7 +572,7 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		items, ok := receiver.([]Value)
+		items, ok := indexedItems(receiver)
 		if !ok {
 			return nil, RuntimeError{Message: "indexing requires array-like value", Span: e.Span}
 		}
@@ -583,6 +604,9 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 	callee, err := in.evalExpr(call.Callee, local)
 	if err != nil {
 		return nil, err
+	}
+	if fn, ok := callee.(builtinRef); ok {
+		return in.callBuiltin(fn.name, call.Args, nil, local, call.Span)
 	}
 	args := make([]Value, len(call.Args))
 	for i, arg := range call.Args {
@@ -637,10 +661,6 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 	if err != nil {
 		return nil, err
 	}
-	obj, ok := receiver.(*instance)
-	if !ok {
-		return nil, RuntimeError{Message: "member call requires class instance", Span: member.Span}
-	}
 	args := make([]Value, len(argExprs))
 	for i, arg := range argExprs {
 		value, err := in.evalExpr(arg, local)
@@ -648,6 +668,13 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 			return nil, err
 		}
 		args[i] = value
+	}
+	if native, ok := in.callNativeMethod(receiver, member.Name, args, local, member.Span); ok {
+		return native.value, native.err
+	}
+	obj, ok := receiver.(*instance)
+	if !ok {
+		return nil, RuntimeError{Message: "member call requires class instance", Span: member.Span}
 	}
 	for _, method := range obj.class.Methods {
 		if method.Name == member.Name && len(method.Parameters) == len(args) {
@@ -672,8 +699,258 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 			}
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
+	case *nativeList, *nativeSet, *nativeMap, *nativeTerm:
+		if in.nativeHasMethod(receiver, expr.Name) {
+			return nil, RuntimeError{Message: "method '" + expr.Name + "' must be called with ()", Span: expr.Span}
+		}
+		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
 	default:
 		return nil, RuntimeError{Message: "member access expects class instance", Span: expr.Span}
+	}
+}
+
+type nativeCallResult struct {
+	value Value
+	err   error
+}
+
+func (in *Interpreter) callBuiltin(name string, argExprs []parser.Expr, args []Value, local *env, span parser.Span) (Value, error) {
+	switch name {
+	case "List":
+		if args == nil {
+			args = make([]Value, len(argExprs))
+			for i, arg := range argExprs {
+				value, err := in.evalExpr(arg, local)
+				if err != nil {
+					return nil, err
+				}
+				args[i] = value
+			}
+		}
+		return &nativeList{items: append([]Value(nil), args...)}, nil
+	case "Array":
+		if args == nil {
+			args = make([]Value, len(argExprs))
+			for i, arg := range argExprs {
+				value, err := in.evalExpr(arg, local)
+				if err != nil {
+					return nil, err
+				}
+				args[i] = value
+			}
+		}
+		return &nativeArray{items: append([]Value(nil), args...)}, nil
+	case "Set":
+		if args == nil {
+			args = make([]Value, len(argExprs))
+			for i, arg := range argExprs {
+				value, err := in.evalExpr(arg, local)
+				if err != nil {
+					return nil, err
+				}
+				args[i] = value
+			}
+		}
+		s := &nativeSet{keys: map[string]Value{}, order: []string{}}
+		for _, arg := range args {
+			key, err := nativeKey(arg, span, local, in)
+			if err != nil {
+				return nil, err
+			}
+			if _, ok := s.keys[key]; !ok {
+				s.order = append(s.order, key)
+			}
+			s.keys[key] = arg
+		}
+		return s, nil
+	case "Map":
+		m := &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: []string{}}
+		for _, argExpr := range argExprs {
+			pair, ok := argExpr.(*parser.BinaryExpr)
+			if !ok || pair.Operator != ":" {
+				return nil, RuntimeError{Message: "Map constructor expects key : value pairs", Span: span}
+			}
+			keyValue, err := in.evalExpr(pair.Left, local)
+			if err != nil {
+				return nil, err
+			}
+			valueValue, err := in.evalExpr(pair.Right, local)
+			if err != nil {
+				return nil, err
+			}
+			key, err := nativeKey(keyValue, exprSpan(pair.Left), local, in)
+			if err != nil {
+				return nil, err
+			}
+			if _, ok := m.items[key]; !ok {
+				m.order = append(m.order, key)
+				m.keys[key] = keyValue
+			}
+			m.items[key] = valueValue
+		}
+		return m, nil
+	default:
+		return nil, RuntimeError{Message: "value is not callable", Span: span}
+	}
+}
+
+func (in *Interpreter) nativeHasMethod(receiver Value, name string) bool {
+	switch receiver.(type) {
+	case *nativeList:
+		return name == "append" || name == "get" || name == "size"
+	case *nativeSet:
+		return name == "add" || name == "contains" || name == "size"
+	case *nativeMap:
+		return name == "set" || name == "get" || name == "contains" || name == "size"
+	case *nativeTerm:
+		return name == "print" || name == "println"
+	default:
+		return false
+	}
+}
+
+func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Value, local *env, span parser.Span) (nativeCallResult, bool) {
+	switch value := receiver.(type) {
+	case *nativeList:
+		switch name {
+		case "append":
+			if len(args) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "append expects 1 argument", Span: span}}, true
+			}
+			value.items = append(value.items, args[0])
+			return nativeCallResult{value: value}, true
+		case "get":
+			if len(args) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "get expects 1 argument", Span: span}}, true
+			}
+			index, ok := args[0].(int64)
+			if !ok {
+				return nativeCallResult{err: RuntimeError{Message: "get index must be Int", Span: span}}, true
+			}
+			if index < 0 || index >= int64(len(value.items)) {
+				return nativeCallResult{err: RuntimeError{Message: "index out of bounds", Span: span}}, true
+			}
+			return nativeCallResult{value: value.items[index]}, true
+		case "size":
+			if len(args) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
+			}
+			return nativeCallResult{value: int64(len(value.items))}, true
+		}
+	case *nativeSet:
+		switch name {
+		case "add":
+			if len(args) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "add expects 1 argument", Span: span}}, true
+			}
+			key, err := nativeKey(args[0], span, local, in)
+			if err != nil {
+				return nativeCallResult{err: err}, true
+			}
+			if _, ok := value.keys[key]; !ok {
+				value.order = append(value.order, key)
+			}
+			value.keys[key] = args[0]
+			return nativeCallResult{value: value}, true
+		case "contains":
+			if len(args) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "contains expects 1 argument", Span: span}}, true
+			}
+			key, err := nativeKey(args[0], span, local, in)
+			if err != nil {
+				return nativeCallResult{err: err}, true
+			}
+			_, ok := value.keys[key]
+			return nativeCallResult{value: ok}, true
+		case "size":
+			if len(args) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
+			}
+			return nativeCallResult{value: int64(len(value.keys))}, true
+		}
+	case *nativeMap:
+		switch name {
+		case "set":
+			if len(args) != 2 {
+				return nativeCallResult{err: RuntimeError{Message: "set expects 2 arguments", Span: span}}, true
+			}
+			key, err := nativeKey(args[0], span, local, in)
+			if err != nil {
+				return nativeCallResult{err: err}, true
+			}
+			if _, ok := value.items[key]; !ok {
+				value.order = append(value.order, key)
+				value.keys[key] = args[0]
+			}
+			value.items[key] = args[1]
+			return nativeCallResult{value: value}, true
+		case "get":
+			if len(args) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "get expects 1 argument", Span: span}}, true
+			}
+			key, err := nativeKey(args[0], span, local, in)
+			if err != nil {
+				return nativeCallResult{err: err}, true
+			}
+			result, ok := value.items[key]
+			if !ok {
+				return nativeCallResult{err: RuntimeError{Message: "missing map key", Span: span}}, true
+			}
+			return nativeCallResult{value: result}, true
+		case "contains":
+			if len(args) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "contains expects 1 argument", Span: span}}, true
+			}
+			key, err := nativeKey(args[0], span, local, in)
+			if err != nil {
+				return nativeCallResult{err: err}, true
+			}
+			_, ok := value.items[key]
+			return nativeCallResult{value: ok}, true
+		case "size":
+			if len(args) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
+			}
+			return nativeCallResult{value: int64(len(value.items))}, true
+		}
+	case *nativeTerm:
+		switch name {
+		case "print":
+			if len(args) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "print expects 1 argument", Span: span}}, true
+			}
+			fmt.Print(fmt.Sprint(args[0]))
+			return nativeCallResult{value: value}, true
+		case "println":
+			if len(args) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "println expects 1 argument", Span: span}}, true
+			}
+			fmt.Println(fmt.Sprint(args[0]))
+			return nativeCallResult{value: value}, true
+		}
+	}
+	return nativeCallResult{}, false
+}
+
+func nativeKey(value Value, span parser.Span, local *env, in *Interpreter) (string, error) {
+	switch v := value.(type) {
+	case int64:
+		return fmt.Sprintf("i:%d", v), nil
+	case float64:
+		return fmt.Sprintf("f:%g", v), nil
+	case bool:
+		if v {
+			return "b:true", nil
+		}
+		return "b:false", nil
+	case string:
+		return "s:" + v, nil
+	case rune:
+		return fmt.Sprintf("r:%d", v), nil
+	case *instance:
+		return fmt.Sprintf("o:%p", v), nil
+	default:
+		return "", RuntimeError{Message: "unsupported Map/Set key type", Span: span}
 	}
 }
 
@@ -941,8 +1218,35 @@ func asBool(value Value, span parser.Span) (bool, error) {
 }
 
 func iterableToSlice(value Value) ([]Value, bool) {
-	items, ok := value.([]Value)
-	return items, ok
+	switch items := value.(type) {
+	case []Value:
+		return items, true
+	case *nativeList:
+		return items.items, true
+	case *nativeArray:
+		return items.items, true
+	case *nativeSet:
+		out := make([]Value, 0, len(items.order))
+		for _, key := range items.order {
+			out = append(out, items.keys[key])
+		}
+		return out, true
+	default:
+		return nil, false
+	}
+}
+
+func indexedItems(value Value) ([]Value, bool) {
+	switch items := value.(type) {
+	case []Value:
+		return items, true
+	case *nativeList:
+		return items.items, true
+	case *nativeArray:
+		return items.items, true
+	default:
+		return nil, false
+	}
 }
 
 func zeroValue(ref *parser.TypeRef) Value {
@@ -960,8 +1264,16 @@ func zeroValue(ref *parser.TypeRef) Value {
 		return ""
 	case "Rune":
 		return rune(0)
-	case "List", "Set", "Array":
-		return []Value{}
+	case "List":
+		return &nativeList{items: []Value{}}
+	case "Set":
+		return &nativeSet{keys: map[string]Value{}, order: []string{}}
+	case "Map":
+		return &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: []string{}}
+	case "Array":
+		return &nativeArray{items: []Value{}}
+	case "Term":
+		return &nativeTerm{}
 	default:
 		return nil
 	}

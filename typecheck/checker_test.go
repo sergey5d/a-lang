@@ -648,3 +648,27 @@ def run() Bool {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }
+
+func TestAnalyzeBuiltinCollectionAndTermInterfaces(t *testing.T) {
+	src := `
+def run() Int {
+	items List[Int] = List(1, 2)
+	items.append(3)
+
+	values Map[String, Int] = Map("a" : 1)
+	values.set("b", 2)
+
+	seen Set[Int] = Set(1, 2)
+	if seen.contains(2) {
+		Term.println("ok")
+	}
+
+	return items.size() + values.get("a")
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}

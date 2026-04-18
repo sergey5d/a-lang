@@ -76,9 +76,93 @@ func Analyze(program *parser.Program) Result {
 		interfaces: map[string]interfaceInfo{},
 		exprTypes:  map[parser.Expr]*Type{},
 	}
+	c.installBuiltinInterfaces()
 	c.collectDecls(program)
 	c.checkProgram(program)
 	return Result{Diagnostics: c.diagnostics, ExprTypes: c.exprTypes}
+}
+
+func (c *Checker) installBuiltinInterfaces() {
+	for name, info := range builtinInterfaceInfos() {
+		c.interfaces[name] = info
+	}
+}
+
+func builtinInterfaceInfos() map[string]interfaceInfo {
+	out := map[string]interfaceInfo{}
+
+	listDecl := &parser.InterfaceDecl{
+		Name:           "List",
+		TypeParameters: []parser.TypeParameter{{Name: "T"}},
+		Methods: []parser.InterfaceMethod{
+			{Name: "append", Parameters: []parser.Parameter{{Name: "value", Type: namedType("T")}}, ReturnType: genericType("List", "T")},
+			{Name: "get", Parameters: []parser.Parameter{{Name: "index", Type: namedType("Int")}}, ReturnType: namedType("T")},
+			{Name: "size", Parameters: nil, ReturnType: namedType("Int")},
+		},
+	}
+	out["List"] = interfaceInfo{decl: listDecl, methods: map[string]interfaceMethodInfo{
+		"append": {decl: listDecl.Methods[0]},
+		"get":    {decl: listDecl.Methods[1]},
+		"size":   {decl: listDecl.Methods[2]},
+	}}
+
+	setDecl := &parser.InterfaceDecl{
+		Name:           "Set",
+		TypeParameters: []parser.TypeParameter{{Name: "T"}},
+		Methods: []parser.InterfaceMethod{
+			{Name: "add", Parameters: []parser.Parameter{{Name: "value", Type: namedType("T")}}, ReturnType: genericType("Set", "T")},
+			{Name: "contains", Parameters: []parser.Parameter{{Name: "value", Type: namedType("T")}}, ReturnType: namedType("Bool")},
+			{Name: "size", Parameters: nil, ReturnType: namedType("Int")},
+		},
+	}
+	out["Set"] = interfaceInfo{decl: setDecl, methods: map[string]interfaceMethodInfo{
+		"add":      {decl: setDecl.Methods[0]},
+		"contains": {decl: setDecl.Methods[1]},
+		"size":     {decl: setDecl.Methods[2]},
+	}}
+
+	mapDecl := &parser.InterfaceDecl{
+		Name:           "Map",
+		TypeParameters: []parser.TypeParameter{{Name: "K"}, {Name: "V"}},
+		Methods: []parser.InterfaceMethod{
+			{Name: "set", Parameters: []parser.Parameter{{Name: "key", Type: namedType("K")}, {Name: "value", Type: namedType("V")}}, ReturnType: genericType("Map", "K", "V")},
+			{Name: "get", Parameters: []parser.Parameter{{Name: "key", Type: namedType("K")}}, ReturnType: namedType("V")},
+			{Name: "contains", Parameters: []parser.Parameter{{Name: "key", Type: namedType("K")}}, ReturnType: namedType("Bool")},
+			{Name: "size", Parameters: nil, ReturnType: namedType("Int")},
+		},
+	}
+	out["Map"] = interfaceInfo{decl: mapDecl, methods: map[string]interfaceMethodInfo{
+		"set":      {decl: mapDecl.Methods[0]},
+		"get":      {decl: mapDecl.Methods[1]},
+		"contains": {decl: mapDecl.Methods[2]},
+		"size":     {decl: mapDecl.Methods[3]},
+	}}
+
+	termDecl := &parser.InterfaceDecl{
+		Name: "Term",
+		Methods: []parser.InterfaceMethod{
+			{Name: "print", Parameters: []parser.Parameter{{Name: "value", Type: namedType("String")}}, ReturnType: namedType("Term")},
+			{Name: "println", Parameters: []parser.Parameter{{Name: "value", Type: namedType("String")}}, ReturnType: namedType("Term")},
+		},
+	}
+	out["Term"] = interfaceInfo{decl: termDecl, methods: map[string]interfaceMethodInfo{
+		"print":   {decl: termDecl.Methods[0]},
+		"println": {decl: termDecl.Methods[1]},
+	}}
+
+	return out
+}
+
+func namedType(name string) *parser.TypeRef {
+	return &parser.TypeRef{Name: name}
+}
+
+func genericType(name string, args ...string) *parser.TypeRef {
+	ref := &parser.TypeRef{Name: name}
+	for _, arg := range args {
+		ref.Arguments = append(ref.Arguments, namedType(arg))
+	}
+	return ref
 }
 
 func (c *Checker) collectDecls(program *parser.Program) {
@@ -435,6 +519,10 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			result = &Type{Kind: TypeClass, Name: e.Name}
 			break
 		}
+		if e.Name == "Term" {
+			result = &Type{Kind: TypeInterface, Name: "Term"}
+			break
+		}
 		if isBuiltinValue(e.Name) {
 			result = unknownType
 			break
@@ -453,7 +541,7 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		result = builtin("String")
 	case *parser.ListLiteral:
 		if len(e.Elements) == 0 {
-			result = &Type{Kind: TypeBuiltin, Name: "List", Args: []*Type{unknownType}}
+			result = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{unknownType}}
 			break
 		}
 		elemType := c.checkExpr(e.Elements[0])
@@ -463,7 +551,7 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 				c.addDiagnostic("type_mismatch", "list literal elements must have the same type", exprSpan(elem))
 			}
 		}
-		result = &Type{Kind: TypeBuiltin, Name: "List", Args: []*Type{elemType}}
+		result = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{elemType}}
 	case *parser.GroupExpr:
 		result = c.checkExpr(e.Inner)
 	case *parser.UnaryExpr:
@@ -505,6 +593,9 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 
 func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 	if ident, ok := call.Callee.(*parser.Identifier); ok {
+		if isBuiltinValue(ident.Name) {
+			return c.checkBuiltinConstructorCall(ident.Name, call)
+		}
 		if class, ok := c.classes[ident.Name]; ok {
 			return c.checkConstructorCall(class, call)
 		}
@@ -535,6 +626,79 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 		argType = c.checkExpr(arg)
 	}
 	return sig.ReturnType
+}
+
+func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr) *Type {
+	switch name {
+	case "List":
+		if len(call.Args) == 0 {
+			return &Type{Kind: TypeInterface, Name: "List", Args: []*Type{unknownType}}
+		}
+		elemType := c.checkExpr(call.Args[0])
+		for _, arg := range call.Args[1:] {
+			argType := c.checkExpr(arg)
+			if !sameType(elemType, argType) {
+				c.addDiagnostic("type_mismatch", "List constructor arguments must have the same type", exprSpan(arg))
+			}
+		}
+		return &Type{Kind: TypeInterface, Name: "List", Args: []*Type{elemType}}
+	case "Set":
+		if len(call.Args) == 0 {
+			return &Type{Kind: TypeInterface, Name: "Set", Args: []*Type{unknownType}}
+		}
+		elemType := c.checkExpr(call.Args[0])
+		for _, arg := range call.Args[1:] {
+			argType := c.checkExpr(arg)
+			if !sameType(elemType, argType) {
+				c.addDiagnostic("type_mismatch", "Set constructor arguments must have the same type", exprSpan(arg))
+			}
+		}
+		return &Type{Kind: TypeInterface, Name: "Set", Args: []*Type{elemType}}
+	case "Map":
+		if len(call.Args) == 0 {
+			return &Type{Kind: TypeInterface, Name: "Map", Args: []*Type{unknownType, unknownType}}
+		}
+		keyType := unknownType
+		valType := unknownType
+		for i, arg := range call.Args {
+			pair, ok := arg.(*parser.BinaryExpr)
+			if !ok || pair.Operator != ":" {
+				c.addDiagnostic("invalid_argument_type", "Map constructor expects key : value pairs", exprSpan(arg))
+				c.checkExpr(arg)
+				continue
+			}
+			leftType := c.checkExpr(pair.Left)
+			rightType := c.checkExpr(pair.Right)
+			if i == 0 {
+				keyType, valType = leftType, rightType
+				continue
+			}
+			if !sameType(keyType, leftType) {
+				c.addDiagnostic("type_mismatch", "Map constructor keys must have the same type", exprSpan(pair.Left))
+			}
+			if !sameType(valType, rightType) {
+				c.addDiagnostic("type_mismatch", "Map constructor values must have the same type", exprSpan(pair.Right))
+			}
+		}
+		return &Type{Kind: TypeInterface, Name: "Map", Args: []*Type{keyType, valType}}
+	case "Array":
+		if len(call.Args) == 0 {
+			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
+		}
+		elemType := c.checkExpr(call.Args[0])
+		for _, arg := range call.Args[1:] {
+			argType := c.checkExpr(arg)
+			if !sameType(elemType, argType) {
+				c.addDiagnostic("type_mismatch", "Array constructor arguments must have the same type", exprSpan(arg))
+			}
+		}
+		return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{elemType}}
+	default:
+		for _, arg := range call.Args {
+			c.checkExpr(arg)
+		}
+		return unknownType
+	}
 }
 
 func (c *Checker) checkIndexExpr(expr *parser.IndexExpr) *Type {
@@ -1288,11 +1452,11 @@ func (c *Checker) kindOf(name string) TypeKind {
 			return kind
 		}
 	}
+	if isBuiltinInterfaceType(name) {
+		return TypeInterface
+	}
 	if isBuiltinType(name) {
 		return TypeBuiltin
-	}
-	if name == "Eq" {
-		return TypeInterface
 	}
 	if _, ok := c.classes[name]; ok {
 		return TypeClass
@@ -1311,7 +1475,16 @@ func builtin(name string) *Type { return &Type{Kind: TypeBuiltin, Name: name} }
 
 func isBuiltinType(name string) bool {
 	switch name {
-	case "Int", "Int64", "Bool", "String", "Rune", "Float", "Float64", "List", "Set", "Array", "Map":
+	case "Int", "Int64", "Bool", "String", "Rune", "Float", "Float64", "Array":
+		return true
+	default:
+		return false
+	}
+}
+
+func isBuiltinInterfaceType(name string) bool {
+	switch name {
+	case "Eq", "List", "Set", "Map", "Term":
 		return true
 	default:
 		return false
@@ -1320,7 +1493,7 @@ func isBuiltinType(name string) bool {
 
 func isBuiltinValue(name string) bool {
 	switch name {
-	case "Map", "Set", "Array":
+	case "List", "Map", "Set", "Array":
 		return true
 	default:
 		return false

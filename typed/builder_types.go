@@ -73,7 +73,11 @@ func (b *typeRefBuilder) BuildType(ref *parser.TypeRef) *typecheck.Type {
 // kindOf classifies a type name using the known declarations in context.
 func (b *typeRefBuilder) kindOf(name string) typecheck.TypeKind {
 	switch name {
-	case "Int", "Float", "Bool", "String", "Rune", "Decimal", "List", "Array", "Map", "Set":
+	case "List", "Map", "Set", "Term", "Eq":
+		return typecheck.TypeInterface
+	}
+	switch name {
+	case "Int", "Float", "Bool", "String", "Rune", "Decimal", "Array":
 		return typecheck.TypeBuiltin
 	}
 	if _, ok := b.ctx.classes[name]; ok {

@@ -1,6 +1,8 @@
 package interpreter
 
 import (
+	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -249,5 +251,50 @@ def run() Bool {
 	}
 	if value != true {
 		t.Fatalf("expected true, got %#v", value)
+	}
+}
+
+func TestBuiltinCollectionsAndTerm(t *testing.T) {
+	src := `
+def run() Int {
+	items = List(1, 2)
+	items.append(3)
+
+	values = Map("a" : 1)
+	values.set("b", 2)
+
+	seen = Set(1, 2)
+	if seen.contains(2) {
+		Term.println("ok")
+	}
+
+	return items.size() + values.get("a") + values.size() + seen.size()
+}
+`
+
+	in := New(parseProgram(t, src))
+
+	oldStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe returned error: %v", err)
+	}
+	os.Stdout = writer
+
+	value, callErr := in.Call("run")
+
+	_ = writer.Close()
+	os.Stdout = oldStdout
+	output, _ := io.ReadAll(reader)
+	_ = reader.Close()
+
+	if callErr != nil {
+		t.Fatalf("Call returned error: %v", callErr)
+	}
+	if value != int64(8) {
+		t.Fatalf("expected 8, got %#v", value)
+	}
+	if strings.TrimSpace(string(output)) != "ok" {
+		t.Fatalf("expected Term output 'ok', got %q", string(output))
 	}
 }
