@@ -729,6 +729,9 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.Expr, args []V
 		}
 		return &nativeList{items: append([]Value(nil), args...)}, nil
 	case "Array":
+		if len(argExprs) != 1 {
+			return nil, RuntimeError{Message: fmt.Sprintf("Array constructor expects 1 argument, got %d", len(argExprs)), Span: span}
+		}
 		if args == nil {
 			args = make([]Value, len(argExprs))
 			for i, arg := range argExprs {
@@ -739,7 +742,14 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.Expr, args []V
 				args[i] = value
 			}
 		}
-		return &nativeArray{items: append([]Value(nil), args...)}, nil
+		length, ok := args[0].(int64)
+		if !ok {
+			return nil, RuntimeError{Message: "Array constructor length must be Int", Span: exprSpan(argExprs[0])}
+		}
+		if length < 0 {
+			return nil, RuntimeError{Message: "Array constructor length must be non-negative", Span: exprSpan(argExprs[0])}
+		}
+		return &nativeArray{items: make([]Value, int(length))}, nil
 	case "Set":
 		if args == nil {
 			args = make([]Value, len(argExprs))
@@ -798,6 +808,8 @@ func (in *Interpreter) nativeHasMethod(receiver Value, name string) bool {
 	switch receiver.(type) {
 	case *nativeList:
 		return name == "append" || name == "get" || name == "size"
+	case *nativeArray:
+		return name == "size"
 	case *nativeSet:
 		return name == "add" || name == "contains" || name == "size"
 	case *nativeMap:
@@ -831,6 +843,14 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 				return nativeCallResult{err: RuntimeError{Message: "index out of bounds", Span: span}}, true
 			}
 			return nativeCallResult{value: value.items[index]}, true
+		case "size":
+			if len(args) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
+			}
+			return nativeCallResult{value: int64(len(value.items))}, true
+		}
+	case *nativeArray:
+		switch name {
 		case "size":
 			if len(args) != 0 {
 				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true

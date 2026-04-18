@@ -672,3 +672,33 @@ def run() Int {
 		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
 	}
 }
+
+func TestAnalyzeArrayConstructorAndSize(t *testing.T) {
+	src := `
+def run() Int {
+	values Array[Int] = Array(5)
+	return values.size()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeInvalidArrayConstructor(t *testing.T) {
+	src := `
+def run() Array[Int] {
+	return Array(1, 2)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if result.Diagnostics[0].Code != "invalid_argument_count" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}

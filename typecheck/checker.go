@@ -682,17 +682,16 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 		}
 		return &Type{Kind: TypeInterface, Name: "Map", Args: []*Type{keyType, valType}}
 	case "Array":
-		if len(call.Args) == 0 {
+		if len(call.Args) != 1 {
+			for _, arg := range call.Args {
+				c.checkExpr(arg)
+			}
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Array constructor expects 1 argument, got %d", len(call.Args)), call.Span)
 			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
 		}
-		elemType := c.checkExpr(call.Args[0])
-		for _, arg := range call.Args[1:] {
-			argType := c.checkExpr(arg)
-			if !sameType(elemType, argType) {
-				c.addDiagnostic("type_mismatch", "Array constructor arguments must have the same type", exprSpan(arg))
-			}
-		}
-		return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{elemType}}
+		lengthType := c.checkExpr(call.Args[0])
+		c.requireAssignable(lengthType, builtin("Int"), exprSpan(call.Args[0]), "invalid_argument_type", "Array constructor length must be Int")
+		return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
 	default:
 		for _, arg := range call.Args {
 			c.checkExpr(arg)
@@ -745,6 +744,18 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr)
 	argTypes := c.checkArgTypes(args)
 	if isUnknown(receiverType) {
 		return unknownType
+	}
+	if receiverType.Kind == TypeBuiltin && receiverType.Name == "Array" {
+		switch member.Name {
+		case "size":
+			if len(argTypes) != 0 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 0, len(argTypes)), member.Span)
+			}
+			return builtin("Int")
+		default:
+			c.addDiagnostic("unknown_member", "unknown member '"+member.Name+"'", member.Span)
+			return unknownType
+		}
 	}
 	switch receiverType.Kind {
 	case TypeClass:
@@ -853,6 +864,13 @@ func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
 func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*Type, bool) {
 	if isUnknown(receiver) {
 		return unknownType, true
+	}
+	if receiver.Kind == TypeBuiltin && receiver.Name == "Array" {
+		if name == "size" {
+			c.addDiagnostic("invalid_member_access", "method '"+name+"' must be called with ()", span)
+			return unknownType, true
+		}
+		return unknownType, false
 	}
 	switch receiver.Kind {
 	case TypeClass:

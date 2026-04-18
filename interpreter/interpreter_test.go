@@ -298,3 +298,22 @@ def run() Int {
 		t.Fatalf("expected Term output 'ok', got %q", string(output))
 	}
 }
+
+func TestArrayConstructorAndSize(t *testing.T) {
+	src := `
+def run() Int {
+	values = Array(5)
+	values[1] := 7
+	return values.size()
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(5) {
+		t.Fatalf("expected 5, got %#v", value)
+	}
+}
