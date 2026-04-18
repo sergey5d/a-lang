@@ -689,6 +689,12 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			return equal, nil
 		}
 		return applyBinary(e.Operator, left, right, e.Span)
+	case *parser.IsExpr:
+		left, err := in.evalExpr(e.Left, local)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeValueMatchesType(left, e.Target), nil
 	case *parser.CallExpr:
 		return in.evalCall(e, local)
 	case *parser.MemberExpr:
@@ -1277,7 +1283,13 @@ func runtimeValueMatchesType(value Value, ref *parser.TypeRef) bool {
 	if ref == nil {
 		return true
 	}
+	if len(ref.TupleElements) > 0 {
+		tuple, ok := value.(*nativeTuple)
+		return ok && len(ref.TupleElements) == len(tuple.items)
+	}
 	switch ref.Name {
+	case "Unit":
+		return value == nil
 	case "Int":
 		_, ok := value.(int64)
 		return ok
@@ -1308,16 +1320,19 @@ func runtimeValueMatchesType(value Value, ref *parser.TypeRef) bool {
 	case "Array":
 		_, ok := value.(*nativeArray)
 		return ok
-	case "Tuple":
-		tuple, ok := value.(*nativeTuple)
-		return ok && len(ref.TupleElements) == len(tuple.items)
+	case "Term":
+		_, ok := value.(*nativeTerm)
+		return ok
 	default:
-		if len(ref.TupleElements) > 0 {
-			tuple, ok := value.(*nativeTuple)
-			return ok && len(ref.TupleElements) == len(tuple.items)
-		}
 		if instanceValue, ok := value.(*instance); ok {
-			return instanceValue.class.Name == ref.Name
+			if instanceValue.class.Name == ref.Name {
+				return true
+			}
+			for _, impl := range instanceValue.class.Implements {
+				if impl.Name == ref.Name {
+					return true
+				}
+			}
 		}
 		return false
 	}

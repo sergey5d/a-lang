@@ -212,6 +212,29 @@ def run(values List[Int], flag Bool) Int {
 	}
 }
 
+func TestParseIsExpression(t *testing.T) {
+	src := `
+def run(value Any) Bool {
+	return value is String
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	ret := fn.Body.Statements[0].(*ReturnStmt)
+	isExpr, ok := ret.Value.(*IsExpr)
+	if !ok {
+		t.Fatalf("expected return value to be is expression, got %T", ret.Value)
+	}
+	if isExpr.Target == nil || isExpr.Target.Name != "String" {
+		t.Fatalf("expected is target String, got %#v", isExpr.Target)
+	}
+}
+
 func TestParseMethodWithoutReturnType(t *testing.T) {
 	src := `
 class Counter {

@@ -774,6 +774,23 @@ def run(values List[Int], flag Bool) Int {
 	}
 }
 
+func TestAnalyzeIsExpression(t *testing.T) {
+	src := `
+class Counter {
+}
+
+def run() Bool {
+	value = Counter()
+	return value is Counter
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeUnitLambda(t *testing.T) {
 	src := `
 def run() Int {

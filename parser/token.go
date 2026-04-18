@@ -22,6 +22,7 @@ const (
 	TokenPrivate    TokenType = "PRIVATE"
 	TokenDeferred   TokenType = "DEFERRED"
 	TokenIf         TokenType = "IF"
+	TokenIs         TokenType = "IS"
 	TokenElse       TokenType = "ELSE"
 	TokenLoop       TokenType = "LOOP"
 	TokenFor        TokenType = "FOR"
@@ -80,6 +81,7 @@ var keywords = map[string]TokenType{
 	"private":    TokenPrivate,
 	"deferred":   TokenDeferred,
 	"if":         TokenIf,
+	"is":         TokenIs,
 	"else":       TokenElse,
 	"loop":       TokenLoop,
 	"for":        TokenFor,

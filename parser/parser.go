@@ -95,6 +95,8 @@ func exprSpan(expr Expr) Span {
 		return e.Span
 	case *BinaryExpr:
 		return e.Span
+	case *IsExpr:
+		return e.Span
 	case *UnaryExpr:
 		return e.Span
 	case *GroupExpr:

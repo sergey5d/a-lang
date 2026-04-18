@@ -760,6 +760,10 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		left := c.checkExpr(e.Left)
 		right := c.checkExpr(e.Right)
 		result = c.checkBinaryOperation(left, right, e.Operator, e.Span)
+	case *parser.IsExpr:
+		c.checkExpr(e.Left)
+		c.resolveDeclaredType(e.Target)
+		result = builtin("Bool")
 	case *parser.CallExpr:
 		result = c.checkCall(e)
 	case *parser.MemberExpr:
@@ -1894,6 +1898,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.LambdaExpr:
 		return e.Span
 	case *parser.BinaryExpr:
+		return e.Span
+	case *parser.IsExpr:
 		return e.Span
 	case *parser.UnaryExpr:
 		return e.Span

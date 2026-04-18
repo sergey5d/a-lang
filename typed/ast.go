@@ -381,6 +381,15 @@ type BinaryExpr struct {
 
 func (*BinaryExpr) exprNode() {}
 
+// IsExpr is a typed runtime type-check expression.
+type IsExpr struct {
+	baseExpr
+	Left   Expr
+	Target *typecheck.Type
+}
+
+func (*IsExpr) exprNode() {}
+
 // FieldExpr is a typed field read with an optional resolved field symbol.
 type FieldExpr struct {
 	baseExpr

@@ -375,6 +375,15 @@ type BinaryExpr struct {
 
 func (*BinaryExpr) exprNode() {}
 
+// IsExpr checks whether a value conforms to a type at runtime.
+type IsExpr struct {
+	Left   Expr     `json:"left"`
+	Target *TypeRef `json:"target"`
+	Span   Span     `json:"span"`
+}
+
+func (*IsExpr) exprNode() {}
+
 // UnaryExpr applies a unary operator to one expression.
 type UnaryExpr struct {
 	Operator string `json:"operator"`

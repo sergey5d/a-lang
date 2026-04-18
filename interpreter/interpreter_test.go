@@ -718,3 +718,24 @@ def run() Int {
 		t.Fatalf("expected 5, got %#v", value)
 	}
 }
+
+func TestIsExpression(t *testing.T) {
+	src := `
+class Counter {
+}
+
+def run() Bool {
+	counter = Counter()
+	return counter is Counter && "x" is String && !(counter is String)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != true {
+		t.Fatalf("expected true, got %#v", value)
+	}
+}

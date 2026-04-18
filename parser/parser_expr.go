@@ -45,6 +45,24 @@ func (p *Parser) parseExpression(minPrec int) (Expr, error) {
 		}
 
 		op := p.peek().Type
+		if op == TokenIs {
+			prec := precedence(op)
+			if prec < minPrec {
+				break
+			}
+			p.advance()
+			target, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			left = &IsExpr{
+				Left:   left,
+				Target: target,
+				Span:   mergeSpans(exprSpan(left), typeSpan(target)),
+			}
+			continue
+		}
+
 		prec := precedence(op)
 		if prec < minPrec {
 			break
@@ -219,7 +237,7 @@ func precedence(t TokenType) int {
 		return 1
 	case TokenAndAnd:
 		return 2
-	case TokenEqEq, TokenBangEq:
+	case TokenEqEq, TokenBangEq, TokenIs:
 		return 3
 	case TokenLT, TokenLTE, TokenGT, TokenGTE:
 		return 4

@@ -324,6 +324,9 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 	case *parser.BinaryExpr:
 		r.resolveExpr(e.Left)
 		r.resolveExpr(e.Right)
+	case *parser.IsExpr:
+		r.resolveExpr(e.Left)
+		r.resolveTypeRef(e.Target)
 	case *parser.UnaryExpr:
 		r.resolveExpr(e.Right)
 	case *parser.GroupExpr:

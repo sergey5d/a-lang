@@ -52,6 +52,8 @@ func (b *exprBuilder) Build(expr parser.Expr) (Expr, error) {
 		return b.buildUnaryExpr(expr, e)
 	case *parser.BinaryExpr:
 		return b.buildBinaryExpr(expr, e)
+	case *parser.IsExpr:
+		return b.buildIsExpr(expr, e)
 	case *parser.MemberExpr:
 		return b.buildMemberExpr(expr, e)
 	case *parser.IndexExpr:
