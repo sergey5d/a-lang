@@ -1,16 +1,26 @@
 # EXPECT:
-# counter? true
-# string? true
-# wrong? false
+# value is Counter? true
+# counter is CounterPrecursor? true
+# string is String? true
+# value is String? false
+# counter is Breaker? false
 # 0
 
-class Counter {
+interface CounterPrecursor {
+}
+
+class Counter with CounterPrecursor {
+}
+
+interface Breaker {
 }
 
 def main() Int {
-	value = Counter()
-	Term.println("counter? " + (value is Counter))
-	Term.println("string? " + ("hello" is String))
-	Term.println("wrong? " + (value is String))
+	counter = Counter()
+	Term.println("value is Counter? " + (counter is Counter))
+	Term.println("counter is CounterPrecursor? " + (counter is CounterPrecursor))
+	Term.println("string is String? " + ("hello" is String))
+	Term.println("value is String? " + (counter is String))
+	Term.println("counter is Breaker? " + (counter is Breaker))
 	0
 }
