@@ -311,6 +311,24 @@ def run() Bool {
 	}
 }
 
+func TestZeroArgFunctionBindingSugar(t *testing.T) {
+	src := `
+def run() Int {
+	action () -> Int = 1
+	return action()
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(1) {
+		t.Fatalf("expected 1, got %#v", value)
+	}
+}
+
 func TestFunctionWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
 	src := `
 def suffix(value String) {

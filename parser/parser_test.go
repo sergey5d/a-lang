@@ -450,6 +450,24 @@ def run() Unit {
 	}
 }
 
+func TestParseZeroArgFunctionBindingSugar(t *testing.T) {
+	src := `
+def run() Unit {
+	action () -> Unit = Term.println("x")
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	stmt := program.Functions[0].Body.Statements[0].(*ValStmt)
+	if _, ok := stmt.Values[0].(*LambdaExpr); !ok {
+		t.Fatalf("expected lambda expression, got %T", stmt.Values[0])
+	}
+}
+
 func TestParseUnitFunctionType(t *testing.T) {
 	src := `
 def run(action () -> Unit) Unit {

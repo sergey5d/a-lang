@@ -817,6 +817,20 @@ def run() Unit {
 	}
 }
 
+func TestAnalyzeZeroArgFunctionBindingSugar(t *testing.T) {
+	src := `
+def run() Int {
+	action () -> Int = 1
+	return action()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeFunctionImplicitReturn(t *testing.T) {
 	src := `
 def suffix(value String) String {

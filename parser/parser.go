@@ -43,6 +43,24 @@ func implicitUnitType(span Span) *TypeRef {
 	return &TypeRef{Name: "Unit", Span: span}
 }
 
+func isZeroArgFunctionType(ref *TypeRef) bool {
+	return ref != nil && ref.ReturnType != nil && len(ref.ParameterTypes) == 0
+}
+
+func wrapThunkExpr(ref *TypeRef, expr Expr) Expr {
+	if !isZeroArgFunctionType(ref) {
+		return expr
+	}
+	if _, ok := expr.(*LambdaExpr); ok {
+		return expr
+	}
+	return &LambdaExpr{
+		Parameters: []LambdaParameter{},
+		Body:       expr,
+		Span:       exprSpan(expr),
+	}
+}
+
 func exprSpan(expr Expr) Span {
 	switch e := expr.(type) {
 	case *Identifier:
@@ -562,6 +580,11 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 	values, err := p.parseBindingInitializers(len(bindings))
 	if err != nil {
 		return nil, err
+	}
+	for i := range bindings {
+		if i < len(values) && values[i] != nil {
+			values[i] = wrapThunkExpr(bindings[i].Type, values[i])
+		}
 	}
 	stmt := &ValStmt{Bindings: bindings, Values: values}
 	stmt.Span = tokenSpan(start)
