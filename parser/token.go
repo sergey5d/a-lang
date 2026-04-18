@@ -23,6 +23,7 @@ const (
 	TokenDeferred   TokenType = "DEFERRED"
 	TokenIf         TokenType = "IF"
 	TokenElse       TokenType = "ELSE"
+	TokenLoop       TokenType = "LOOP"
 	TokenFor        TokenType = "FOR"
 	TokenYield      TokenType = "YIELD"
 	TokenReturn     TokenType = "RETURN"
@@ -80,6 +81,7 @@ var keywords = map[string]TokenType{
 	"deferred":   TokenDeferred,
 	"if":         TokenIf,
 	"else":       TokenElse,
+	"loop":       TokenLoop,
 	"for":        TokenFor,
 	"yield":      TokenYield,
 	"return":     TokenReturn,

@@ -146,7 +146,7 @@ def main() Int {
 
 	Term.println("result " + result)
 
-	for {
+	loop {
 	    if counter < 20 {
 	        Term.println("counter " + counter)
 	    } else {

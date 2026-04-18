@@ -23,6 +23,8 @@ func (l *Lowerer) lowerStmt(stmt typed.Stmt) ([]Stmt, error) {
 		return l.lowerAssignmentStmt(s)
 	case *typed.IfStmt:
 		return l.lowerIfStmt(s)
+	case *typed.LoopStmt:
+		return l.lowerLoopStmt(s)
 	case *typed.ForStmt:
 		return l.lowerForStmt(s)
 	case *typed.ReturnStmt:
@@ -114,16 +116,18 @@ func (l *Lowerer) lowerExprStmt(stmt *typed.ExprStmt) ([]Stmt, error) {
 	return []Stmt{&ExprStmt{Expr: expr}}, nil
 }
 
-func (l *Lowerer) lowerForStmt(stmt *typed.ForStmt) ([]Stmt, error) {
+func (l *Lowerer) lowerLoopStmt(stmt *typed.LoopStmt) ([]Stmt, error) {
 	body, err := l.lowerBlock(stmt.Body)
 	if err != nil {
 		return nil, err
 	}
-	if len(stmt.Bindings) == 0 {
-		if stmt.YieldBody != nil {
-			return nil, fmt.Errorf("yield loops without bindings are not supported")
-		}
-		return []Stmt{&Loop{Body: body}}, nil
+	return []Stmt{&Loop{Body: body}}, nil
+}
+
+func (l *Lowerer) lowerForStmt(stmt *typed.ForStmt) ([]Stmt, error) {
+	body, err := l.lowerBlock(stmt.Body)
+	if err != nil {
+		return nil, err
 	}
 	if stmt.YieldBody == nil {
 		return l.lowerForBindings(stmt.Bindings, body)

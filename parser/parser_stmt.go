@@ -29,6 +29,8 @@ func (p *Parser) parseStatement() (Statement, error) {
 	switch p.peek().Type {
 	case TokenIf:
 		return p.parseIfStmt()
+	case TokenLoop:
+		return p.parseLoopStmt()
 	case TokenFor:
 		return p.parseForStmt()
 	case TokenDef:
@@ -288,6 +290,15 @@ func (p *Parser) parseForStmt() (Statement, error) {
 	return p.parseForStmtAfterStart(start)
 }
 
+func (p *Parser) parseLoopStmt() (Statement, error) {
+	start := p.advance()
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &LoopStmt{Body: body, Span: mergeSpans(tokenSpan(start), body.Span)}, nil
+}
+
 func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 	if p.check(TokenIdentifier) && p.checkNext(TokenLeftArrow) {
 		binding, err := p.parseForBinding()
@@ -322,11 +333,7 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 			Span:      mergeSpans(tokenSpan(start), yieldBody.Span),
 		}, nil
 	}
-	body, err := p.parseBlock()
-	if err != nil {
-		return nil, err
-	}
-	return &ForStmt{Body: body, Span: mergeSpans(tokenSpan(start), body.Span)}, nil
+	return nil, fmt.Errorf("for loop requires bindings like 'for item <- items { ... }' or a yield form")
 }
 
 func (p *Parser) parseForBinding() (ForBinding, error) {

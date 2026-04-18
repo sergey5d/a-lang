@@ -292,6 +292,8 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			return in.execBlock(s.Else, local, self)
 		}
 		return nil, nil, nil
+	case *parser.LoopStmt:
+		return in.execLoop(s, local, self)
 	case *parser.ForStmt:
 		return in.execFor(s, local, self)
 	case *parser.ReturnStmt:
@@ -311,24 +313,6 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 }
 
 func (in *Interpreter) execFor(stmt *parser.ForStmt, local *env, self *instance) (Value, any, error) {
-	if len(stmt.Bindings) == 0 {
-		if stmt.YieldBody != nil {
-			return nil, nil, RuntimeError{Message: "yield loops without bindings are not supported", Span: stmt.Span}
-		}
-		for {
-			_, signal, err := in.execBlock(stmt.Body, local, self)
-			if err != nil {
-				return nil, nil, err
-			}
-			switch signal.(type) {
-			case nil:
-			case breakSignal:
-				return nil, nil, nil
-			default:
-				return nil, signal, nil
-			}
-		}
-	}
 	if stmt.YieldBody != nil {
 		var yielded []Value
 		signal, err := in.execForBindings(stmt.Bindings, 0, local, self, func(loopEnv *env) (any, error) {
@@ -365,6 +349,22 @@ func (in *Interpreter) execFor(stmt *parser.ForStmt, local *env, self *instance)
 		return nil, nil, nil
 	default:
 		return nil, signal, nil
+	}
+}
+
+func (in *Interpreter) execLoop(stmt *parser.LoopStmt, local *env, self *instance) (Value, any, error) {
+	for {
+		_, signal, err := in.execBlock(stmt.Body, local, self)
+		if err != nil {
+			return nil, nil, err
+		}
+		switch signal.(type) {
+		case nil:
+		case breakSignal:
+			return nil, nil, nil
+		default:
+			return nil, signal, nil
+		}
 	}
 }
 
@@ -1734,6 +1734,8 @@ func stmtSpan(stmt parser.Statement) parser.Span {
 	case *parser.MultiAssignmentStmt:
 		return s.Span
 	case *parser.IfStmt:
+		return s.Span
+	case *parser.LoopStmt:
 		return s.Span
 	case *parser.ForStmt:
 		return s.Span

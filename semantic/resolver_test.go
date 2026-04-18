@@ -35,7 +35,7 @@ def run(input Int) Bool {
 		}
 	}
 
-	for {
+	loop {
 		if acc == input {
 			break
 		}

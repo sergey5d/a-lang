@@ -129,7 +129,7 @@ def loops(input Int, value Int) Bool {
 		}
 	}
 
-	for {
+	loop {
 		break
 	}
 
@@ -155,9 +155,9 @@ def loops(input Int, value Int) Bool {
 		t.Fatalf("expected single-binding for loop, got %#v", first)
 	}
 
-	third := fn.Body.Statements[2].(*ForStmt)
-	if len(third.Bindings) != 0 || third.Body == nil {
-		t.Fatalf("expected infinite for loop, got %#v", third)
+	third := fn.Body.Statements[2].(*LoopStmt)
+	if third.Body == nil {
+		t.Fatalf("expected infinite loop, got %#v", third)
 	}
 
 	fourth := fn.Body.Statements[3].(*ForStmt)

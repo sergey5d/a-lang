@@ -176,7 +176,15 @@ type IfStmt struct {
 
 func (*IfStmt) statementNode() {}
 
-// ForStmt represents loop forms including foreach, infinite, and yield-style loops.
+// LoopStmt represents an infinite loop.
+type LoopStmt struct {
+	Body *BlockStmt `json:"body"`
+	Span Span       `json:"span"`
+}
+
+func (*LoopStmt) statementNode() {}
+
+// ForStmt represents foreach and yield-style loops.
 type ForStmt struct {
 	Bindings  []ForBinding `json:"bindings,omitempty"`
 	Body      *BlockStmt   `json:"body,omitempty"`

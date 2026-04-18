@@ -211,6 +211,15 @@ type IfStmt struct {
 func (*IfStmt) stmtNode()              {}
 func (s *IfStmt) GetSpan() parser.Span { return s.Span }
 
+// LoopStmt is a typed infinite loop.
+type LoopStmt struct {
+	Body *BlockStmt
+	Span parser.Span
+}
+
+func (*LoopStmt) stmtNode()              {}
+func (s *LoopStmt) GetSpan() parser.Span { return s.Span }
+
 // ForBinding is a typed loop binding with an inferred element type.
 type ForBinding struct {
 	Name     string

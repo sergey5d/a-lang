@@ -230,6 +230,12 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		if s.Else != nil {
 			r.resolveBlock(s.Else)
 		}
+	case *parser.LoopStmt:
+		r.pushScope()
+		r.loopDepth++
+		r.resolveBlockStatements(s.Body.Statements)
+		r.loopDepth--
+		r.popScope()
 	case *parser.ForStmt:
 		r.pushScope()
 		for _, binding := range s.Bindings {
