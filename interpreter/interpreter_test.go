@@ -152,6 +152,34 @@ def run() Int {
 	}
 }
 
+func TestMethodOverloadDispatch(t *testing.T) {
+	src := `
+class Adder {
+	def add(value Int) Int {
+		return value + 1
+	}
+
+	def add(value String) Int {
+		return 99
+	}
+}
+
+def run() Int {
+	adder Adder = Adder()
+	return adder.add("hehe")
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(99) {
+		t.Fatalf("expected 99, got %#v", value)
+	}
+}
+
 func TestMethodWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
 	src := `
 class Counter {

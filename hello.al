@@ -6,8 +6,24 @@ class Adder {
 	}
 
 	def add(value Int) Int {
+	    Term.println("value added int " + value)
 		this.base + value
 	}
+
+	def add(value String) Int {
+	    Term.println("value added string " + value)
+    	this.base + 4
+    }
+
+	def alterThemAll(items Int...) {
+    	    for item <- items {
+    	        increased = item + 5
+    	        Term.println("increased!", increased)
+    	        if increased != 9 {
+    	            break
+    	        }
+    	    }
+    }
 }
 
 class Bucket {
@@ -69,7 +85,11 @@ def run() Int {
 
 	lambdaResult Int = addBoost(counter)
 
-	adder Adder = Adder(10)
+	adder = Adder(10)
+	adder.alterThemAll(4, 5, 9)
+	adder.add(5)
+	adder.add("hehe")
+
 	methodResult Int = adder.add(lambdaResult)
 
 	Term.println("counter " + counter)

@@ -781,7 +781,7 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 		return nil, RuntimeError{Message: "member call requires class instance", Span: member.Span}
 	}
 	for _, method := range obj.class.Methods {
-		if method.Name == member.Name && acceptsArgCount(method.Parameters, len(args)) {
+		if method.Name == member.Name && runtimeMethodMatches(method, args) {
 			return in.callMethod(obj, method, args, local)
 		}
 	}
@@ -1198,6 +1198,68 @@ func expectedClosureArgs(fn *closure) string {
 		return fmt.Sprintf("at least %d", len(fn.params)-1)
 	}
 	return fmt.Sprintf("%d", len(fn.params))
+}
+
+func runtimeMethodMatches(method *parser.MethodDecl, args []Value) bool {
+	if !acceptsArgCount(method.Parameters, len(args)) {
+		return false
+	}
+	for i, arg := range args {
+		paramIndex := i
+		if len(method.Parameters) > 0 && method.Parameters[len(method.Parameters)-1].Variadic && paramIndex >= len(method.Parameters)-1 {
+			paramIndex = len(method.Parameters) - 1
+		}
+		if paramIndex >= len(method.Parameters) {
+			return false
+		}
+		if !runtimeValueMatchesType(arg, method.Parameters[paramIndex].Type) {
+			return false
+		}
+	}
+	return true
+}
+
+func runtimeValueMatchesType(value Value, ref *parser.TypeRef) bool {
+	if ref == nil {
+		return true
+	}
+	switch ref.Name {
+	case "Int":
+		_, ok := value.(int64)
+		return ok
+	case "Float":
+		_, ok := value.(float64)
+		return ok
+	case "Bool":
+		_, ok := value.(bool)
+		return ok
+	case "String":
+		_, ok := value.(string)
+		return ok
+	case "Rune":
+		_, ok := value.(rune)
+		return ok
+	case "List":
+		_, ok := value.(*nativeList)
+		return ok
+	case "Set":
+		_, ok := value.(*nativeSet)
+		return ok
+	case "Map":
+		_, ok := value.(*nativeMap)
+		return ok
+	case "Option":
+		_, ok := value.(*nativeOption)
+		return ok
+	case "Array":
+		_, ok := value.(*nativeArray)
+		return ok
+	default:
+		if instanceValue, ok := value.(*instance); ok {
+			return instanceValue.class.Name == ref.Name
+		}
+		return false
+	}
 }
 
 func applyBinary(op string, left, right Value, span parser.Span) (Value, error) {
