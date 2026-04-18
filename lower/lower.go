@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"a-lang/parser"
 	"a-lang/typecheck"
 	"a-lang/typed"
 )
@@ -16,14 +15,6 @@ type Lowerer struct {
 func ProgramFromTyped(program *typed.Program) (*Program, error) {
 	l := &Lowerer{}
 	return l.lowerProgram(program)
-}
-
-func ProgramFromAST(program *parser.Program, types typecheck.Result) (*Program, error) {
-	typedProgram, err := typed.Build(program, types)
-	if err != nil {
-		return nil, err
-	}
-	return ProgramFromTyped(typedProgram)
 }
 
 func (l *Lowerer) lowerProgram(program *typed.Program) (*Program, error) {

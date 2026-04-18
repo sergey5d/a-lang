@@ -16,13 +16,13 @@ class Adder {
     }
 
 	def alterThemAll(items Int...) {
-    	    for item <- items {
-    	        increased = item + 5
-    	        Term.println("increased!", increased)
-    	        if increased != 9 {
-    	            break
-    	        }
+    	for item <- items {
+    	    increased = item + 5
+    	    Term.println("increased!", increased)
+    	    if increased != 9 {
+    	        break
     	    }
+        }
     }
 
     def tupleFun() (Int, String) = (1, "fun")
