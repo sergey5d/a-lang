@@ -1,0 +1,249 @@
+package parser
+
+func (p *Parser) parseTypeRef() (*TypeRef, error) {
+	if p.check(TokenLParen) {
+		return p.parseParenTypeRef()
+	}
+	return p.parseArrowTypeRef()
+}
+
+func (p *Parser) parseArrowTypeRef() (*TypeRef, error) {
+	left, err := p.parseNamedTypeRef()
+	if err != nil {
+		return nil, err
+	}
+	if p.match(TokenArrow) {
+		returnType, err := p.parseTypeRef()
+		if err != nil {
+			return nil, err
+		}
+		return &TypeRef{
+			ParameterTypes: []*TypeRef{left},
+			ReturnType:     returnType,
+			Span:           mergeSpans(left.Span, typeSpan(returnType)),
+		}, nil
+	}
+	return left, nil
+}
+
+func (p *Parser) parseNamedTypeRef() (*TypeRef, error) {
+	name, err := p.consume(TokenIdentifier, "expected type name")
+	if err != nil {
+		return nil, err
+	}
+	ref := &TypeRef{Name: name.Lexeme, Span: tokenSpan(name)}
+	if p.match(TokenLBracket) {
+		for {
+			arg, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			ref.Arguments = append(ref.Arguments, arg)
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+		end, err := p.consume(TokenRBracket, "expected ']' after type arguments")
+		if err != nil {
+			return nil, err
+		}
+		ref.Span = mergeSpans(ref.Span, tokenSpan(end))
+	}
+	return ref, nil
+}
+
+func (p *Parser) parseParenTypeRef() (*TypeRef, error) {
+	start, err := p.consume(TokenLParen, "expected '('")
+	if err != nil {
+		return nil, err
+	}
+	var params []*TypeRef
+	var names []string
+	hasNames := false
+	if !p.check(TokenRParen) {
+		for {
+			name := ""
+			if p.isNamedTupleElementStartAt(p.pos) {
+				nameToken, err := p.consume(TokenIdentifier, "expected tuple element name")
+				if err != nil {
+					return nil, err
+				}
+				name = nameToken.Lexeme
+				hasNames = true
+			}
+			param, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, param)
+			names = append(names, name)
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+	}
+	if _, err := p.consume(TokenRParen, "expected ')' after function type parameters"); err != nil {
+		return nil, err
+	}
+	if !p.match(TokenArrow) {
+		if len(params) == 1 && !hasNames {
+			return params[0], nil
+		}
+		tupleNames := []string(nil)
+		if hasNames {
+			tupleNames = names
+		}
+		return &TypeRef{
+			Name:          "Tuple",
+			TupleElements: params,
+			TupleNames:    tupleNames,
+			Span:          mergeSpans(tokenSpan(start), tokenSpan(p.previous())),
+		}, nil
+	}
+	returnType, err := p.parseTypeRef()
+	if err != nil {
+		return nil, err
+	}
+	return &TypeRef{
+		ParameterTypes: params,
+		ReturnType:     returnType,
+		Span:           mergeSpans(tokenSpan(start), typeSpan(returnType)),
+	}, nil
+}
+
+func (p *Parser) isNamedTupleElementStartAt(start int) bool {
+	if start >= len(p.tokens) || p.tokens[start].Type != TokenIdentifier {
+		return false
+	}
+	next := start + 1
+	if next >= len(p.tokens) {
+		return false
+	}
+	if p.tokens[next].Type != TokenIdentifier && p.tokens[next].Type != TokenLParen {
+		return false
+	}
+	end, ok := p.scanTypeRef(next)
+	if !ok || end >= len(p.tokens) {
+		return false
+	}
+	return p.tokens[end].Type == TokenComma || p.tokens[end].Type == TokenRParen
+}
+
+func (p *Parser) typeRefFollowedBy(tt TokenType) bool {
+	return p.typeRefFollowedByAt(p.pos, tt)
+}
+
+func (p *Parser) simpleTypeRefFollowedBy(tt TokenType) bool {
+	return p.simpleTypeRefFollowedByAt(p.pos, tt)
+}
+
+func (p *Parser) typeRefFollowedByAt(start int, tt TokenType) bool {
+	end, ok := p.scanTypeRef(start)
+	if !ok || end >= len(p.tokens) {
+		return false
+	}
+	return p.tokens[end].Type == tt
+}
+
+func (p *Parser) simpleTypeRefFollowedByAt(start int, tt TokenType) bool {
+	end, ok := p.scanSimpleTypeRef(start)
+	if !ok || end >= len(p.tokens) {
+		return false
+	}
+	return p.tokens[end].Type == tt
+}
+
+func (p *Parser) scanTypeRef(start int) (int, bool) {
+	if start >= len(p.tokens) {
+		return start, false
+	}
+	if p.tokens[start].Type == TokenLParen {
+		i := start + 1
+		if i < len(p.tokens) && p.tokens[i].Type != TokenRParen {
+			for {
+				if p.isNamedTupleElementStartAt(i) {
+					i++
+				}
+				var ok bool
+				i, ok = p.scanTypeRef(i)
+				if !ok || i >= len(p.tokens) {
+					return start, false
+				}
+				if p.tokens[i].Type == TokenComma {
+					i++
+					continue
+				}
+				if p.tokens[i].Type == TokenRParen {
+					i++
+					break
+				}
+				return start, false
+			}
+		} else if i < len(p.tokens) && p.tokens[i].Type == TokenRParen {
+			i++
+		} else {
+			return start, false
+		}
+		if i < len(p.tokens) && p.tokens[i].Type == TokenArrow {
+			return p.scanTypeRef(i + 1)
+		}
+		return i, true
+	}
+	if p.tokens[start].Type != TokenIdentifier {
+		return start, false
+	}
+	i := start + 1
+	if i < len(p.tokens) && p.tokens[i].Type == TokenLBracket {
+		i++
+		for {
+			var ok bool
+			i, ok = p.scanTypeRef(i)
+			if !ok {
+				return start, false
+			}
+			if i >= len(p.tokens) {
+				return start, false
+			}
+			if p.tokens[i].Type == TokenComma {
+				i++
+				continue
+			}
+			if p.tokens[i].Type == TokenRBracket {
+				i++
+				break
+			}
+			return start, false
+		}
+	}
+	if i < len(p.tokens) && p.tokens[i].Type == TokenArrow {
+		return p.scanTypeRef(i + 1)
+	}
+	return i, true
+}
+
+func (p *Parser) scanSimpleTypeRef(start int) (int, bool) {
+	if start >= len(p.tokens) || p.tokens[start].Type != TokenIdentifier {
+		return start, false
+	}
+	i := start + 1
+	if i < len(p.tokens) && p.tokens[i].Type == TokenLBracket {
+		i++
+		for {
+			var ok bool
+			i, ok = p.scanTypeRef(i)
+			if !ok || i >= len(p.tokens) {
+				return start, false
+			}
+			if p.tokens[i].Type == TokenComma {
+				i++
+				continue
+			}
+			if p.tokens[i].Type == TokenRBracket {
+				i++
+				break
+			}
+			return start, false
+		}
+	}
+	return i, true
+}
