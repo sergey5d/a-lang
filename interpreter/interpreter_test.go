@@ -321,6 +321,24 @@ def run() Int {
 	}
 }
 
+func TestStringConcatenation(t *testing.T) {
+	src := `
+def run() String {
+	count Int = 10
+	return "counter " + count
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "counter 10" {
+		t.Fatalf("expected %q, got %#v", "counter 10", value)
+	}
+}
+
 func TestArrayConstructorAndSize(t *testing.T) {
 	src := `
 def run() Int {

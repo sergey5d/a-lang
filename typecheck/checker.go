@@ -944,7 +944,19 @@ func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*
 
 func (c *Checker) checkBinaryOperation(left, right *Type, op string, span parser.Span) *Type {
 	switch op {
-	case "+", "-", "*", "/", "%":
+	case "+":
+		if sameType(left, builtin("String")) || sameType(right, builtin("String")) {
+			return builtin("String")
+		}
+		if !isNumeric(left) || !isNumeric(right) {
+			c.addDiagnostic("invalid_binary_operand", "operator + requires numeric operands unless one side is String", span)
+			return unknownType
+		}
+		if !sameType(left, right) {
+			c.addDiagnostic("type_mismatch", "arithmetic operands must have the same type", span)
+		}
+		return left
+	case "-", "*", "/", "%":
 		if !isNumeric(left) || !isNumeric(right) {
 			c.addDiagnostic("invalid_binary_operand", "arithmetic operators require numeric operands", span)
 			return unknownType

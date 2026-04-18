@@ -52,15 +52,13 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println(string(out))
-	case "run":
-		entry := "run"
-		var rawArgs []string
-		if len(os.Args) >= 4 {
-			entry = os.Args[3]
-			rawArgs = os.Args[4:]
-		} else {
-			rawArgs = os.Args[3:3]
-		}
+		case "run":
+			entry := "run"
+			rawArgs := []string{}
+			if len(os.Args) >= 4 {
+				entry = os.Args[3]
+				rawArgs = os.Args[4:]
+			}
 		entryFn := findFunction(program, entry)
 		if entryFn == nil {
 			fmt.Fprintf(os.Stderr, "unknown entry %q\n", entry)

@@ -691,6 +691,20 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeStringConcatenation(t *testing.T) {
+	src := `
+def run() String {
+	count Int = 10
+	return "counter " + count
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeArrayConstructorAndSize(t *testing.T) {
 	src := `
 def run() Int {
