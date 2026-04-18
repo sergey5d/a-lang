@@ -86,7 +86,7 @@ def add(a Int, b Int) Int {
 def run() Int {
 	value Int = add(true)
 	fixed Int = 1
-	fixed = 2
+	fixed := 2
 	return value
 }
 `
@@ -106,21 +106,25 @@ def run() Int {
 	}
 }
 
-func TestAnalyzeMutableReassignmentRequiresColonAssign(t *testing.T) {
+func TestAnalyzeConstructorFieldAssignmentAllowsEquals(t *testing.T) {
 	src := `
+class Box {
+	value Int
+
+	def init(value Int) {
+		this.value = value
+	}
+}
+
 def run() Int {
-	value Int := 1
-	value = 2
-	return value
+	box Box = Box(2)
+	return box.value
 }
 `
 
 	result := Analyze(parseProgram(t, src))
-	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
-	}
-	if result.Diagnostics[0].Code != "invalid_assignment_operator" {
-		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
 	}
 }
 
@@ -787,6 +791,22 @@ def sum(values Int...) Int {
 
 def run() Int {
 	sum(1, 2, 3)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeMultiAssignmentStmt(t *testing.T) {
+	src := `
+def run() Int {
+	a Int := 0
+	b String := ""
+	a, b := 1, "ok"
+	a
 }
 `
 

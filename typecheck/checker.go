@@ -503,6 +503,36 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			c.checkBinaryOperation(targetType, valueType, op, s.Span)
 		}
 		c.requireAssignable(valueType, targetType, s.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+targetType.String())
+	case *parser.MultiAssignmentStmt:
+		if len(s.Targets) != len(s.Values) {
+			c.addDiagnostic("invalid_assignment_count", fmt.Sprintf("assignment expects %d values, got %d", len(s.Targets), len(s.Values)), s.Span)
+		}
+		count := len(s.Targets)
+		if len(s.Values) < count {
+			count = len(s.Values)
+		}
+		for i := 0; i < count; i++ {
+			targetType, mutable := c.checkAssignmentTarget(s.Targets[i], s.Span)
+			valueType := c.checkExpr(s.Values[i])
+			if !mutable {
+				continue
+			}
+			if s.Operator == "=" && !c.allowEqualsAssignment(s.Targets[i]) {
+				c.addDiagnostic("invalid_assignment_operator", "use ':=' for mutable reassignment", s.Span)
+				continue
+			}
+			if s.Operator != "=" && s.Operator != ":=" {
+				c.addDiagnostic("invalid_assignment_operator", "multi-assignment supports only '=' and ':='", s.Span)
+				continue
+			}
+			c.requireAssignable(valueType, targetType, s.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+targetType.String())
+		}
+		for i := count; i < len(s.Targets); i++ {
+			c.checkAssignmentTarget(s.Targets[i], s.Span)
+		}
+		for i := count; i < len(s.Values); i++ {
+			c.checkExpr(s.Values[i])
+		}
 	case *parser.IfStmt:
 		condType := c.checkExpr(s.Condition)
 		c.requireAssignable(condType, builtin("Bool"), exprSpan(s.Condition), "invalid_condition_type", "if condition must be Bool")
@@ -1785,6 +1815,8 @@ func stmtSpan(stmt parser.Statement) parser.Span {
 	case *parser.LocalFunctionStmt:
 		return s.Span
 	case *parser.AssignmentStmt:
+		return s.Span
+	case *parser.MultiAssignmentStmt:
 		return s.Span
 	case *parser.IfStmt:
 		return s.Span

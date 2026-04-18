@@ -160,10 +160,10 @@ def run() Bool {
 `
 
 	diagnostics := Analyze(parseProgram(t, src))
-	if len(diagnostics) != 1 {
-		t.Fatalf("expected 1 diagnostic, got %#v", diagnostics)
+	if len(diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics, got %#v", diagnostics)
 	}
-	if diagnostics[0].Code != "assign_immutable" {
+	if diagnostics[0].Code != "duplicate_binding" {
 		t.Fatalf("unexpected diagnostic %#v", diagnostics[0])
 	}
 }

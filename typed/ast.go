@@ -188,6 +188,17 @@ type AssignmentStmt struct {
 func (*AssignmentStmt) stmtNode()              {}
 func (s *AssignmentStmt) GetSpan() parser.Span { return s.Span }
 
+// MultiAssignmentStmt is a typed write to multiple assignment targets.
+type MultiAssignmentStmt struct {
+	Targets  []Expr
+	Operator string
+	Values   []Expr
+	Span     parser.Span
+}
+
+func (*MultiAssignmentStmt) stmtNode()              {}
+func (s *MultiAssignmentStmt) GetSpan() parser.Span { return s.Span }
+
 // IfStmt is a typed if / else-if / else chain.
 type IfStmt struct {
 	Condition Expr

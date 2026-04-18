@@ -323,6 +323,26 @@ def run() Int {
 	}
 }
 
+func TestMultiAssignmentStmt(t *testing.T) {
+	src := `
+def run() Int {
+	a Int := 1
+	b Int := 2
+	a, b := b, a + b
+	a + b
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(5) {
+		t.Fatalf("expected 5, got %#v", value)
+	}
+}
+
 func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {

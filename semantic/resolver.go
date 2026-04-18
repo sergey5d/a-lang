@@ -213,6 +213,14 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		r.popScope()
 	case *parser.AssignmentStmt:
 		r.resolveAssignment(s)
+	case *parser.MultiAssignmentStmt:
+		for _, target := range s.Targets {
+			assign := &parser.AssignmentStmt{Target: target, Operator: s.Operator, Span: s.Span}
+			r.resolveAssignment(assign)
+		}
+		for _, value := range s.Values {
+			r.resolveExpr(value)
+		}
 	case *parser.IfStmt:
 		r.resolveExpr(s.Condition)
 		r.resolveBlock(s.Then)

@@ -153,6 +153,16 @@ type AssignmentStmt struct {
 
 func (*AssignmentStmt) statementNode() {}
 
+// MultiAssignmentStmt writes multiple values to multiple existing assignment targets.
+type MultiAssignmentStmt struct {
+	Targets  []Expr  `json:"targets"`
+	Operator string  `json:"operator"`
+	Values   []Expr  `json:"values"`
+	Span     Span    `json:"span"`
+}
+
+func (*MultiAssignmentStmt) statementNode() {}
+
 // IfStmt represents an if / else-if / else chain.
 type IfStmt struct {
 	Condition Expr       `json:"condition"`

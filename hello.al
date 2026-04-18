@@ -142,6 +142,20 @@ def run() Int {
         Term.println("item", item)
     }
 
+    var1, var2, var3 = 1, crapper, "5a7"
+
+    var4 Int, var5 Float, var6 = 120, 100., "5aa7"
+
+    var7, var8 = 800, adder.add(7) + 700
+
+    var9, var10 := 800, adder.add(7) + 700
+
+    Term.println(var1, var2, var3, var4, var5, var5, var6, var7, var8, var9, var10)
+
+    var9, var10 := 801, adder.add(7) + 701
+
+    Term.println(var1, var2, var3, var4, var5, var5, var6, var7, var8, var9, var10)
+
     bucket Bucket = Bucket(10)
 
     bucket.print()

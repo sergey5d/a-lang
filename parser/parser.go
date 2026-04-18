@@ -88,6 +88,8 @@ func stmtSpan(stmt Statement) Span {
 		return s.Span
 	case *AssignmentStmt:
 		return s.Span
+	case *MultiAssignmentStmt:
+		return s.Span
 	case *IfStmt:
 		return s.Span
 	case *ForStmt:
@@ -571,7 +573,11 @@ func (p *Parser) isBareBindingStart() bool {
 		return false
 	}
 
-	if p.checkNext(TokenAssign) || p.checkNext(TokenColonAssign) {
+	if p.checkNext(TokenAssign) {
+		return true
+	}
+
+	if p.checkNext(TokenColonAssign) {
 		return !p.isDeclared(p.peek().Lexeme)
 	}
 
@@ -584,9 +590,14 @@ func (p *Parser) isBareBindingStart() bool {
 
 func (p *Parser) bindingListFollowedByAssign(start int) bool {
 	i := start
+	sawType := false
+	sawUndeclared := false
 	for {
 		if i >= len(p.tokens) || p.tokens[i].Type != TokenIdentifier {
 			return false
+		}
+		if !p.isDeclared(p.tokens[i].Lexeme) {
+			sawUndeclared = true
 		}
 		i++
 		if i < len(p.tokens) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen) {
@@ -594,13 +605,17 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 			if !ok {
 				return false
 			}
+			sawType = true
 			i = end
 		}
 		if i >= len(p.tokens) {
 			return false
 		}
-		if p.tokens[i].Type == TokenAssign || p.tokens[i].Type == TokenColonAssign {
+		if p.tokens[i].Type == TokenAssign {
 			return true
+		}
+		if p.tokens[i].Type == TokenColonAssign {
+			return sawType || sawUndeclared
 		}
 		if p.tokens[i].Type != TokenComma {
 			return false
@@ -811,6 +826,33 @@ func (p *Parser) parseExprStmt() (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
+	if p.match(TokenComma) {
+		targets := []Expr{target}
+		for {
+			nextTarget, err := p.parseExpression(0)
+			if err != nil {
+				return nil, err
+			}
+			targets = append(targets, nextTarget)
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+		if !isAssignmentOperator(p.peek().Type) {
+			return nil, fmt.Errorf("expected assignment operator after assignment targets at %d:%d", p.peek().Line, p.peek().Column)
+		}
+		operator := p.advance()
+		values, err := p.parseAssignmentValues()
+		if err != nil {
+			return nil, err
+		}
+		return &MultiAssignmentStmt{
+			Targets:  targets,
+			Operator: operator.Lexeme,
+			Values:   values,
+			Span:     mergeSpans(exprSpan(targets[0]), exprSpan(values[len(values)-1])),
+		}, nil
+	}
 	if isAssignmentOperator(p.peek().Type) {
 		operator := p.advance()
 		value, err := p.parseExpression(0)
@@ -825,6 +867,21 @@ func (p *Parser) parseExprStmt() (Statement, error) {
 		}, nil
 	}
 	return &ExprStmt{Expr: target, Span: exprSpan(target)}, nil
+}
+
+func (p *Parser) parseAssignmentValues() ([]Expr, error) {
+	values := []Expr{}
+	for {
+		value, err := p.parseExpression(0)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+		if !p.match(TokenComma) {
+			break
+		}
+	}
+	return values, nil
 }
 
 func isAssignmentOperator(tt TokenType) bool {

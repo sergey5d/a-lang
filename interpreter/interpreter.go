@@ -252,6 +252,24 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			return nil, nil, err
 		}
 		return nil, nil, in.assign(s.Target, s.Operator, value, local)
+	case *parser.MultiAssignmentStmt:
+		if len(s.Targets) != len(s.Values) {
+			return nil, nil, RuntimeError{Message: fmt.Sprintf("assignment expects %d values, got %d", len(s.Targets), len(s.Values)), Span: s.Span}
+		}
+		values := make([]Value, len(s.Values))
+		for i, expr := range s.Values {
+			value, err := in.evalExpr(expr, local)
+			if err != nil {
+				return nil, nil, err
+			}
+			values[i] = value
+		}
+		for i, target := range s.Targets {
+			if err := in.assign(target, s.Operator, values[i], local); err != nil {
+				return nil, nil, err
+			}
+		}
+		return nil, nil, nil
 	case *parser.IfStmt:
 		cond, err := in.evalExpr(s.Condition, local)
 		if err != nil {
@@ -1550,6 +1568,8 @@ func stmtSpan(stmt parser.Statement) parser.Span {
 	case *parser.ValStmt:
 		return s.Span
 	case *parser.AssignmentStmt:
+		return s.Span
+	case *parser.MultiAssignmentStmt:
 		return s.Span
 	case *parser.IfStmt:
 		return s.Span

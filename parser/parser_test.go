@@ -322,6 +322,48 @@ def printAll(values String...) {
 	}
 }
 
+func TestParseMultiAssignmentStmt(t *testing.T) {
+	src := `
+def run() Int {
+	a Int := 0
+	b Int := 0
+	a, b := 1, 2
+	a
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	if _, ok := fn.Body.Statements[2].(*MultiAssignmentStmt); !ok {
+		t.Fatalf("expected multi assignment statement, got %T", fn.Body.Statements[2])
+	}
+}
+
+func TestParseDeclaredNamesWithEqualsAsBindings(t *testing.T) {
+	src := `
+def run() Int {
+	a Int := 0
+	b Int := 0
+	a, b = 1, 2
+	a
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	if _, ok := fn.Body.Statements[2].(*ValStmt); !ok {
+		t.Fatalf("expected binding statement, got %T", fn.Body.Statements[2])
+	}
+}
+
 func TestParseExtendedOperators(t *testing.T) {
 	src := `
 def ops(a Int, b Int) Bool {
