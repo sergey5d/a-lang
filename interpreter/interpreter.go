@@ -154,7 +154,7 @@ func (in *Interpreter) callFunction(fn *parser.FunctionDecl, args []Value, paren
 	if ret, ok := signal.(returnSignal); ok {
 		return in.coerceValueForTypeRef(fn.ReturnType, ret.value), nil
 	}
-	if fn.ReturnType == nil {
+	if fn.ReturnType == nil || isUnitTypeRef(fn.ReturnType) {
 		return nil, nil
 	}
 	return in.coerceValueForTypeRef(fn.ReturnType, value), nil
@@ -180,7 +180,7 @@ func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl,
 	if ret, ok := signal.(returnSignal); ok {
 		return in.coerceValueForTypeRef(method.ReturnType, ret.value), nil
 	}
-	if method.ReturnType == nil {
+	if method.ReturnType == nil || isUnitTypeRef(method.ReturnType) {
 		return nil, nil
 	}
 	return in.coerceValueForTypeRef(method.ReturnType, value), nil
@@ -555,6 +555,8 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		return e.Value, nil
 	case *parser.StringLiteral:
 		return e.Value, nil
+	case *parser.UnitLiteral:
+		return nil, nil
 	case *parser.ListLiteral:
 		items := make([]Value, len(e.Elements))
 		for i, item := range e.Elements {
@@ -781,6 +783,9 @@ func (in *Interpreter) callClosure(fn *closure, args []Value) (Value, error) {
 		if err != nil {
 			return nil, err
 		}
+		if isUnitTypeRef(fn.returnType) {
+			return nil, nil
+		}
 		return in.coerceValueForTypeRef(fn.returnType, value), nil
 	}
 	if fn.blockBody != nil {
@@ -790,6 +795,9 @@ func (in *Interpreter) callClosure(fn *closure, args []Value) (Value, error) {
 		}
 		if ret, ok := signal.(returnSignal); ok {
 			return in.coerceValueForTypeRef(fn.returnType, ret.value), nil
+		}
+		if isUnitTypeRef(fn.returnType) {
+			return nil, nil
 		}
 		return in.coerceValueForTypeRef(fn.returnType, value), nil
 	}
@@ -1604,9 +1612,16 @@ func (in *Interpreter) coerceValueForBinding(ref *parser.TypeRef, value Value) V
 	return in.coerceValueForTypeRef(ref, value)
 }
 
+func isUnitTypeRef(ref *parser.TypeRef) bool {
+	return ref != nil && ref.Name == "Unit" && len(ref.Arguments) == 0 && len(ref.TupleElements) == 0 && ref.ReturnType == nil
+}
+
 func (in *Interpreter) coerceValueForTypeRef(ref *parser.TypeRef, value Value) Value {
 	if ref == nil {
 		return value
+	}
+	if isUnitTypeRef(ref) {
+		return nil
 	}
 	tuple, ok := value.(*nativeTuple)
 	if !ok || len(ref.TupleElements) == 0 {
@@ -1685,6 +1700,8 @@ func zeroValue(ref *parser.TypeRef) Value {
 		return ""
 	case "Rune":
 		return rune(0)
+	case "Unit":
+		return nil
 	case "List":
 		return &nativeList{items: []Value{}}
 	case "Set":
@@ -1746,6 +1763,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.BoolLiteral:
 		return e.Span
 	case *parser.StringLiteral:
+		return e.Span
+	case *parser.UnitLiteral:
 		return e.Span
 	case *parser.ListLiteral:
 		return e.Span

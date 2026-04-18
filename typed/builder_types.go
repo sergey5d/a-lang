@@ -84,7 +84,7 @@ func (b *typeRefBuilder) kindOf(name string) typecheck.TypeKind {
 		return typecheck.TypeInterface
 	}
 	switch name {
-	case "Int", "Float", "Bool", "String", "Rune", "Decimal", "Array":
+	case "Int", "Float", "Bool", "String", "Rune", "Decimal", "Array", "Unit":
 		return typecheck.TypeBuiltin
 	}
 	if _, ok := b.ctx.classes[name]; ok {

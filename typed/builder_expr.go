@@ -36,6 +36,8 @@ func (b *exprBuilder) Build(expr parser.Expr) (Expr, error) {
 		return &BoolLiteral{baseExpr: b.base(expr), Value: e.Value}, nil
 	case *parser.StringLiteral:
 		return &StringLiteral{baseExpr: b.base(expr), Value: e.Value}, nil
+	case *parser.UnitLiteral:
+		return &UnitLiteral{baseExpr: b.base(expr)}, nil
 	case *parser.ListLiteral:
 		return b.buildListLiteral(expr, e)
 	case *parser.TupleLiteral:

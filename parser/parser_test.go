@@ -187,8 +187,8 @@ class Counter {
 	}
 
 	method := program.Classes[0].Methods[0]
-	if method.ReturnType != nil {
-		t.Fatalf("expected omitted return type, got %#v", method.ReturnType)
+	if method.ReturnType == nil || method.ReturnType.Name != "Unit" {
+		t.Fatalf("expected Unit return type, got %#v", method.ReturnType)
 	}
 }
 
@@ -223,6 +223,29 @@ class Counter {
 	}
 }
 
+func TestParseExplicitUnitDefs(t *testing.T) {
+	src := `
+def printIt() Unit = Term.println("x")
+
+class Counter {
+	def print() Unit = Term.println("y")
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	if program.Functions[0].ReturnType == nil || program.Functions[0].ReturnType.Name != "Unit" {
+		t.Fatalf("expected Unit return type for function, got %#v", program.Functions[0].ReturnType)
+	}
+	method := program.Classes[0].Methods[0]
+	if method.ReturnType == nil || method.ReturnType.Name != "Unit" {
+		t.Fatalf("expected Unit return type for method, got %#v", method.ReturnType)
+	}
+}
+
 func TestParseFunctionWithoutReturnType(t *testing.T) {
 	src := `
 def printIt() {
@@ -236,8 +259,8 @@ def printIt() {
 	}
 
 	fn := program.Functions[0]
-	if fn.ReturnType != nil {
-		t.Fatalf("expected omitted return type, got %#v", fn.ReturnType)
+	if fn.ReturnType == nil || fn.ReturnType.Name != "Unit" {
+		t.Fatalf("expected Unit return type, got %#v", fn.ReturnType)
 	}
 }
 
@@ -393,6 +416,58 @@ def run() (value Int, label String) {
 	}
 	if _, ok := stmt.Values[0].(*TupleLiteral); !ok {
 		t.Fatalf("expected tuple literal, got %T", stmt.Values[0])
+	}
+}
+
+func TestParseUnitAndGroupedParenExpr(t *testing.T) {
+	src := `
+def run() Unit {
+	unit = ()
+	value = (1)
+	pair = (1, 2)
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	body := program.Functions[0].Body.Statements
+	unitStmt := body[0].(*ValStmt)
+	if _, ok := unitStmt.Values[0].(*UnitLiteral); !ok {
+		t.Fatalf("expected unit literal, got %T", unitStmt.Values[0])
+	}
+
+	groupStmt := body[1].(*ValStmt)
+	if _, ok := groupStmt.Values[0].(*GroupExpr); !ok {
+		t.Fatalf("expected grouped expression, got %T", groupStmt.Values[0])
+	}
+
+	tupleStmt := body[2].(*ValStmt)
+	if _, ok := tupleStmt.Values[0].(*TupleLiteral); !ok {
+		t.Fatalf("expected tuple literal, got %T", tupleStmt.Values[0])
+	}
+}
+
+func TestParseUnitFunctionType(t *testing.T) {
+	src := `
+def run(action () -> Unit) Unit {
+	action()
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fnType := program.Functions[0].Parameters[0].Type
+	if fnType.ReturnType == nil || fnType.ReturnType.Name != "Unit" {
+		t.Fatalf("expected Unit return type, got %#v", fnType)
+	}
+	if len(fnType.ParameterTypes) != 0 {
+		t.Fatalf("expected zero-arg function type, got %#v", fnType.ParameterTypes)
 	}
 }
 

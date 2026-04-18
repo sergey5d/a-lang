@@ -253,6 +253,64 @@ def run() String {
 	}
 }
 
+func TestUnitLambda(t *testing.T) {
+	src := `
+def run() Int {
+	action () -> Unit = () -> Term.println("hi")
+	action()
+	return 0
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(0) {
+		t.Fatalf("expected 0, got %#v", value)
+	}
+}
+
+func TestExplicitUnitFunction(t *testing.T) {
+	src := `
+def log() Unit = "hello!"
+
+def run() Int {
+	log()
+	return 0
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(0) {
+		t.Fatalf("expected 0, got %#v", value)
+	}
+}
+
+func TestUnitLiteralAndGroupedExpr(t *testing.T) {
+	src := `
+def run() Bool {
+	unit Unit = ()
+	value Int = (1)
+	return value == 1
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != true {
+		t.Fatalf("expected true, got %#v", value)
+	}
+}
+
 func TestFunctionWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
 	src := `
 def suffix(value String) {

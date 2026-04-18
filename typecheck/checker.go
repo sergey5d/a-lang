@@ -261,6 +261,8 @@ func (c *Checker) checkGlobals(statements []parser.Statement) {
 				c.globals[bindingDecl.Name] = binding{typ: declType, mutable: bindingDecl.Mutable}
 				c.define(bindingDecl.Name, declType, bindingDecl.Mutable)
 			}
+		case *parser.ExprStmt, *parser.AssignmentStmt, *parser.MultiAssignmentStmt, *parser.IfStmt, *parser.ForStmt:
+			c.checkStmt(stmt)
 		default:
 			c.addDiagnostic("unsupported_top_level", "unsupported top-level statement for type checking", stmtSpan(stmt))
 		}
@@ -282,7 +284,7 @@ func (c *Checker) checkFunction(fn *parser.FunctionDecl) {
 		c.define(param.Name, paramType, false)
 	}
 	implicitReturn := c.checkBlock(fn.Body)
-	if fn.ReturnType != nil && !isUnknown(implicitReturn) {
+	if fn.ReturnType != nil && !isUnknown(implicitReturn) && !isUnitType(expectedReturn) {
 		c.requireAssignable(implicitReturn, expectedReturn, fn.Body.Span, "invalid_return_type", "cannot implicitly return "+implicitReturn.String()+" from function returning "+expectedReturn.String())
 	}
 }
@@ -350,7 +352,7 @@ func (c *Checker) checkMethod(method *parser.MethodDecl, owner *parser.ClassDecl
 		c.define(param.Name, paramType, false)
 	}
 	implicitReturn := c.checkBlock(method.Body)
-	if !method.Constructor && method.ReturnType != nil && !isUnknown(implicitReturn) {
+	if !method.Constructor && method.ReturnType != nil && !isUnknown(implicitReturn) && !isUnitType(expectedReturn) {
 		c.requireAssignable(implicitReturn, expectedReturn, method.Body.Span, "invalid_return_type", "cannot implicitly return "+implicitReturn.String()+" from method returning "+expectedReturn.String())
 	}
 }
@@ -549,7 +551,7 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			c.define(param.Name, paramType, false)
 		}
 		implicitReturn := c.checkBlock(s.Function.Body)
-		if s.Function.ReturnType != nil && !isUnknown(implicitReturn) {
+		if s.Function.ReturnType != nil && !isUnknown(implicitReturn) && !isUnitType(expectedReturn) {
 			c.requireAssignable(implicitReturn, expectedReturn, s.Function.Body.Span, "invalid_return_type", "cannot implicitly return "+implicitReturn.String()+" from function returning "+expectedReturn.String())
 		}
 	case *parser.AssignmentStmt:
@@ -617,16 +619,17 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		}
 		c.popScope()
 	case *parser.ReturnStmt:
-		expectedReturn := unknownType
-		if len(c.returnTypes) > 0 {
-			expectedReturn = c.returnTypes[len(c.returnTypes)-1]
-		}
-		valueType := c.checkExprWithExpected(s.Value, expectedReturn)
 		if len(c.returnTypes) == 0 {
 			c.addDiagnostic("invalid_return", "return used outside callable body", s.Span)
 			return
 		}
 		expected := c.returnTypes[len(c.returnTypes)-1]
+		if isUnitType(expected) {
+			valueType := c.checkExpr(s.Value)
+			c.addDiagnostic("invalid_return_type", "cannot explicitly return "+valueType.String()+" from function returning Unit", s.Span)
+			return
+		}
+		valueType := c.checkExprWithExpected(s.Value, expected)
 		if isUnknown(expected) {
 			c.returnTypes[len(c.returnTypes)-1] = valueType
 			return
@@ -710,6 +713,8 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		result = builtin("Bool")
 	case *parser.StringLiteral:
 		result = builtin("String")
+	case *parser.UnitLiteral:
+		result = builtin("Unit")
 	case *parser.ListLiteral:
 		if len(e.Elements) == 0 {
 			result = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{unknownType}}
@@ -1064,7 +1069,9 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr, expected *Type) *Type
 	if expr.Body != nil {
 		returnType = c.checkExpr(expr.Body)
 		if expectedSig != nil && !isUnknown(expectedSig.ReturnType) {
-			c.requireAssignable(returnType, expectedSig.ReturnType, exprSpan(expr.Body), "invalid_lambda_type", "lambda body does not match expected return type")
+			if !isUnitType(expectedSig.ReturnType) {
+				c.requireAssignable(returnType, expectedSig.ReturnType, exprSpan(expr.Body), "invalid_lambda_type", "lambda body does not match expected return type")
+			}
 			returnType = expectedSig.ReturnType
 		}
 	}
@@ -1080,7 +1087,7 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr, expected *Type) *Type
 		if !isUnknown(implicitReturn) {
 			if isUnknown(returnType) {
 				returnType = implicitReturn
-			} else {
+			} else if !isUnitType(returnType) {
 				c.requireAssignable(implicitReturn, returnType, expr.BlockBody.Span, "invalid_lambda_type", "lambda body does not match expected return type")
 			}
 		}
@@ -1793,9 +1800,13 @@ func functionType(name string, sig Signature) *Type {
 
 func builtin(name string) *Type { return &Type{Kind: TypeBuiltin, Name: name} }
 
+func isUnitType(t *Type) bool {
+	return t != nil && t.Kind == TypeBuiltin && t.Name == "Unit"
+}
+
 func isBuiltinType(name string) bool {
 	switch name {
-	case "Int", "Int64", "Bool", "String", "Rune", "Float", "Float64", "Array":
+	case "Int", "Int64", "Bool", "String", "Rune", "Float", "Float64", "Array", "Unit":
 		return true
 	default:
 		return false
@@ -1859,6 +1870,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.BoolLiteral:
 		return e.Span
 	case *parser.StringLiteral:
+		return e.Span
+	case *parser.UnitLiteral:
 		return e.Span
 	case *parser.ListLiteral:
 		return e.Span

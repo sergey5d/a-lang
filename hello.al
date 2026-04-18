@@ -64,6 +64,19 @@ def suckItAll23(val String) Int {
     23
 }
 
+suck23 = suckItAll23("s23-v2")
+
+suck231 () -> Unit = suckItAll23("s23-v3")
+
+suck232 () -> Unit = ()
+
+suck233 () -> Unit = 
+	suckItAll23("s23-v3")
+
+suck231()
+suck232()
+suck233()
+
 def run() Int {
 	first Int = 5
 	second Int = 7

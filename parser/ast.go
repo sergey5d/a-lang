@@ -271,6 +271,13 @@ type StringLiteral struct {
 
 func (*StringLiteral) exprNode() {}
 
+// UnitLiteral is the unit value expression written as ().
+type UnitLiteral struct {
+	Span Span `json:"span"`
+}
+
+func (*UnitLiteral) exprNode() {}
+
 // ListLiteral is a bracketed list literal expression.
 type ListLiteral struct {
 	Elements []Expr `json:"elements"`

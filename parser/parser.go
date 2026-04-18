@@ -39,6 +39,10 @@ func typeSpan(ref *TypeRef) Span {
 	return ref.Span
 }
 
+func implicitUnitType(span Span) *TypeRef {
+	return &TypeRef{Name: "Unit", Span: span}
+}
+
 func exprSpan(expr Expr) Span {
 	switch e := expr.(type) {
 	case *Identifier:
@@ -54,6 +58,8 @@ func exprSpan(expr Expr) Span {
 	case *BoolLiteral:
 		return e.Span
 	case *StringLiteral:
+		return e.Span
+	case *UnitLiteral:
 		return e.Span
 	case *ListLiteral:
 		return e.Span
@@ -191,6 +197,9 @@ func (p *Parser) parseFunction() (*FunctionDecl, error) {
 	p.endScope()
 	if err != nil {
 		return nil, err
+	}
+	if returnType == nil {
+		returnType = implicitUnitType(body.Span)
 	}
 
 	return &FunctionDecl{
@@ -377,6 +386,9 @@ func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
 	body, err := p.parseCallableBody()
 	if err != nil {
 		return nil, err
+	}
+	if !constructor && returnType == nil {
+		returnType = implicitUnitType(body.Span)
 	}
 	return &MethodDecl{
 		Name:        name.Lexeme,
@@ -1548,7 +1560,11 @@ func precedence(t TokenType) int {
 
 func (p *Parser) parseParenExpr(start Token) (Expr, error) {
 	if p.check(TokenRParen) {
-		return nil, fmt.Errorf("unexpected token %s", p.peek().String())
+		end, err := p.consume(TokenRParen, "expected ')'")
+		if err != nil {
+			return nil, err
+		}
+		return &UnitLiteral{Span: mergeSpans(tokenSpan(start), tokenSpan(end))}, nil
 	}
 	first, err := p.parseExpression(0)
 	if err != nil {

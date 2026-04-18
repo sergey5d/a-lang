@@ -322,6 +322,13 @@ type StringLiteral struct {
 
 func (*StringLiteral) exprNode() {}
 
+// UnitLiteral is the typed unit value expression written as ().
+type UnitLiteral struct {
+	baseExpr
+}
+
+func (*UnitLiteral) exprNode() {}
+
 // ListLiteral is a typed list literal.
 type ListLiteral struct {
 	baseExpr

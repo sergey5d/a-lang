@@ -771,6 +771,52 @@ def run(values List[Int], flag Bool) Int {
 	}
 }
 
+func TestAnalyzeUnitLambda(t *testing.T) {
+	src := `
+def run() Int {
+	action () -> Unit = () -> Term.println("hi")
+	action()
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeUnitLiteralAndGroupedExpr(t *testing.T) {
+	src := `
+def run() Bool {
+	unit Unit = ()
+	value Int = (1)
+	return value == 1
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeExplicitReturnValueInUnitFunctionFails(t *testing.T) {
+	src := `
+def run() Unit {
+	return 1
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "invalid_return_type" {
+		t.Fatalf("expected invalid_return_type, got %#v", result.Diagnostics[0])
+	}
+}
+
 func TestAnalyzeFunctionImplicitReturn(t *testing.T) {
 	src := `
 def suffix(value String) String {
