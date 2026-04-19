@@ -31,16 +31,21 @@ func (p *Parser) parseClass() (*ClassDecl, error) {
 	if _, err := p.consume(TokenLBrace, "expected '{' after class name"); err != nil {
 		return nil, err
 	}
+	sawMethod := false
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		private := p.match(TokenPrivate)
 		switch p.peek().Type {
 		case TokenIdentifier:
+			if sawMethod {
+				return nil, fmt.Errorf("class fields must appear before method declarations")
+			}
 			field, err := p.parseField(private)
 			if err != nil {
 				return nil, err
 			}
 			decl.Fields = append(decl.Fields, field)
 		case TokenDef:
+			sawMethod = true
 			method, err := p.parseMethod(private)
 			if err != nil {
 				return nil, err
@@ -108,7 +113,7 @@ func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
 	if err != nil {
 		return nil, err
 	}
-	constructor := name.Lexeme == "init"
+	constructor := name.Lexeme == "init" || name.Lexeme == "this"
 	var returnType *TypeRef
 	if !constructor && !p.check(TokenLBrace) && !p.check(TokenAssign) {
 		typ, err := p.parseTypeRef()

@@ -248,10 +248,44 @@ class Counter {
 	if err != nil {
 		t.Fatalf("Parse returned error: %v", err)
 	}
-
 	method := program.Classes[0].Methods[0]
+	if method.Constructor {
+		t.Fatalf("expected ordinary method, got constructor %#v", method)
+	}
 	if method.ReturnType == nil || method.ReturnType.Name != "Unit" {
-		t.Fatalf("expected Unit return type, got %#v", method.ReturnType)
+		t.Fatalf("expected omitted return type to normalize to Unit, got %#v", method.ReturnType)
+	}
+}
+
+func TestParseThisConstructorAndFieldOrder(t *testing.T) {
+	src := `
+class Counter {
+	count Int
+
+	def this(seed Int) {
+		this(count = seed)
+	}
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	method := program.Classes[0].Methods[0]
+	if !method.Constructor || method.Name != "this" {
+		t.Fatalf("expected def this to be marked as constructor, got %#v", method)
+	}
+
+	bad := `
+class Broken {
+	def run() Unit {
+	}
+	count Int
+}
+`
+	if _, err := Parse(bad); err == nil {
+		t.Fatalf("expected parse error for field after method")
 	}
 }
 

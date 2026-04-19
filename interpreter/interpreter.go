@@ -166,6 +166,9 @@ func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl,
 	}
 	local := newEnv(parent)
 	local.define("this", receiver, false)
+	if method.Constructor {
+		local.define("__constructor__", true, false)
+	}
 	for i, param := range method.Parameters {
 		if param.Variadic {
 			local.define(param.Name, &nativeList{items: append([]Value{}, args[i:]...)}, false)
@@ -186,6 +189,73 @@ func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl,
 	return in.coerceValueForTypeRef(method.ReturnType, value), nil
 }
 
+func implicitConstructorFields(class *parser.ClassDecl) []parser.FieldDecl {
+	fields := make([]parser.FieldDecl, 0, len(class.Fields))
+	for _, field := range class.Fields {
+		if !field.Private && field.Initializer == nil {
+			fields = append(fields, field)
+		}
+	}
+	return fields
+}
+
+func (in *Interpreter) applyImplicitConstructor(receiver *instance, args []Value, span parser.Span) error {
+	fields := implicitConstructorFields(receiver.class)
+	if len(args) != len(fields) {
+		return RuntimeError{Message: fmt.Sprintf("constructor '%s' expects %d args, got %d", receiver.class.Name, len(fields), len(args)), Span: span}
+	}
+	for i, field := range fields {
+		receiver.fields[field.Name] = args[i]
+	}
+	return nil
+}
+
+func constructorParamOptions(class *parser.ClassDecl) [][]parser.Parameter {
+	var options [][]parser.Parameter
+	for _, method := range class.Methods {
+		if method.Constructor {
+			options = append(options, method.Parameters)
+		}
+	}
+	fields := implicitConstructorFields(class)
+	params := make([]parser.Parameter, len(fields))
+	for i, field := range fields {
+		params[i] = parser.Parameter{Name: field.Name, Type: field.Type, Span: field.Span}
+	}
+	options = append(options, params)
+	return options
+}
+
+func reorderConstructorValueArgs(class *parser.ClassDecl, args []namedValueArg, span parser.Span) ([]Value, error) {
+	var firstErr error
+	for _, params := range constructorParamOptions(class) {
+		reordered, err := reorderNamedValueArgs(params, args, span, "constructor '"+class.Name+"'")
+		if err == nil {
+			return reordered, nil
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return namedArgValues(args), nil
+}
+
+func (in *Interpreter) constructInto(receiver *instance, class *parser.ClassDecl, args []Value, parent *env, span parser.Span) error {
+	for _, method := range class.Methods {
+		if method.Constructor && runtimeMethodMatches(method, args) {
+			_, err := in.callMethod(receiver, method, args, parent)
+			return err
+		}
+	}
+	if len(implicitConstructorFields(class)) > 0 || len(args) == 0 {
+		return in.applyImplicitConstructor(receiver, args, span)
+	}
+	return RuntimeError{Message: fmt.Sprintf("constructor '%s' expects 0 args, got %d", class.Name, len(args)), Span: span}
+}
+
 func (in *Interpreter) construct(class *parser.ClassDecl, args []Value, parent *env) (Value, error) {
 	obj := &instance{class: class, fields: map[string]Value{}}
 	fieldEnv := newEnv(parent)
@@ -204,16 +274,8 @@ func (in *Interpreter) construct(class *parser.ClassDecl, args []Value, parent *
 			obj.fields[field.Name] = zeroValue(field.Type)
 		}
 	}
-	for _, method := range class.Methods {
-		if method.Constructor {
-			if _, err := in.callMethod(obj, method, args, parent); err != nil {
-				return nil, err
-			}
-			return obj, nil
-		}
-	}
-	if len(args) != 0 {
-		return nil, RuntimeError{Message: fmt.Sprintf("constructor '%s' expects 0 args, got %d", class.Name, len(args)), Span: class.Span}
+	if err := in.constructInto(obj, class, args, parent, class.Span); err != nil {
+		return nil, err
 	}
 	return obj, nil
 }
@@ -524,6 +586,16 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			}
 			return binding.value, nil
 		}
+		if thisSlot, ok := local.get("this"); ok {
+			if obj, ok := thisSlot.value.(*instance); ok {
+				if value, exists := obj.fields[e.Name]; exists {
+					if _, deferred := value.(deferredValue); deferred {
+						return nil, RuntimeError{Message: "field '" + e.Name + "' is deferred and has not been assigned", Span: e.Span}
+					}
+					return value, nil
+				}
+			}
+		}
 		if _, ok := in.functions[e.Name]; ok {
 			return e.Name, nil
 		}
@@ -738,6 +810,37 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 }
 
 func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error) {
+	if ident, ok := call.Callee.(*parser.Identifier); ok && ident.Name == "this" {
+		ctorFlag, ok := local.get("__constructor__")
+		if !ok || ctorFlag.value != true {
+			return nil, RuntimeError{Message: "'this(...)' is only valid inside constructors", Span: call.Span}
+		}
+		thisSlot, ok := local.get("this")
+		if !ok {
+			return nil, RuntimeError{Message: "missing this receiver", Span: call.Span}
+		}
+		obj, ok := thisSlot.value.(*instance)
+		if !ok {
+			return nil, RuntimeError{Message: "invalid this receiver", Span: call.Span}
+		}
+		args := make([]namedValueArg, len(call.Args))
+		for i, arg := range call.Args {
+			value, err := in.evalExpr(arg.Value, local)
+			if err != nil {
+				return nil, err
+			}
+			args[i] = namedValueArg{Name: arg.Name, Value: value, Span: arg.Span}
+		}
+		ordered := namedArgValues(args)
+		if hasNamedParserArgs(call.Args) {
+			reordered, err := reorderConstructorValueArgs(obj.class, args, call.Span)
+			if err != nil {
+				return nil, err
+			}
+			ordered = reordered
+		}
+		return nil, in.constructInto(obj, obj.class, ordered, local, call.Span)
+	}
 	if member, ok := call.Callee.(*parser.MemberExpr); ok {
 		return in.evalMethodCall(member, call.Args, local)
 	}
@@ -776,38 +879,14 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 		if !ok {
 			return nil, RuntimeError{Message: "undefined class '" + fn.name + "'", Span: call.Span}
 		}
-		ordered := namedArgValues(args)
-		if hasNamedParserArgs(call.Args) {
-			if len(class.Methods) == 0 {
-				return nil, RuntimeError{Message: "named arguments are not supported for this constructor", Span: call.Span}
-			}
-			found := false
-			var fallback []Value
-			for _, method := range class.Methods {
-				if !method.Constructor {
-					continue
-				}
-				reordered, err := reorderNamedValueArgs(method.Parameters, args, call.Span, "constructor '"+fn.name+"'")
+			ordered := namedArgValues(args)
+			if hasNamedParserArgs(call.Args) {
+				reordered, err := reorderConstructorValueArgs(class, args, call.Span)
 				if err != nil {
-					continue
+					return nil, err
 				}
-				if fallback == nil {
-					fallback = reordered
-				}
-				if runtimeMethodMatches(method, reordered) {
-					ordered = reordered
-					found = true
-					break
-				}
+				ordered = reordered
 			}
-			if !found && fallback != nil {
-				ordered = fallback
-				found = true
-			}
-			if !found {
-				return nil, RuntimeError{Message: "no constructor overload matches named arguments", Span: call.Span}
-			}
-		}
 		return in.construct(class, ordered, local)
 	case *closure:
 		if hasNamedParserArgs(call.Args) {

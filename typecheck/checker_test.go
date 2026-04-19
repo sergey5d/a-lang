@@ -217,6 +217,31 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeImplicitPrimaryConstructorAndThisDelegation(t *testing.T) {
+	src := `
+class Counter {
+	count Int
+	label String
+	private seen Bool := false
+
+	def this(seed Int) {
+		this(count = seed, label = "ok")
+	}
+}
+
+def run() Int {
+	left Counter = Counter(1, "x")
+	right Counter = Counter(seed = 3)
+	return left.count + right.count
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeInterfaceImplementation(t *testing.T) {
 	src := `
 interface Stringable {

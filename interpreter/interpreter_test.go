@@ -769,3 +769,34 @@ def run() Int {
 		t.Fatalf("expected 12, got %#v", value)
 	}
 }
+
+func TestImplicitPrimaryConstructorAndThisDelegation(t *testing.T) {
+	src := `
+class Counter {
+	count Int
+	label String
+	private seen Bool := false
+
+	def this(seed Int) {
+		this(count = seed, label = "ok")
+	}
+
+	def value() Int = count
+}
+
+def run() Int {
+	left Counter = Counter(1, "x")
+	right Counter = Counter(seed = 3)
+	return left.value() + right.value()
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(4) {
+		t.Fatalf("expected 4, got %#v", value)
+	}
+}

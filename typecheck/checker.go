@@ -694,6 +694,10 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			result = binding.typ
 			break
 		}
+		if fieldType, ok := c.currentFieldType(e.Name); ok {
+			result = fieldType
+			break
+		}
 		if sig, ok := c.functions[e.Name]; ok {
 			result = functionType(e.Name, sig)
 			break
@@ -809,6 +813,39 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 
 func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 	if ident, ok := call.Callee.(*parser.Identifier); ok {
+		if ident.Name == "this" && c.currentClass != nil && c.currentMethod != nil && c.currentMethod.Constructor {
+			info := c.classes[c.currentClass.Name]
+			classType := &Type{Kind: TypeClass, Name: c.currentClass.Name}
+			if hasNamedCallArgs(call.Args) {
+				if ctor, reordered, ok := c.resolveNamedConstructorOverload(info, call.Args, call.Span); ok {
+					sig := c.primaryConstructorSignature(info.decl)
+					if ctor != nil {
+						sig = c.instantiateMethodSignature(ctor, info.decl, nil)
+					}
+					for i := range reordered {
+						if expected, ok := paramTypeForArg(sig, i); ok {
+							argType := c.checkExprWithExpected(reordered[i], expected)
+							c.requireAssignable(argType, expected, exprSpan(reordered[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+						}
+					}
+				}
+			} else {
+				argTypes := c.checkArgTypes(callArgValues(call.Args))
+				if ctor, ok := c.resolveConstructorOverload(info, argTypes, call.Span); ok {
+					sig := c.primaryConstructorSignature(info.decl)
+					if ctor != nil {
+						sig = c.instantiateMethodSignature(ctor, info.decl, nil)
+					}
+					for i, arg := range callArgValues(call.Args) {
+						if expected, ok := paramTypeForArg(sig, i); ok {
+							argType := c.checkExprWithExpected(arg, expected)
+							c.requireAssignable(argType, expected, exprSpan(arg), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+						}
+					}
+				}
+			}
+			return classType
+		}
 		if isBuiltinValue(ident.Name) {
 			return c.checkBuiltinConstructorCall(ident.Name, call)
 		}
@@ -990,38 +1027,39 @@ func (c *Checker) checkIndexExpr(expr *parser.IndexExpr) *Type {
 
 func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *Type {
 	classType := &Type{Kind: TypeClass, Name: class.decl.Name}
-	if len(class.constructors) != 0 {
-		orderedArgs := callArgValues(call.Args)
-		if hasNamedCallArgs(call.Args) {
-			if ctor, reordered, ok := c.resolveNamedConstructorOverload(class, call.Args, call.Span); ok {
-				orderedArgs = reordered
-				sig := c.instantiateMethodSignature(ctor, class.decl, constructorTypeArgs(class.decl, call.Callee))
-				for i := range orderedArgs {
-					if expected, ok := paramTypeForArg(sig, i); ok {
-						argType := c.checkExprWithExpected(orderedArgs[i], expected)
-						c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
-					} else {
-						c.checkExpr(orderedArgs[i])
-					}
-				}
+	orderedArgs := callArgValues(call.Args)
+	if hasNamedCallArgs(call.Args) {
+		if ctor, reordered, ok := c.resolveNamedConstructorOverload(class, call.Args, call.Span); ok {
+			orderedArgs = reordered
+			sig := c.primaryConstructorSignature(class.decl)
+			if ctor != nil {
+				sig = c.instantiateMethodSignature(ctor, class.decl, constructorTypeArgs(class.decl, call.Callee))
 			}
-		} else {
-			argTypes := c.checkArgTypes(orderedArgs)
-			if ctor, ok := c.resolveConstructorOverload(class, argTypes, call.Span); ok {
-				sig := c.instantiateMethodSignature(ctor, class.decl, constructorTypeArgs(class.decl, call.Callee))
-				for i := range orderedArgs {
-					if expected, ok := paramTypeForArg(sig, i); ok {
-						argType := c.checkExprWithExpected(orderedArgs[i], expected)
-						c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
-					} else {
-						c.checkExpr(orderedArgs[i])
-					}
+			for i := range orderedArgs {
+				if expected, ok := paramTypeForArg(sig, i); ok {
+					argType := c.checkExprWithExpected(orderedArgs[i], expected)
+					c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+				} else {
+					c.checkExpr(orderedArgs[i])
 				}
 			}
 		}
-	} else if len(call.Args) != 0 {
-		c.checkArgTypes(callArgValues(call.Args))
-		c.addDiagnostic("invalid_argument_count", fmt.Sprintf("constructor '%s' expects 0 arguments, got %d", class.decl.Name, len(call.Args)), call.Span)
+	} else {
+		argTypes := c.checkArgTypes(orderedArgs)
+		if ctor, ok := c.resolveConstructorOverload(class, argTypes, call.Span); ok {
+			sig := c.primaryConstructorSignature(class.decl)
+			if ctor != nil {
+				sig = c.instantiateMethodSignature(ctor, class.decl, constructorTypeArgs(class.decl, call.Callee))
+			}
+			for i := range orderedArgs {
+				if expected, ok := paramTypeForArg(sig, i); ok {
+					argType := c.checkExprWithExpected(orderedArgs[i], expected)
+					c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+				} else {
+					c.checkExpr(orderedArgs[i])
+				}
+			}
+		}
 	}
 	if ident, ok := call.Callee.(*parser.Identifier); ok {
 		if refType, ok := c.lookupTypeInstance(ident.Name); ok {
@@ -1511,6 +1549,9 @@ func (c *Checker) uninitializedLetFields(owner *parser.ClassDecl, ctor *parser.M
 		if field.Mutable {
 			continue
 		}
+		if constructorVisibleField(field) {
+			continue
+		}
 		if field.Initializer != nil {
 			continue
 		}
@@ -1551,6 +1592,41 @@ func (c *Checker) checkArgTypes(args []parser.Expr) []*Type {
 		result[i] = c.checkExpr(arg)
 	}
 	return result
+}
+
+func constructorVisibleField(field parser.FieldDecl) bool {
+	return !field.Private && field.Initializer == nil
+}
+
+func (c *Checker) currentFieldType(name string) (*Type, bool) {
+	if c.currentClass == nil {
+		return nil, false
+	}
+	for _, field := range c.currentClass.Fields {
+		if field.Name == name {
+			return c.resolveDeclaredType(field.Type), true
+		}
+	}
+	return nil, false
+}
+
+func primaryConstructorParams(class *parser.ClassDecl) []parser.Parameter {
+	params := make([]parser.Parameter, 0, len(class.Fields))
+	for _, field := range class.Fields {
+		if constructorVisibleField(field) {
+			params = append(params, parser.Parameter{Name: field.Name, Type: field.Type, Span: field.Span})
+		}
+	}
+	return params
+}
+
+func (c *Checker) primaryConstructorSignature(class *parser.ClassDecl) Signature {
+	params := primaryConstructorParams(class)
+	out := make([]*Type, len(params))
+	for i, param := range params {
+		out[i] = c.resolveDeclaredType(param.Type)
+	}
+	return Signature{Parameters: out, ReturnType: &Type{Kind: TypeClass, Name: class.Name}}
 }
 
 func callArgValues(args []parser.CallArg) []parser.Expr {
@@ -1676,6 +1752,18 @@ func (c *Checker) resolveConstructorOverload(class classInfo, argTypes []*Type, 
 			candidates = append(candidates, ctor)
 		}
 	}
+	primarySig := c.primaryConstructorSignature(class.decl)
+	primaryMatches := signatureMatches(primarySig, argTypes)
+	if primaryMatches && len(candidates) == 0 {
+		return nil, true
+	}
+	if primaryMatches && len(candidates) > 0 {
+		if len(candidates) == 1 {
+			return candidates[0], true
+		}
+		c.addDiagnostic("ambiguous_overload", "constructor call for class '"+class.decl.Name+"' is ambiguous", span)
+		return nil, false
+	}
 	if len(candidates) == 1 {
 		return candidates[0], true
 	}
@@ -1739,7 +1827,18 @@ func (c *Checker) resolveNamedConstructorOverload(class classInfo, args []parser
 		matchArgs = ordered
 		matchCount++
 	}
+	primaryParams := primaryConstructorParams(class.decl)
+	if ordered, ok := tryReorderCallArgs(primaryParams, args); ok {
+		argTypes := c.checkArgTypes(ordered)
+		if signatureMatches(c.primaryConstructorSignature(class.decl), argTypes) {
+			matchArgs = ordered
+			matchCount++
+		}
+	}
 	if matchCount == 1 {
+		return matchCtor, matchArgs, true
+	}
+	if matchCount == 2 && matchCtor != nil {
 		return matchCtor, matchArgs, true
 	}
 	if matchCount > 1 {
@@ -1748,6 +1847,10 @@ func (c *Checker) resolveNamedConstructorOverload(class classInfo, args []parser
 	}
 	if len(class.constructors) == 1 {
 		c.reorderCallArgs(class.constructors[0].Parameters, args, span, "constructor '"+class.decl.Name+"'")
+		return nil, nil, false
+	}
+	if len(class.constructors) == 0 {
+		c.reorderCallArgs(primaryParams, args, span, "constructor '"+class.decl.Name+"'")
 		return nil, nil, false
 	}
 	c.addDiagnostic("no_matching_overload", fmt.Sprintf("no constructor overload for class '%s' matches %d arguments", class.decl.Name, len(args)), span)

@@ -126,10 +126,15 @@ func (b *typeRefBuilder) resolveConstructorSymbol(className string, args []Expr)
 		return nil
 	}
 	subst := b.substForClass(class, nil)
-	for _, candidate := range b.ctx.methodSymbols[className]["init"] {
-		if b.methodMatches(candidate.decl, subst, args) {
-			symbol := candidate.symbol
-			return &symbol
+	for _, candidates := range b.ctx.methodSymbols[className] {
+		for _, candidate := range candidates {
+			if !candidate.decl.Constructor {
+				continue
+			}
+			if b.methodMatches(candidate.decl, subst, args) {
+				symbol := candidate.symbol
+				return &symbol
+			}
 		}
 	}
 	return nil
