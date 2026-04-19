@@ -193,7 +193,7 @@ def fromArray(values Array[Int]) Int {
 func TestAnalyzeClassMembersAndConstructors(t *testing.T) {
 	src := `
 class Counter {
-	private count Int := deferred
+	private count Int := ?
 
 	def init(count Int) {
 		this.count = count
@@ -513,7 +513,7 @@ func TestAnalyzeConstructorMustInitializeImmutableFields(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
-	private seen Bool := deferred
+	private seen Bool := ?
 
 	def init() {
 		this.seen = false

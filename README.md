@@ -45,7 +45,7 @@ Before running, the CLI always:
 
 ```txt
 class Counter {
-	private count Int := deferred
+	private count Int := ?
 
 	def init(count Int) {
 		this.count = count
@@ -75,7 +75,7 @@ The syntax is still evolving, but the current codebase supports a meaningful sub
 - immutable bindings with `=`
 - mutable bindings with `:=`
 - compound assignment like `+=`
-- deferred initialization with `deferred`
+- deferred initialization with `?`
 - functions with `def`
 - classes and interfaces
 - `with` for interface implementation

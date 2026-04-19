@@ -81,6 +81,9 @@ func (l *Lexer) nextToken() (Token, error) {
 			return l.token(TokenRange, "..", startLine, startColumn), nil
 		}
 		return l.token(TokenDot, ".", startLine, startColumn), nil
+	case '?':
+		l.advance()
+		return l.token(TokenQuestion, "?", startLine, startColumn), nil
 	case '+':
 		l.advance()
 		if l.match('=') {

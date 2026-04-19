@@ -20,15 +20,21 @@ class A {
 }
 
 class B {
+    # immutable member variables
     private age Int
     private name String
+    # initialized mutable variable
     private malnutritioned Bool := false
+    # not yet initialized mutable variable
     private unassigned Float := ?
+    # not yet initialized immutable variable (syntax is for consistency only)
+    private questionable Int = ?
 
     def this(age Int, name String) {
         this.age = age
         this.name = name
-        unassigned := 1.1
+        this.unassigned := 1.1
+        this.questionable = 1
     }
 
     def trueAge() Int = age

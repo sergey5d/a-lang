@@ -198,11 +198,11 @@ func (p *Parser) parseBindingInitializers(count int) ([]Expr, error) {
 	if count <= 0 {
 		return nil, nil
 	}
-	if p.match(TokenDeferred) {
+	if p.match(TokenQuestion) {
 		values := []Expr{nil}
 		for len(values) < count && p.match(TokenComma) {
-			if !p.match(TokenDeferred) {
-				return nil, fmt.Errorf("expected 'deferred' after ',' in initializer list, got %s", p.peek().String())
+			if !p.match(TokenQuestion) {
+				return nil, fmt.Errorf("expected '?' after ',' in initializer list, got %s", p.peek().String())
 			}
 			values = append(values, nil)
 		}
@@ -217,7 +217,7 @@ func (p *Parser) parseBindingInitializers(count int) ([]Expr, error) {
 		return values, nil
 	}
 	for len(values) < count && p.match(TokenComma) {
-		if p.match(TokenDeferred) {
+		if p.match(TokenQuestion) {
 			values = append(values, nil)
 			continue
 		}

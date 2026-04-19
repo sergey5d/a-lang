@@ -37,7 +37,7 @@ class Adder {
 # this is comment!!!
 
 class Bucket {
-    base Int := deferred
+    base Int := ?
 
     def init(a Int) {
         this.base = a

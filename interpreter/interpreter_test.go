@@ -123,7 +123,7 @@ def run() Int {
 func TestClassesAndMethods(t *testing.T) {
 	src := `
 class Counter {
-	private count Int := deferred
+	private count Int := ?
 
 	def init(count Int) {
 		this.count = count
@@ -183,7 +183,7 @@ def run() Int {
 func TestMethodWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
 	src := `
 class Counter {
-	private count Int := deferred
+	private count Int := ?
 
 	def init(count Int) {
 		this.count = count
@@ -466,7 +466,7 @@ def run() Int {
 func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {
-	private count Int := deferred
+	private count Int := ?
 
 	def init(count Int) {
 		this.count = count

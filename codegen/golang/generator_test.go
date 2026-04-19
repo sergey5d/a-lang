@@ -25,7 +25,7 @@ func parseProgram(t *testing.T, src string) *parser.Program {
 func TestGenerate(t *testing.T) {
 	src := `
 class Counter {
-	private count Int := deferred
+	private count Int := ?
 
 	def init(count Int) {
 		this.count = count

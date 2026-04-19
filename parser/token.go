@@ -22,7 +22,6 @@ const (
 	TokenClass      TokenType = "CLASS"
 	TokenWith       TokenType = "WITH"
 	TokenPrivate    TokenType = "PRIVATE"
-	TokenDeferred   TokenType = "DEFERRED"
 	TokenIf         TokenType = "IF"
 	TokenIs         TokenType = "IS"
 	TokenElse       TokenType = "ELSE"
@@ -42,6 +41,7 @@ const (
 	TokenComma  TokenType = ","
 	TokenColon  TokenType = ":"
 	TokenDot    TokenType = "."
+	TokenQuestion TokenType = "?"
 	TokenEllipsis TokenType = "..."
 	TokenAssign TokenType = "="
 	TokenColonAssign TokenType = ":="
@@ -83,7 +83,6 @@ var keywords = map[string]TokenType{
 	"class":      TokenClass,
 	"with":       TokenWith,
 	"private":    TokenPrivate,
-	"deferred":   TokenDeferred,
 	"if":         TokenIf,
 	"is":         TokenIs,
 	"else":       TokenElse,

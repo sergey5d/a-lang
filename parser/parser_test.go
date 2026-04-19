@@ -702,7 +702,7 @@ class Box[T] with Mapper[T, Stringable] {
 
 class SolidWork with Stringable {
 	private a List[Int]
-	private b Map[String, Bool] := deferred
+	private b Map[String, Bool] := ?
 
 	def init(a Int, b Bool) {
 		this.a = a

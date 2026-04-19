@@ -358,7 +358,7 @@ func (c *Checker) checkGlobals(statements []parser.Statement) {
 						c.requireAssignable(valueType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+declType.String())
 					}
 				} else if !hasValue {
-					c.addDiagnostic("invalid_deferred", "deferred binding '"+bindingDecl.Name+"' requires an explicit type", bindingDecl.Span)
+					c.addDiagnostic("invalid_deferred", "binding '"+bindingDecl.Name+"' initialized with '?' requires an explicit type", bindingDecl.Span)
 					declType = unknownType
 				}
 				c.globals[bindingDecl.Name] = binding{typ: declType, mutable: bindingDecl.Mutable}
@@ -630,7 +630,7 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			if bindingDecl.Type != nil {
 				declType = c.resolveDeclaredType(bindingDecl.Type)
 			} else if !hasValue {
-				c.addDiagnostic("invalid_deferred", "deferred binding '"+bindingDecl.Name+"' requires an explicit type", bindingDecl.Span)
+				c.addDiagnostic("invalid_deferred", "binding '"+bindingDecl.Name+"' initialized with '?' requires an explicit type", bindingDecl.Span)
 				declType = unknownType
 			}
 			c.define(bindingDecl.Name, declType, bindingDecl.Mutable)

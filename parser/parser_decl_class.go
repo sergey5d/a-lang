@@ -84,7 +84,7 @@ func (p *Parser) parseField(private bool) (FieldDecl, error) {
 	case TokenAssign, TokenColonAssign:
 		operator := p.advance()
 		field.Mutable = operator.Type == TokenColonAssign
-		if p.match(TokenDeferred) {
+		if p.match(TokenQuestion) {
 			field.Deferred = true
 			field.Span = mergeSpans(field.Span, tokenSpan(p.previous()))
 			return field, nil
