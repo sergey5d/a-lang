@@ -285,7 +285,7 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 	case *parser.CallExpr:
 		r.resolveExpr(e.Callee)
 		for _, arg := range e.Args {
-			r.resolveExpr(arg)
+			r.resolveExpr(arg.Value)
 		}
 	case *parser.MemberExpr:
 		r.resolveExpr(e.Receiver)

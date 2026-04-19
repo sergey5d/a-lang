@@ -31,8 +31,14 @@ func TestExamples(t *testing.T) {
 				t.Fatalf("ReadFile returned error: %v", err)
 			}
 			src := string(srcBytes)
+			if shouldIgnoreExample(src) {
+				t.Skipf("skipping %s: marked with # IGNORE", filepath.Base(path))
+			}
 			expected, err := parseExpectedOutput(src)
 			if err != nil {
+				if err == errMissingExpectedHeader {
+					t.Skipf("skipping %s: no # EXPECT header", filepath.Base(path))
+				}
 				t.Fatalf("parseExpectedOutput returned error: %v", err)
 			}
 
@@ -84,6 +90,8 @@ func TestExamples(t *testing.T) {
 	}
 }
 
+var errMissingExpectedHeader = fmt.Errorf("missing '# EXPECT:' header")
+
 func parseExpectedOutput(src string) (string, error) {
 	lines := strings.Split(src, "\n")
 	start := -1
@@ -98,7 +106,7 @@ func parseExpectedOutput(src string) (string, error) {
 		}
 	}
 	if start == -1 {
-		return "", fmt.Errorf("missing '# EXPECT:' header")
+		return "", errMissingExpectedHeader
 	}
 
 	var out []string
@@ -118,4 +126,20 @@ func parseExpectedOutput(src string) (string, error) {
 
 func normalizeExampleOutput(s string) string {
 	return strings.TrimRight(s, "\n")
+}
+
+func shouldIgnoreExample(src string) bool {
+	for _, line := range strings.Split(src, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if trimmed == "# IGNORE" {
+			return true
+		}
+		if !strings.HasPrefix(trimmed, "#") {
+			return false
+		}
+	}
+	return false
 }

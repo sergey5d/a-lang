@@ -748,25 +748,72 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 	if fn, ok := callee.(builtinRef); ok {
 		return in.callBuiltin(fn.name, call.Args, nil, local, call.Span)
 	}
-	args := make([]Value, len(call.Args))
+	args := make([]namedValueArg, len(call.Args))
 	for i, arg := range call.Args {
-		value, err := in.evalExpr(arg, local)
+		value, err := in.evalExpr(arg.Value, local)
 		if err != nil {
 			return nil, err
 		}
-		args[i] = value
+		args[i] = namedValueArg{Name: arg.Name, Value: value, Span: arg.Span}
 	}
 	switch fn := callee.(type) {
 	case string:
-		return in.callFunctionByName(fn, args, local)
+		ordered := namedArgValues(args)
+		if hasNamedParserArgs(call.Args) {
+			decl, ok := in.functions[fn]
+			if !ok {
+				return nil, RuntimeError{Message: "undefined function '" + fn + "'", Span: call.Span}
+			}
+			reordered, err := reorderNamedValueArgs(decl.Parameters, args, call.Span, "function '"+fn+"'")
+			if err != nil {
+				return nil, err
+			}
+			ordered = reordered
+		}
+		return in.callFunctionByName(fn, ordered, local)
 	case classRef:
 		class, ok := in.classes[fn.name]
 		if !ok {
 			return nil, RuntimeError{Message: "undefined class '" + fn.name + "'", Span: call.Span}
 		}
-		return in.construct(class, args, local)
+		ordered := namedArgValues(args)
+		if hasNamedParserArgs(call.Args) {
+			if len(class.Methods) == 0 {
+				return nil, RuntimeError{Message: "named arguments are not supported for this constructor", Span: call.Span}
+			}
+			found := false
+			var fallback []Value
+			for _, method := range class.Methods {
+				if !method.Constructor {
+					continue
+				}
+				reordered, err := reorderNamedValueArgs(method.Parameters, args, call.Span, "constructor '"+fn.name+"'")
+				if err != nil {
+					continue
+				}
+				if fallback == nil {
+					fallback = reordered
+				}
+				if runtimeMethodMatches(method, reordered) {
+					ordered = reordered
+					found = true
+					break
+				}
+			}
+			if !found && fallback != nil {
+				ordered = fallback
+				found = true
+			}
+			if !found {
+				return nil, RuntimeError{Message: "no constructor overload matches named arguments", Span: call.Span}
+			}
+		}
+		return in.construct(class, ordered, local)
 	case *closure:
-		return in.callClosure(fn, args)
+		if hasNamedParserArgs(call.Args) {
+			return nil, RuntimeError{Message: "named arguments require a direct function, method, or constructor call", Span: call.Span}
+		}
+		return in.callClosure(fn, namedArgValues(args))
 	default:
 		return nil, RuntimeError{Message: "value is not callable", Span: call.Span}
 	}
@@ -810,18 +857,18 @@ func (in *Interpreter) callClosure(fn *closure, args []Value) (Value, error) {
 	return nil, nil
 }
 
-func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []parser.Expr, local *env) (Value, error) {
+func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []parser.CallArg, local *env) (Value, error) {
 	receiver, err := in.evalExpr(member.Receiver, local)
 	if err != nil {
 		return nil, err
 	}
-	args := make([]Value, len(argExprs))
+	args := make([]namedValueArg, len(argExprs))
 	for i, arg := range argExprs {
-		value, err := in.evalExpr(arg, local)
+		value, err := in.evalExpr(arg.Value, local)
 		if err != nil {
 			return nil, err
 		}
-		args[i] = value
+		args[i] = namedValueArg{Name: arg.Name, Value: value, Span: arg.Span}
 	}
 	if native, ok := in.callNativeMethod(receiver, member.Name, args, local, member.Span); ok {
 		return native.value, native.err
@@ -830,10 +877,52 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 	if !ok {
 		return nil, RuntimeError{Message: "member call requires class instance", Span: member.Span}
 	}
-	for _, method := range obj.class.Methods {
-		if method.Name == member.Name && runtimeMethodMatches(method, args) {
-			return in.callMethod(obj, method, args, local)
+	if hasNamedParserArgs(argExprs) {
+		var candidates []*parser.MethodDecl
+		for _, method := range obj.class.Methods {
+			if method.Name == member.Name {
+				candidates = append(candidates, method)
+			}
 		}
+		if len(candidates) == 1 {
+			ordered, err := reorderNamedValueArgs(candidates[0].Parameters, args, member.Span, "method '"+member.Name+"'")
+			if err != nil {
+				return nil, err
+			}
+			return in.callMethod(obj, candidates[0], ordered, local)
+		}
+	}
+	var firstErr error
+	var fallbackMethod *parser.MethodDecl
+	var fallbackArgs []Value
+	for _, method := range obj.class.Methods {
+		if method.Name != member.Name {
+			continue
+		}
+		ordered := namedArgValues(args)
+		if hasNamedParserArgs(argExprs) {
+			reordered, err := reorderNamedValueArgs(method.Parameters, args, member.Span, "method '"+member.Name+"'")
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
+			}
+			ordered = reordered
+			if fallbackMethod == nil {
+				fallbackMethod = method
+				fallbackArgs = ordered
+			}
+		}
+		if runtimeMethodMatches(method, ordered) {
+			return in.callMethod(obj, method, ordered, local)
+		}
+	}
+	if fallbackMethod != nil {
+		return in.callMethod(obj, fallbackMethod, fallbackArgs, local)
+	}
+	if firstErr != nil {
+		return nil, firstErr
 	}
 	return nil, RuntimeError{Message: "unknown method '" + member.Name + "'", Span: member.Span}
 }
@@ -878,13 +967,94 @@ type nativeCallResult struct {
 	err   error
 }
 
-func (in *Interpreter) callBuiltin(name string, argExprs []parser.Expr, args []Value, local *env, span parser.Span) (Value, error) {
+type namedValueArg struct {
+	Name  string
+	Value Value
+	Span  parser.Span
+}
+
+func namedArgValues(args []namedValueArg) []Value {
+	values := make([]Value, len(args))
+	for i, arg := range args {
+		values[i] = arg.Value
+	}
+	return values
+}
+
+func hasNamedParserArgs(args []parser.CallArg) bool {
+	for _, arg := range args {
+		if arg.Name != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasNamedValueArgs(args []namedValueArg) bool {
+	for _, arg := range args {
+		if arg.Name != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func reorderNamedValueArgs(params []parser.Parameter, args []namedValueArg, span parser.Span, callable string) ([]Value, error) {
+	if len(params) > 0 && params[len(params)-1].Variadic {
+		return nil, RuntimeError{Message: "named arguments are not supported for variadic " + callable, Span: span}
+	}
+	ordered := make([]Value, len(params))
+	filled := make([]bool, len(params))
+	seenNamed := false
+	pos := 0
+	for _, arg := range args {
+		if arg.Name == "" {
+			if seenNamed {
+				return nil, RuntimeError{Message: "positional arguments cannot follow named arguments", Span: arg.Span}
+			}
+			if pos >= len(params) {
+				return nil, RuntimeError{Message: fmt.Sprintf("%s expects %d arguments, got %d", callable, len(params), len(args)), Span: span}
+			}
+			ordered[pos] = arg.Value
+			filled[pos] = true
+			pos++
+			continue
+		}
+		seenNamed = true
+		paramIndex := -1
+		for i, param := range params {
+			if param.Name == arg.Name {
+				paramIndex = i
+				break
+			}
+		}
+		if paramIndex < 0 {
+			return nil, RuntimeError{Message: "unknown named argument '" + arg.Name + "'", Span: arg.Span}
+		}
+		if filled[paramIndex] {
+			return nil, RuntimeError{Message: "argument '" + arg.Name + "' was provided more than once", Span: arg.Span}
+		}
+		ordered[paramIndex] = arg.Value
+		filled[paramIndex] = true
+	}
+	for i, ok := range filled {
+		if !ok {
+			return nil, RuntimeError{Message: "missing argument '" + params[i].Name + "' in " + callable, Span: span}
+		}
+	}
+	return ordered, nil
+}
+
+func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args []Value, local *env, span parser.Span) (Value, error) {
+	if hasNamedParserArgs(argExprs) {
+		return nil, RuntimeError{Message: "named arguments are not supported for builtin constructors", Span: span}
+	}
 	switch name {
 	case "List":
 		if args == nil {
 			args = make([]Value, len(argExprs))
 			for i, arg := range argExprs {
-				value, err := in.evalExpr(arg, local)
+				value, err := in.evalExpr(arg.Value, local)
 				if err != nil {
 					return nil, err
 				}
@@ -899,7 +1069,7 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.Expr, args []V
 		if args == nil {
 			args = make([]Value, len(argExprs))
 			for i, arg := range argExprs {
-				value, err := in.evalExpr(arg, local)
+				value, err := in.evalExpr(arg.Value, local)
 				if err != nil {
 					return nil, err
 				}
@@ -908,17 +1078,17 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.Expr, args []V
 		}
 		length, ok := args[0].(int64)
 		if !ok {
-			return nil, RuntimeError{Message: "Array constructor length must be Int", Span: exprSpan(argExprs[0])}
+			return nil, RuntimeError{Message: "Array constructor length must be Int", Span: exprSpan(argExprs[0].Value)}
 		}
 		if length < 0 {
-			return nil, RuntimeError{Message: "Array constructor length must be non-negative", Span: exprSpan(argExprs[0])}
+			return nil, RuntimeError{Message: "Array constructor length must be non-negative", Span: exprSpan(argExprs[0].Value)}
 		}
 		return &nativeArray{items: make([]Value, int(length))}, nil
 	case "Set":
 		if args == nil {
 			args = make([]Value, len(argExprs))
 			for i, arg := range argExprs {
-				value, err := in.evalExpr(arg, local)
+				value, err := in.evalExpr(arg.Value, local)
 				if err != nil {
 					return nil, err
 				}
@@ -944,7 +1114,7 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.Expr, args []V
 		if args == nil {
 			args = make([]Value, len(argExprs))
 			for i, arg := range argExprs {
-				value, err := in.evalExpr(arg, local)
+				value, err := in.evalExpr(arg.Value, local)
 				if err != nil {
 					return nil, err
 				}
@@ -960,7 +1130,7 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.Expr, args []V
 	case "Map":
 		m := &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: []string{}}
 		for _, argExpr := range argExprs {
-			pair, ok := argExpr.(*parser.BinaryExpr)
+			pair, ok := argExpr.Value.(*parser.BinaryExpr)
 			if !ok || pair.Operator != ":" {
 				return nil, RuntimeError{Message: "Map constructor expects key : value pairs", Span: span}
 			}
@@ -1007,21 +1177,82 @@ func (in *Interpreter) nativeHasMethod(receiver Value, name string) bool {
 	}
 }
 
-func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Value, local *env, span parser.Span) (nativeCallResult, bool) {
+func nativeMethodParams(receiver Value, name string) ([]parser.Parameter, bool) {
+	switch receiver.(type) {
+	case *nativeList:
+		switch name {
+		case "append":
+			return []parser.Parameter{{Name: "value"}}, true
+		case "get":
+			return []parser.Parameter{{Name: "index"}}, true
+		case "size":
+			return nil, true
+		}
+	case *nativeArray:
+		if name == "size" {
+			return nil, true
+		}
+	case *nativeOption:
+		switch name {
+		case "isSet", "get":
+			return nil, true
+		case "getOr":
+			return []parser.Parameter{{Name: "defaultValue"}}, true
+		}
+	case *nativeSet:
+		switch name {
+		case "add", "contains":
+			return []parser.Parameter{{Name: "value"}}, true
+		case "size":
+			return nil, true
+		}
+	case *nativeMap:
+		switch name {
+		case "set":
+			return []parser.Parameter{{Name: "key"}, {Name: "value"}}, true
+		case "get", "contains":
+			return []parser.Parameter{{Name: "key"}}, true
+		case "size":
+			return nil, true
+		}
+	case *nativeTerm:
+		switch name {
+		case "print":
+			return []parser.Parameter{{Name: "value"}}, true
+		case "println":
+			return []parser.Parameter{{Name: "value", Variadic: true}}, true
+		}
+	}
+	return nil, false
+}
+
+func (in *Interpreter) callNativeMethod(receiver Value, name string, args []namedValueArg, local *env, span parser.Span) (nativeCallResult, bool) {
+	ordered := namedArgValues(args)
+	if hasNamedValueArgs(args) {
+		params, ok := nativeMethodParams(receiver, name)
+		if !ok {
+			return nativeCallResult{}, false
+		}
+		reordered, err := reorderNamedValueArgs(params, args, span, "method '"+name+"'")
+		if err != nil {
+			return nativeCallResult{err: err}, true
+		}
+		ordered = reordered
+	}
 	switch value := receiver.(type) {
 	case *nativeList:
 		switch name {
 		case "append":
-			if len(args) != 1 {
+			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "append expects 1 argument", Span: span}}, true
 			}
-			value.items = append(value.items, args[0])
+			value.items = append(value.items, ordered[0])
 			return nativeCallResult{value: value}, true
 		case "get":
-			if len(args) != 1 {
+			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "get expects 1 argument", Span: span}}, true
 			}
-			index, ok := args[0].(int64)
+			index, ok := ordered[0].(int64)
 			if !ok {
 				return nativeCallResult{err: RuntimeError{Message: "get index must be Int", Span: span}}, true
 			}
@@ -1030,7 +1261,7 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 			}
 			return nativeCallResult{value: &nativeOption{value: value.items[index], set: true}}, true
 		case "size":
-			if len(args) != 0 {
+			if len(ordered) != 0 {
 				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
 			}
 			return nativeCallResult{value: int64(len(value.items))}, true
@@ -1038,7 +1269,7 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 	case *nativeArray:
 		switch name {
 		case "size":
-			if len(args) != 0 {
+			if len(ordered) != 0 {
 				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
 			}
 			return nativeCallResult{value: int64(len(value.items))}, true
@@ -1046,12 +1277,12 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 	case *nativeOption:
 		switch name {
 		case "isSet":
-			if len(args) != 0 {
+			if len(ordered) != 0 {
 				return nativeCallResult{err: RuntimeError{Message: "isSet expects 0 arguments", Span: span}}, true
 			}
 			return nativeCallResult{value: value.set}, true
 		case "get":
-			if len(args) != 0 {
+			if len(ordered) != 0 {
 				return nativeCallResult{err: RuntimeError{Message: "get expects 0 arguments", Span: span}}, true
 			}
 			if !value.set {
@@ -1059,41 +1290,41 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 			}
 			return nativeCallResult{value: value.value}, true
 		case "getOr":
-			if len(args) != 1 {
+			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "getOr expects 1 argument", Span: span}}, true
 			}
 			if value.set {
 				return nativeCallResult{value: value.value}, true
 			}
-			return nativeCallResult{value: args[0]}, true
+			return nativeCallResult{value: ordered[0]}, true
 		}
 	case *nativeSet:
 		switch name {
 		case "add":
-			if len(args) != 1 {
+			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "add expects 1 argument", Span: span}}, true
 			}
-			key, err := nativeKey(args[0], span, local, in)
+			key, err := nativeKey(ordered[0], span, local, in)
 			if err != nil {
 				return nativeCallResult{err: err}, true
 			}
 			if _, ok := value.keys[key]; !ok {
 				value.order = append(value.order, key)
 			}
-			value.keys[key] = args[0]
+			value.keys[key] = ordered[0]
 			return nativeCallResult{value: value}, true
 		case "contains":
-			if len(args) != 1 {
+			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "contains expects 1 argument", Span: span}}, true
 			}
-			key, err := nativeKey(args[0], span, local, in)
+			key, err := nativeKey(ordered[0], span, local, in)
 			if err != nil {
 				return nativeCallResult{err: err}, true
 			}
 			_, ok := value.keys[key]
 			return nativeCallResult{value: ok}, true
 		case "size":
-			if len(args) != 0 {
+			if len(ordered) != 0 {
 				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
 			}
 			return nativeCallResult{value: int64(len(value.keys))}, true
@@ -1101,24 +1332,24 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 	case *nativeMap:
 		switch name {
 		case "set":
-			if len(args) != 2 {
+			if len(ordered) != 2 {
 				return nativeCallResult{err: RuntimeError{Message: "set expects 2 arguments", Span: span}}, true
 			}
-			key, err := nativeKey(args[0], span, local, in)
+			key, err := nativeKey(ordered[0], span, local, in)
 			if err != nil {
 				return nativeCallResult{err: err}, true
 			}
 			if _, ok := value.items[key]; !ok {
 				value.order = append(value.order, key)
-				value.keys[key] = args[0]
+				value.keys[key] = ordered[0]
 			}
-			value.items[key] = args[1]
+			value.items[key] = ordered[1]
 			return nativeCallResult{value: value}, true
 		case "get":
-			if len(args) != 1 {
+			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "get expects 1 argument", Span: span}}, true
 			}
-			key, err := nativeKey(args[0], span, local, in)
+			key, err := nativeKey(ordered[0], span, local, in)
 			if err != nil {
 				return nativeCallResult{err: err}, true
 			}
@@ -1128,17 +1359,17 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 			}
 			return nativeCallResult{value: &nativeOption{value: result, set: true}}, true
 		case "contains":
-			if len(args) != 1 {
+			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "contains expects 1 argument", Span: span}}, true
 			}
-			key, err := nativeKey(args[0], span, local, in)
+			key, err := nativeKey(ordered[0], span, local, in)
 			if err != nil {
 				return nativeCallResult{err: err}, true
 			}
 			_, ok := value.items[key]
 			return nativeCallResult{value: ok}, true
 		case "size":
-			if len(args) != 0 {
+			if len(ordered) != 0 {
 				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
 			}
 			return nativeCallResult{value: int64(len(value.items))}, true
@@ -1146,14 +1377,14 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []Valu
 	case *nativeTerm:
 		switch name {
 		case "print":
-			if len(args) != 1 {
+			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "print expects 1 argument", Span: span}}, true
 			}
-			fmt.Print(fmt.Sprint(args[0]))
+			fmt.Print(fmt.Sprint(ordered[0]))
 			return nativeCallResult{value: value}, true
 		case "println":
-			parts := make([]any, len(args))
-			for i, arg := range args {
+			parts := make([]any, len(ordered))
+			for i, arg := range ordered {
 				parts[i] = fmt.Sprint(arg)
 			}
 			fmt.Println(parts...)

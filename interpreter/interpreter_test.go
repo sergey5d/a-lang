@@ -739,3 +739,33 @@ def run() Bool {
 		t.Fatalf("expected true, got %#v", value)
 	}
 }
+
+func TestNamedCallArguments(t *testing.T) {
+	src := `
+class Counter {
+	def set(value Int, label String) Int {
+		return value
+	}
+}
+
+def doSomething(a String, b Int) Int {
+	return b
+}
+
+def run() Int {
+	counter = Counter()
+	left Int = doSomething(b = 5, a = "go")
+	right Int = counter.set(label = "ok", value = 7)
+	return left + right
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(12) {
+		t.Fatalf("expected 12, got %#v", value)
+	}
+}

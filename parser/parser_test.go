@@ -930,6 +930,31 @@ def vars(b Int) Bool {
 	}
 }
 
+func TestParseNamedCallArguments(t *testing.T) {
+	src := `
+def doSomething(a String, b Int) Unit {
+}
+
+def main() Unit {
+	doSomething(a = "crap", b = 5)
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	stmt := program.Functions[1].Body.Statements[0].(*ExprStmt)
+	call := stmt.Expr.(*CallExpr)
+	if len(call.Args) != 2 {
+		t.Fatalf("expected 2 call arguments, got %d", len(call.Args))
+	}
+	if call.Args[0].Name != "a" || call.Args[1].Name != "b" {
+		t.Fatalf("expected named arguments a, b, got %#v", call.Args)
+	}
+}
+
 func TestParseLambdaBindings(t *testing.T) {
 	src := `
 def vars() Bool {
@@ -953,7 +978,7 @@ def vars() Bool {
 	if !ok {
 		t.Fatalf("expected first binding value to be call expression, got %T", first.Values[0])
 	}
-	firstLambda, ok := firstCall.Args[0].(*LambdaExpr)
+	firstLambda, ok := firstCall.Args[0].Value.(*LambdaExpr)
 	if !ok {
 		t.Fatalf("expected map argument to be lambda, got %T", firstCall.Args[0])
 	}
@@ -966,7 +991,7 @@ def vars() Bool {
 	if !ok {
 		t.Fatalf("expected second binding value to be call expression, got %T", second.Values[0])
 	}
-	secondLambda, ok := secondCall.Args[0].(*LambdaExpr)
+	secondLambda, ok := secondCall.Args[0].Value.(*LambdaExpr)
 	if !ok {
 		t.Fatalf("expected map argument to be lambda, got %T", secondCall.Args[0])
 	}
@@ -979,7 +1004,7 @@ def vars() Bool {
 	if !ok {
 		t.Fatalf("expected third binding value to be call expression, got %T", third.Values[0])
 	}
-	thirdLambda, ok := thirdCall.Args[0].(*LambdaExpr)
+	thirdLambda, ok := thirdCall.Args[0].Value.(*LambdaExpr)
 	if !ok {
 		t.Fatalf("expected typed map argument to be lambda, got %T", thirdCall.Args[0])
 	}
@@ -992,7 +1017,7 @@ def vars() Bool {
 	if !ok {
 		t.Fatalf("expected fourth binding value to be call expression, got %T", fourth.Values[0])
 	}
-	fourthLambda, ok := fourthCall.Args[0].(*LambdaExpr)
+	fourthLambda, ok := fourthCall.Args[0].Value.(*LambdaExpr)
 	if !ok {
 		t.Fatalf("expected typed single-parameter lambda, got %T", fourthCall.Args[0])
 	}

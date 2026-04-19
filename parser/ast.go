@@ -103,6 +103,13 @@ type Parameter struct {
 	Span     Span     `json:"span"`
 }
 
+// CallArg represents a positional or named argument in a call expression.
+type CallArg struct {
+	Name  string `json:"name,omitempty"`
+	Value Expr   `json:"value"`
+	Span  Span   `json:"span"`
+}
+
 // BlockStmt is a braced sequence of statements.
 type BlockStmt struct {
 	Statements []Statement `json:"statements"`
@@ -302,11 +309,11 @@ type TupleLiteral struct {
 
 func (*TupleLiteral) exprNode() {}
 
-// CallExpr applies a callee expression to argument expressions.
+// CallExpr applies a callee expression to positional and named arguments.
 type CallExpr struct {
-	Callee Expr   `json:"callee"`
-	Args   []Expr `json:"args"`
-	Span   Span   `json:"span"`
+	Callee Expr      `json:"callee"`
+	Args   []CallArg `json:"args"`
+	Span   Span      `json:"span"`
 }
 
 func (*CallExpr) exprNode() {}

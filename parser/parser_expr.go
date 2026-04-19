@@ -17,7 +17,7 @@ func (p *Parser) parseExpression(minPrec int) (Expr, error) {
 			call := &CallExpr{Callee: left, Args: args}
 			endSpan := exprSpan(left)
 			if len(args) > 0 {
-				endSpan = exprSpan(args[len(args)-1])
+				endSpan = args[len(args)-1].Span
 			}
 			call.Span = mergeSpans(exprSpan(left), endSpan)
 			left = call
@@ -208,18 +208,40 @@ func (p *Parser) parseForYieldExprAfterStart(start Token) (Expr, error) {
 	}, nil
 }
 
-func (p *Parser) parseCallArgs() ([]Expr, error) {
+func (p *Parser) parseCallArgs() ([]CallArg, error) {
 	if _, err := p.consume(TokenLParen, "expected '('"); err != nil {
 		return nil, err
 	}
-	var args []Expr
+	var args []CallArg
+	seenNamed := false
 	if !p.check(TokenRParen) {
 		for {
-			expr, err := p.parseExpression(0)
-			if err != nil {
-				return nil, err
+			if p.check(TokenIdentifier) && p.checkNext(TokenAssign) {
+				nameToken := p.advance()
+				p.advance()
+				value, err := p.parseExpression(0)
+				if err != nil {
+					return nil, err
+				}
+				args = append(args, CallArg{
+					Name:  nameToken.Lexeme,
+					Value: value,
+					Span:  mergeSpans(tokenSpan(nameToken), exprSpan(value)),
+				})
+				seenNamed = true
+			} else {
+				if seenNamed {
+					return nil, fmt.Errorf("positional arguments cannot follow named arguments")
+				}
+				expr, err := p.parseExpression(0)
+				if err != nil {
+					return nil, err
+				}
+				args = append(args, CallArg{
+					Value: expr,
+					Span:  exprSpan(expr),
+				})
 			}
-			args = append(args, expr)
 			if !p.match(TokenComma) {
 				break
 			}

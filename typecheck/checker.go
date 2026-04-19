@@ -56,6 +56,7 @@ type Checker struct {
 	typeScopes    []typeScope
 	globals       map[string]binding
 	functions     map[string]Signature
+	functionDecls map[string]*parser.FunctionDecl
 	classes       map[string]classInfo
 	interfaces    map[string]interfaceInfo
 	returnTypes   []*Type
@@ -73,6 +74,7 @@ func Analyze(program *parser.Program) Result {
 	c := &Checker{
 		globals:    map[string]binding{},
 		functions:  map[string]Signature{},
+		functionDecls: map[string]*parser.FunctionDecl{},
 		classes:    map[string]classInfo{},
 		interfaces: map[string]interfaceInfo{},
 		exprTypes:  map[parser.Expr]*Type{},
@@ -219,6 +221,7 @@ func (c *Checker) collectDecls(program *parser.Program) {
 			ReturnType: fromTypeRef(fn.ReturnType, c),
 			Variadic:   len(fn.Parameters) > 0 && fn.Parameters[len(fn.Parameters)-1].Variadic,
 		}
+		c.functionDecls[fn.Name] = fn
 	}
 }
 
@@ -812,15 +815,48 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 		if class, ok := c.classes[ident.Name]; ok {
 			return c.checkConstructorCall(class, call)
 		}
+		if fn, ok := c.functions[ident.Name]; ok {
+			orderedArgs := callArgValues(call.Args)
+			if hasNamedCallArgs(call.Args) {
+				decl := c.functionDecls[ident.Name]
+				reordered, ok := c.reorderCallArgs(decl.Parameters, call.Args, call.Span, "function '"+ident.Name+"'")
+				if !ok {
+					c.checkArgTypes(callArgValues(call.Args))
+					return fn.ReturnType
+				}
+				orderedArgs = reordered
+			}
+			sig := fn
+			if !validArgCount(sig, len(orderedArgs)) {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(sig), len(orderedArgs)), call.Span)
+			}
+			for i, arg := range orderedArgs {
+				if expected, ok := paramTypeForArg(sig, i); ok {
+					argType := c.checkExprWithExpected(arg, expected)
+					c.requireAssignable(argType, expected, exprSpan(arg), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+					continue
+				}
+				c.checkExpr(arg)
+			}
+			return sig.ReturnType
+		}
 	}
 	if member, ok := call.Callee.(*parser.MemberExpr); ok {
 		return c.checkMethodCall(member, call.Args)
 	}
 
+	if hasNamedCallArgs(call.Args) {
+		for _, arg := range call.Args {
+			c.checkExpr(arg.Value)
+		}
+		c.addDiagnostic("invalid_named_argument", "named arguments require a direct function, method, or constructor call", call.Span)
+		return unknownType
+	}
+
 	calleeType := c.checkExpr(call.Callee)
 	if calleeType.Kind != TypeFunction || calleeType.Signature == nil {
 		for _, arg := range call.Args {
-			c.checkExpr(arg)
+			c.checkExpr(arg.Value)
 		}
 		return unknownType
 	}
@@ -832,26 +868,33 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 	for i, arg := range call.Args {
 		var argType *Type
 		if expected, ok := paramTypeForArg(sig, i); ok {
-			argType = c.checkExprWithExpected(arg, expected)
-			c.requireAssignable(argType, expected, exprSpan(arg), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+			argType = c.checkExprWithExpected(arg.Value, expected)
+			c.requireAssignable(argType, expected, exprSpan(arg.Value), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
 			continue
 		}
-		argType = c.checkExpr(arg)
+		argType = c.checkExpr(arg.Value)
 	}
 	return sig.ReturnType
 }
 
 func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr) *Type {
+	if hasNamedCallArgs(call.Args) {
+		for _, arg := range call.Args {
+			c.checkExpr(arg.Value)
+		}
+		c.addDiagnostic("invalid_named_argument", "named arguments are not supported for builtin constructors", call.Span)
+		return unknownType
+	}
 	switch name {
 	case "List":
 		if len(call.Args) == 0 {
 			return &Type{Kind: TypeInterface, Name: "List", Args: []*Type{unknownType}}
 		}
-		elemType := c.checkExpr(call.Args[0])
+		elemType := c.checkExpr(call.Args[0].Value)
 		for _, arg := range call.Args[1:] {
-			argType := c.checkExpr(arg)
+			argType := c.checkExpr(arg.Value)
 			if !sameType(elemType, argType) {
-				c.addDiagnostic("type_mismatch", "List constructor arguments must have the same type", exprSpan(arg))
+				c.addDiagnostic("type_mismatch", "List constructor arguments must have the same type", exprSpan(arg.Value))
 			}
 		}
 		return &Type{Kind: TypeInterface, Name: "List", Args: []*Type{elemType}}
@@ -859,11 +902,11 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 		if len(call.Args) == 0 {
 			return &Type{Kind: TypeInterface, Name: "Set", Args: []*Type{unknownType}}
 		}
-		elemType := c.checkExpr(call.Args[0])
+		elemType := c.checkExpr(call.Args[0].Value)
 		for _, arg := range call.Args[1:] {
-			argType := c.checkExpr(arg)
+			argType := c.checkExpr(arg.Value)
 			if !sameType(elemType, argType) {
-				c.addDiagnostic("type_mismatch", "Set constructor arguments must have the same type", exprSpan(arg))
+				c.addDiagnostic("type_mismatch", "Set constructor arguments must have the same type", exprSpan(arg.Value))
 			}
 		}
 		return &Type{Kind: TypeInterface, Name: "Set", Args: []*Type{elemType}}
@@ -874,10 +917,10 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 		keyType := unknownType
 		valType := unknownType
 		for i, arg := range call.Args {
-			pair, ok := arg.(*parser.BinaryExpr)
+			pair, ok := arg.Value.(*parser.BinaryExpr)
 			if !ok || pair.Operator != ":" {
-				c.addDiagnostic("invalid_argument_type", "Map constructor expects key : value pairs", exprSpan(arg))
-				c.checkExpr(arg)
+				c.addDiagnostic("invalid_argument_type", "Map constructor expects key : value pairs", exprSpan(arg.Value))
+				c.checkExpr(arg.Value)
 				continue
 			}
 			leftType := c.checkExpr(pair.Left)
@@ -897,35 +940,35 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 	case "Array":
 		if len(call.Args) != 1 {
 			for _, arg := range call.Args {
-				c.checkExpr(arg)
+				c.checkExpr(arg.Value)
 			}
 			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Array constructor expects 1 argument, got %d", len(call.Args)), call.Span)
 			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
 		}
-		lengthType := c.checkExpr(call.Args[0])
-		c.requireAssignable(lengthType, builtin("Int"), exprSpan(call.Args[0]), "invalid_argument_type", "Array constructor length must be Int")
+		lengthType := c.checkExpr(call.Args[0].Value)
+		c.requireAssignable(lengthType, builtin("Int"), exprSpan(call.Args[0].Value), "invalid_argument_type", "Array constructor length must be Int")
 		return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
 	case "Some":
 		if len(call.Args) != 1 {
 			for _, arg := range call.Args {
-				c.checkExpr(arg)
+				c.checkExpr(arg.Value)
 			}
 			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Some constructor expects 1 argument, got %d", len(call.Args)), call.Span)
 			return &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
 		}
-		valueType := c.checkExpr(call.Args[0])
+		valueType := c.checkExpr(call.Args[0].Value)
 		return &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{valueType}}
 	case "None":
 		if len(call.Args) != 0 {
 			for _, arg := range call.Args {
-				c.checkExpr(arg)
+				c.checkExpr(arg.Value)
 			}
 			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("None constructor expects 0 arguments, got %d", len(call.Args)), call.Span)
 		}
 		return &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
 	default:
 		for _, arg := range call.Args {
-			c.checkExpr(arg)
+			c.checkExpr(arg.Value)
 		}
 		return unknownType
 	}
@@ -948,20 +991,36 @@ func (c *Checker) checkIndexExpr(expr *parser.IndexExpr) *Type {
 func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *Type {
 	classType := &Type{Kind: TypeClass, Name: class.decl.Name}
 	if len(class.constructors) != 0 {
-		argTypes := c.checkArgTypes(call.Args)
-		if ctor, ok := c.resolveConstructorOverload(class, argTypes, call.Span); ok {
-			sig := c.instantiateMethodSignature(ctor, class.decl, constructorTypeArgs(class.decl, call.Callee))
-			for i := range argTypes {
-				if expected, ok := paramTypeForArg(sig, i); ok {
-					argType := c.checkExprWithExpected(call.Args[i], expected)
-					c.requireAssignable(argType, expected, exprSpan(call.Args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
-				} else {
-					c.checkExpr(call.Args[i])
+		orderedArgs := callArgValues(call.Args)
+		if hasNamedCallArgs(call.Args) {
+			if ctor, reordered, ok := c.resolveNamedConstructorOverload(class, call.Args, call.Span); ok {
+				orderedArgs = reordered
+				sig := c.instantiateMethodSignature(ctor, class.decl, constructorTypeArgs(class.decl, call.Callee))
+				for i := range orderedArgs {
+					if expected, ok := paramTypeForArg(sig, i); ok {
+						argType := c.checkExprWithExpected(orderedArgs[i], expected)
+						c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+					} else {
+						c.checkExpr(orderedArgs[i])
+					}
+				}
+			}
+		} else {
+			argTypes := c.checkArgTypes(orderedArgs)
+			if ctor, ok := c.resolveConstructorOverload(class, argTypes, call.Span); ok {
+				sig := c.instantiateMethodSignature(ctor, class.decl, constructorTypeArgs(class.decl, call.Callee))
+				for i := range orderedArgs {
+					if expected, ok := paramTypeForArg(sig, i); ok {
+						argType := c.checkExprWithExpected(orderedArgs[i], expected)
+						c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+					} else {
+						c.checkExpr(orderedArgs[i])
+					}
 				}
 			}
 		}
 	} else if len(call.Args) != 0 {
-		c.checkArgTypes(call.Args)
+		c.checkArgTypes(callArgValues(call.Args))
 		c.addDiagnostic("invalid_argument_count", fmt.Sprintf("constructor '%s' expects 0 arguments, got %d", class.decl.Name, len(call.Args)), call.Span)
 	}
 	if ident, ok := call.Callee.(*parser.Identifier); ok {
@@ -972,13 +1031,19 @@ func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *
 	return classType
 }
 
-func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr) *Type {
+func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallArg) *Type {
 	receiverType := c.checkExpr(member.Receiver)
-	argTypes := c.checkArgTypes(args)
 	if isUnknown(receiverType) {
+		c.checkArgTypes(callArgValues(args))
 		return unknownType
 	}
 	if receiverType.Kind == TypeBuiltin && receiverType.Name == "Array" {
+		if hasNamedCallArgs(args) {
+			c.checkArgTypes(callArgValues(args))
+			c.addDiagnostic("invalid_named_argument", "named arguments are not supported for Array methods", member.Span)
+			return unknownType
+		}
+		argTypes := c.checkArgTypes(callArgValues(args))
 		switch member.Name {
 		case "size":
 			if len(argTypes) != 0 {
@@ -994,31 +1059,38 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr)
 	case TypeClass:
 		info, ok := c.classes[receiverType.Name]
 		if !ok {
+			c.checkArgTypes(callArgValues(args))
 			return unknownType
 		}
-		method, ok := c.resolveMethodOverload(info, receiverType, member.Name, argTypes, member.Span)
-		if !ok {
+		var (
+			method      methodInfo
+			okMethod    bool
+			orderedArgs []parser.Expr
+		)
+		if hasNamedCallArgs(args) {
+			method, orderedArgs, okMethod = c.resolveNamedMethodOverload(info, receiverType, member.Name, args, member.Span)
+		} else {
+			orderedArgs = callArgValues(args)
+			argTypes := c.checkArgTypes(orderedArgs)
+			method, okMethod = c.resolveMethodOverload(info, receiverType, member.Name, argTypes, member.Span)
+		}
+		if !okMethod {
 			return unknownType
 		}
 		sig := c.instantiateMethodSignature(method.decl, info.decl, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
-		for i := range argTypes {
+		for i := range orderedArgs {
 			if expected, ok := paramTypeForArg(sig, i); ok {
-				argType := c.checkExprWithExpected(args[i], expected)
-				c.requireAssignable(argType, expected, exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+				argType := c.checkExprWithExpected(orderedArgs[i], expected)
+				c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
 			} else {
-				c.checkExpr(args[i])
+				c.checkExpr(orderedArgs[i])
 			}
 		}
 		return sig.ReturnType
 	case TypeInterface:
-		if receiverType.Name == "Term" && (member.Name == "println" || member.Name == "print") {
-			for _, arg := range args {
-				c.checkExpr(arg)
-			}
-			return receiverType
-		}
 		info, ok := c.interfaces[receiverType.Name]
 		if !ok {
+			c.checkArgTypes(callArgValues(args))
 			return unknownType
 		}
 		method, ok := info.methods[member.Name]
@@ -1026,16 +1098,37 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.Expr)
 			c.addDiagnostic("unknown_member", "unknown member '"+member.Name+"'", member.Span)
 			return unknownType
 		}
+		orderedArgs := callArgValues(args)
+		if hasNamedCallArgs(args) {
+			if method.decl.Parameters[len(method.decl.Parameters)-1].Variadic {
+				c.checkArgTypes(callArgValues(args))
+				c.addDiagnostic("invalid_named_argument", "named arguments are not supported for variadic methods", member.Span)
+				return unknownType
+			}
+			reordered, ok := c.reorderCallArgs(method.decl.Parameters, args, member.Span, "method '"+member.Name+"'")
+			if !ok {
+				c.checkArgTypes(callArgValues(args))
+				return unknownType
+			}
+			orderedArgs = reordered
+		}
+		argTypes := c.checkArgTypes(orderedArgs)
+		if receiverType.Name == "Term" && (member.Name == "println" || member.Name == "print") {
+			for _, arg := range orderedArgs {
+				c.checkExpr(arg)
+			}
+			return receiverType
+		}
 		sig := c.instantiateInterfaceMethodSignature(method.decl, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
 		if !validArgCount(sig, len(argTypes)) {
 			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %s arguments, got %d", member.Name, expectedArgCount(sig), len(argTypes)), member.Span)
 		}
 		for i := range argTypes {
 			if expected, ok := paramTypeForArg(sig, i); ok {
-				argType := c.checkExprWithExpected(args[i], expected)
-				c.requireAssignable(argType, expected, exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+				argType := c.checkExprWithExpected(orderedArgs[i], expected)
+				c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
 			} else {
-				c.checkExpr(args[i])
+				c.checkExpr(orderedArgs[i])
 			}
 		}
 		return sig.ReturnType
@@ -1460,6 +1553,121 @@ func (c *Checker) checkArgTypes(args []parser.Expr) []*Type {
 	return result
 }
 
+func callArgValues(args []parser.CallArg) []parser.Expr {
+	values := make([]parser.Expr, len(args))
+	for i, arg := range args {
+		values[i] = arg.Value
+	}
+	return values
+}
+
+func hasNamedCallArgs(args []parser.CallArg) bool {
+	for _, arg := range args {
+		if arg.Name != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func tryReorderCallArgs(params []parser.Parameter, args []parser.CallArg) ([]parser.Expr, bool) {
+	if len(args) == 0 {
+		if len(params) == 0 {
+			return []parser.Expr{}, true
+		}
+		return nil, false
+	}
+	if len(params) > 0 && params[len(params)-1].Variadic {
+		return nil, false
+	}
+	ordered := make([]parser.Expr, len(params))
+	filled := make([]bool, len(params))
+	seenNamed := false
+	pos := 0
+	for _, arg := range args {
+		if arg.Name == "" {
+			if seenNamed || pos >= len(params) {
+				return nil, false
+			}
+			ordered[pos] = arg.Value
+			filled[pos] = true
+			pos++
+			continue
+		}
+		seenNamed = true
+		paramIndex := -1
+		for i, param := range params {
+			if param.Name == arg.Name {
+				paramIndex = i
+				break
+			}
+		}
+		if paramIndex < 0 || filled[paramIndex] {
+			return nil, false
+		}
+		ordered[paramIndex] = arg.Value
+		filled[paramIndex] = true
+	}
+	for _, ok := range filled {
+		if !ok {
+			return nil, false
+		}
+	}
+	return ordered, true
+}
+
+func (c *Checker) reorderCallArgs(params []parser.Parameter, args []parser.CallArg, span parser.Span, callable string) ([]parser.Expr, bool) {
+	if len(params) > 0 && params[len(params)-1].Variadic {
+		c.addDiagnostic("invalid_named_argument", "named arguments are not supported for variadic "+callable, span)
+		return nil, false
+	}
+	ordered := make([]parser.Expr, len(params))
+	filled := make([]bool, len(params))
+	seenNamed := false
+	pos := 0
+	for _, arg := range args {
+		if arg.Name == "" {
+			if seenNamed {
+				c.addDiagnostic("invalid_named_argument", "positional arguments cannot follow named arguments", arg.Span)
+				return nil, false
+			}
+			if pos >= len(params) {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("%s expects %d arguments, got %d", callable, len(params), len(args)), span)
+				return nil, false
+			}
+			ordered[pos] = arg.Value
+			filled[pos] = true
+			pos++
+			continue
+		}
+		seenNamed = true
+		paramIndex := -1
+		for i, param := range params {
+			if param.Name == arg.Name {
+				paramIndex = i
+				break
+			}
+		}
+		if paramIndex < 0 {
+			c.addDiagnostic("unknown_argument", "unknown named argument '"+arg.Name+"'", arg.Span)
+			return nil, false
+		}
+		if filled[paramIndex] {
+			c.addDiagnostic("duplicate_argument", "argument '"+arg.Name+"' was provided more than once", arg.Span)
+			return nil, false
+		}
+		ordered[paramIndex] = arg.Value
+		filled[paramIndex] = true
+	}
+	for i, ok := range filled {
+		if !ok {
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("missing argument '%s' in %s", params[i].Name, callable), span)
+			return nil, false
+		}
+	}
+	return ordered, true
+}
+
 func (c *Checker) resolveConstructorOverload(class classInfo, argTypes []*Type, span parser.Span) (*parser.MethodDecl, bool) {
 	candidates := make([]*parser.MethodDecl, 0, len(class.constructors))
 	for _, ctor := range class.constructors {
@@ -1509,6 +1717,86 @@ func (c *Checker) resolveMethodOverload(class classInfo, receiver *Type, name st
 	}
 	c.addDiagnostic("no_matching_overload", fmt.Sprintf("no overload of method '%s' matches %d arguments", name, len(argTypes)), span)
 	return methodInfo{}, false
+}
+
+func (c *Checker) resolveNamedConstructorOverload(class classInfo, args []parser.CallArg, span parser.Span) (*parser.MethodDecl, []parser.Expr, bool) {
+	var (
+		matchCtor  *parser.MethodDecl
+		matchArgs  []parser.Expr
+		matchCount int
+	)
+	for _, ctor := range class.constructors {
+		ordered, ok := tryReorderCallArgs(ctor.Parameters, args)
+		if !ok {
+			continue
+		}
+		argTypes := c.checkArgTypes(ordered)
+		sig := c.instantiateMethodSignature(ctor, class.decl, nil)
+		if !signatureMatches(sig, argTypes) {
+			continue
+		}
+		matchCtor = ctor
+		matchArgs = ordered
+		matchCount++
+	}
+	if matchCount == 1 {
+		return matchCtor, matchArgs, true
+	}
+	if matchCount > 1 {
+		c.addDiagnostic("ambiguous_overload", "constructor call for class '"+class.decl.Name+"' is ambiguous", span)
+		return nil, nil, false
+	}
+	if len(class.constructors) == 1 {
+		c.reorderCallArgs(class.constructors[0].Parameters, args, span, "constructor '"+class.decl.Name+"'")
+		return nil, nil, false
+	}
+	c.addDiagnostic("no_matching_overload", fmt.Sprintf("no constructor overload for class '%s' matches %d arguments", class.decl.Name, len(args)), span)
+	return nil, nil, false
+}
+
+func (c *Checker) resolveNamedMethodOverload(class classInfo, receiver *Type, name string, args []parser.CallArg, span parser.Span) (methodInfo, []parser.Expr, bool) {
+	methods, ok := class.methods[name]
+	if !ok || len(methods) == 0 {
+		c.addDiagnostic("unknown_member", "unknown member '"+name+"'", span)
+		return methodInfo{}, nil, false
+	}
+	subst := c.substForDecl(class.decl.TypeParameters, receiver.Args)
+	type candidate struct {
+		method methodInfo
+		args   []parser.Expr
+	}
+	var matches []candidate
+	for _, method := range methods {
+		if method.decl.Private && !c.canAccessPrivate(class.decl) {
+			continue
+		}
+		ordered, ok := tryReorderCallArgs(method.decl.Parameters, args)
+		if !ok {
+			continue
+		}
+		argTypes := c.checkArgTypes(ordered)
+		sig := c.instantiateMethodSignature(method.decl, class.decl, subst)
+		if signatureMatches(sig, argTypes) {
+			matches = append(matches, candidate{method: method, args: ordered})
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0].method, matches[0].args, true
+	}
+	if len(matches) > 1 {
+		c.addDiagnostic("ambiguous_overload", "method call '"+name+"' is ambiguous", span)
+		return methodInfo{}, nil, false
+	}
+	if hasPrivateOnlyMatch(methods, class.decl, c) {
+		c.addDiagnostic("private_access", "cannot access private method '"+name+"' outside class '"+class.decl.Name+"'", span)
+		return methodInfo{}, nil, false
+	}
+	if len(methods) == 1 {
+		c.reorderCallArgs(methods[0].decl.Parameters, args, span, "method '"+name+"'")
+		return methodInfo{}, nil, false
+	}
+	c.addDiagnostic("no_matching_overload", fmt.Sprintf("no overload of method '%s' matches %d arguments", name, len(args)), span)
+	return methodInfo{}, nil, false
 }
 
 func (c *Checker) findMatchingMethodOverload(class classInfo, name string, paramTypes []*Type) (methodInfo, bool) {

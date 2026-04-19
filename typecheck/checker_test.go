@@ -791,6 +791,32 @@ def run() Bool {
 	}
 }
 
+func TestAnalyzeNamedCallArguments(t *testing.T) {
+	src := `
+class Counter {
+	def set(value Int, label String) Int {
+		return value
+	}
+}
+
+def doSomething(a String, b Int) Int {
+	return b
+}
+
+def run() Int {
+	counter = Counter()
+	left Int = doSomething(b = 5, a = "crap")
+	right Int = counter.set(label = "ok", value = 7)
+	return left + right
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeUnitLambda(t *testing.T) {
 	src := `
 def run() Int {
