@@ -3,6 +3,7 @@ package typecheck
 import (
 	"fmt"
 
+	"a-lang/module"
 	"a-lang/parser"
 	"a-lang/semantic"
 )
@@ -34,6 +35,7 @@ type interfaceMethodInfo struct {
 }
 
 type classInfo struct {
+	name         string
 	decl         *parser.ClassDecl
 	fields       map[string]fieldInfo
 	methods      map[string][]methodInfo
@@ -43,6 +45,13 @@ type classInfo struct {
 type interfaceInfo struct {
 	decl    *parser.InterfaceDecl
 	methods map[string]interfaceMethodInfo
+}
+
+type moduleInfo struct {
+	functions     map[string]Signature
+	functionDecls map[string]*parser.FunctionDecl
+	classes       map[string]classInfo
+	interfaces    map[string]interfaceInfo
 }
 
 type Result struct {
@@ -59,6 +68,7 @@ type Checker struct {
 	functionDecls map[string]*parser.FunctionDecl
 	classes       map[string]classInfo
 	interfaces    map[string]interfaceInfo
+	imports       map[string]moduleInfo
 	returnTypes   []*Type
 	exprTypes     map[parser.Expr]*Type
 	currentClass  *parser.ClassDecl
@@ -77,6 +87,7 @@ func Analyze(program *parser.Program) Result {
 		functionDecls: map[string]*parser.FunctionDecl{},
 		classes:    map[string]classInfo{},
 		interfaces: map[string]interfaceInfo{},
+		imports:    map[string]moduleInfo{},
 		exprTypes:  map[parser.Expr]*Type{},
 	}
 	c.installBuiltinInterfaces()
@@ -85,9 +96,97 @@ func Analyze(program *parser.Program) Result {
 	return Result{Diagnostics: c.diagnostics, ExprTypes: c.exprTypes}
 }
 
+func AnalyzeModule(mod *module.LoadedModule) Result {
+	seen := map[string]Result{}
+	var analyzeOne func(*module.LoadedModule) Result
+	analyzeOne = func(current *module.LoadedModule) Result {
+		if result, ok := seen[current.Path]; ok {
+			return result
+		}
+		c := &Checker{
+			globals:       map[string]binding{},
+			functions:     map[string]Signature{},
+			functionDecls: map[string]*parser.FunctionDecl{},
+			classes:       map[string]classInfo{},
+			interfaces:    map[string]interfaceInfo{},
+			imports:       map[string]moduleInfo{},
+			exprTypes:     map[parser.Expr]*Type{},
+		}
+		c.installBuiltinInterfaces()
+		c.installModuleImports(current)
+		c.collectDecls(current.Program)
+		c.checkProgram(current.Program)
+		result := Result{Diagnostics: append([]semantic.Diagnostic(nil), c.diagnostics...), ExprTypes: c.exprTypes}
+		seen[current.Path] = result
+		for _, imported := range current.Imports {
+			child := analyzeOne(imported)
+			result.Diagnostics = append(result.Diagnostics, child.Diagnostics...)
+		}
+		seen[current.Path] = result
+		return result
+	}
+	return analyzeOne(mod)
+}
+
 func (c *Checker) installBuiltinInterfaces() {
 	for name, info := range builtinInterfaceInfos() {
 		c.interfaces[name] = info
+	}
+}
+
+func (c *Checker) installModuleImports(current *module.LoadedModule) {
+	for alias, imported := range current.Imports {
+		info := moduleInfo{
+			functions:     map[string]Signature{},
+			functionDecls: map[string]*parser.FunctionDecl{},
+			classes:       map[string]classInfo{},
+			interfaces:    map[string]interfaceInfo{},
+		}
+		for _, fn := range imported.Program.Functions {
+			params := make([]*Type, len(fn.Parameters))
+			for i, param := range fn.Parameters {
+				params[i] = fromTypeRef(param.Type, c)
+			}
+			info.functions[fn.Name] = Signature{
+				Parameters: params,
+				ReturnType: fromTypeRef(fn.ReturnType, c),
+				Variadic:   len(fn.Parameters) > 0 && fn.Parameters[len(fn.Parameters)-1].Variadic,
+			}
+			info.functionDecls[fn.Name] = fn
+		}
+		for _, decl := range imported.Program.Interfaces {
+			qualified := imported.Path + "::" + decl.Name
+			iface := interfaceInfo{
+				decl:    decl,
+				methods: map[string]interfaceMethodInfo{},
+			}
+			for _, method := range decl.Methods {
+				iface.methods[method.Name] = interfaceMethodInfo{decl: method}
+			}
+			info.interfaces[decl.Name] = iface
+			c.interfaces[qualified] = iface
+		}
+		for _, decl := range imported.Program.Classes {
+			qualified := imported.Path + "::" + decl.Name
+			class := classInfo{
+				name:    qualified,
+				decl:    decl,
+				fields:  map[string]fieldInfo{},
+				methods: map[string][]methodInfo{},
+			}
+			for _, field := range decl.Fields {
+				class.fields[field.Name] = fieldInfo{decl: field}
+			}
+			for _, method := range decl.Methods {
+				class.methods[method.Name] = append(class.methods[method.Name], methodInfo{decl: method})
+				if method.Constructor {
+					class.constructors = append(class.constructors, method)
+				}
+			}
+			info.classes[decl.Name] = class
+			c.classes[qualified] = class
+		}
+		c.imports[alias] = info
 	}
 }
 
@@ -196,6 +295,7 @@ func (c *Checker) collectDecls(program *parser.Program) {
 	}
 	for _, decl := range program.Classes {
 		info := classInfo{
+			name:    decl.Name,
 			decl:    decl,
 			fields:  map[string]fieldInfo{},
 			methods: map[string][]methodInfo{},
@@ -698,6 +798,10 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			result = fieldType
 			break
 		}
+		if _, ok := c.imports[e.Name]; ok {
+			result = &Type{Kind: TypeModule, Name: e.Name}
+			break
+		}
 		if sig, ok := c.functions[e.Name]; ok {
 			result = functionType(e.Name, sig)
 			break
@@ -1026,7 +1130,7 @@ func (c *Checker) checkIndexExpr(expr *parser.IndexExpr) *Type {
 }
 
 func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *Type {
-	classType := &Type{Kind: TypeClass, Name: class.decl.Name}
+	classType := &Type{Kind: TypeClass, Name: class.name}
 	orderedArgs := callArgValues(call.Args)
 	if hasNamedCallArgs(call.Args) {
 		if ctor, reordered, ok := c.resolveNamedConstructorOverload(class, call.Args, call.Span); ok {
@@ -1073,6 +1177,44 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 	receiverType := c.checkExpr(member.Receiver)
 	if isUnknown(receiverType) {
 		c.checkArgTypes(callArgValues(args))
+		return unknownType
+	}
+	if receiverType.Kind == TypeModule {
+		info, ok := c.imports[receiverType.Name]
+		if !ok {
+			c.checkArgTypes(callArgValues(args))
+			return unknownType
+		}
+		if fn, ok := info.functions[member.Name]; ok {
+			orderedArgs := callArgValues(args)
+			if hasNamedCallArgs(args) {
+				decl := info.functionDecls[member.Name]
+				reordered, ok := c.reorderCallArgs(decl.Parameters, args, member.Span, "function '"+member.Name+"'")
+				if !ok {
+					c.checkArgTypes(callArgValues(args))
+					return fn.ReturnType
+				}
+				orderedArgs = reordered
+			}
+			if !validArgCount(fn, len(orderedArgs)) {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(fn), len(orderedArgs)), member.Span)
+			}
+			for i, arg := range orderedArgs {
+				if expected, ok := paramTypeForArg(fn, i); ok {
+					argType := c.checkExprWithExpected(arg, expected)
+					c.requireAssignable(argType, expected, exprSpan(arg), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+				} else {
+					c.checkExpr(arg)
+				}
+			}
+			return fn.ReturnType
+		}
+		if class, ok := info.classes[member.Name]; ok {
+			call := &parser.CallExpr{Callee: member, Args: args, Span: member.Span}
+			return c.checkConstructorCall(class, call)
+		}
+		c.checkArgTypes(callArgValues(args))
+		c.addDiagnostic("unknown_member", "unknown imported member '"+member.Name+"' on module '"+receiverType.Name+"'", member.Span)
 		return unknownType
 	}
 	if receiverType.Kind == TypeBuiltin && receiverType.Name == "Array" {
@@ -1238,6 +1380,20 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr, expected *Type) *Type
 
 func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
 	receiverType := c.checkExpr(expr.Receiver)
+	if receiverType.Kind == TypeModule {
+		info, ok := c.imports[receiverType.Name]
+		if !ok {
+			return unknownType
+		}
+		if fn, ok := info.functions[expr.Name]; ok {
+			return functionType(expr.Name, fn)
+		}
+		if class, ok := info.classes[expr.Name]; ok {
+			return &Type{Kind: TypeClass, Name: class.name}
+		}
+		c.addDiagnostic("unknown_member", "unknown imported member '"+expr.Name+"' on module '"+receiverType.Name+"'", expr.Span)
+		return unknownType
+	}
 	if memberType, ok := c.lookupMember(receiverType, expr.Name, expr.Span); ok {
 		return memberType
 	}

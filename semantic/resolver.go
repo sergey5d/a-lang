@@ -1,6 +1,9 @@
 package semantic
 
-import "a-lang/parser"
+import (
+	"a-lang/module"
+	"a-lang/parser"
+)
 
 type Resolver struct {
 	diagnostics []Diagnostic
@@ -10,9 +13,16 @@ type Resolver struct {
 	functions   map[string]parser.Span
 	classes     map[string]parser.Span
 	interfaces  map[string]parser.Span
+	imports     map[string]importInfo
 	classTypes  map[string]typeDecl
 	ifaceTypes  map[string]typeDecl
 	loopDepth   int
+}
+
+type importInfo struct {
+	functions  map[string]parser.Span
+	classes    map[string]parser.Span
+	interfaces map[string]parser.Span
 }
 
 type symbol struct {
@@ -34,11 +44,62 @@ func Analyze(program *parser.Program) []Diagnostic {
 		functions:  map[string]parser.Span{},
 		classes:    map[string]parser.Span{},
 		interfaces: map[string]parser.Span{},
+		imports:    map[string]importInfo{},
 		classTypes: map[string]typeDecl{},
 		ifaceTypes: map[string]typeDecl{},
 	}
 	resolver.resolveProgram(program)
 	return resolver.diagnostics
+}
+
+func AnalyzeModule(mod *module.LoadedModule) []Diagnostic {
+	seen := map[string]bool{}
+	var diagnostics []Diagnostic
+	var walk func(*module.LoadedModule)
+	walk = func(current *module.LoadedModule) {
+		if seen[current.Path] {
+			return
+		}
+		seen[current.Path] = true
+		for _, imported := range current.Imports {
+			walk(imported)
+		}
+		resolver := &Resolver{
+			globals:    map[string]symbol{},
+			functions:  map[string]parser.Span{},
+			classes:    map[string]parser.Span{},
+			interfaces: map[string]parser.Span{},
+			imports:    moduleImportInfo(current),
+			classTypes: map[string]typeDecl{},
+			ifaceTypes: map[string]typeDecl{},
+		}
+		resolver.resolveProgram(current.Program)
+		diagnostics = append(diagnostics, resolver.diagnostics...)
+	}
+	walk(mod)
+	return diagnostics
+}
+
+func moduleImportInfo(mod *module.LoadedModule) map[string]importInfo {
+	out := map[string]importInfo{}
+	for alias, imported := range mod.Imports {
+		info := importInfo{
+			functions:  map[string]parser.Span{},
+			classes:    map[string]parser.Span{},
+			interfaces: map[string]parser.Span{},
+		}
+		for _, fn := range imported.Program.Functions {
+			info.functions[fn.Name] = fn.Span
+		}
+		for _, class := range imported.Program.Classes {
+			info.classes[class.Name] = class.Span
+		}
+		for _, iface := range imported.Program.Interfaces {
+			info.interfaces[iface.Name] = iface.Span
+		}
+		out[alias] = info
+	}
+	return out
 }
 
 func (r *Resolver) resolveProgram(program *parser.Program) {
@@ -271,7 +332,7 @@ func (r *Resolver) resolveBlockStatements(statements []parser.Statement) {
 func (r *Resolver) resolveExpr(expr parser.Expr) {
 	switch e := expr.(type) {
 	case *parser.Identifier:
-		if r.isDefined(e.Name) || r.functions[e.Name] != (parser.Span{}) || r.classes[e.Name] != (parser.Span{}) || r.interfaces[e.Name] != (parser.Span{}) || isBuiltin(e.Name) {
+		if r.isDefined(e.Name) || r.functions[e.Name] != (parser.Span{}) || r.classes[e.Name] != (parser.Span{}) || r.interfaces[e.Name] != (parser.Span{}) || r.imports[e.Name].functions != nil || isBuiltin(e.Name) {
 			return
 		}
 		r.addDiagnostic("undefined_name", "undefined name '"+e.Name+"'", e.Span)
@@ -288,6 +349,15 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 			r.resolveExpr(arg.Value)
 		}
 	case *parser.MemberExpr:
+		if ident, ok := e.Receiver.(*parser.Identifier); ok {
+			if info, ok := r.imports[ident.Name]; ok {
+				if info.functions[e.Name] != (parser.Span{}) || info.classes[e.Name] != (parser.Span{}) || info.interfaces[e.Name] != (parser.Span{}) {
+					return
+				}
+				r.addDiagnostic("unknown_member", "unknown imported member '"+e.Name+"' on module '"+ident.Name+"'", e.Span)
+				return
+			}
+		}
 		r.resolveExpr(e.Receiver)
 	case *parser.IndexExpr:
 		r.resolveExpr(e.Receiver)

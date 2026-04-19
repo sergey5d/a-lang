@@ -23,10 +23,12 @@ class B {
     private age Int
     private name String
     private malnutritioned Bool := false
+    private unassigned Float := ?
 
     def this(age Int, name String) {
         this.age = age
         this.name = name
+        unassigned := 1.1
     }
 
     def trueAge() Int = age

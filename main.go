@@ -2,6 +2,7 @@ package main
 
 import (
 	"a-lang/interpreter"
+	"a-lang/module"
 	"a-lang/parser"
 	"a-lang/semantic"
 	"a-lang/typecheck"
@@ -17,20 +18,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	src, err := os.ReadFile(os.Args[1])
+	loaded, err := module.Load(os.Args[1])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "read %s: %v\n", os.Args[1], err)
+		fmt.Fprintf(os.Stderr, "load error: %v\n", err)
 		os.Exit(1)
 	}
+	program := loaded.Program
 
-	program, err := parser.Parse(string(src))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "parse error: %v\n", err)
-		os.Exit(1)
-	}
-
-	diagnostics := semantic.Analyze(program)
-	typeResult := typecheck.Analyze(program)
+	diagnostics := semantic.AnalyzeModule(loaded)
+	typeResult := typecheck.AnalyzeModule(loaded)
 	diagnostics = append(diagnostics, typeResult.Diagnostics...)
 	if len(diagnostics) > 0 {
 		for _, diagnostic := range diagnostics {
@@ -69,7 +65,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		in := interpreter.New(program)
+		in := interpreter.NewModule(loaded)
 		value, err := in.Call(entry, args...)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)

@@ -1,9 +1,35 @@
 package parser
 
+import "fmt"
+
 func (p *Parser) parseProgram() (*Program, error) {
 	program := &Program{}
+	if p.match(TokenPackage) {
+		keyword := p.previous()
+		name, span, err := p.parseModulePath("expected package name")
+		if err != nil {
+			return nil, err
+		}
+		program.PackageName = name
+		program.PackageSpan = mergeSpans(tokenSpan(keyword), span)
+	}
+	for p.match(TokenImport) {
+		keyword := p.previous()
+		path, span, err := p.parseModulePath("expected import path")
+		if err != nil {
+			return nil, err
+		}
+		program.Imports = append(program.Imports, ImportDecl{
+			Path: path,
+			Span: mergeSpans(tokenSpan(keyword), span),
+		})
+	}
 	for !p.isAtEnd() {
 		switch p.peek().Type {
+		case TokenPackage:
+			return nil, fmt.Errorf("'package' must appear before declarations")
+		case TokenImport:
+			return nil, fmt.Errorf("'import' must appear before declarations")
 		case TokenDef:
 			fn, err := p.parseFunction()
 			if err != nil {
@@ -38,6 +64,12 @@ func (p *Parser) parseProgram() (*Program, error) {
 
 func (p *Parser) programSpan(program *Program) (Span, bool) {
 	var spans []Span
+	if program.PackageName != "" {
+		spans = append(spans, program.PackageSpan)
+	}
+	for _, imp := range program.Imports {
+		spans = append(spans, imp.Span)
+	}
 	for _, fn := range program.Functions {
 		spans = append(spans, fn.Span)
 	}
@@ -54,4 +86,22 @@ func (p *Parser) programSpan(program *Program) (Span, bool) {
 		return Span{}, false
 	}
 	return mergeSpans(spans[0], spans[len(spans)-1]), true
+}
+
+func (p *Parser) parseModulePath(message string) (string, Span, error) {
+	start, err := p.consume(TokenIdentifier, message)
+	if err != nil {
+		return "", Span{}, err
+	}
+	path := start.Lexeme
+	span := tokenSpan(start)
+	for p.match(TokenSlash) {
+		next, err := p.consume(TokenIdentifier, "expected path segment after '/'")
+		if err != nil {
+			return "", Span{}, err
+		}
+		path += "/" + next.Lexeme
+		span = mergeSpans(span, tokenSpan(next))
+	}
+	return path, span, nil
 }

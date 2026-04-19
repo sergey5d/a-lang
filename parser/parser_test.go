@@ -235,6 +235,32 @@ def run(value Any) Bool {
 	}
 }
 
+func TestParsePackageAndImports(t *testing.T) {
+	src := `
+package app
+import util
+import model/user
+
+def main() Unit {
+	()
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if program.PackageName != "app" {
+		t.Fatalf("expected package app, got %q", program.PackageName)
+	}
+	if len(program.Imports) != 2 {
+		t.Fatalf("expected 2 imports, got %d", len(program.Imports))
+	}
+	if program.Imports[0].Path != "util" || program.Imports[1].Path != "model/user" {
+		t.Fatalf("unexpected imports %#v", program.Imports)
+	}
+}
+
 func TestParseMethodWithoutReturnType(t *testing.T) {
 	src := `
 class Counter {

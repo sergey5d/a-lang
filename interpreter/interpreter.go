@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"a-lang/module"
 	"a-lang/parser"
 )
 
@@ -36,6 +37,9 @@ type Interpreter struct {
 	program   *parser.Program
 	functions map[string]*parser.FunctionDecl
 	classes   map[string]*parser.ClassDecl
+	imports   map[string]*Interpreter
+	globals   *env
+	ready     bool
 }
 
 type instance struct {
@@ -98,6 +102,7 @@ func New(program *parser.Program) *Interpreter {
 		program:   program,
 		functions: map[string]*parser.FunctionDecl{},
 		classes:   map[string]*parser.ClassDecl{},
+		imports:   map[string]*Interpreter{},
 	}
 	for _, fn := range program.Functions {
 		in.functions[fn.Name] = fn
@@ -108,15 +113,42 @@ func New(program *parser.Program) *Interpreter {
 	return in
 }
 
+func NewModule(mod *module.LoadedModule) *Interpreter {
+	in := New(mod.Program)
+	for alias, imported := range mod.Imports {
+		in.imports[alias] = NewModule(imported)
+	}
+	return in
+}
+
 func (in *Interpreter) Call(function string, args ...Value) (Value, error) {
-	global := newEnv(nil)
-	if err := in.execTopLevel(global); err != nil {
+	global, err := in.ensureGlobals()
+	if err != nil {
 		return nil, err
 	}
 	return in.callFunctionByName(function, args, global)
 }
 
+func (in *Interpreter) ensureGlobals() (*env, error) {
+	if in.ready {
+		return in.globals, nil
+	}
+	global := newEnv(nil)
+	if err := in.execTopLevel(global); err != nil {
+		return nil, err
+	}
+	in.globals = global
+	in.ready = true
+	return global, nil
+}
+
 func (in *Interpreter) execTopLevel(global *env) error {
+	for alias, imported := range in.imports {
+		global.define(alias, moduleRef{name: alias}, false)
+		if _, err := imported.ensureGlobals(); err != nil {
+			return err
+		}
+	}
 	for _, stmt := range in.program.Statements {
 		if _, signal, err := in.execStmt(stmt, global, nil); err != nil {
 			return err
@@ -597,7 +629,7 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			}
 		}
 		if _, ok := in.functions[e.Name]; ok {
-			return e.Name, nil
+			return functionRef{module: in, name: e.Name}, nil
 		}
 		switch e.Name {
 		case "List", "Set", "Map", "Array", "Some", "None":
@@ -605,8 +637,11 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		case "Term":
 			return &nativeTerm{}, nil
 		}
+		if _, ok := in.imports[e.Name]; ok {
+			return moduleRef{name: e.Name}, nil
+		}
 		if _, ok := in.classes[e.Name]; ok {
-			return classRef{name: e.Name}, nil
+			return classRef{module: in, name: e.Name}, nil
 		}
 		return nil, RuntimeError{Message: "undefined name '" + e.Name + "'", Span: e.Span}
 	case *parser.IntegerLiteral:
@@ -860,22 +895,22 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 		args[i] = namedValueArg{Name: arg.Name, Value: value, Span: arg.Span}
 	}
 	switch fn := callee.(type) {
-	case string:
+	case functionRef:
 		ordered := namedArgValues(args)
 		if hasNamedParserArgs(call.Args) {
-			decl, ok := in.functions[fn]
+			decl, ok := fn.module.functions[fn.name]
 			if !ok {
-				return nil, RuntimeError{Message: "undefined function '" + fn + "'", Span: call.Span}
+				return nil, RuntimeError{Message: "undefined function '" + fn.name + "'", Span: call.Span}
 			}
-			reordered, err := reorderNamedValueArgs(decl.Parameters, args, call.Span, "function '"+fn+"'")
+			reordered, err := reorderNamedValueArgs(decl.Parameters, args, call.Span, "function '"+fn.name+"'")
 			if err != nil {
 				return nil, err
 			}
 			ordered = reordered
 		}
-		return in.callFunctionByName(fn, ordered, local)
+		return fn.module.callFunctionByName(fn.name, ordered, local)
 	case classRef:
-		class, ok := in.classes[fn.name]
+		class, ok := fn.module.classes[fn.name]
 		if !ok {
 			return nil, RuntimeError{Message: "undefined class '" + fn.name + "'", Span: call.Span}
 		}
@@ -887,7 +922,7 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 				}
 				ordered = reordered
 			}
-		return in.construct(class, ordered, local)
+		return fn.module.construct(class, ordered, local)
 	case *closure:
 		if hasNamedParserArgs(call.Args) {
 			return nil, RuntimeError{Message: "named arguments require a direct function, method, or constructor call", Span: call.Span}
@@ -949,6 +984,37 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 		}
 		args[i] = namedValueArg{Name: arg.Name, Value: value, Span: arg.Span}
 	}
+	if modRef, ok := receiver.(moduleRef); ok {
+		mod, ok := in.imports[modRef.name]
+		if !ok {
+			return nil, RuntimeError{Message: "unknown module '" + modRef.name + "'", Span: member.Span}
+		}
+		ordered := namedArgValues(args)
+		if hasNamedParserArgs(argExprs) {
+			if decl, ok := mod.functions[member.Name]; ok {
+				reordered, err := reorderNamedValueArgs(decl.Parameters, args, member.Span, "function '"+member.Name+"'")
+				if err != nil {
+					return nil, err
+				}
+				ordered = reordered
+			}
+		}
+		if _, ok := mod.functions[member.Name]; ok {
+			return mod.callFunctionByName(member.Name, ordered, mod.globals)
+		}
+		if _, ok := mod.classes[member.Name]; ok {
+			class := mod.classes[member.Name]
+			if hasNamedParserArgs(argExprs) {
+				reordered, err := reorderConstructorValueArgs(class, args, member.Span)
+				if err != nil {
+					return nil, err
+				}
+				ordered = reordered
+			}
+			return mod.construct(class, ordered, mod.globals)
+		}
+		return nil, RuntimeError{Message: "unknown member '" + member.Name + "'", Span: member.Span}
+	}
 	if native, ok := in.callNativeMethod(receiver, member.Name, args, local, member.Span); ok {
 		return native.value, native.err
 	}
@@ -1008,6 +1074,18 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 
 func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Value, error) {
 	switch value := receiver.(type) {
+	case moduleRef:
+		mod, ok := in.imports[value.name]
+		if !ok {
+			return nil, RuntimeError{Message: "unknown module '" + value.name + "'", Span: expr.Span}
+		}
+		if _, ok := mod.functions[expr.Name]; ok {
+			return functionRef{module: mod, name: expr.Name}, nil
+		}
+		if _, ok := mod.classes[expr.Name]; ok {
+			return classRef{module: mod, name: expr.Name}, nil
+		}
+		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
 	case *instance:
 		if field, ok := value.fields[expr.Name]; ok {
 			if _, deferred := field.(deferredValue); deferred {
@@ -1495,7 +1573,15 @@ func nativeKey(value Value, span parser.Span, local *env, in *Interpreter) (stri
 	}
 }
 
-type classRef struct{ name string }
+type moduleRef struct{ name string }
+type functionRef struct {
+	module *Interpreter
+	name   string
+}
+type classRef struct {
+	module *Interpreter
+	name   string
+}
 
 func newEnv(parent *env) *env {
 	return &env{parent: parent, values: map[string]slot{}}

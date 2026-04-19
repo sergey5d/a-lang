@@ -2,7 +2,7 @@ package examples_test
 
 import (
 	"a-lang/interpreter"
-	"a-lang/parser"
+	"a-lang/module"
 	"a-lang/semantic"
 	"a-lang/typecheck"
 	"fmt"
@@ -42,13 +42,12 @@ func TestExamples(t *testing.T) {
 				t.Fatalf("parseExpectedOutput returned error: %v", err)
 			}
 
-			program, err := parser.Parse(src)
+			loaded, err := module.Load(path)
 			if err != nil {
-				t.Fatalf("Parse returned error: %v", err)
+				t.Fatalf("Load returned error: %v", err)
 			}
-
-			diagnostics := semantic.Analyze(program)
-			typeResult := typecheck.Analyze(program)
+			diagnostics := semantic.AnalyzeModule(loaded)
+			typeResult := typecheck.AnalyzeModule(loaded)
 			diagnostics = append(diagnostics, typeResult.Diagnostics...)
 			if len(diagnostics) > 0 {
 				var messages []string
@@ -65,7 +64,7 @@ func TestExamples(t *testing.T) {
 			}
 			os.Stdout = writer
 
-			in := interpreter.New(program)
+			in := interpreter.NewModule(loaded)
 			value, callErr := in.Call("main")
 
 			_ = writer.Close()

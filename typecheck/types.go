@@ -16,6 +16,7 @@ const (
 	TypeParam     TypeKind = "type_param"
 	TypeFunction  TypeKind = "function"
 	TypeTuple     TypeKind = "tuple"
+	TypeModule    TypeKind = "module"
 )
 
 type Type struct {
