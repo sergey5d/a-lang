@@ -720,7 +720,7 @@ class SolidWork with Stringable {
 }
 
 class RecordKeeper {
-	record Set[String]
+	entries Set[String]
 	private approved Bool
 }
 
@@ -775,6 +775,28 @@ solidWork = SolidWork(1, false)
 	}
 	if !cls.Methods[0].Constructor {
 		t.Fatalf("expected init to be marked as constructor")
+	}
+}
+
+func TestParseRecordDecl(t *testing.T) {
+	src := `
+record Amount {
+	amount Int
+	description String
+
+	def label() String = description
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Classes) != 1 {
+		t.Fatalf("expected 1 aggregate decl, got %d", len(program.Classes))
+	}
+	if !program.Classes[0].Record {
+		t.Fatalf("expected declaration to be marked as record")
 	}
 }
 

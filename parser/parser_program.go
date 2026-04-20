@@ -48,6 +48,12 @@ func (p *Parser) parseProgram() (*Program, error) {
 				return nil, err
 			}
 			program.Classes = append(program.Classes, decl)
+		case TokenRecord:
+			decl, err := p.parseRecord()
+			if err != nil {
+				return nil, err
+			}
+			program.Classes = append(program.Classes, decl)
 		default:
 			stmt, err := p.parseStatement()
 			if err != nil {

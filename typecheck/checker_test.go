@@ -242,6 +242,22 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeRecordRejectsMutableFields(t *testing.T) {
+	src := `
+record Amount {
+	amount Int := 1
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics for mutable record field")
+	}
+	if result.Diagnostics[0].Code != "invalid_record_field" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
 func TestAnalyzeInterfaceImplementation(t *testing.T) {
 	src := `
 interface Stringable {

@@ -3,11 +3,19 @@ package parser
 import "fmt"
 
 func (p *Parser) parseClass() (*ClassDecl, error) {
-	start, err := p.consume(TokenClass, "expected 'class'")
+	return p.parseClassLike(TokenClass, false, "class")
+}
+
+func (p *Parser) parseRecord() (*ClassDecl, error) {
+	return p.parseClassLike(TokenRecord, true, "record")
+}
+
+func (p *Parser) parseClassLike(kind TokenType, record bool, noun string) (*ClassDecl, error) {
+	start, err := p.consume(kind, "expected '"+noun+"'")
 	if err != nil {
 		return nil, err
 	}
-	name, err := p.consume(TokenIdentifier, "expected class name")
+	name, err := p.consume(TokenIdentifier, "expected "+noun+" name")
 	if err != nil {
 		return nil, err
 	}
@@ -15,7 +23,7 @@ func (p *Parser) parseClass() (*ClassDecl, error) {
 	if err != nil {
 		return nil, err
 	}
-	decl := &ClassDecl{Name: name.Lexeme, TypeParameters: typeParams}
+	decl := &ClassDecl{Name: name.Lexeme, Record: record, TypeParameters: typeParams}
 	if p.match(TokenWith) {
 		for {
 			target, err := p.parseTypeRef()
@@ -28,7 +36,7 @@ func (p *Parser) parseClass() (*ClassDecl, error) {
 			}
 		}
 	}
-	if _, err := p.consume(TokenLBrace, "expected '{' after class name"); err != nil {
+	if _, err := p.consume(TokenLBrace, "expected '{' after "+noun+" name"); err != nil {
 		return nil, err
 	}
 	sawMethod := false

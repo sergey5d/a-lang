@@ -75,6 +75,7 @@ type InterfaceMethod struct {
 // ClassDecl describes a class declaration, its fields, and its methods.
 type ClassDecl struct {
 	Name           string          `json:"name"`
+	Record         bool            `json:"record,omitempty"`
 	TypeParameters []TypeParameter `json:"typeParameters,omitempty"`
 	Implements     []*TypeRef      `json:"implements,omitempty"`
 	Fields         []FieldDecl     `json:"fields,omitempty"`

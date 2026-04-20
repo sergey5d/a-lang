@@ -20,6 +20,7 @@ const (
 	TokenImport     TokenType = "IMPORT"
 	TokenInterface  TokenType = "INTERFACE"
 	TokenClass      TokenType = "CLASS"
+	TokenRecord     TokenType = "RECORD"
 	TokenWith       TokenType = "WITH"
 	TokenPrivate    TokenType = "PRIVATE"
 	TokenIf         TokenType = "IF"
@@ -81,6 +82,7 @@ var keywords = map[string]TokenType{
 	"import":     TokenImport,
 	"interface":  TokenInterface,
 	"class":      TokenClass,
+	"record":     TokenRecord,
 	"with":       TokenWith,
 	"private":    TokenPrivate,
 	"if":         TokenIf,

@@ -402,6 +402,9 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 	}
 
 	for _, field := range decl.Fields {
+		if decl.Record && field.Mutable {
+			c.addDiagnostic("invalid_record_field", "record '"+decl.Name+"' cannot declare mutable field '"+field.Name+"'", field.Span)
+		}
 		fieldType := c.resolveDeclaredType(field.Type)
 		if field.Initializer != nil {
 			valueType := c.checkExprWithExpected(field.Initializer, fieldType)

@@ -82,6 +82,7 @@ func (b *classBuilder) Build(class *parser.ClassDecl) (*ClassDecl, error) {
 
 	return &ClassDecl{
 		Name:           class.Name,
+		Record:         class.Record,
 		TypeParameters: b.params.buildTypeParameters(class.TypeParameters),
 		Interfaces:     implements,
 		Fields:         fields,
