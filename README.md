@@ -78,7 +78,7 @@ The syntax is still evolving, but the current codebase supports a meaningful sub
 - deferred initialization with `?`
 - functions with `def`
 - classes and interfaces
-- `with` for interface implementation
+- `with` for interface implementation, including multiple interfaces on one class or record
 - `private` members
 - generics on classes and interfaces
 - lambdas, including block-bodied lambdas
