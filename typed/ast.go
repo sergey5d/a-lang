@@ -98,6 +98,7 @@ type InterfaceMethod struct {
 type InterfaceDecl struct {
 	Name           string
 	TypeParameters []TypeParameter
+	Extends        []*typecheck.Type
 	Methods        []InterfaceMethod
 	Symbol         SymbolRef
 	Span           parser.Span

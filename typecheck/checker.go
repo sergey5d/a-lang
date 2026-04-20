@@ -330,8 +330,20 @@ func (c *Checker) checkProgram(program *parser.Program) {
 	for _, fn := range program.Functions {
 		c.checkFunction(fn)
 	}
+	for _, decl := range program.Interfaces {
+		c.checkInterface(decl)
+	}
 	for _, decl := range program.Classes {
 		c.checkClass(decl)
+	}
+}
+
+func (c *Checker) checkInterface(decl *parser.InterfaceDecl) {
+	for _, parent := range decl.Extends {
+		parentType := c.resolveDeclaredType(parent)
+		if parentType.Kind != TypeInterface {
+			c.addDiagnostic("invalid_interface_inheritance", "interface '"+decl.Name+"' can only inherit from interfaces", parent.Span)
+		}
 	}
 }
 
@@ -478,7 +490,7 @@ func (c *Checker) checkInterfaceImplementation(class classInfo, impl *parser.Typ
 		}
 	}
 
-	for _, method := range iface.decl.Methods {
+	for _, method := range c.interfaceMethods(iface.decl, map[string]bool{}) {
 		classMethods, ok := class.methods[method.Name]
 		if !ok || len(classMethods) == 0 {
 			c.addDiagnostic("interface_not_implemented", "class '"+class.decl.Name+"' does not implement method '"+method.Name+"'", class.decl.Span)
@@ -493,6 +505,89 @@ func (c *Checker) checkInterfaceImplementation(class classInfo, impl *parser.Typ
 		actual := c.instantiateMethodSignature(classMethod.decl, class.decl, nil)
 		c.compareSignatures(actual, expected, classMethod.decl.Span, method.Name)
 	}
+}
+
+func (c *Checker) interfaceMethods(decl *parser.InterfaceDecl, seen map[string]bool) []parser.InterfaceMethod {
+	if decl == nil {
+		return nil
+	}
+	key := decl.Name
+	if seen[key] {
+		return nil
+	}
+	seen[key] = true
+	var methods []parser.InterfaceMethod
+	added := map[string]bool{}
+	for _, parent := range decl.Extends {
+		info, ok := c.interfaces[parent.Name]
+		if !ok {
+			continue
+		}
+		for _, method := range c.interfaceMethods(info.decl, seen) {
+			sigKey := interfaceMethodKey(method)
+			if added[sigKey] {
+				continue
+			}
+			added[sigKey] = true
+			methods = append(methods, method)
+		}
+	}
+	for _, method := range decl.Methods {
+		sigKey := interfaceMethodKey(method)
+		if added[sigKey] {
+			continue
+		}
+		added[sigKey] = true
+		methods = append(methods, method)
+	}
+	return methods
+}
+
+func interfaceMethodKey(method parser.InterfaceMethod) string {
+	key := method.Name + "("
+	for i, param := range method.Parameters {
+		if i > 0 {
+			key += ","
+		}
+		key += param.Type.Name
+		for _, arg := range param.Type.Arguments {
+			key += "[" + arg.Name + "]"
+		}
+	}
+	key += "):"
+	if method.ReturnType != nil {
+		key += method.ReturnType.Name
+		for _, arg := range method.ReturnType.Arguments {
+			key += "[" + arg.Name + "]"
+		}
+	}
+	return key
+}
+
+func (c *Checker) lookupInterfaceMethodInfo(decl *parser.InterfaceDecl, name string, seen map[string]bool) (interfaceMethodInfo, bool) {
+	if decl == nil {
+		return interfaceMethodInfo{}, false
+	}
+	key := decl.Name
+	if seen[key] {
+		return interfaceMethodInfo{}, false
+	}
+	seen[key] = true
+	for _, method := range decl.Methods {
+		if method.Name == name {
+			return interfaceMethodInfo{decl: method}, true
+		}
+	}
+	for _, parent := range decl.Extends {
+		info, ok := c.interfaces[parent.Name]
+		if !ok {
+			continue
+		}
+		if method, ok := c.lookupInterfaceMethodInfo(info.decl, name, seen); ok {
+			return method, true
+		}
+	}
+	return interfaceMethodInfo{}, false
 }
 
 func (c *Checker) checkEqImplementation(class classInfo, impl *parser.TypeRef) {
@@ -1276,7 +1371,7 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			c.checkArgTypes(callArgValues(args))
 			return unknownType
 		}
-		method, ok := info.methods[member.Name]
+		method, ok := c.lookupInterfaceMethodInfo(info.decl, member.Name, map[string]bool{})
 		if !ok {
 			c.addDiagnostic("unknown_member", "unknown member '"+member.Name+"'", member.Span)
 			return unknownType
@@ -1454,7 +1549,7 @@ func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*
 			return unknownType, false
 		}
 		subst := c.substForDecl(info.decl.TypeParameters, receiver.Args)
-		if method, ok := info.methods[name]; ok {
+		if method, ok := c.lookupInterfaceMethodInfo(info.decl, name, map[string]bool{}); ok {
 			_ = c.instantiateInterfaceMethodSignature(method.decl, subst)
 			c.addDiagnostic("invalid_member_access", "method '"+name+"' must be called with ()", span)
 			return unknownType, true

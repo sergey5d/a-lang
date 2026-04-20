@@ -13,10 +13,22 @@ func (p *Parser) parseInterface() (*InterfaceDecl, error) {
 	if err != nil {
 		return nil, err
 	}
+	decl := &InterfaceDecl{Name: name.Lexeme, TypeParameters: typeParams}
+	if p.match(TokenWith) {
+		for {
+			target, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			decl.Extends = append(decl.Extends, target)
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+	}
 	if _, err := p.consume(TokenLBrace, "expected '{' after interface name"); err != nil {
 		return nil, err
 	}
-	decl := &InterfaceDecl{Name: name.Lexeme, TypeParameters: typeParams}
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		method, err := p.parseInterfaceMethod()
 		if err != nil {

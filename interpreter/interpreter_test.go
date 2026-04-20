@@ -740,6 +740,40 @@ def run() Bool {
 	}
 }
 
+func TestInterfaceInheritanceIsExpression(t *testing.T) {
+	src := `
+interface Hopper {
+	def hop() String
+}
+
+interface Jumper {
+	def jump(steps Int) String
+}
+
+interface Acrobat with Hopper, Jumper {
+}
+
+class Rabbit with Acrobat {
+	def hop() String = "hop"
+	def jump(steps Int) String = "jump " + steps
+}
+
+def run() Bool {
+	rabbit = Rabbit()
+	return rabbit is Acrobat && rabbit is Hopper && rabbit is Jumper
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != true {
+		t.Fatalf("expected true, got %#v", value)
+	}
+}
+
 func TestNamedCallArguments(t *testing.T) {
 	src := `
 class Counter {

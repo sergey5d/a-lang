@@ -800,6 +800,33 @@ record Amount {
 	}
 }
 
+func TestParseInterfaceInheritance(t *testing.T) {
+	src := `
+interface Hopper {
+	def hop() String
+}
+
+interface Acrobat with Hopper {
+	def land() String
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Interfaces) != 2 {
+		t.Fatalf("expected 2 interfaces, got %d", len(program.Interfaces))
+	}
+	acrobat := program.Interfaces[1]
+	if acrobat.Name != "Acrobat" {
+		t.Fatalf("unexpected interface %#v", acrobat)
+	}
+	if len(acrobat.Extends) != 1 || acrobat.Extends[0].Name != "Hopper" {
+		t.Fatalf("unexpected extends clause %#v", acrobat.Extends)
+	}
+}
+
 func TestRejectInvalidRuneLiterals(t *testing.T) {
 	cases := []string{
 		"def bad() Bool { a = '' return true }",

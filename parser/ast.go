@@ -60,6 +60,7 @@ type FunctionDecl struct {
 type InterfaceDecl struct {
 	Name           string            `json:"name"`
 	TypeParameters []TypeParameter   `json:"typeParameters,omitempty"`
+	Extends        []*TypeRef        `json:"extends,omitempty"`
 	Methods        []InterfaceMethod `json:"methods"`
 	Span           Span              `json:"span"`
 }

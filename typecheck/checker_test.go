@@ -288,6 +288,36 @@ class Bad with Stringable {
 	}
 }
 
+func TestAnalyzeInterfaceInheritance(t *testing.T) {
+	src := `
+interface Hopper {
+	def hop() String
+}
+
+interface Jumper {
+	def jump(steps Int) String
+}
+
+interface Acrobat with Hopper, Jumper {
+}
+
+class Rabbit with Acrobat {
+	def hop() String = "hop"
+	def jump(steps Int) String = "jump " + steps
+}
+
+def run() String {
+	rabbit = Rabbit()
+	return rabbit.hop() + " " + rabbit.jump(3)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeImmutableFieldAssignmentInInit(t *testing.T) {
 	src := `
 class Counter {

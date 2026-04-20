@@ -194,6 +194,9 @@ func (r *Resolver) resolveInterface(decl *parser.InterfaceDecl) {
 	for _, param := range decl.TypeParameters {
 		r.defineType(param.Name, param.Span, "duplicate_type_parameter", "duplicate type parameter '"+param.Name+"'")
 	}
+	for _, parent := range decl.Extends {
+		r.resolveTypeRef(parent)
+	}
 	for _, method := range decl.Methods {
 		r.resolveTypeRef(method.ReturnType)
 		for _, param := range method.Parameters {

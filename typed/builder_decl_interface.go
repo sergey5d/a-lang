@@ -1,6 +1,9 @@
 package typed
 
-import "a-lang/parser"
+import (
+	"a-lang/parser"
+	"a-lang/typecheck"
+)
 
 // interfaceBuilder builds typed interface declarations.
 type interfaceBuilder struct {
@@ -20,9 +23,14 @@ func (b *interfaceBuilder) Build(iface *parser.InterfaceDecl) (*InterfaceDecl, e
 			Span:       method.Span,
 		}
 	}
+	extends := make([]*typecheck.Type, len(iface.Extends))
+	for i, parent := range iface.Extends {
+		extends[i] = b.types.BuildType(parent)
+	}
 	return &InterfaceDecl{
 		Name:           iface.Name,
 		TypeParameters: b.params.buildTypeParameters(iface.TypeParameters),
+		Extends:        extends,
 		Methods:        methods,
 		Symbol:         b.ctx.interfaceSymbols[iface.Name],
 		Span:           iface.Span,

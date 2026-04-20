@@ -37,6 +37,7 @@ type Interpreter struct {
 	program   *parser.Program
 	functions map[string]*parser.FunctionDecl
 	classes   map[string]*parser.ClassDecl
+	interfaces map[string]*parser.InterfaceDecl
 	imports   map[string]*Interpreter
 	globals   *env
 	ready     bool
@@ -99,13 +100,17 @@ func (t *nativeTuple) String() string {
 
 func New(program *parser.Program) *Interpreter {
 	in := &Interpreter{
-		program:   program,
-		functions: map[string]*parser.FunctionDecl{},
-		classes:   map[string]*parser.ClassDecl{},
-		imports:   map[string]*Interpreter{},
+		program:    program,
+		functions:  map[string]*parser.FunctionDecl{},
+		classes:    map[string]*parser.ClassDecl{},
+		interfaces: map[string]*parser.InterfaceDecl{},
+		imports:    map[string]*Interpreter{},
 	}
 	for _, fn := range program.Functions {
 		in.functions[fn.Name] = fn
+	}
+	for _, iface := range program.Interfaces {
+		in.interfaces[iface.Name] = iface
 	}
 	for _, class := range program.Classes {
 		in.classes[class.Name] = class
@@ -277,7 +282,7 @@ func reorderConstructorValueArgs(class *parser.ClassDecl, args []namedValueArg, 
 
 func (in *Interpreter) constructInto(receiver *instance, class *parser.ClassDecl, args []Value, parent *env, span parser.Span) error {
 	for _, method := range class.Methods {
-		if method.Constructor && runtimeMethodMatches(method, args) {
+		if method.Constructor && in.runtimeMethodMatches(method, args) {
 			_, err := in.callMethod(receiver, method, args, parent)
 			return err
 		}
@@ -801,7 +806,7 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		return runtimeValueMatchesType(left, e.Target), nil
+		return in.runtimeValueMatchesType(left, e.Target), nil
 	case *parser.CallExpr:
 		return in.evalCall(e, local)
 	case *parser.MemberExpr:
@@ -1059,7 +1064,7 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 				fallbackArgs = ordered
 			}
 		}
-		if runtimeMethodMatches(method, ordered) {
+		if in.runtimeMethodMatches(method, ordered) {
 			return in.callMethod(obj, method, ordered, local)
 		}
 	}
@@ -1656,7 +1661,7 @@ func expectedClosureArgs(fn *closure) string {
 	return fmt.Sprintf("%d", len(fn.params))
 }
 
-func runtimeMethodMatches(method *parser.MethodDecl, args []Value) bool {
+func (in *Interpreter) runtimeMethodMatches(method *parser.MethodDecl, args []Value) bool {
 	if !acceptsArgCount(method.Parameters, len(args)) {
 		return false
 	}
@@ -1668,14 +1673,14 @@ func runtimeMethodMatches(method *parser.MethodDecl, args []Value) bool {
 		if paramIndex >= len(method.Parameters) {
 			return false
 		}
-		if !runtimeValueMatchesType(arg, method.Parameters[paramIndex].Type) {
+		if !in.runtimeValueMatchesType(arg, method.Parameters[paramIndex].Type) {
 			return false
 		}
 	}
 	return true
 }
 
-func runtimeValueMatchesType(value Value, ref *parser.TypeRef) bool {
+func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef) bool {
 	if ref == nil {
 		return true
 	}
@@ -1725,13 +1730,33 @@ func runtimeValueMatchesType(value Value, ref *parser.TypeRef) bool {
 				return true
 			}
 			for _, impl := range instanceValue.class.Implements {
-				if impl.Name == ref.Name {
+				if impl.Name == ref.Name || in.interfaceExtends(impl.Name, ref.Name, map[string]bool{}) {
 					return true
 				}
 			}
 		}
 		return false
 	}
+}
+
+func (in *Interpreter) interfaceExtends(name, target string, seen map[string]bool) bool {
+	if name == target {
+		return true
+	}
+	if seen[name] {
+		return false
+	}
+	seen[name] = true
+	iface, ok := in.interfaces[name]
+	if !ok {
+		return false
+	}
+	for _, parent := range iface.Extends {
+		if parent.Name == target || in.interfaceExtends(parent.Name, target, seen) {
+			return true
+		}
+	}
+	return false
 }
 
 func applyBinary(op string, left, right Value, span parser.Span) (Value, error) {
