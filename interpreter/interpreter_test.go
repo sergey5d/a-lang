@@ -798,6 +798,35 @@ def run() Bool {
 	}
 }
 
+func TestRecordAndClassDestructuring(t *testing.T) {
+	src := `
+record Pair {
+	left Int
+	right String
+}
+
+class Box {
+	value Int
+	label String
+}
+
+def run() Int {
+	a Int, b String = Pair(5, "x")
+	c Int, d String = Box(7, "y")
+	return a + c
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(12) {
+		t.Fatalf("expected 12, got %#v", value)
+	}
+}
+
 func TestNamedCallArguments(t *testing.T) {
 	src := `
 class Counter {

@@ -764,15 +764,16 @@ func (c *Checker) bindingValueTypes(bindings []parser.Binding, values []parser.E
 		return out
 	}
 	if len(values) == 1 {
-		tupleType := c.checkExpr(values[0])
-		if tupleType.Kind != TypeTuple {
+		valueType := c.checkExpr(values[0])
+		parts, kind, ok := c.destructurableValueTypes(valueType)
+		if !ok {
 			c.addDiagnostic("invalid_binding_count", fmt.Sprintf("binding expects %d values, got 1", len(bindings)), span)
-			return []*Type{tupleType}
+			return []*Type{valueType}
 		}
-		if len(tupleType.Args) != len(bindings) {
-			c.addDiagnostic("invalid_binding_count", fmt.Sprintf("binding expects %d tuple values, got %d", len(bindings), len(tupleType.Args)), span)
+		if len(parts) != len(bindings) {
+			c.addDiagnostic("invalid_binding_count", fmt.Sprintf("binding expects %d %s values, got %d", len(bindings), kind, len(parts)), span)
 		}
-		return tupleType.Args
+		return parts
 	}
 	for _, value := range values {
 		c.checkExpr(value)
@@ -790,21 +791,49 @@ func (c *Checker) assignmentValueTypes(targetCount int, values []parser.Expr, sp
 		return out
 	}
 	if len(values) == 1 {
-		tupleType := c.checkExpr(values[0])
-		if tupleType.Kind != TypeTuple {
+		valueType := c.checkExpr(values[0])
+		parts, kind, ok := c.destructurableValueTypes(valueType)
+		if !ok {
 			c.addDiagnostic("invalid_assignment_count", fmt.Sprintf("assignment expects %d values, got 1", targetCount), span)
-			return []*Type{tupleType}
+			return []*Type{valueType}
 		}
-		if len(tupleType.Args) != targetCount {
-			c.addDiagnostic("invalid_assignment_count", fmt.Sprintf("assignment expects %d tuple values, got %d", targetCount, len(tupleType.Args)), span)
+		if len(parts) != targetCount {
+			c.addDiagnostic("invalid_assignment_count", fmt.Sprintf("assignment expects %d %s values, got %d", targetCount, kind, len(parts)), span)
 		}
-		return tupleType.Args
+		return parts
 	}
 	for _, value := range values {
 		c.checkExpr(value)
 	}
 	c.addDiagnostic("invalid_assignment_count", fmt.Sprintf("assignment expects %d values, got %d", targetCount, len(values)), span)
 	return nil
+}
+
+func (c *Checker) destructurableValueTypes(valueType *Type) ([]*Type, string, bool) {
+	if valueType == nil || isUnknown(valueType) {
+		return nil, "", false
+	}
+	if valueType.Kind == TypeTuple {
+		return valueType.Args, "tuple", true
+	}
+	if valueType.Kind != TypeClass {
+		return nil, "", false
+	}
+	info, ok := c.classes[valueType.Name]
+	if !ok || info.decl.Enum || info.decl.Object {
+		return nil, "", false
+	}
+	for _, field := range info.decl.Fields {
+		if field.Private {
+			return nil, "", false
+		}
+	}
+	subst := c.substForDecl(info.decl.TypeParameters, valueType.Args)
+	out := make([]*Type, len(info.decl.Fields))
+	for i, field := range info.decl.Fields {
+		out[i] = c.instantiateTypeRef(field.Type, subst)
+	}
+	return out, "destructured", true
 }
 
 func (c *Checker) checkStmt(stmt parser.Statement) {

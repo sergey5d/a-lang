@@ -1,4 +1,4 @@
-# IGNORE:
+# SKIP
 # Future syntax idea for anonymous objects / object literals.
 
 # Possible direction:

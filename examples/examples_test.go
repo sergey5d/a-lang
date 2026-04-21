@@ -24,16 +24,16 @@ func TestExamples(t *testing.T) {
 
 	for _, path := range paths {
 		path := path
+		srcBytes, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile returned error for %s: %v", filepath.Base(path), err)
+		}
+		src := string(srcBytes)
+		if shouldSkipExample(src) {
+			continue
+		}
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			t.Logf("running %s", filepath.Base(path))
-			srcBytes, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatalf("ReadFile returned error: %v", err)
-			}
-			src := string(srcBytes)
-			if shouldIgnoreExample(src) {
-				t.Skipf("skipping %s: marked with # IGNORE", filepath.Base(path))
-			}
 			expected, err := parseExpectedOutput(src)
 			if err != nil {
 				if err == errMissingExpectedHeader {
@@ -127,13 +127,13 @@ func normalizeExampleOutput(s string) string {
 	return strings.TrimRight(s, "\n")
 }
 
-func shouldIgnoreExample(src string) bool {
+func shouldSkipExample(src string) bool {
 	for _, line := range strings.Split(src, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
 		}
-		if trimmed == "# IGNORE" {
+		if trimmed == "# SKIP" || strings.HasPrefix(trimmed, "# SKIP:") {
 			return true
 		}
 		if !strings.HasPrefix(trimmed, "#") {

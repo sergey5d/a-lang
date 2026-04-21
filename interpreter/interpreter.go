@@ -2395,14 +2395,14 @@ func (in *Interpreter) bindingValues(bindings []parser.Binding, values []parser.
 		if err != nil {
 			return nil, err
 		}
-		tuple, ok := value.(*nativeTuple)
+		items, kind, ok := destructurableValues(value)
 		if !ok {
 			return nil, RuntimeError{Message: fmt.Sprintf("binding expects %d values, got 1", len(bindings)), Span: span}
 		}
-		if len(tuple.items) != len(bindings) {
-			return nil, RuntimeError{Message: fmt.Sprintf("binding expects %d tuple values, got %d", len(bindings), len(tuple.items)), Span: span}
+		if len(items) != len(bindings) {
+			return nil, RuntimeError{Message: fmt.Sprintf("binding expects %d %s values, got %d", len(bindings), kind, len(items)), Span: span}
 		}
-		return append([]Value(nil), tuple.items...), nil
+		return append([]Value(nil), items...), nil
 	}
 	return nil, RuntimeError{Message: fmt.Sprintf("binding expects %d values, got %d", len(bindings), len(values)), Span: span}
 }
@@ -2466,16 +2466,40 @@ func (in *Interpreter) assignmentValues(targetCount int, values []parser.Expr, l
 		if err != nil {
 			return nil, err
 		}
-		tuple, ok := value.(*nativeTuple)
+		items, kind, ok := destructurableValues(value)
 		if !ok {
 			return nil, RuntimeError{Message: fmt.Sprintf("assignment expects %d values, got 1", targetCount), Span: span}
 		}
-		if len(tuple.items) != targetCount {
-			return nil, RuntimeError{Message: fmt.Sprintf("assignment expects %d tuple values, got %d", targetCount, len(tuple.items)), Span: span}
+		if len(items) != targetCount {
+			return nil, RuntimeError{Message: fmt.Sprintf("assignment expects %d %s values, got %d", targetCount, kind, len(items)), Span: span}
 		}
-		return append([]Value(nil), tuple.items...), nil
+		return append([]Value(nil), items...), nil
 	}
 	return nil, RuntimeError{Message: fmt.Sprintf("assignment expects %d values, got %d", targetCount, len(values)), Span: span}
+}
+
+func destructurableValues(value Value) ([]Value, string, bool) {
+	if tuple, ok := value.(*nativeTuple); ok {
+		return tuple.items, "tuple", true
+	}
+	instanceValue, ok := value.(*instance)
+	if !ok || instanceValue.class.Enum || instanceValue.class.Object {
+		return nil, "", false
+	}
+	for _, field := range instanceValue.class.Fields {
+		if field.Private {
+			return nil, "", false
+		}
+	}
+	items := make([]Value, len(instanceValue.class.Fields))
+	for i, field := range instanceValue.class.Fields {
+		fieldValue, ok := instanceValue.fields[field.Name]
+		if !ok {
+			return nil, "", false
+		}
+		items[i] = fieldValue
+	}
+	return items, "destructured", true
 }
 
 func indexedItems(value Value) ([]Value, bool) {

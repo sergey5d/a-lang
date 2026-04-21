@@ -291,6 +291,60 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeRecordAndClassDestructuring(t *testing.T) {
+	src := `
+record Pair {
+	left Int
+	right String
+}
+
+class Box {
+	value Int
+	label String
+}
+
+def run() Int {
+	a Int, b String = Pair(5, "x")
+	c Int, d String = Box(7, "y")
+	return a + c
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeClassDestructuringRejectsPrivateFields(t *testing.T) {
+	src := `
+class Box {
+	value Int
+	private hidden String = "x"
+}
+
+def run() Int {
+	a Int, b String = Box(7)
+	return a
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	found := false
+	for _, diag := range result.Diagnostics {
+		if diag.Code == "invalid_binding_count" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected invalid_binding_count diagnostic, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeObjectSingletonAccess(t *testing.T) {
 	src := `
 object A {
