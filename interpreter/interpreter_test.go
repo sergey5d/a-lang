@@ -774,6 +774,30 @@ def run() Bool {
 	}
 }
 
+func TestRecordUpdateExpr(t *testing.T) {
+	src := `
+record Amount {
+	amount Int
+	description String
+}
+
+def run() Bool {
+	value = Amount(10, "x")
+	updated = value with { amount = 42 }
+	return value.amount == 10 && updated.amount == 42 && updated.description == "x"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != true {
+		t.Fatalf("expected true, got %#v", value)
+	}
+}
+
 func TestNamedCallArguments(t *testing.T) {
 	src := `
 class Counter {

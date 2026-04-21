@@ -298,6 +298,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 		return e.Span
 	case *parser.IndexExpr:
 		return e.Span
+	case *parser.RecordUpdateExpr:
+		return e.Span
 	case *parser.IfExpr:
 		return e.Span
 	case *parser.ForYieldExpr:

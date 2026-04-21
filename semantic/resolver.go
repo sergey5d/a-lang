@@ -365,6 +365,11 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 	case *parser.IndexExpr:
 		r.resolveExpr(e.Receiver)
 		r.resolveExpr(e.Index)
+	case *parser.RecordUpdateExpr:
+		r.resolveExpr(e.Receiver)
+		for _, update := range e.Updates {
+			r.resolveExpr(update.Value)
+		}
 	case *parser.IfExpr:
 		r.resolveExpr(e.Condition)
 		r.pushScope()

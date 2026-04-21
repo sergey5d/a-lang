@@ -254,7 +254,7 @@ func (p *Parser) parseIfStmt() (Statement, error) {
 }
 
 func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
-	condition, err := p.parseExpression(0)
+	condition, err := p.parseExpressionWithOptions(0, false)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +344,7 @@ func (p *Parser) parseForBinding() (ForBinding, error) {
 	if _, err := p.consume(TokenLeftArrow, "expected '<-'"); err != nil {
 		return ForBinding{}, err
 	}
-	iterable, err := p.parseExpression(0)
+	iterable, err := p.parseExpressionWithOptions(0, false)
 	if err != nil {
 		return ForBinding{}, err
 	}

@@ -411,6 +411,21 @@ type IndexExpr struct {
 
 func (*IndexExpr) exprNode() {}
 
+// RecordUpdateField is a typed record field override in a copy/update expression.
+type RecordUpdateField struct {
+	Name  string
+	Value Expr
+}
+
+// RecordUpdateExpr copies a record value and overrides selected fields.
+type RecordUpdateExpr struct {
+	baseExpr
+	Receiver Expr
+	Updates  []RecordUpdateField
+}
+
+func (*RecordUpdateExpr) exprNode() {}
+
 // IfExpr is a typed if / else expression.
 type IfExpr struct {
 	baseExpr

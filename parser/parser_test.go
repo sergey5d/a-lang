@@ -827,6 +827,37 @@ interface Acrobat with Hopper {
 	}
 }
 
+func TestParseRecordUpdateExpr(t *testing.T) {
+	src := `
+record Amount {
+	amount Int
+	description String
+}
+
+def run() Amount {
+	value = Amount(10, "x")
+	return value with { amount = 42, description = "y" }
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	run := program.Functions[0]
+	ret, ok := run.Body.Statements[1].(*ReturnStmt)
+	if !ok {
+		t.Fatalf("expected return statement, got %#v", run.Body.Statements[1])
+	}
+	update, ok := ret.Value.(*RecordUpdateExpr)
+	if !ok {
+		t.Fatalf("expected record update expr, got %#v", ret.Value)
+	}
+	if len(update.Updates) != 2 || update.Updates[0].Name != "amount" || update.Updates[1].Name != "description" {
+		t.Fatalf("unexpected record updates %#v", update.Updates)
+	}
+}
+
 func TestRejectInvalidRuneLiterals(t *testing.T) {
 	cases := []string{
 		"def bad() Bool { a = '' return true }",

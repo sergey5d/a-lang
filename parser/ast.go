@@ -347,6 +347,15 @@ type IndexExpr struct {
 
 func (*IndexExpr) exprNode() {}
 
+// RecordUpdateExpr copies a record value and overrides selected fields.
+type RecordUpdateExpr struct {
+	Receiver Expr      `json:"receiver"`
+	Updates  []CallArg `json:"updates"`
+	Span     Span      `json:"span"`
+}
+
+func (*RecordUpdateExpr) exprNode() {}
+
 // IfExpr is an if / else expression whose value comes from the chosen branch.
 type IfExpr struct {
 	Condition Expr       `json:"condition"`

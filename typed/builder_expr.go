@@ -58,6 +58,8 @@ func (b *exprBuilder) Build(expr parser.Expr) (Expr, error) {
 		return b.buildMemberExpr(expr, e)
 	case *parser.IndexExpr:
 		return b.buildIndexExpr(expr, e)
+	case *parser.RecordUpdateExpr:
+		return b.buildRecordUpdateExpr(expr, e)
 	case *parser.IfExpr:
 		return b.buildIfExpr(expr, e)
 	case *parser.ForYieldExpr:

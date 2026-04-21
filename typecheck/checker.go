@@ -979,6 +979,8 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		result = c.checkMemberExpr(e)
 	case *parser.IndexExpr:
 		result = c.checkIndexExpr(e)
+	case *parser.RecordUpdateExpr:
+		result = c.checkRecordUpdateExpr(e)
 	case *parser.IfExpr:
 		condType := c.checkExpr(e.Condition)
 		c.requireAssignable(condType, builtin("Bool"), exprSpan(e.Condition), "invalid_condition_type", "if condition must be Bool")
@@ -1225,6 +1227,56 @@ func (c *Checker) checkIndexExpr(expr *parser.IndexExpr) *Type {
 	}
 	c.addDiagnostic("invalid_index_target", "indexing requires Array[T]", expr.Span)
 	return unknownType
+}
+
+func (c *Checker) checkRecordUpdateExpr(expr *parser.RecordUpdateExpr) *Type {
+	receiverType := c.checkExpr(expr.Receiver)
+	if isUnknown(receiverType) {
+		for _, update := range expr.Updates {
+			c.checkExpr(update.Value)
+		}
+		return unknownType
+	}
+	if receiverType.Kind != TypeClass {
+		for _, update := range expr.Updates {
+			c.checkExpr(update.Value)
+		}
+		c.addDiagnostic("invalid_record_update", "record update requires a record value", expr.Span)
+		return unknownType
+	}
+	info, ok := c.classes[receiverType.Name]
+	if !ok || !info.decl.Record {
+		for _, update := range expr.Updates {
+			c.checkExpr(update.Value)
+		}
+		c.addDiagnostic("invalid_record_update", "record update requires a record value", expr.Span)
+		return unknownType
+	}
+	subst := c.substForDecl(info.decl.TypeParameters, receiverType.Args)
+	seen := map[string]bool{}
+	for _, update := range expr.Updates {
+		if seen[update.Name] {
+			c.addDiagnostic("invalid_record_update", "duplicate record field '"+update.Name+"'", expr.Span)
+			c.checkExpr(update.Value)
+			continue
+		}
+		seen[update.Name] = true
+		field, ok := info.fields[update.Name]
+		if !ok {
+			c.addDiagnostic("unknown_member", "unknown record field '"+update.Name+"'", expr.Span)
+			c.checkExpr(update.Value)
+			continue
+		}
+		if field.decl.Private && !c.canAccessPrivate(info.decl) {
+			c.addDiagnostic("private_access", "cannot access private field '"+update.Name+"' outside class '"+info.decl.Name+"'", expr.Span)
+			c.checkExpr(update.Value)
+			continue
+		}
+		expected := c.instantiateTypeRef(field.decl.Type, subst)
+		valueType := c.checkExprWithExpected(update.Value, expected)
+		c.requireAssignable(valueType, expected, exprSpan(update.Value), "type_mismatch", "cannot assign "+valueType.String()+" to "+expected.String())
+	}
+	return receiverType
 }
 
 func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *Type {
@@ -2535,6 +2587,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.MemberExpr:
 		return e.Span
 	case *parser.IndexExpr:
+		return e.Span
+	case *parser.RecordUpdateExpr:
 		return e.Span
 	case *parser.IfExpr:
 		return e.Span

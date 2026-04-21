@@ -3,12 +3,24 @@ package parser
 import "fmt"
 
 func (p *Parser) parseExpression(minPrec int) (Expr, error) {
+	return p.parseExpressionWithOptions(minPrec, true)
+}
+
+func (p *Parser) parseExpressionWithOptions(minPrec int, allowRecordUpdate bool) (Expr, error) {
 	left, err := p.parsePrefix()
 	if err != nil {
 		return nil, err
 	}
 
 	for {
+		if allowRecordUpdate && p.match(TokenWith) {
+			updates, end, err := p.parseRecordUpdateArgs()
+			if err != nil {
+				return nil, err
+			}
+			left = &RecordUpdateExpr{Receiver: left, Updates: updates, Span: mergeSpans(exprSpan(left), tokenSpan(end))}
+			continue
+		}
 		if p.check(TokenLParen) {
 			args, err := p.parseCallArgs()
 			if err != nil {
@@ -32,7 +44,7 @@ func (p *Parser) parseExpression(minPrec int) (Expr, error) {
 			continue
 		}
 		if p.match(TokenLBracket) {
-			index, err := p.parseExpression(0)
+			index, err := p.parseExpressionWithOptions(0, true)
 			if err != nil {
 				return nil, err
 			}
@@ -69,7 +81,7 @@ func (p *Parser) parseExpression(minPrec int) (Expr, error) {
 		}
 
 		token := p.advance()
-		right, err := p.parseExpression(prec + 1)
+		right, err := p.parseExpressionWithOptions(prec+1, allowRecordUpdate)
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +134,7 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		}
 		var items []Expr
 		for {
-			expr, err := p.parseExpression(0)
+			expr, err := p.parseExpressionWithOptions(0, true)
 			if err != nil {
 				return nil, err
 			}
@@ -145,7 +157,7 @@ func (p *Parser) parsePrefix() (Expr, error) {
 }
 
 func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
-	condition, err := p.parseExpression(0)
+	condition, err := p.parseExpressionWithOptions(0, false)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +231,7 @@ func (p *Parser) parseCallArgs() ([]CallArg, error) {
 			if p.check(TokenIdentifier) && p.checkNext(TokenAssign) {
 				nameToken := p.advance()
 				p.advance()
-				value, err := p.parseExpression(0)
+				value, err := p.parseExpressionWithOptions(0, true)
 				if err != nil {
 					return nil, err
 				}
@@ -233,7 +245,7 @@ func (p *Parser) parseCallArgs() ([]CallArg, error) {
 				if seenNamed {
 					return nil, fmt.Errorf("positional arguments cannot follow named arguments")
 				}
-				expr, err := p.parseExpression(0)
+				expr, err := p.parseExpressionWithOptions(0, true)
 				if err != nil {
 					return nil, err
 				}
@@ -251,6 +263,39 @@ func (p *Parser) parseCallArgs() ([]CallArg, error) {
 		return nil, err
 	}
 	return args, nil
+}
+
+func (p *Parser) parseRecordUpdateArgs() ([]CallArg, Token, error) {
+	if _, err := p.consume(TokenLBrace, "expected '{'"); err != nil {
+		return nil, Token{}, err
+	}
+	var updates []CallArg
+	for {
+		nameToken, err := p.consume(TokenIdentifier, "expected record field name")
+		if err != nil {
+			return nil, Token{}, err
+		}
+		if _, err := p.consume(TokenAssign, "expected '=' after record field name"); err != nil {
+			return nil, Token{}, err
+		}
+		value, err := p.parseExpressionWithOptions(0, true)
+		if err != nil {
+			return nil, Token{}, err
+		}
+		updates = append(updates, CallArg{
+			Name:  nameToken.Lexeme,
+			Value: value,
+			Span:  mergeSpans(tokenSpan(nameToken), exprSpan(value)),
+		})
+		if !p.match(TokenComma) {
+			break
+		}
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after record update")
+	if err != nil {
+		return nil, Token{}, err
+	}
+	return updates, end, nil
 }
 
 func precedence(t TokenType) int {

@@ -836,6 +836,27 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			return nil, RuntimeError{Message: "index out of bounds", Span: e.Span}
 		}
 		return items[index], nil
+	case *parser.RecordUpdateExpr:
+		receiver, err := in.evalExpr(e.Receiver, local)
+		if err != nil {
+			return nil, err
+		}
+		record, ok := receiver.(*instance)
+		if !ok || !record.class.Record {
+			return nil, RuntimeError{Message: "record update requires a record value", Span: e.Span}
+		}
+		copyFields := make(map[string]Value, len(record.fields))
+		for name, value := range record.fields {
+			copyFields[name] = value
+		}
+		for _, update := range e.Updates {
+			value, err := in.evalExpr(update.Value, local)
+			if err != nil {
+				return nil, err
+			}
+			copyFields[update.Name] = value
+		}
+		return &instance{class: record.class, fields: copyFields}, nil
 	case *parser.LambdaExpr:
 		params := make([]string, len(e.Parameters))
 		for i, param := range e.Parameters {
@@ -2213,6 +2234,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.MemberExpr:
 		return e.Span
 	case *parser.IndexExpr:
+		return e.Span
+	case *parser.RecordUpdateExpr:
 		return e.Span
 	case *parser.LambdaExpr:
 		return e.Span

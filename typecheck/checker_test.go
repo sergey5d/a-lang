@@ -258,6 +258,26 @@ record Amount {
 	}
 }
 
+func TestAnalyzeRecordUpdateExpr(t *testing.T) {
+	src := `
+record Amount {
+	amount Int
+	description String
+}
+
+def run() Int {
+	value = Amount(10, "x")
+	updated = value with { amount = 42 }
+	return updated.amount
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeInterfaceImplementation(t *testing.T) {
 	src := `
 interface Stringable {
