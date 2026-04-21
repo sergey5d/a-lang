@@ -6,6 +6,10 @@ func (p *Parser) parseClass() (*ClassDecl, error) {
 	return p.parseClassLike(TokenClass, false, "class")
 }
 
+func (p *Parser) parseObject() (*ClassDecl, error) {
+	return p.parseClassLike(TokenObject, false, "object")
+}
+
 func (p *Parser) parseRecord() (*ClassDecl, error) {
 	return p.parseClassLike(TokenRecord, true, "record")
 }
@@ -41,7 +45,7 @@ func (p *Parser) parseEnum() (*ClassDecl, error) {
 			decl.Fields = append(decl.Fields, field)
 		case TokenDef:
 			sawNonField = true
-			method, err := p.parseMethod(false)
+			method, err := p.parseMethod(false, false)
 			if err != nil {
 				return nil, err
 			}
@@ -78,7 +82,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, noun string) (*Clas
 	if err != nil {
 		return nil, err
 	}
-	decl := &ClassDecl{Name: name.Lexeme, Record: record, TypeParameters: typeParams}
+	decl := &ClassDecl{Name: name.Lexeme, Object: kind == TokenObject, Record: record, TypeParameters: typeParams}
 	if p.match(TokenWith) {
 		for {
 			target, err := p.parseTypeRef()
@@ -109,7 +113,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, noun string) (*Clas
 			decl.Fields = append(decl.Fields, field)
 		case TokenDef:
 			sawMethod = true
-			method, err := p.parseMethod(private)
+			method, err := p.parseMethod(private, decl.Object)
 			if err != nil {
 				return nil, err
 			}
@@ -163,20 +167,26 @@ func (p *Parser) parseField(private bool) (FieldDecl, error) {
 	return field, nil
 }
 
-func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
+func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, error) {
 	start, err := p.consume(TokenDef, "expected 'def'")
 	if err != nil {
 		return nil, err
 	}
-	name, err := p.consume(TokenIdentifier, "expected method name")
-	if err != nil {
-		return nil, err
+	nameLexeme := ""
+	if allowShortApply && p.check(TokenLParen) {
+		nameLexeme = "apply"
+	} else {
+		name, err := p.consume(TokenIdentifier, "expected method name")
+		if err != nil {
+			return nil, err
+		}
+		nameLexeme = name.Lexeme
 	}
 	params, err := p.parseParameters()
 	if err != nil {
 		return nil, err
 	}
-	constructor := name.Lexeme == "init" || name.Lexeme == "this"
+	constructor := nameLexeme == "init" || nameLexeme == "this"
 	var returnType *TypeRef
 	if !constructor && !p.check(TokenLBrace) && !p.check(TokenAssign) {
 		typ, err := p.parseTypeRef()
@@ -193,7 +203,7 @@ func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
 		returnType = implicitUnitType(body.Span)
 	}
 	return &MethodDecl{
-		Name:        name.Lexeme,
+		Name:        nameLexeme,
 		Parameters:  params,
 		ReturnType:  returnType,
 		Body:        body,

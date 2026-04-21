@@ -20,6 +20,7 @@ const (
 	TokenImport     TokenType = "IMPORT"
 	TokenInterface  TokenType = "INTERFACE"
 	TokenClass      TokenType = "CLASS"
+	TokenObject     TokenType = "OBJECT"
 	TokenRecord     TokenType = "RECORD"
 	TokenEnum       TokenType = "ENUM"
 	TokenCase       TokenType = "CASE"
@@ -83,6 +84,7 @@ var keywords = map[string]TokenType{
 	"import":     TokenImport,
 	"interface":  TokenInterface,
 	"class":      TokenClass,
+	"object":     TokenObject,
 	"record":     TokenRecord,
 	"enum":       TokenEnum,
 	"case":       TokenCase,

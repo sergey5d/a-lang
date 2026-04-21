@@ -159,6 +159,16 @@ func (in *Interpreter) execTopLevel(global *env) error {
 			return err
 		}
 	}
+	for _, class := range in.program.Classes {
+		if !class.Object {
+			continue
+		}
+		value, err := in.construct(class, nil, global)
+		if err != nil {
+			return err
+		}
+		global.define(class.Name, value, false)
+	}
 	for _, stmt := range in.program.Statements {
 		if _, signal, err := in.execStmt(stmt, global, nil); err != nil {
 			return err
@@ -740,7 +750,12 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		if _, ok := in.imports[e.Name]; ok {
 			return moduleRef{name: e.Name}, nil
 		}
-		if _, ok := in.classes[e.Name]; ok {
+		if class, ok := in.classes[e.Name]; ok {
+			if class.Object {
+				if slot, ok := local.get(e.Name); ok {
+					return slot.value, nil
+				}
+			}
 			return classRef{module: in, name: e.Name}, nil
 		}
 		return nil, RuntimeError{Message: "undefined name '" + e.Name + "'", Span: e.Span}
@@ -1073,9 +1088,47 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 			return nil, RuntimeError{Message: "named arguments require a direct function, method, or constructor call", Span: call.Span}
 		}
 		return in.callClosure(fn, namedArgValues(args))
+	case *instance:
+		return in.callApplyMethod(fn, args, call.Args, local, call.Span)
 	default:
 		return nil, RuntimeError{Message: "value is not callable", Span: call.Span}
 	}
+}
+
+func (in *Interpreter) callApplyMethod(obj *instance, args []namedValueArg, parserArgs []parser.CallArg, local *env, span parser.Span) (Value, error) {
+	var firstErr error
+	var fallbackMethod *parser.MethodDecl
+	var fallbackArgs []Value
+	for _, method := range obj.class.Methods {
+		if method.Name != "apply" {
+			continue
+		}
+		ordered := namedArgValues(args)
+		if hasNamedParserArgs(parserArgs) {
+			reordered, err := reorderNamedValueArgs(method.Parameters, args, span, "method 'apply'")
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
+			}
+			ordered = reordered
+			if fallbackMethod == nil {
+				fallbackMethod = method
+				fallbackArgs = ordered
+			}
+		}
+		if in.runtimeMethodMatches(method, ordered) {
+			return in.callMethod(obj, method, ordered, local)
+		}
+	}
+	if fallbackMethod != nil {
+		return in.callMethod(obj, fallbackMethod, fallbackArgs, local)
+	}
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return nil, RuntimeError{Message: "value is not callable", Span: span}
 }
 
 func (in *Interpreter) callClosure(fn *closure, args []Value) (Value, error) {
@@ -1147,8 +1200,18 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 		if _, ok := mod.functions[member.Name]; ok {
 			return mod.callFunctionByName(member.Name, ordered, mod.globals)
 		}
-		if _, ok := mod.classes[member.Name]; ok {
-			class := mod.classes[member.Name]
+		if class, ok := mod.classes[member.Name]; ok {
+			if class.Object {
+				slot, ok := mod.globals.get(member.Name)
+				if !ok {
+					return nil, RuntimeError{Message: "unknown member '" + member.Name + "'", Span: member.Span}
+				}
+				obj, ok := slot.value.(*instance)
+				if !ok {
+					return nil, RuntimeError{Message: "object '" + member.Name + "' is not initialized", Span: member.Span}
+				}
+				return mod.callApplyMethod(obj, args, argExprs, local, member.Span)
+			}
 			if hasNamedParserArgs(argExprs) {
 				reordered, err := reorderConstructorValueArgs(class, args, member.Span)
 				if err != nil {
@@ -1253,7 +1316,14 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 		if _, ok := mod.functions[expr.Name]; ok {
 			return functionRef{module: mod, name: expr.Name}, nil
 		}
-		if _, ok := mod.classes[expr.Name]; ok {
+		if class, ok := mod.classes[expr.Name]; ok {
+			if class.Object {
+				slot, ok := mod.globals.get(expr.Name)
+				if !ok {
+					return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
+				}
+				return slot.value, nil
+			}
 			return classRef{module: mod, name: expr.Name}, nil
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}

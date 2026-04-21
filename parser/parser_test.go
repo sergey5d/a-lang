@@ -800,6 +800,48 @@ record Amount {
 	}
 }
 
+func TestParseObjectDecl(t *testing.T) {
+	src := `
+object A {
+	def value() Unit = ()
+	def test(a Int) Int = a + 5
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Classes) != 1 {
+		t.Fatalf("expected 1 declaration, got %d", len(program.Classes))
+	}
+	if !program.Classes[0].Object {
+		t.Fatalf("expected declaration to be marked as object")
+	}
+	if len(program.Classes[0].Methods) != 2 {
+		t.Fatalf("expected 2 object methods, got %#v", program.Classes[0].Methods)
+	}
+}
+
+func TestParseObjectShortApplyDecl(t *testing.T) {
+	src := `
+object Range {
+	def (end Int) Int = end
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Classes) != 1 || len(program.Classes[0].Methods) != 1 {
+		t.Fatalf("unexpected object declaration %#v", program.Classes)
+	}
+	if program.Classes[0].Methods[0].Name != "apply" {
+		t.Fatalf("expected short object method to normalize to apply, got %#v", program.Classes[0].Methods[0])
+	}
+}
+
 func TestParseInterfaceInheritance(t *testing.T) {
 	src := `
 interface Hopper {

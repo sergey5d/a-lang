@@ -828,6 +828,55 @@ def run() Int {
 	}
 }
 
+func TestObjectSingletonAccess(t *testing.T) {
+	src := `
+object A {
+	count Int := 2
+
+	def value() Int = count
+
+	def test(a Int) Int {
+		return a + this.value()
+	}
+}
+
+def run() Int {
+	return A.test(5)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(7) {
+		t.Fatalf("expected 7, got %#v", value)
+	}
+}
+
+func TestObjectApplyCall(t *testing.T) {
+	src := `
+object Range {
+	def apply(end Int) Int = end
+	def (start Int, end Int) Int = start + end
+}
+
+def run() Int {
+	return Range(5) + Range(2, 4)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(11) {
+		t.Fatalf("expected 11, got %#v", value)
+	}
+}
+
 func TestImplicitPrimaryConstructorAndThisDelegation(t *testing.T) {
 	src := `
 class Counter {

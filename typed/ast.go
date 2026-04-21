@@ -131,6 +131,7 @@ type MethodDecl struct {
 // ClassDecl is a typed class declaration including resolved interface types.
 type ClassDecl struct {
 	Name           string
+	Object         bool
 	Record         bool
 	TypeParameters []TypeParameter
 	Interfaces     []*typecheck.Type

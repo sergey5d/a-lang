@@ -322,6 +322,9 @@ func (c *Checker) collectDecls(program *parser.Program) {
 			info.enumCases[enumCase.Name] = enumCase
 		}
 		c.classes[decl.Name] = info
+		if decl.Object {
+			c.globals[decl.Name] = binding{typ: &Type{Kind: TypeClass, Name: decl.Name}, mutable: false}
+		}
 	}
 	for _, fn := range program.Functions {
 		params := make([]*Type, len(fn.Parameters))
@@ -426,6 +429,9 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 	}
 
 	for _, field := range decl.Fields {
+		if decl.Object && !field.Mutable && field.Initializer == nil {
+			c.addDiagnostic("invalid_object_field", "object '"+decl.Name+"' must initialize immutable field '"+field.Name+"'", field.Span)
+		}
 		if decl.Record && field.Mutable {
 			c.addDiagnostic("invalid_record_field", "record '"+decl.Name+"' cannot declare mutable field '"+field.Name+"'", field.Span)
 		}
@@ -438,7 +444,7 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 			c.requireAssignable(valueType, fieldType, exprSpan(field.Initializer), "type_mismatch", "cannot assign "+valueType.String()+" to "+fieldType.String())
 		}
 	}
-	if !decl.Enum {
+	if !decl.Enum && !decl.Object {
 		c.checkConstructorRules(info)
 	}
 	for _, method := range decl.Methods {
@@ -502,6 +508,9 @@ func (c *Checker) checkMethod(method *parser.MethodDecl, owner *parser.ClassDecl
 		if method.Constructor {
 			c.addDiagnostic("invalid_enum_method", "enum '"+owner.Name+"' cannot declare constructors", method.Span)
 		}
+	}
+	if owner.Object && method.Constructor {
+		c.addDiagnostic("invalid_object_method", "object '"+owner.Name+"' cannot declare constructors", method.Span)
 	}
 	implicitReturn := c.checkBlock(method.Body)
 	if !method.Constructor && method.ReturnType != nil && !isUnknown(implicitReturn) && !isUnitType(expectedReturn) {
@@ -1153,6 +1162,9 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 			return c.checkBuiltinConstructorCall(ident.Name, call)
 		}
 		if class, ok := c.classes[ident.Name]; ok {
+			if class.decl.Object {
+				return c.checkObjectApplyCall(class, call.Args, call.Span)
+			}
 			return c.checkConstructorCall(class, call)
 		}
 		if fn, ok := c.functions[ident.Name]; ok {
@@ -1194,6 +1206,11 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 	}
 
 	calleeType := c.checkExpr(call.Callee)
+	if calleeType.Kind == TypeClass {
+		if info, ok := c.classes[calleeType.Name]; ok && info.decl.Object {
+			return c.checkObjectApplyCall(info, call.Args, call.Span)
+		}
+	}
 	if calleeType.Kind != TypeFunction || calleeType.Signature == nil {
 		for _, arg := range call.Args {
 			c.checkExpr(arg.Value)
@@ -1213,6 +1230,43 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 			continue
 		}
 		argType = c.checkExpr(arg.Value)
+	}
+	return sig.ReturnType
+}
+
+func (c *Checker) checkObjectApplyCall(class classInfo, args []parser.CallArg, span parser.Span) *Type {
+	applyMethods, ok := class.methods["apply"]
+	if !ok || len(applyMethods) == 0 {
+		for _, arg := range args {
+			c.checkExpr(arg.Value)
+		}
+		c.addDiagnostic("invalid_call_target", "object '"+class.decl.Name+"' is not callable", span)
+		return unknownType
+	}
+	receiverType := &Type{Kind: TypeClass, Name: class.name}
+	var (
+		method      methodInfo
+		okMethod    bool
+		orderedArgs []parser.Expr
+	)
+	if hasNamedCallArgs(args) {
+		method, orderedArgs, okMethod = c.resolveNamedMethodOverload(class, receiverType, "apply", args, span)
+	} else {
+		orderedArgs = callArgValues(args)
+		argTypes := c.checkArgTypes(orderedArgs)
+		method, okMethod = c.resolveMethodOverload(class, receiverType, "apply", argTypes, span)
+	}
+	if !okMethod {
+		return unknownType
+	}
+	sig := c.instantiateMethodSignature(method.decl, class.decl, c.substForDecl(class.decl.TypeParameters, receiverType.Args))
+	for i := range orderedArgs {
+		if expected, ok := paramTypeForArg(sig, i); ok {
+			argType := c.checkExprWithExpected(orderedArgs[i], expected)
+			c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+		} else {
+			c.checkExpr(orderedArgs[i])
+		}
 	}
 	return sig.ReturnType
 }
@@ -1389,6 +1443,13 @@ func (c *Checker) checkRecordUpdateExpr(expr *parser.RecordUpdateExpr) *Type {
 
 func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *Type {
 	classType := &Type{Kind: TypeClass, Name: class.name}
+	if class.decl.Object {
+		c.addDiagnostic("invalid_call_target", "object '"+class.decl.Name+"' is a singleton and cannot be called as a constructor", call.Span)
+		for _, arg := range call.Args {
+			c.checkExpr(arg.Value)
+		}
+		return classType
+	}
 	orderedArgs := callArgValues(call.Args)
 	if hasNamedCallArgs(call.Args) {
 		if ctor, reordered, ok := c.resolveNamedConstructorOverload(class, call.Args, call.Span); ok {
@@ -1468,6 +1529,9 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			return fn.ReturnType
 		}
 		if class, ok := info.classes[member.Name]; ok {
+			if class.decl.Object {
+				return c.checkObjectApplyCall(class, args, member.Span)
+			}
 			call := &parser.CallExpr{Callee: member, Args: args, Span: member.Span}
 			return c.checkConstructorCall(class, call)
 		}

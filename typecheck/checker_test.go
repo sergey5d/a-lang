@@ -278,6 +278,44 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeObjectSingletonAccess(t *testing.T) {
+	src := `
+object A {
+	def value() Int = 5
+	def test(a Int) Int = a + this.value()
+}
+
+def run() Int {
+	return A.test(2)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeObjectApplyCall(t *testing.T) {
+	src := `
+object Range {
+	def apply(end Int) Int = end
+	def (start Int, end Int) Int = start + end
+}
+
+def run() Int {
+	left Int = Range(5)
+	right Int = Range(2, 4)
+	return left + right
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeInterfaceImplementation(t *testing.T) {
 	src := `
 interface Stringable {
