@@ -1809,11 +1809,6 @@ func (c *Checker) checkBinaryOperation(left, right *Type, op string, span parser
 		return builtin("Bool")
 	case ":":
 		return unknownType
-	case "..":
-		if !sameType(left, builtin("Int")) || !sameType(right, builtin("Int")) {
-			c.addDiagnostic("invalid_binary_operand", "range operands must be Int", span)
-		}
-		return &Type{Kind: TypeBuiltin, Name: "List", Args: []*Type{builtin("Int")}}
 	default:
 		return unknownType
 	}

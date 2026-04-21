@@ -3,9 +3,11 @@
 # range 2
 # range 3
 # total 6
-# compact range 10
-# compact range 14
-# compact multiplied 140
+# another range 10
+# another range 11
+# another range 12
+# another range 13
+# another multiplied 17160
 
 def main() Unit {
     total Int := 0
@@ -16,9 +18,9 @@ def main() Unit {
     Term.println("total", total)
 
     multiplied := 1
-    for item <- [10...14] {
-        Term.println("compact range", item)
+    for item <- Range(10, 14) {
+        Term.println("another range", item)
         multiplied *= item
     }
-    Term.println("compact multiplied", multiplied)
+    Term.println("another multiplied", multiplied)
 }

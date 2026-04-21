@@ -2033,23 +2033,6 @@ func applyBinary(op string, left, right Value, span parser.Span) (Value, error) 
 			return nil, err
 		}
 		return lb || rb, nil
-	case "..":
-		start, ok1 := left.(int64)
-		end, ok2 := right.(int64)
-		if !ok1 || !ok2 {
-			return nil, RuntimeError{Message: "range operands must be Int", Span: span}
-		}
-		var out []Value
-		if start <= end {
-			for i := start; i < end; i++ {
-				out = append(out, i)
-			}
-		} else {
-			for i := start; i > end; i-- {
-				out = append(out, i)
-			}
-		}
-		return out, nil
 	}
 	return nil, RuntimeError{Message: "unsupported operator '" + op + "'", Span: span}
 }

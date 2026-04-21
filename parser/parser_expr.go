@@ -314,8 +314,6 @@ func precedence(t TokenType) int {
 		return 6
 	case TokenColon:
 		return 7
-	case TokenRange:
-		return 8
 	default:
 		return -1
 	}

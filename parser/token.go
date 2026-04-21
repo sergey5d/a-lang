@@ -74,7 +74,6 @@ const (
 	TokenAndAnd TokenType = "&&"
 	TokenOrOr   TokenType = "||"
 
-	TokenRange TokenType = ".."
 	TokenUnder TokenType = "_"
 )
 
