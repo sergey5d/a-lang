@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"a-lang/parser"
 )
@@ -43,6 +44,14 @@ func load(path string, cache map[string]*LoadedModule, loading map[string]bool) 
 	if err != nil {
 		return nil, err
 	}
+	stdlibDir, _ := findStdlibDir(filepath.Dir(abs))
+	if stdlibDir != "" {
+		preludePrograms, err := loadPreludePrograms(stdlibDir, abs)
+		if err != nil {
+			return nil, err
+		}
+		program = mergePrelude(program, preludePrograms)
+	}
 
 	mod := &LoadedModule{
 		Path:        abs,
@@ -71,4 +80,81 @@ func load(path string, cache map[string]*LoadedModule, loading map[string]bool) 
 	}
 
 	return mod, nil
+}
+
+func findStdlibDir(start string) (string, error) {
+	dir, err := filepath.Abs(start)
+	if err != nil {
+		return "", err
+	}
+	for {
+		candidate := filepath.Join(dir, "stdlib")
+		info, err := os.Stat(candidate)
+		if err == nil && info.IsDir() {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", nil
+		}
+		dir = parent
+	}
+}
+
+func loadPreludePrograms(stdlibDir, currentFile string) ([]*parser.Program, error) {
+	entries, err := os.ReadDir(stdlibDir)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".al" {
+			continue
+		}
+		path := filepath.Join(stdlibDir, entry.Name())
+		if path == currentFile {
+			continue
+		}
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+
+	out := make([]*parser.Program, 0, len(paths))
+	for _, path := range paths {
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		program, err := parser.Parse(string(src))
+		if err != nil {
+			return nil, fmt.Errorf("parse stdlib %q: %w", filepath.Base(path), err)
+		}
+		out = append(out, program)
+	}
+	return out, nil
+}
+
+func mergePrelude(program *parser.Program, prelude []*parser.Program) *parser.Program {
+	if len(prelude) == 0 {
+		return program
+	}
+	merged := &parser.Program{
+		PackageName: program.PackageName,
+		PackageSpan: program.PackageSpan,
+		Imports:     append([]parser.ImportDecl(nil), program.Imports...),
+		Functions:   []*parser.FunctionDecl{},
+		Interfaces:  []*parser.InterfaceDecl{},
+		Classes:     []*parser.ClassDecl{},
+		Statements:  append([]parser.Statement(nil), program.Statements...),
+		Span:        program.Span,
+	}
+	for _, std := range prelude {
+		merged.Functions = append(merged.Functions, std.Functions...)
+		merged.Interfaces = append(merged.Interfaces, std.Interfaces...)
+		merged.Classes = append(merged.Classes, std.Classes...)
+	}
+	merged.Functions = append(merged.Functions, program.Functions...)
+	merged.Interfaces = append(merged.Interfaces, program.Interfaces...)
+	merged.Classes = append(merged.Classes, program.Classes...)
+	return merged
 }

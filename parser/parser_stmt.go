@@ -254,15 +254,33 @@ func (p *Parser) parseIfStmt() (Statement, error) {
 }
 
 func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
-	condition, err := p.parseExpressionWithOptions(0, false)
-	if err != nil {
-		return nil, err
+	stmt := &IfStmt{}
+	if p.check(TokenIdentifier) && p.checkNext(TokenLeftArrow) {
+		name, err := p.consume(TokenIdentifier, "expected binding name after 'if'")
+		if err != nil {
+			return nil, err
+		}
+		if _, err := p.consume(TokenLeftArrow, "expected '<-' after if binding name"); err != nil {
+			return nil, err
+		}
+		value, err := p.parseExpressionWithOptions(0, false)
+		if err != nil {
+			return nil, err
+		}
+		stmt.BindingName = name.Lexeme
+		stmt.BindingValue = value
+	} else {
+		condition, err := p.parseExpressionWithOptions(0, false)
+		if err != nil {
+			return nil, err
+		}
+		stmt.Condition = condition
 	}
 	thenBlock, err := p.parseBlock()
 	if err != nil {
 		return nil, err
 	}
-	stmt := &IfStmt{Condition: condition, Then: thenBlock}
+	stmt.Then = thenBlock
 	if p.match(TokenElse) {
 		if p.check(TokenIf) {
 			elseIfStmt, err := p.parseIfStmt()

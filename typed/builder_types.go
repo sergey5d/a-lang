@@ -79,19 +79,19 @@ func (b *typeRefBuilder) BuildType(ref *parser.TypeRef) *typecheck.Type {
 
 // kindOf classifies a type name using the known declarations in context.
 func (b *typeRefBuilder) kindOf(name string) typecheck.TypeKind {
-	switch name {
-	case "List", "Map", "Set", "Term", "Eq", "Option":
-		return typecheck.TypeInterface
-	}
-	switch name {
-	case "Int", "Float", "Bool", "String", "Rune", "Decimal", "Array", "Unit":
-		return typecheck.TypeBuiltin
-	}
 	if _, ok := b.ctx.classes[name]; ok {
 		return typecheck.TypeClass
 	}
 	if _, ok := b.ctx.interfaces[name]; ok {
 		return typecheck.TypeInterface
+	}
+	switch name {
+	case "List", "Map", "Set", "Term", "Eq", "Option":
+		return typecheck.TypeInterface
+	}
+	switch name {
+		case "Int", "Float", "Bool", "String", "Rune", "Decimal", "Array", "Unit":
+			return typecheck.TypeBuiltin
 	}
 	return typecheck.TypeUnknown
 }
@@ -268,8 +268,55 @@ func elementType(typ *typecheck.Type) *typecheck.Type {
 
 // iterableElementType extracts the item type for iterable runtime values.
 func (b *typeRefBuilder) iterableElementType(typ *typecheck.Type) *typecheck.Type {
+	if typ == nil {
+		return &typecheck.Type{Kind: typecheck.TypeUnknown, Name: "<unknown>"}
+	}
+	if typ.Name == "Array" && len(typ.Args) > 0 {
+		return typ.Args[0]
+	}
+	if typ.Kind == typecheck.TypeInterface {
+		if typ.Name == "Iterable" && len(typ.Args) > 0 {
+			return typ.Args[0]
+		}
+		if iface, ok := b.ctx.interfaces[typ.Name]; ok {
+			if elem := b.iterableTypeFromRefs(iface.Extends, typ.Args, iface.TypeParameters); elem != nil {
+				return elem
+			}
+		}
+	}
+	if typ.Kind == typecheck.TypeClass {
+		if class, ok := b.ctx.classes[typ.Name]; ok {
+			if elem := b.iterableTypeFromRefs(class.Implements, typ.Args, class.TypeParameters); elem != nil {
+				return elem
+			}
+		}
+	}
 	return elementType(typ)
 }
+
+func (b *typeRefBuilder) iterableTypeFromRefs(refs []*parser.TypeRef, args []*typecheck.Type, params []parser.TypeParameter) *typecheck.Type {
+	subst := map[string]*typecheck.Type{}
+	for i, param := range params {
+		if i < len(args) {
+			subst[param.Name] = args[i]
+		}
+	}
+	for _, ref := range refs {
+		inst := b.instantiateTypeRef(ref, subst)
+		if inst.Name == "Iterable" && len(inst.Args) > 0 {
+			return inst.Args[0]
+		}
+		if inst.Kind == typecheck.TypeInterface {
+			if iface, ok := b.ctx.interfaces[inst.Name]; ok {
+				if elem := b.iterableTypeFromRefs(iface.Extends, inst.Args, iface.TypeParameters); elem != nil {
+					return elem
+				}
+			}
+		}
+	}
+	return nil
+}
+
 
 // exprSpan returns the parser span for a parser expression node.
 func exprSpan(expr parser.Expr) parser.Span {

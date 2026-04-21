@@ -1066,3 +1066,38 @@ def run() Array[Int] {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }
+
+func TestAnalyzeIfOptionBinding(t *testing.T) {
+	src := `
+def run(value Option[Int]) Int {
+	if item <- value {
+		return item
+	}
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeIfOptionBindingRejectsNonOption(t *testing.T) {
+	src := `
+def run(value Int) Int {
+	if item <- value {
+		return item
+	}
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if result.Diagnostics[0].Code != "invalid_condition_type" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}

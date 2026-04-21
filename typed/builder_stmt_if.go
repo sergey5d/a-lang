@@ -10,9 +10,19 @@ type ifStmtBuilder struct {
 
 // Build converts a parser if statement into a typed if statement.
 func (b *ifStmtBuilder) Build(stmt *parser.IfStmt) (Stmt, error) {
-	cond, err := b.exprs.Build(stmt.Condition)
-	if err != nil {
-		return nil, err
+	var cond Expr
+	var bindingValue Expr
+	var err error
+	if stmt.BindingValue != nil {
+		bindingValue, err = b.exprs.Build(stmt.BindingValue)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		cond, err = b.exprs.Build(stmt.Condition)
+		if err != nil {
+			return nil, err
+		}
 	}
 	thenBlock, err := b.blocks.Build(stmt.Then)
 	if err != nil {
@@ -30,5 +40,5 @@ func (b *ifStmtBuilder) Build(stmt *parser.IfStmt) (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &IfStmt{Condition: cond, Then: thenBlock, ElseIf: elseIf, Else: elseBlock, Span: stmt.Span}, nil
+	return &IfStmt{Condition: cond, BindingName: stmt.BindingName, BindingValue: bindingValue, Then: thenBlock, ElseIf: elseIf, Else: elseBlock, Span: stmt.Span}, nil
 }

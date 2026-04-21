@@ -304,8 +304,16 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 			r.resolveExpr(value)
 		}
 	case *parser.IfStmt:
-		r.resolveExpr(s.Condition)
-		r.resolveBlock(s.Then)
+		if s.BindingValue != nil {
+			r.resolveExpr(s.BindingValue)
+			r.pushScope()
+			r.defineMutable(s.BindingName, s.Span, false, "duplicate_binding", "duplicate binding '"+s.BindingName+"'")
+			r.resolveBlockStatements(s.Then.Statements)
+			r.popScope()
+		} else {
+			r.resolveExpr(s.Condition)
+			r.resolveBlock(s.Then)
+		}
 		if s.ElseIf != nil {
 			r.resolveStatement(s.ElseIf)
 		}

@@ -203,11 +203,13 @@ func (s *MultiAssignmentStmt) GetSpan() parser.Span { return s.Span }
 
 // IfStmt is a typed if / else-if / else chain.
 type IfStmt struct {
-	Condition Expr
-	Then      *BlockStmt
-	ElseIf    *IfStmt
-	Else      *BlockStmt
-	Span      parser.Span
+	Condition    Expr
+	BindingName  string
+	BindingValue Expr
+	Then         *BlockStmt
+	ElseIf       *IfStmt
+	Else         *BlockStmt
+	Span         parser.Span
 }
 
 func (*IfStmt) stmtNode()              {}

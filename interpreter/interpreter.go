@@ -61,6 +61,10 @@ type closure struct {
 type builtinRef struct{ name string }
 
 type nativeList struct{ items []Value }
+type nativeListIterator struct {
+	items []Value
+	index int
+}
 type nativeArray struct{ items []Value }
 type nativeTuple struct {
 	items []Value
@@ -419,16 +423,32 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 		}
 		return nil, nil, nil
 	case *parser.IfStmt:
-		cond, err := in.evalExpr(s.Condition, local)
-		if err != nil {
-			return nil, nil, err
-		}
-		truthy, err := asBool(cond, exprSpan(s.Condition))
-		if err != nil {
-			return nil, nil, err
-		}
-		if truthy {
-			return in.execBlock(s.Then, local, self)
+		if s.BindingValue != nil {
+			optionValue, err := in.evalExpr(s.BindingValue, local)
+			if err != nil {
+				return nil, nil, err
+			}
+			set, value, err := in.optionBindingValue(optionValue, local, exprSpan(s.BindingValue))
+			if err != nil {
+				return nil, nil, err
+			}
+			if set {
+				thenEnv := newEnv(local)
+				thenEnv.define(s.BindingName, value, false)
+				return in.execBlock(s.Then, thenEnv, self)
+			}
+		} else {
+			cond, err := in.evalExpr(s.Condition, local)
+			if err != nil {
+				return nil, nil, err
+			}
+			truthy, err := asBool(cond, exprSpan(s.Condition))
+			if err != nil {
+				return nil, nil, err
+			}
+			if truthy {
+				return in.execBlock(s.Then, local, self)
+			}
 		}
 		if s.ElseIf != nil {
 			return in.execStmt(s.ElseIf, local, self)
@@ -454,6 +474,35 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 		return value, nil, err
 	default:
 		return nil, nil, RuntimeError{Message: "unsupported statement", Span: stmtSpan(stmt)}
+	}
+}
+
+func (in *Interpreter) optionBindingValue(optionValue Value, local *env, span parser.Span) (bool, Value, error) {
+	switch value := optionValue.(type) {
+	case *nativeOption:
+		if !value.set {
+			return false, nil, nil
+		}
+		return true, value.value, nil
+	case *instance:
+		if value.class.Name != "Option" {
+			return false, nil, RuntimeError{Message: "if binding requires Option[T]", Span: span}
+		}
+		setValue, err := in.invokeMethod(value, "isSet", nil, local, span)
+		if err != nil {
+			return false, nil, err
+		}
+		set, ok := setValue.(bool)
+		if !ok || !set {
+			return false, nil, nil
+		}
+		unwrapped, err := in.invokeMethod(value, "get", nil, local, span)
+		if err != nil {
+			return false, nil, err
+		}
+		return true, unwrapped, nil
+	default:
+		return false, nil, RuntimeError{Message: "if binding requires Option[T]", Span: span}
 	}
 }
 
@@ -521,7 +570,7 @@ func (in *Interpreter) execForBindings(bindings []parser.ForBinding, index int, 
 	if err != nil {
 		return nil, err
 	}
-	items, ok := iterableToSlice(iterable)
+	items, ok := in.iterableToSlice(iterable, local, bindings[index].Span)
 	if !ok {
 		return nil, RuntimeError{Message: "for loop expects iterable list value", Span: bindings[index].Span}
 	}
@@ -1417,12 +1466,12 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 				args[i] = value
 			}
 		}
-		return &nativeOption{value: args[0], set: true}, nil
+		return in.constructStdlibOption(args[0], true, local, span)
 	case "None":
 		if len(argExprs) != 0 {
 			return nil, RuntimeError{Message: fmt.Sprintf("None constructor expects 0 arguments, got %d", len(argExprs)), Span: span}
 		}
-		return &nativeOption{set: false}, nil
+		return in.constructStdlibOption(nil, false, local, span)
 	case "Map":
 		m := &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: []string{}}
 		for _, argExpr := range argExprs {
@@ -1457,7 +1506,9 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 func (in *Interpreter) nativeHasMethod(receiver Value, name string) bool {
 	switch receiver.(type) {
 	case *nativeList:
-		return name == "append" || name == "get" || name == "size"
+		return name == "append" || name == "get" || name == "size" || name == "iterator"
+	case *nativeListIterator:
+		return name == "hasNext" || name == "next"
 	case *nativeArray:
 		return name == "size"
 	case *nativeOption:
@@ -1482,6 +1533,13 @@ func nativeMethodParams(receiver Value, name string) ([]parser.Parameter, bool) 
 		case "get":
 			return []parser.Parameter{{Name: "index"}}, true
 		case "size":
+			return nil, true
+		case "iterator":
+			return nil, true
+		}
+	case *nativeListIterator:
+		switch name {
+		case "hasNext", "next":
 			return nil, true
 		}
 	case *nativeArray:
@@ -1553,14 +1611,39 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []name
 				return nativeCallResult{err: RuntimeError{Message: "get index must be Int", Span: span}}, true
 			}
 			if index < 0 || index >= int64(len(value.items)) {
-				return nativeCallResult{value: &nativeOption{set: false}}, true
+				result, err := in.constructStdlibOption(nil, false, local, span)
+				return nativeCallResult{value: result, err: err}, true
 			}
-			return nativeCallResult{value: &nativeOption{value: value.items[index], set: true}}, true
+			result, err := in.constructStdlibOption(value.items[index], true, local, span)
+			return nativeCallResult{value: result, err: err}, true
 		case "size":
 			if len(ordered) != 0 {
 				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
 			}
 			return nativeCallResult{value: int64(len(value.items))}, true
+		case "iterator":
+			if len(ordered) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "iterator expects 0 arguments", Span: span}}, true
+			}
+			return nativeCallResult{value: &nativeListIterator{items: append([]Value(nil), value.items...)}}, true
+		}
+	case *nativeListIterator:
+		switch name {
+		case "hasNext":
+			if len(ordered) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "hasNext expects 0 arguments", Span: span}}, true
+			}
+			return nativeCallResult{value: value.index < len(value.items)}, true
+		case "next":
+			if len(ordered) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "next expects 0 arguments", Span: span}}, true
+			}
+			if value.index >= len(value.items) {
+				return nativeCallResult{err: RuntimeError{Message: "iterator exhausted", Span: span}}, true
+			}
+			item := value.items[value.index]
+			value.index++
+			return nativeCallResult{value: item}, true
 		}
 	case *nativeArray:
 		switch name {
@@ -1651,9 +1734,11 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []name
 			}
 			result, ok := value.items[key]
 			if !ok {
-				return nativeCallResult{value: &nativeOption{set: false}}, true
+				opt, err := in.constructStdlibOption(nil, false, local, span)
+				return nativeCallResult{value: opt, err: err}, true
 			}
-			return nativeCallResult{value: &nativeOption{value: result, set: true}}, true
+			opt, err := in.constructStdlibOption(result, true, local, span)
+			return nativeCallResult{value: opt, err: err}, true
 		case "contains":
 			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "contains expects 1 argument", Span: span}}, true
@@ -1829,6 +1914,15 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 		return ok && len(ref.TupleElements) == len(tuple.items)
 	}
 	switch ref.Name {
+	case "", "Unit", "Int", "Float", "Bool", "String", "Rune", "List", "Iterable", "Iterator", "Set", "Map", "Option", "Array", "Term":
+	default:
+		if _, ok := in.classes[ref.Name]; !ok {
+			if _, ok := in.interfaces[ref.Name]; !ok {
+				return true
+			}
+		}
+	}
+	switch ref.Name {
 	case "Unit":
 		return value == nil
 	case "Int":
@@ -1849,6 +1943,15 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 	case "List":
 		_, ok := value.(*nativeList)
 		return ok
+	case "Iterable":
+		switch value.(type) {
+		case *nativeList, *nativeArray, *nativeSet, *nativeListIterator:
+			return true
+		}
+		return false
+	case "Iterator":
+		_, ok := value.(*nativeListIterator)
+		return ok
 	case "Set":
 		_, ok := value.(*nativeSet)
 		return ok
@@ -1856,6 +1959,9 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 		_, ok := value.(*nativeMap)
 		return ok
 	case "Option":
+		if instanceValue, ok := value.(*instance); ok && instanceValue.class.Name == "Option" {
+			return true
+		}
 		_, ok := value.(*nativeOption)
 		return ok
 	case "Array":
@@ -2133,7 +2239,7 @@ func asBool(value Value, span parser.Span) (bool, error) {
 	return b, nil
 }
 
-func iterableToSlice(value Value) ([]Value, bool) {
+func (in *Interpreter) iterableToSlice(value Value, local *env, span parser.Span) ([]Value, bool) {
 	switch items := value.(type) {
 	case []Value:
 		return items, true
@@ -2147,9 +2253,65 @@ func iterableToSlice(value Value) ([]Value, bool) {
 			out = append(out, items.keys[key])
 		}
 		return out, true
-	default:
+	}
+	iterator, err := in.invokeMethod(value, "iterator", nil, local, span)
+	if err != nil {
 		return nil, false
 	}
+	var out []Value
+	for {
+		hasNextValue, err := in.invokeMethod(iterator, "hasNext", nil, local, span)
+		if err != nil {
+			return nil, false
+		}
+		hasNext, ok := hasNextValue.(bool)
+		if !ok || !hasNext {
+			break
+		}
+		nextValue, err := in.invokeMethod(iterator, "next", nil, local, span)
+		if err != nil {
+			return nil, false
+		}
+		out = append(out, nextValue)
+	}
+	return out, true
+}
+
+func (in *Interpreter) invokeMethod(receiver Value, name string, args []Value, local *env, span parser.Span) (Value, error) {
+	named := make([]namedValueArg, len(args))
+	for i, arg := range args {
+		named[i] = namedValueArg{Value: arg, Span: span}
+	}
+	if native, ok := in.callNativeMethod(receiver, name, named, local, span); ok {
+		return native.value, native.err
+	}
+	obj, ok := receiver.(*instance)
+	if !ok {
+		return nil, RuntimeError{Message: "member call requires class instance", Span: span}
+	}
+	for _, method := range obj.class.Methods {
+		if method.Name != name {
+			continue
+		}
+		if in.runtimeMethodMatches(method, args) {
+			return in.callMethod(obj, method, args, local)
+		}
+	}
+	return nil, RuntimeError{Message: "unknown method '" + name + "'", Span: span}
+}
+
+func (in *Interpreter) constructStdlibOption(value Value, set bool, local *env, span parser.Span) (Value, error) {
+	class, ok := in.classes["Option"]
+	if !ok {
+		if set {
+			return &nativeOption{value: value, set: true}, nil
+		}
+		return &nativeOption{set: false}, nil
+	}
+	if set {
+		return in.construct(class, []Value{value}, local)
+	}
+	return in.construct(class, nil, local)
 }
 
 func (in *Interpreter) bindingValues(bindings []parser.Binding, values []parser.Expr, local *env, span parser.Span) ([]Value, error) {

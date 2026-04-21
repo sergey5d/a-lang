@@ -1295,6 +1295,36 @@ def classify(a Int) Bool {
 	}
 }
 
+func TestParseIfOptionBinding(t *testing.T) {
+	src := `
+def run(value Option[Int]) Unit {
+	if item <- value {
+		Term.println(item)
+	}
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	ifStmt, ok := fn.Body.Statements[0].(*IfStmt)
+	if !ok {
+		t.Fatalf("expected first statement to be if, got %T", fn.Body.Statements[0])
+	}
+	if ifStmt.BindingName != "item" {
+		t.Fatalf("expected binding name 'item', got %q", ifStmt.BindingName)
+	}
+	if ifStmt.BindingValue == nil {
+		t.Fatalf("expected binding value to be populated")
+	}
+	if ifStmt.Condition != nil {
+		t.Fatalf("expected boolean condition to be empty for option-binding if")
+	}
+}
+
 func TestAttachSourceSpans(t *testing.T) {
 	src := `
 def sample(a Int) Bool {

@@ -858,3 +858,29 @@ def run() Int {
 		t.Fatalf("expected 4, got %#v", value)
 	}
 }
+
+func TestIfOptionBinding(t *testing.T) {
+	src := `
+def run() Int {
+	found Option[Int] = Some(5)
+	missing Option[Int] = None()
+	total Int := 0
+	if item <- found {
+		total := total + item
+	}
+	if item <- missing {
+		total := total + item
+	}
+	return total
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(5) {
+		t.Fatalf("expected 5, got %#v", value)
+	}
+}

@@ -202,11 +202,13 @@ func (*MultiAssignmentStmt) statementNode() {}
 
 // IfStmt represents an if / else-if / else chain.
 type IfStmt struct {
-	Condition Expr       `json:"condition"`
-	Then      *BlockStmt `json:"then"`
-	ElseIf    *IfStmt    `json:"elseIf,omitempty"`
-	Else      *BlockStmt `json:"else,omitempty"`
-	Span      Span       `json:"span"`
+	Condition    Expr       `json:"condition,omitempty"`
+	BindingName  string     `json:"bindingName,omitempty"`
+	BindingValue Expr       `json:"bindingValue,omitempty"`
+	Then         *BlockStmt `json:"then"`
+	ElseIf       *IfStmt    `json:"elseIf,omitempty"`
+	Else         *BlockStmt `json:"else,omitempty"`
+	Span         Span       `json:"span"`
 }
 
 func (*IfStmt) statementNode() {}

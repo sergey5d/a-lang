@@ -201,16 +201,19 @@ func builtinInterfaceInfos() map[string]interfaceInfo {
 	listDecl := &parser.InterfaceDecl{
 		Name:           "List",
 		TypeParameters: []parser.TypeParameter{{Name: "T"}},
+		Extends:        []*parser.TypeRef{genericType("Iterable", "T")},
 		Methods: []parser.InterfaceMethod{
 			{Name: "append", Parameters: []parser.Parameter{{Name: "value", Type: namedType("T")}}, ReturnType: genericType("List", "T")},
 			{Name: "get", Parameters: []parser.Parameter{{Name: "index", Type: namedType("Int")}}, ReturnType: genericType("Option", "T")},
 			{Name: "size", Parameters: nil, ReturnType: namedType("Int")},
+			{Name: "iterator", Parameters: nil, ReturnType: genericType("Iterator", "T")},
 		},
 	}
 	out["List"] = interfaceInfo{decl: listDecl, methods: map[string]interfaceMethodInfo{
-		"append": {decl: listDecl.Methods[0]},
-		"get":    {decl: listDecl.Methods[1]},
-		"size":   {decl: listDecl.Methods[2]},
+		"append":   {decl: listDecl.Methods[0]},
+		"get":      {decl: listDecl.Methods[1]},
+		"size":     {decl: listDecl.Methods[2]},
+		"iterator": {decl: listDecl.Methods[3]},
 	}}
 
 	setDecl := &parser.InterfaceDecl{
@@ -879,9 +882,22 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			c.checkAssignmentTarget(s.Targets[i], s.Span)
 		}
 	case *parser.IfStmt:
-		condType := c.checkExpr(s.Condition)
-		c.requireAssignable(condType, builtin("Bool"), exprSpan(s.Condition), "invalid_condition_type", "if condition must be Bool")
-		_ = c.checkBlock(s.Then)
+		if s.BindingValue != nil {
+			optionType := c.checkExpr(s.BindingValue)
+			elemType := c.optionElementType(optionType)
+			if isUnknown(elemType) {
+				c.addDiagnostic("invalid_condition_type", "if binding requires Option[T]", exprSpan(s.BindingValue))
+				elemType = unknownType
+			}
+			c.pushScope()
+			c.define(s.BindingName, elemType, false)
+			c.checkBlockStatements(s.Then.Statements)
+			c.popScope()
+		} else {
+			condType := c.checkExpr(s.Condition)
+			c.requireAssignable(condType, builtin("Bool"), exprSpan(s.Condition), "invalid_condition_type", "if condition must be Bool")
+			_ = c.checkBlock(s.Then)
+		}
 		if s.ElseIf != nil {
 			c.checkStmt(s.ElseIf)
 		}
@@ -1273,23 +1289,32 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 		c.requireAssignable(lengthType, builtin("Int"), exprSpan(call.Args[0].Value), "invalid_argument_type", "Array constructor length must be Int")
 		return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
 	case "Some":
+		optionType := &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
+		if _, ok := c.classes["Option"]; ok {
+			optionType = &Type{Kind: TypeClass, Name: "Option", Args: []*Type{unknownType}}
+		}
 		if len(call.Args) != 1 {
 			for _, arg := range call.Args {
 				c.checkExpr(arg.Value)
 			}
 			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Some constructor expects 1 argument, got %d", len(call.Args)), call.Span)
-			return &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
+			return optionType
 		}
 		valueType := c.checkExpr(call.Args[0].Value)
-		return &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{valueType}}
+		optionType.Args = []*Type{valueType}
+		return optionType
 	case "None":
+		optionType := &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
+		if _, ok := c.classes["Option"]; ok {
+			optionType = &Type{Kind: TypeClass, Name: "Option", Args: []*Type{unknownType}}
+		}
 		if len(call.Args) != 0 {
 			for _, arg := range call.Args {
 				c.checkExpr(arg.Value)
 			}
 			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("None constructor expects 0 arguments, got %d", len(call.Args)), call.Span)
 		}
-		return &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
+		return optionType
 	default:
 		for _, arg := range call.Args {
 			c.checkExpr(arg.Value)
@@ -2501,8 +2526,55 @@ func (c *Checker) iterableElementType(t *Type) *Type {
 	if isUnknown(t) {
 		return unknownType
 	}
-	if (t.Name == "List" || t.Name == "Set" || t.Name == "Array") && len(t.Args) == 1 {
+	if t.Name == "Array" && len(t.Args) == 1 {
 		return t.Args[0]
+	}
+	if t.Kind == TypeInterface {
+		if t.Name == "Iterable" && len(t.Args) == 1 {
+			return t.Args[0]
+		}
+		if info, ok := c.interfaces[t.Name]; ok {
+			subst := c.substForDecl(info.decl.TypeParameters, t.Args)
+			if elem := c.iterableTypeFromRefs(info.decl.Extends, subst); !isUnknown(elem) {
+				return elem
+			}
+		}
+	}
+	if t.Kind == TypeClass {
+		if info, ok := c.classes[t.Name]; ok {
+			subst := c.substForDecl(info.decl.TypeParameters, t.Args)
+			if elem := c.iterableTypeFromRefs(info.decl.Implements, subst); !isUnknown(elem) {
+				return elem
+			}
+		}
+	}
+	return unknownType
+}
+
+func (c *Checker) optionElementType(t *Type) *Type {
+	if isUnknown(t) {
+		return unknownType
+	}
+	if t.Name == "Option" && len(t.Args) == 1 {
+		return t.Args[0]
+	}
+	return unknownType
+}
+
+func (c *Checker) iterableTypeFromRefs(refs []*parser.TypeRef, subst map[string]*Type) *Type {
+	for _, ref := range refs {
+		inst := c.instantiateTypeRef(ref, subst)
+		if inst.Name == "Iterable" && len(inst.Args) == 1 {
+			return inst.Args[0]
+		}
+		if inst.Kind == TypeInterface {
+			if info, ok := c.interfaces[inst.Name]; ok {
+				nextSubst := c.substForDecl(info.decl.TypeParameters, inst.Args)
+				if elem := c.iterableTypeFromRefs(info.decl.Extends, nextSubst); !isUnknown(elem) {
+					return elem
+				}
+			}
+		}
 	}
 	return unknownType
 }
@@ -2550,9 +2622,61 @@ func (c *Checker) requireAssignable(actual, expected *Type, span parser.Span, co
 	if isUnknown(actual) || isUnknown(expected) {
 		return
 	}
-	if !sameType(actual, expected) {
+	if !c.isAssignable(actual, expected) {
 		c.addDiagnostic(code, message, span)
 	}
+}
+
+func (c *Checker) isAssignable(actual, expected *Type) bool {
+	if sameType(actual, expected) {
+		return true
+	}
+	if expected.Kind != TypeInterface {
+		return false
+	}
+	switch actual.Kind {
+	case TypeClass:
+		info, ok := c.classes[actual.Name]
+		if !ok {
+			return false
+		}
+		subst := c.substForDecl(info.decl.TypeParameters, actual.Args)
+		for _, impl := range info.decl.Implements {
+			inst := c.instantiateTypeRef(impl, subst)
+			if sameType(inst, expected) || c.interfaceAssignable(inst, expected, map[string]bool{}) {
+				return true
+			}
+		}
+	case TypeInterface:
+		return c.interfaceAssignable(actual, expected, map[string]bool{})
+	}
+	return false
+}
+
+func (c *Checker) interfaceAssignable(actual, expected *Type, seen map[string]bool) bool {
+	if sameType(actual, expected) {
+		return true
+	}
+	if actual == nil || actual.Kind != TypeInterface {
+		return false
+	}
+	key := actual.Name + actual.String()
+	if seen[key] {
+		return false
+	}
+	seen[key] = true
+	info, ok := c.interfaces[actual.Name]
+	if !ok {
+		return false
+	}
+	subst := c.substForDecl(info.decl.TypeParameters, actual.Args)
+	for _, parent := range info.decl.Extends {
+		inst := c.instantiateTypeRef(parent, subst)
+		if sameType(inst, expected) || c.interfaceAssignable(inst, expected, seen) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Checker) addDiagnostic(code, message string, span parser.Span) {
@@ -2617,17 +2741,17 @@ func (c *Checker) kindOf(name string) TypeKind {
 			return kind
 		}
 	}
-	if isBuiltinInterfaceType(name) {
-		return TypeInterface
-	}
-	if isBuiltinType(name) {
-		return TypeBuiltin
-	}
 	if _, ok := c.classes[name]; ok {
 		return TypeClass
 	}
 	if _, ok := c.interfaces[name]; ok {
 		return TypeInterface
+	}
+	if isBuiltinInterfaceType(name) {
+		return TypeInterface
+	}
+	if isBuiltinType(name) {
+		return TypeBuiltin
 	}
 	return ""
 }

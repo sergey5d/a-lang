@@ -4,7 +4,7 @@
 # none: true
 
 # Enums might have 2 flavors.
-# Fully defined where all attributes have values or partially defined see Option.Some
+# Fully defined where all attributes have values.
 
 enum Color {
     color String
@@ -22,12 +22,13 @@ enum Color {
     }
 }
 
-enum Option[T] {
+# Naive implementation of option type
+enum OptionX[T] {
 
     def isDefined() Bool = this != None
 
-    case None
-    case Some {
+    case NoneX
+    case SomeX {
         value T
     }
 }
@@ -35,13 +36,13 @@ enum Option[T] {
 black = Color.Black
 reddish = black.isReddish()
 
-someInt = Option.Some(5)
-noneInt = Option.None
+someInt = OptionX.SomeX(5)
+noneInt = OptionX.NoneX()
 
 someDefined = someInt.isDefined()
 
 def main() Unit {
     Term.println("reddish:", reddish)
     Term.println("some defined:", someDefined)
-    Term.println("none:", noneInt == Option.None)
+    Term.println("none:", noneInt == OptionX.NoneX)
 }
