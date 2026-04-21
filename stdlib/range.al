@@ -7,9 +7,9 @@ record IntRange with Iterable[Int] {
 }
 
 private class RangeIterator with Iterator[Int] {
-    private current Int := ?
-    private end Int := ?
-    private step Int := ?
+    current Int := ?
+    end Int := ?
+    step Int := ?
 
     def this(start Int, end Int, step Int) {
         this.current := start
