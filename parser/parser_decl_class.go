@@ -3,18 +3,38 @@ package parser
 import "fmt"
 
 func (p *Parser) parseClass() (*ClassDecl, error) {
-	return p.parseClassLike(TokenClass, false, "class")
+	return p.parseClassLike(TokenClass, false, false, "class")
 }
 
 func (p *Parser) parseObject() (*ClassDecl, error) {
-	return p.parseClassLike(TokenObject, false, "object")
+	return p.parseClassLike(TokenObject, false, false, "object")
 }
 
 func (p *Parser) parseRecord() (*ClassDecl, error) {
-	return p.parseClassLike(TokenRecord, true, "record")
+	return p.parseClassLike(TokenRecord, true, false, "record")
+}
+
+func (p *Parser) parsePrivateClass() (*ClassDecl, error) {
+	return p.parseClassLike(TokenClass, false, true, "class")
+}
+
+func (p *Parser) parsePrivateObject() (*ClassDecl, error) {
+	return p.parseClassLike(TokenObject, false, true, "object")
+}
+
+func (p *Parser) parsePrivateRecord() (*ClassDecl, error) {
+	return p.parseClassLike(TokenRecord, true, true, "record")
 }
 
 func (p *Parser) parseEnum() (*ClassDecl, error) {
+	return p.parseEnumLike(false)
+}
+
+func (p *Parser) parsePrivateEnum() (*ClassDecl, error) {
+	return p.parseEnumLike(true)
+}
+
+func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 	start, err := p.consume(TokenEnum, "expected 'enum'")
 	if err != nil {
 		return nil, err
@@ -27,7 +47,7 @@ func (p *Parser) parseEnum() (*ClassDecl, error) {
 	if err != nil {
 		return nil, err
 	}
-	decl := &ClassDecl{Name: name.Lexeme, Enum: true, TypeParameters: typeParams}
+	decl := &ClassDecl{Name: name.Lexeme, Private: private, Enum: true, TypeParameters: typeParams}
 	if _, err := p.consume(TokenLBrace, "expected '{' after enum name"); err != nil {
 		return nil, err
 	}
@@ -69,7 +89,7 @@ func (p *Parser) parseEnum() (*ClassDecl, error) {
 	return decl, nil
 }
 
-func (p *Parser) parseClassLike(kind TokenType, record bool, noun string) (*ClassDecl, error) {
+func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun string) (*ClassDecl, error) {
 	start, err := p.consume(kind, "expected '"+noun+"'")
 	if err != nil {
 		return nil, err
@@ -82,7 +102,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, noun string) (*Clas
 	if err != nil {
 		return nil, err
 	}
-	decl := &ClassDecl{Name: name.Lexeme, Object: kind == TokenObject, Record: record, TypeParameters: typeParams}
+	decl := &ClassDecl{Name: name.Lexeme, Private: private, Object: kind == TokenObject, Record: record, TypeParameters: typeParams}
 	if p.match(TokenWith) {
 		for {
 			target, err := p.parseTypeRef()

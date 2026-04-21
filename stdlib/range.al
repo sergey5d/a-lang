@@ -6,7 +6,7 @@ record IntRange with Iterable[Int] {
     def iterator() Iterator[Int] = RangeIterator(start = start, end = end, step = step)
 }
 
-class RangeIterator with Iterator[Int] {
+private class RangeIterator with Iterator[Int] {
     private current Int := ?
     private end Int := ?
     private step Int := ?

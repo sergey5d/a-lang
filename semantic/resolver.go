@@ -82,7 +82,9 @@ func AnalyzeModule(mod *module.LoadedModule) []Diagnostic {
 
 func moduleImportInfo(mod *module.LoadedModule) map[string]importInfo {
 	out := map[string]importInfo{}
+	currentPackage := mod.Program.PackageName
 	for alias, imported := range mod.Imports {
+		samePackage := currentPackage != "" && imported.Program.PackageName == currentPackage
 		info := importInfo{
 			functions:  map[string]parser.Span{},
 			classes:    map[string]parser.Span{},
@@ -92,6 +94,9 @@ func moduleImportInfo(mod *module.LoadedModule) map[string]importInfo {
 			info.functions[fn.Name] = fn.Span
 		}
 		for _, class := range imported.Program.Classes {
+			if class.Private && !samePackage {
+				continue
+			}
 			info.classes[class.Name] = class.Span
 		}
 		for _, iface := range imported.Program.Interfaces {

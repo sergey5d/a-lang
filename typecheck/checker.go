@@ -136,7 +136,9 @@ func (c *Checker) installBuiltinInterfaces() {
 }
 
 func (c *Checker) installModuleImports(current *module.LoadedModule) {
+	currentPackage := current.Program.PackageName
 	for alias, imported := range current.Imports {
+		samePackage := currentPackage != "" && imported.Program.PackageName == currentPackage
 		info := moduleInfo{
 			functions:     map[string]Signature{},
 			functionDecls: map[string]*parser.FunctionDecl{},
@@ -168,6 +170,9 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 			c.interfaces[qualified] = iface
 		}
 		for _, decl := range imported.Program.Classes {
+			if decl.Private && !samePackage {
+				continue
+			}
 			qualified := imported.Path + "::" + decl.Name
 			class := classInfo{
 				name:    qualified,

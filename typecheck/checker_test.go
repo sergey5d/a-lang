@@ -1,8 +1,11 @@
 package typecheck
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"a-lang/module"
 	"a-lang/parser"
 )
 
@@ -13,6 +16,16 @@ func parseProgram(t *testing.T, src string) *parser.Program {
 		t.Fatalf("Parse returned error: %v", err)
 	}
 	return program
+}
+
+func writeModuleFile(t *testing.T, path, src string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
 }
 
 func TestAnalyzeValidProgram(t *testing.T) {
@@ -313,6 +326,76 @@ def run() Int {
 	result := Analyze(parseProgram(t, src))
 	if len(result.Diagnostics) != 0 {
 		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeModuleAllowsPrivateClassWithinSamePackage(t *testing.T) {
+	dir := t.TempDir()
+	writeModuleFile(t, filepath.Join(dir, "app.al"), `
+package app
+
+private class Hidden {
+	def value() Int = 7
+}
+`)
+	writeModuleFile(t, filepath.Join(dir, "main.al"), `
+package app
+
+import app
+
+def run() Int {
+	value Hidden = app.Hidden()
+	return value.value()
+}
+`)
+
+	mod, err := module.Load(filepath.Join(dir, "main.al"))
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	result := AnalyzeModule(mod)
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeModuleRejectsPrivateClassAcrossPackages(t *testing.T) {
+	dir := t.TempDir()
+	writeModuleFile(t, filepath.Join(dir, "lib.al"), `
+package lib
+
+private class Hidden {
+	def value() Int = 7
+}
+`)
+	writeModuleFile(t, filepath.Join(dir, "main.al"), `
+package app
+
+import lib
+
+def run() Int {
+	value = lib.Hidden()
+	return 0
+}
+`)
+
+	mod, err := module.Load(filepath.Join(dir, "main.al"))
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	result := AnalyzeModule(mod)
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	found := false
+	for _, diag := range result.Diagnostics {
+		if diag.Code == "unknown_member" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected unknown_member diagnostic, got %#v", result.Diagnostics)
 	}
 }
 

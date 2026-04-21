@@ -66,6 +66,36 @@ func (p *Parser) parseProgram() (*Program, error) {
 				return nil, err
 			}
 			program.Classes = append(program.Classes, decl)
+		case TokenPrivate:
+			p.advance()
+			switch p.peek().Type {
+			case TokenClass:
+				decl, err := p.parsePrivateClass()
+				if err != nil {
+					return nil, err
+				}
+				program.Classes = append(program.Classes, decl)
+			case TokenObject:
+				decl, err := p.parsePrivateObject()
+				if err != nil {
+					return nil, err
+				}
+				program.Classes = append(program.Classes, decl)
+			case TokenRecord:
+				decl, err := p.parsePrivateRecord()
+				if err != nil {
+					return nil, err
+				}
+				program.Classes = append(program.Classes, decl)
+			case TokenEnum:
+				decl, err := p.parsePrivateEnum()
+				if err != nil {
+					return nil, err
+				}
+				program.Classes = append(program.Classes, decl)
+			default:
+				return nil, fmt.Errorf("'private' is only supported for top-level class-like declarations")
+			}
 		default:
 			stmt, err := p.parseStatement()
 			if err != nil {

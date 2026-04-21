@@ -842,6 +842,25 @@ object Range {
 	}
 }
 
+func TestParsePrivateClassDecl(t *testing.T) {
+	src := `
+private class Hidden {
+	def value() Int = 1
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Classes) != 1 {
+		t.Fatalf("expected 1 declaration, got %d", len(program.Classes))
+	}
+	if !program.Classes[0].Private {
+		t.Fatalf("expected class to be marked private")
+	}
+}
+
 func TestParseInterfaceInheritance(t *testing.T) {
 	src := `
 interface Hopper {
