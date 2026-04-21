@@ -10,6 +10,61 @@ func (p *Parser) parseRecord() (*ClassDecl, error) {
 	return p.parseClassLike(TokenRecord, true, "record")
 }
 
+func (p *Parser) parseEnum() (*ClassDecl, error) {
+	start, err := p.consume(TokenEnum, "expected 'enum'")
+	if err != nil {
+		return nil, err
+	}
+	name, err := p.consume(TokenIdentifier, "expected enum name")
+	if err != nil {
+		return nil, err
+	}
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
+	decl := &ClassDecl{Name: name.Lexeme, Enum: true, TypeParameters: typeParams}
+	if _, err := p.consume(TokenLBrace, "expected '{' after enum name"); err != nil {
+		return nil, err
+	}
+	sawNonField := false
+	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		switch p.peek().Type {
+		case TokenIdentifier:
+			if sawNonField {
+				return nil, fmt.Errorf("enum fields must appear before method or case declarations")
+			}
+			field, err := p.parseField(false)
+			if err != nil {
+				return nil, err
+			}
+			decl.Fields = append(decl.Fields, field)
+		case TokenDef:
+			sawNonField = true
+			method, err := p.parseMethod(false)
+			if err != nil {
+				return nil, err
+			}
+			decl.Methods = append(decl.Methods, method)
+		case TokenCase:
+			sawNonField = true
+			enumCase, err := p.parseEnumCase()
+			if err != nil {
+				return nil, err
+			}
+			decl.Cases = append(decl.Cases, enumCase)
+		default:
+			return nil, fmt.Errorf("expected enum member, got %s", p.peek().String())
+		}
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after enum body")
+	if err != nil {
+		return nil, err
+	}
+	decl.Span = mergeSpans(tokenSpan(start), tokenSpan(end))
+	return decl, nil
+}
+
 func (p *Parser) parseClassLike(kind TokenType, record bool, noun string) (*ClassDecl, error) {
 	start, err := p.consume(kind, "expected '"+noun+"'")
 	if err != nil {
@@ -146,4 +201,49 @@ func (p *Parser) parseMethod(private bool) (*MethodDecl, error) {
 		Constructor: constructor,
 		Span:        mergeSpans(tokenSpan(start), body.Span),
 	}, nil
+}
+
+func (p *Parser) parseEnumCase() (EnumCaseDecl, error) {
+	start, err := p.consume(TokenCase, "expected 'case'")
+	if err != nil {
+		return EnumCaseDecl{}, err
+	}
+	name, err := p.consume(TokenIdentifier, "expected case name")
+	if err != nil {
+		return EnumCaseDecl{}, err
+	}
+	decl := EnumCaseDecl{Name: name.Lexeme, Span: mergeSpans(tokenSpan(start), tokenSpan(name))}
+	if !p.match(TokenLBrace) {
+		return decl, nil
+	}
+	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		if p.check(TokenIdentifier) && (p.checkNext(TokenAssign) || p.checkNext(TokenColonAssign)) {
+			assignStart := p.advance()
+			op := p.advance()
+			if op.Type != TokenAssign {
+				return EnumCaseDecl{}, fmt.Errorf("enum case field assignments must use '='")
+			}
+			value, err := p.parseExpression(0)
+			if err != nil {
+				return EnumCaseDecl{}, err
+			}
+			decl.Assignments = append(decl.Assignments, EnumCaseAssignment{
+				Name:  assignStart.Lexeme,
+				Value: value,
+				Span:  mergeSpans(tokenSpan(assignStart), exprSpan(value)),
+			})
+			continue
+		}
+		field, err := p.parseField(false)
+		if err != nil {
+			return EnumCaseDecl{}, err
+		}
+		decl.Fields = append(decl.Fields, field)
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after case body")
+	if err != nil {
+		return EnumCaseDecl{}, err
+	}
+	decl.Span = mergeSpans(tokenSpan(start), tokenSpan(end))
+	return decl, nil
 }

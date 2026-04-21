@@ -21,6 +21,8 @@ const (
 	TokenInterface  TokenType = "INTERFACE"
 	TokenClass      TokenType = "CLASS"
 	TokenRecord     TokenType = "RECORD"
+	TokenEnum       TokenType = "ENUM"
+	TokenCase       TokenType = "CASE"
 	TokenWith       TokenType = "WITH"
 	TokenPrivate    TokenType = "PRIVATE"
 	TokenIf         TokenType = "IF"
@@ -83,6 +85,8 @@ var keywords = map[string]TokenType{
 	"interface":  TokenInterface,
 	"class":      TokenClass,
 	"record":     TokenRecord,
+	"enum":       TokenEnum,
+	"case":       TokenCase,
 	"with":       TokenWith,
 	"private":    TokenPrivate,
 	"if":         TokenIf,

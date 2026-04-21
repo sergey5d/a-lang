@@ -45,6 +45,7 @@ type Interpreter struct {
 
 type instance struct {
 	class  *parser.ClassDecl
+	caseName string
 	fields map[string]Value
 }
 
@@ -203,6 +204,17 @@ func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl,
 	}
 	local := newEnv(parent)
 	local.define("this", receiver, false)
+	if receiver.class.Enum {
+		for _, enumCase := range receiver.class.Cases {
+			if len(enumCase.Fields) == 0 {
+				value, err := in.constructEnumCase(receiver.class, enumCase, nil, parent, enumCase.Span)
+				if err != nil {
+					return nil, err
+				}
+				local.define(enumCase.Name, value, false)
+			}
+		}
+	}
 	if method.Constructor {
 		local.define("__constructor__", true, false)
 	}
@@ -313,6 +325,40 @@ func (in *Interpreter) construct(class *parser.ClassDecl, args []Value, parent *
 	}
 	if err := in.constructInto(obj, class, args, parent, class.Span); err != nil {
 		return nil, err
+	}
+	return obj, nil
+}
+
+func (in *Interpreter) constructEnumCase(class *parser.ClassDecl, enumCase parser.EnumCaseDecl, args []Value, parent *env, span parser.Span) (Value, error) {
+	obj := &instance{class: class, caseName: enumCase.Name, fields: map[string]Value{}}
+	fieldEnv := newEnv(parent)
+	fieldEnv.define("this", obj, false)
+	for _, field := range class.Fields {
+		switch {
+		case field.Initializer != nil:
+			value, err := in.evalExpr(field.Initializer, fieldEnv)
+			if err != nil {
+				return nil, err
+			}
+			obj.fields[field.Name] = value
+		case field.Deferred:
+			obj.fields[field.Name] = deferredValue{}
+		default:
+			obj.fields[field.Name] = zeroValue(field.Type)
+		}
+	}
+	for _, assignment := range enumCase.Assignments {
+		value, err := in.evalExpr(assignment.Value, fieldEnv)
+		if err != nil {
+			return nil, err
+		}
+		obj.fields[assignment.Name] = value
+	}
+	if len(args) != len(enumCase.Fields) {
+		return nil, RuntimeError{Message: fmt.Sprintf("enum case '%s' expects %d args, got %d", enumCase.Name, len(enumCase.Fields), len(args)), Span: span}
+	}
+	for i, field := range enumCase.Fields {
+		obj.fields[field.Name] = args[i]
 	}
 	return obj, nil
 }
@@ -949,6 +995,30 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 				ordered = reordered
 			}
 		return fn.module.construct(class, ordered, local)
+	case enumCaseRef:
+		class, ok := fn.module.classes[fn.enumName]
+		if !ok {
+			return nil, RuntimeError{Message: "undefined enum '" + fn.enumName + "'", Span: call.Span}
+		}
+		for _, enumCase := range class.Cases {
+			if enumCase.Name != fn.caseName {
+				continue
+			}
+			ordered := namedArgValues(args)
+			if hasNamedParserArgs(call.Args) {
+				params := make([]parser.Parameter, len(enumCase.Fields))
+				for i, field := range enumCase.Fields {
+					params[i] = parser.Parameter{Name: field.Name, Type: field.Type, Span: field.Span}
+				}
+				reordered, err := reorderNamedValueArgs(params, args, call.Span, "enum case '"+fn.caseName+"'")
+				if err != nil {
+					return nil, err
+				}
+				ordered = reordered
+			}
+			return fn.module.constructEnumCase(class, enumCase, ordered, local, call.Span)
+		}
+		return nil, RuntimeError{Message: "unknown enum case '" + fn.caseName + "'", Span: call.Span}
 	case *closure:
 		if hasNamedParserArgs(call.Args) {
 			return nil, RuntimeError{Message: "named arguments require a direct function, method, or constructor call", Span: call.Span}
@@ -1041,6 +1111,32 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 		}
 		return nil, RuntimeError{Message: "unknown member '" + member.Name + "'", Span: member.Span}
 	}
+	if class, ok := receiver.(classRef); ok {
+		decl, found := class.module.classes[class.name]
+		if !found {
+			return nil, RuntimeError{Message: "unknown class '" + class.name + "'", Span: member.Span}
+		}
+		if decl.Enum {
+			for _, enumCase := range decl.Cases {
+				if enumCase.Name != member.Name {
+					continue
+				}
+				ordered := namedArgValues(args)
+				if hasNamedParserArgs(argExprs) {
+					params := make([]parser.Parameter, len(enumCase.Fields))
+					for i, field := range enumCase.Fields {
+						params[i] = parser.Parameter{Name: field.Name, Type: field.Type, Span: field.Span}
+					}
+					reordered, err := reorderNamedValueArgs(params, args, member.Span, "enum case '"+member.Name+"'")
+					if err != nil {
+						return nil, err
+					}
+					ordered = reordered
+				}
+				return class.module.constructEnumCase(decl, enumCase, ordered, local, member.Span)
+			}
+		}
+	}
 	if native, ok := in.callNativeMethod(receiver, member.Name, args, local, member.Span); ok {
 		return native.value, native.err
 	}
@@ -1122,6 +1218,23 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 		for _, method := range value.class.Methods {
 			if method.Name == expr.Name {
 				return nil, RuntimeError{Message: "method '" + expr.Name + "' must be called with ()", Span: expr.Span}
+			}
+		}
+		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
+	case classRef:
+		class, ok := value.module.classes[value.name]
+		if !ok {
+			return nil, RuntimeError{Message: "unknown class '" + value.name + "'", Span: expr.Span}
+		}
+		if class.Enum {
+			for _, enumCase := range class.Cases {
+				if enumCase.Name != expr.Name {
+					continue
+				}
+				if len(enumCase.Fields) == 0 {
+					return value.module.constructEnumCase(class, enumCase, nil, value.module.globals, expr.Span)
+				}
+				return enumCaseRef{module: value.module, enumName: value.name, caseName: expr.Name}, nil
 			}
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
@@ -1609,6 +1722,12 @@ type classRef struct {
 	name   string
 }
 
+type enumCaseRef struct {
+	module   *Interpreter
+	enumName string
+	caseName string
+}
+
 func newEnv(parent *env) *env {
 	return &env{parent: parent, values: map[string]slot{}}
 }
@@ -1961,6 +2080,21 @@ func (in *Interpreter) valuesEqual(left, right Value, span parser.Span, local *e
 		r, ok := right.(*instance)
 		if !ok || l.class.Name != r.class.Name {
 			return false, nil
+		}
+		if l.class.Enum || r.class.Enum {
+			if l.caseName != r.caseName {
+				return false, nil
+			}
+			for name, leftValue := range l.fields {
+				equal, err := in.valuesEqual(leftValue, r.fields[name], span, local)
+				if err != nil {
+					return false, err
+				}
+				if !equal {
+					return false, nil
+				}
+			}
+			return true, nil
 		}
 		for _, method := range l.class.Methods {
 			if method.Name == "equals" && len(method.Parameters) == 1 {

@@ -54,6 +54,12 @@ func (p *Parser) parseProgram() (*Program, error) {
 				return nil, err
 			}
 			program.Classes = append(program.Classes, decl)
+		case TokenEnum:
+			decl, err := p.parseEnum()
+			if err != nil {
+				return nil, err
+			}
+			program.Classes = append(program.Classes, decl)
 		default:
 			stmt, err := p.parseStatement()
 			if err != nil {

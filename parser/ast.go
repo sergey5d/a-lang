@@ -77,11 +77,28 @@ type InterfaceMethod struct {
 type ClassDecl struct {
 	Name           string          `json:"name"`
 	Record         bool            `json:"record,omitempty"`
+	Enum           bool            `json:"enum,omitempty"`
 	TypeParameters []TypeParameter `json:"typeParameters,omitempty"`
 	Implements     []*TypeRef      `json:"implements,omitempty"`
 	Fields         []FieldDecl     `json:"fields,omitempty"`
 	Methods        []*MethodDecl   `json:"methods,omitempty"`
+	Cases          []EnumCaseDecl  `json:"cases,omitempty"`
 	Span           Span            `json:"span"`
+}
+
+// EnumCaseDecl describes a single enum case, including shared-field assignments and payload fields.
+type EnumCaseDecl struct {
+	Name        string               `json:"name"`
+	Fields      []FieldDecl          `json:"fields,omitempty"`
+	Assignments []EnumCaseAssignment `json:"assignments,omitempty"`
+	Span        Span                 `json:"span"`
+}
+
+// EnumCaseAssignment assigns a shared enum field for a given case.
+type EnumCaseAssignment struct {
+	Name  string `json:"name"`
+	Value Expr   `json:"value"`
+	Span  Span   `json:"span"`
 }
 
 // FieldDecl describes a class field declaration.

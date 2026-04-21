@@ -227,6 +227,24 @@ func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
 	for _, field := range decl.Fields {
 		r.defineMutable(field.Name, field.Span, field.Mutable, "duplicate_binding", "duplicate binding '"+field.Name+"'")
 	}
+	if decl.Enum {
+		for _, enumCase := range decl.Cases {
+			if len(enumCase.Fields) == 0 {
+				r.defineMutable(enumCase.Name, enumCase.Span, false, "duplicate_binding", "duplicate binding '"+enumCase.Name+"'")
+			}
+		}
+		for _, enumCase := range decl.Cases {
+			for _, field := range enumCase.Fields {
+				r.resolveTypeRef(field.Type)
+				if field.Initializer != nil {
+					r.resolveExpr(field.Initializer)
+				}
+			}
+			for _, assignment := range enumCase.Assignments {
+				r.resolveExpr(assignment.Value)
+			}
+		}
+	}
 	for _, method := range decl.Methods {
 		r.resolveMethod(method)
 	}

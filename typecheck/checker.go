@@ -40,6 +40,7 @@ type classInfo struct {
 	fields       map[string]fieldInfo
 	methods      map[string][]methodInfo
 	constructors []*parser.MethodDecl
+	enumCases    map[string]parser.EnumCaseDecl
 }
 
 type interfaceInfo struct {
@@ -173,6 +174,7 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 				decl:    decl,
 				fields:  map[string]fieldInfo{},
 				methods: map[string][]methodInfo{},
+				enumCases: map[string]parser.EnumCaseDecl{},
 			}
 			for _, field := range decl.Fields {
 				class.fields[field.Name] = fieldInfo{decl: field}
@@ -182,6 +184,9 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 				if method.Constructor {
 					class.constructors = append(class.constructors, method)
 				}
+			}
+			for _, enumCase := range decl.Cases {
+				class.enumCases[enumCase.Name] = enumCase
 			}
 			info.classes[decl.Name] = class
 			c.classes[qualified] = class
@@ -299,6 +304,7 @@ func (c *Checker) collectDecls(program *parser.Program) {
 			decl:    decl,
 			fields:  map[string]fieldInfo{},
 			methods: map[string][]methodInfo{},
+			enumCases: map[string]parser.EnumCaseDecl{},
 		}
 		for _, field := range decl.Fields {
 			info.fields[field.Name] = fieldInfo{decl: field}
@@ -308,6 +314,9 @@ func (c *Checker) collectDecls(program *parser.Program) {
 			if method.Constructor {
 				info.constructors = append(info.constructors, method)
 			}
+		}
+		for _, enumCase := range decl.Cases {
+			info.enumCases[enumCase.Name] = enumCase
 		}
 		c.classes[decl.Name] = info
 	}
@@ -417,15 +426,23 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 		if decl.Record && field.Mutable {
 			c.addDiagnostic("invalid_record_field", "record '"+decl.Name+"' cannot declare mutable field '"+field.Name+"'", field.Span)
 		}
+		if decl.Enum && field.Mutable {
+			c.addDiagnostic("invalid_enum_field", "enum '"+decl.Name+"' cannot declare mutable field '"+field.Name+"'", field.Span)
+		}
 		fieldType := c.resolveDeclaredType(field.Type)
 		if field.Initializer != nil {
 			valueType := c.checkExprWithExpected(field.Initializer, fieldType)
 			c.requireAssignable(valueType, fieldType, exprSpan(field.Initializer), "type_mismatch", "cannot assign "+valueType.String()+" to "+fieldType.String())
 		}
 	}
-	c.checkConstructorRules(info)
+	if !decl.Enum {
+		c.checkConstructorRules(info)
+	}
 	for _, method := range decl.Methods {
 		c.checkMethod(method, decl)
+	}
+	if decl.Enum {
+		c.checkEnumCases(info)
 	}
 	for _, impl := range decl.Implements {
 		if impl.Name == "Eq" {
@@ -469,6 +486,20 @@ func (c *Checker) checkMethod(method *parser.MethodDecl, owner *parser.ClassDecl
 		}
 		c.define(param.Name, paramType, false)
 	}
+	if owner.Enum {
+		classArgs := make([]*Type, len(owner.TypeParameters))
+		for i, param := range owner.TypeParameters {
+			classArgs[i] = &Type{Kind: TypeParam, Name: param.Name}
+		}
+		for _, enumCase := range owner.Cases {
+			if len(enumCase.Fields) == 0 {
+				c.define(enumCase.Name, &Type{Kind: TypeClass, Name: owner.Name, Args: classArgs}, false)
+			}
+		}
+		if method.Constructor {
+			c.addDiagnostic("invalid_enum_method", "enum '"+owner.Name+"' cannot declare constructors", method.Span)
+		}
+	}
 	implicitReturn := c.checkBlock(method.Body)
 	if !method.Constructor && method.ReturnType != nil && !isUnknown(implicitReturn) && !isUnitType(expectedReturn) {
 		c.requireAssignable(implicitReturn, expectedReturn, method.Body.Span, "invalid_return_type", "cannot implicitly return "+implicitReturn.String()+" from method returning "+expectedReturn.String())
@@ -504,6 +535,58 @@ func (c *Checker) checkInterfaceImplementation(class classInfo, impl *parser.Typ
 		}
 		actual := c.instantiateMethodSignature(classMethod.decl, class.decl, nil)
 		c.compareSignatures(actual, expected, classMethod.decl.Span, method.Name)
+	}
+}
+
+func (c *Checker) checkEnumCases(info classInfo) {
+	sharedFields := map[string]parser.FieldDecl{}
+	for _, field := range info.decl.Fields {
+		sharedFields[field.Name] = field
+	}
+	seenCases := map[string]parser.Span{}
+	for _, enumCase := range info.decl.Cases {
+		if prev, ok := seenCases[enumCase.Name]; ok {
+			c.addDiagnostic("duplicate_enum_case", "duplicate enum case '"+enumCase.Name+"'", enumCase.Span)
+			c.addDiagnostic("duplicate_enum_case", "previous declaration of enum case '"+enumCase.Name+"'", prev)
+			continue
+		}
+		seenCases[enumCase.Name] = enumCase.Span
+		assigned := map[string]bool{}
+		for _, field := range enumCase.Fields {
+			if _, ok := sharedFields[field.Name]; ok {
+				c.addDiagnostic("invalid_enum_case_field", "enum case '"+enumCase.Name+"' must assign shared field '"+field.Name+"' instead of redeclaring it", field.Span)
+			}
+			if field.Mutable {
+				c.addDiagnostic("invalid_enum_case_field", "enum case '"+enumCase.Name+"' cannot declare mutable field '"+field.Name+"'", field.Span)
+			}
+			fieldType := c.resolveDeclaredType(field.Type)
+			if field.Initializer != nil {
+				valueType := c.checkExprWithExpected(field.Initializer, fieldType)
+				c.requireAssignable(valueType, fieldType, exprSpan(field.Initializer), "type_mismatch", "cannot assign "+valueType.String()+" to "+fieldType.String())
+			}
+		}
+		for _, assignment := range enumCase.Assignments {
+			field, ok := sharedFields[assignment.Name]
+			if !ok {
+				c.addDiagnostic("unknown_member", "unknown shared enum field '"+assignment.Name+"' in case '"+enumCase.Name+"'", assignment.Span)
+				c.checkExpr(assignment.Value)
+				continue
+			}
+			if assigned[assignment.Name] {
+				c.addDiagnostic("duplicate_enum_case_assignment", "duplicate assignment to shared enum field '"+assignment.Name+"' in case '"+enumCase.Name+"'", assignment.Span)
+				c.checkExpr(assignment.Value)
+				continue
+			}
+			assigned[assignment.Name] = true
+			expected := c.resolveDeclaredType(field.Type)
+			valueType := c.checkExprWithExpected(assignment.Value, expected)
+			c.requireAssignable(valueType, expected, exprSpan(assignment.Value), "type_mismatch", "cannot assign "+valueType.String()+" to "+expected.String())
+		}
+		for _, field := range info.decl.Fields {
+			if field.Initializer == nil && !assigned[field.Name] {
+				c.addDiagnostic("invalid_enum_case", "enum case '"+enumCase.Name+"' must initialize shared field '"+field.Name+"'", enumCase.Span)
+			}
+		}
 	}
 }
 
@@ -1392,6 +1475,37 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			c.checkArgTypes(callArgValues(args))
 			return unknownType
 		}
+		if info.decl.Enum {
+			if enumCase, ok := info.enumCases[member.Name]; ok {
+				params := make([]parser.Parameter, len(enumCase.Fields))
+				sig := Signature{Parameters: make([]*Type, len(enumCase.Fields)), ReturnType: receiverType}
+				for i, field := range enumCase.Fields {
+					params[i] = parser.Parameter{Name: field.Name, Type: field.Type, Span: field.Span}
+					sig.Parameters[i] = c.resolveDeclaredType(field.Type)
+				}
+				orderedArgs := callArgValues(args)
+				if hasNamedCallArgs(args) {
+					reordered, ok := c.reorderCallArgs(params, args, member.Span, "enum case '"+member.Name+"'")
+					if !ok {
+						c.checkArgTypes(callArgValues(args))
+						return receiverType
+					}
+					orderedArgs = reordered
+				}
+				if !validArgCount(sig, len(orderedArgs)) {
+					c.addDiagnostic("invalid_argument_count", fmt.Sprintf("enum case '%s' expects %s arguments, got %d", member.Name, expectedArgCount(sig), len(orderedArgs)), member.Span)
+				}
+				for i := range orderedArgs {
+					if expected, ok := paramTypeForArg(sig, i); ok {
+						argType := c.checkExprWithExpected(orderedArgs[i], expected)
+						c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+					} else {
+						c.checkExpr(orderedArgs[i])
+					}
+				}
+				return receiverType
+			}
+		}
 		var (
 			method      methodInfo
 			okMethod    bool
@@ -1543,6 +1657,20 @@ func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
 		}
 		c.addDiagnostic("unknown_member", "unknown imported member '"+expr.Name+"' on module '"+receiverType.Name+"'", expr.Span)
 		return unknownType
+	}
+	if receiverType.Kind == TypeClass {
+		if info, ok := c.classes[receiverType.Name]; ok && info.decl.Enum {
+			if enumCase, ok := info.enumCases[expr.Name]; ok {
+				if len(enumCase.Fields) == 0 {
+					return receiverType
+				}
+				params := make([]*Type, len(enumCase.Fields))
+				for i, field := range enumCase.Fields {
+					params[i] = c.resolveDeclaredType(field.Type)
+				}
+				return functionType(expr.Name, Signature{Parameters: params, ReturnType: receiverType})
+			}
+		}
 	}
 	if memberType, ok := c.lookupMember(receiverType, expr.Name, expr.Span); ok {
 		return memberType
@@ -2392,6 +2520,9 @@ func (c *Checker) supportsEquality(t *Type) bool {
 			return false
 		}
 	case TypeClass:
+		if info, ok := c.classes[t.Name]; ok && info.decl.Enum {
+			return true
+		}
 		return c.classImplementsEq(t)
 	default:
 		return false
