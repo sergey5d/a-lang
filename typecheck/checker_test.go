@@ -1021,6 +1021,29 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeGenericFunctionAndMethodCalls(t *testing.T) {
+	src := `
+def id[T](value T) T = value
+
+class Mapper {
+	def map[X](value Int, fn Int -> X) X {
+		fn(value)
+	}
+}
+
+def run() String {
+	mapper Mapper = Mapper()
+	mapped String = mapper.map(5, (x Int) -> "value=" + x)
+	return id(mapped)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeUntypedLambdaWithoutContextFails(t *testing.T) {
 	src := `
 def run() Int {

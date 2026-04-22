@@ -202,6 +202,10 @@ func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, e
 		}
 		nameLexeme = name.Lexeme
 	}
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
 	params, err := p.parseParameters()
 	if err != nil {
 		return nil, err
@@ -223,13 +227,14 @@ func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, e
 		returnType = implicitUnitType(body.Span)
 	}
 	return &MethodDecl{
-		Name:        nameLexeme,
-		Parameters:  params,
-		ReturnType:  returnType,
-		Body:        body,
-		Private:     private,
-		Constructor: constructor,
-		Span:        mergeSpans(tokenSpan(start), body.Span),
+		Name:           nameLexeme,
+		TypeParameters: typeParams,
+		Parameters:     params,
+		ReturnType:     returnType,
+		Body:           body,
+		Private:        private,
+		Constructor:    constructor,
+		Span:           mergeSpans(tokenSpan(start), body.Span),
 	}, nil
 }
 

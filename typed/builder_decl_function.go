@@ -24,11 +24,12 @@ func (b *functionBuilder) Build(fn *parser.FunctionDecl) (*FunctionDecl, error) 
 		return nil, err
 	}
 	return &FunctionDecl{
-		Name:       fn.Name,
-		Parameters: params,
-		ReturnType: b.types.BuildType(fn.ReturnType),
-		Body:       body,
-		Symbol:     b.ctx.functionSymbols[fn.Name],
-		Span:       fn.Span,
+		Name:           fn.Name,
+		TypeParameters: b.params.buildTypeParameters(fn.TypeParameters),
+		Parameters:     params,
+		ReturnType:     b.types.BuildType(fn.ReturnType),
+		Body:           body,
+		Symbol:         b.ctx.functionSymbols[fn.Name],
+		Span:           fn.Span,
 	}, nil
 }

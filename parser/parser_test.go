@@ -838,6 +838,36 @@ object A {
 	}
 }
 
+func TestParseGenericFunctionAndMethodDecl(t *testing.T) {
+	src := `
+def id[T](value T) T = value
+
+class Mapper {
+	def map[X](value Int, fn Int -> X) X {
+		fn(value)
+	}
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Functions) != 1 || len(program.Functions[0].TypeParameters) != 1 {
+		t.Fatalf("expected generic function declaration, got %#v", program.Functions)
+	}
+	if len(program.Classes) != 1 || len(program.Classes[0].Methods) != 1 {
+		t.Fatalf("expected class with one method, got %#v", program.Classes)
+	}
+	method := program.Classes[0].Methods[0]
+	if len(method.TypeParameters) != 1 {
+		t.Fatalf("expected generic method declaration, got %#v", method)
+	}
+	if method.Parameters[1].Type == nil || method.Parameters[1].Type.ReturnType == nil {
+		t.Fatalf("expected function-typed parameter, got %#v", method.Parameters[1].Type)
+	}
+}
+
 func TestParseObjectShortApplyDeclRejected(t *testing.T) {
 	src := `
 object Range {

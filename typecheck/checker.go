@@ -426,6 +426,12 @@ func (c *Checker) checkGlobals(statements []parser.Statement) {
 }
 
 func (c *Checker) checkFunction(fn *parser.FunctionDecl) {
+	c.pushTypeScope()
+	defer c.popTypeScope()
+	for _, param := range fn.TypeParameters {
+		c.currentTypeScope()[param.Name] = TypeParam
+	}
+
 	c.pushScope()
 	defer c.popScope()
 	expectedReturn := fromTypeRef(fn.ReturnType, c)
@@ -489,6 +495,15 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 }
 
 func (c *Checker) checkMethod(method *parser.MethodDecl, owner *parser.ClassDecl) {
+	c.pushTypeScope()
+	defer c.popTypeScope()
+	for _, param := range owner.TypeParameters {
+		c.currentTypeScope()[param.Name] = TypeParam
+	}
+	for _, param := range method.TypeParameters {
+		c.currentTypeScope()[param.Name] = TypeParam
+	}
+
 	c.pushScope()
 	defer c.popScope()
 
@@ -1313,18 +1328,36 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 			}
 			return c.checkConstructorCall(class, call)
 		}
-		if fn, ok := c.functions[ident.Name]; ok {
+		if fnDecl, ok := c.functionDecls[ident.Name]; ok {
 			orderedArgs := callArgValues(call.Args)
 			if hasNamedCallArgs(call.Args) {
-				decl := c.functionDecls[ident.Name]
-				reordered, ok := c.reorderCallArgs(decl.Parameters, call.Args, call.Span, "function '"+ident.Name+"'")
+				reordered, ok := c.reorderCallArgs(fnDecl.Parameters, call.Args, call.Span, "function '"+ident.Name+"'")
 				if !ok {
 					c.checkArgTypes(callArgValues(call.Args))
-					return fn.ReturnType
+					return c.instantiateFunctionSignature(fnDecl, nil).ReturnType
 				}
 				orderedArgs = reordered
 			}
-			sig := fn
+			if len(fnDecl.TypeParameters) == 0 {
+				sig := c.functions[ident.Name]
+				if !validArgCount(sig, len(orderedArgs)) {
+					c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(sig), len(orderedArgs)), call.Span)
+				}
+				for i, arg := range orderedArgs {
+					if expected, ok := paramTypeForArg(sig, i); ok {
+						argType := c.checkExprWithExpected(arg, expected)
+						c.requireAssignable(argType, expected, exprSpan(arg), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+						continue
+					}
+					c.checkExpr(arg)
+				}
+				return sig.ReturnType
+			}
+			argTypes := c.checkArgTypes(orderedArgs)
+			sig, ok := c.resolveFunctionCallSignature(fnDecl, argTypes, call.Span)
+			if !ok {
+				return unknownType
+			}
 			if !validArgCount(sig, len(orderedArgs)) {
 				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(sig), len(orderedArgs)), call.Span)
 			}
@@ -1403,7 +1436,10 @@ func (c *Checker) checkApplyCall(class classInfo, receiverType *Type, args []par
 	if !okMethod {
 		return unknownType
 	}
-	sig := c.instantiateMethodSignature(method.decl, class.decl, c.substForDecl(class.decl.TypeParameters, receiverType.Args))
+	sig, ok := c.resolveMethodCallSignature(class, receiverType, method.decl, orderedArgs, span)
+	if !ok {
+		return unknownType
+	}
 	for i := range orderedArgs {
 		if expected, ok := paramTypeForArg(sig, i); ok {
 			argType := c.checkExprWithExpected(orderedArgs[i], expected)
@@ -1413,6 +1449,119 @@ func (c *Checker) checkApplyCall(class classInfo, receiverType *Type, args []par
 		}
 	}
 	return sig.ReturnType
+}
+
+func (c *Checker) resolveFunctionCallSignature(fn *parser.FunctionDecl, argTypes []*Type, span parser.Span) (Signature, bool) {
+	sig := c.instantiateFunctionSignature(fn, nil)
+	if len(fn.TypeParameters) == 0 {
+		if !signatureMatches(sig, argTypes) {
+			c.addDiagnostic("no_matching_overload", fmt.Sprintf("function '%s' does not match %d arguments", fn.Name, len(argTypes)), span)
+			return Signature{}, false
+		}
+		return sig, true
+	}
+	inferred, ok := c.inferCallableTypeArgs(fn.TypeParameters, fn.Parameters, argTypes, nil)
+	if !ok {
+		c.addDiagnostic("cannot_infer_type_args", "cannot infer type arguments for function '"+fn.Name+"'", span)
+		return Signature{}, false
+	}
+	sig = c.instantiateFunctionSignature(fn, inferred)
+	if !signatureMatches(sig, argTypes) {
+		c.addDiagnostic("no_matching_overload", fmt.Sprintf("function '%s' does not match %d arguments", fn.Name, len(argTypes)), span)
+		return Signature{}, false
+	}
+	return sig, true
+}
+
+func (c *Checker) resolveMethodCallSignature(class classInfo, receiver *Type, method *parser.MethodDecl, args []parser.Expr, span parser.Span) (Signature, bool) {
+	baseSubst := c.substForDecl(class.decl.TypeParameters, receiver.Args)
+	argTypes := c.checkArgTypes(args)
+	sig := c.instantiateMethodSignature(method, class.decl, baseSubst)
+	if len(method.TypeParameters) == 0 {
+		if !signatureMatches(sig, argTypes) {
+			c.addDiagnostic("no_matching_overload", fmt.Sprintf("no overload of method '%s' matches %d arguments", method.Name, len(argTypes)), span)
+			return Signature{}, false
+		}
+		return sig, true
+	}
+	inferred, ok := c.inferCallableTypeArgs(method.TypeParameters, method.Parameters, argTypes, baseSubst)
+	if !ok {
+		c.addDiagnostic("cannot_infer_type_args", "cannot infer type arguments for method '"+method.Name+"'", span)
+		return Signature{}, false
+	}
+	sig = c.instantiateMethodSignature(method, class.decl, mergeSubst(inferred, baseSubst))
+	if !signatureMatches(sig, argTypes) {
+		c.addDiagnostic("no_matching_overload", fmt.Sprintf("no overload of method '%s' matches %d arguments", method.Name, len(argTypes)), span)
+		return Signature{}, false
+	}
+	return sig, true
+}
+
+func (c *Checker) inferCallableTypeArgs(typeParams []parser.TypeParameter, params []parser.Parameter, argTypes []*Type, baseSubst map[string]*Type) (map[string]*Type, bool) {
+	if len(typeParams) == 0 {
+		return nil, true
+	}
+	if len(params) != len(argTypes) {
+		return nil, false
+	}
+	typeParamNames := map[string]bool{}
+	for _, param := range typeParams {
+		typeParamNames[param.Name] = true
+	}
+	templateSubst := mergeSubst(c.substForDecl(typeParams, nil), baseSubst)
+	inferred := map[string]*Type{}
+	for i, param := range params {
+		template := c.instantiateTypeRef(param.Type, templateSubst)
+		if !inferTypeArgsFromTypes(argTypes[i], template, inferred, typeParamNames) {
+			return nil, false
+		}
+	}
+	for _, param := range typeParams {
+		if _, ok := inferred[param.Name]; !ok {
+			return nil, false
+		}
+	}
+	return inferred, true
+}
+
+func inferTypeArgsFromTypes(actual, template *Type, inferred map[string]*Type, typeParams map[string]bool) bool {
+	if isUnknown(actual) || isUnknown(template) {
+		return true
+	}
+	if template.Kind == TypeParam && typeParams[template.Name] {
+		if existing, ok := inferred[template.Name]; ok {
+			return sameType(existing, actual)
+		}
+		inferred[template.Name] = actual
+		return true
+	}
+	if template.Kind == TypeFunction && actual.Kind == TypeFunction && template.Signature != nil && actual.Signature != nil {
+		if len(template.Signature.Parameters) != len(actual.Signature.Parameters) {
+			return false
+		}
+		for i := range template.Signature.Parameters {
+			if !inferTypeArgsFromTypes(actual.Signature.Parameters[i], template.Signature.Parameters[i], inferred, typeParams) {
+				return false
+			}
+		}
+		return inferTypeArgsFromTypes(actual.Signature.ReturnType, template.Signature.ReturnType, inferred, typeParams)
+	}
+	if template.Kind == TypeTuple && actual.Kind == TypeTuple && len(template.Args) == len(actual.Args) {
+		for i := range template.Args {
+			if !inferTypeArgsFromTypes(actual.Args[i], template.Args[i], inferred, typeParams) {
+				return false
+			}
+		}
+		return true
+	}
+	if template.Kind == actual.Kind && template.Name == actual.Name && len(template.Args) == len(actual.Args) {
+		for i := range template.Args {
+			if !inferTypeArgsFromTypes(actual.Args[i], template.Args[i], inferred, typeParams) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (c *Checker) checkInstanceApplyCall(class classInfo, receiverType *Type, args []parser.CallArg, span parser.Span) *Type {
@@ -1652,29 +1801,48 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			c.checkArgTypes(callArgValues(args))
 			return unknownType
 		}
-		if fn, ok := info.functions[member.Name]; ok {
+		if fnDecl, ok := info.functionDecls[member.Name]; ok {
 			orderedArgs := callArgValues(args)
 			if hasNamedCallArgs(args) {
-				decl := info.functionDecls[member.Name]
-				reordered, ok := c.reorderCallArgs(decl.Parameters, args, member.Span, "function '"+member.Name+"'")
+				reordered, ok := c.reorderCallArgs(fnDecl.Parameters, args, member.Span, "function '"+member.Name+"'")
 				if !ok {
 					c.checkArgTypes(callArgValues(args))
-					return fn.ReturnType
+					return c.instantiateFunctionSignature(fnDecl, nil).ReturnType
 				}
 				orderedArgs = reordered
 			}
-			if !validArgCount(fn, len(orderedArgs)) {
-				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(fn), len(orderedArgs)), member.Span)
+			if len(fnDecl.TypeParameters) == 0 {
+				fn := info.functions[member.Name]
+				if !validArgCount(fn, len(orderedArgs)) {
+					c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(fn), len(orderedArgs)), member.Span)
+				}
+				for i, arg := range orderedArgs {
+					if expected, ok := paramTypeForArg(fn, i); ok {
+						argType := c.checkExprWithExpected(arg, expected)
+						c.requireAssignable(argType, expected, exprSpan(arg), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+					} else {
+						c.checkExpr(arg)
+					}
+				}
+				return fn.ReturnType
+			}
+			argTypes := c.checkArgTypes(orderedArgs)
+			sig, ok := c.resolveFunctionCallSignature(fnDecl, argTypes, member.Span)
+			if !ok {
+				return unknownType
+			}
+			if !validArgCount(sig, len(orderedArgs)) {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(sig), len(orderedArgs)), member.Span)
 			}
 			for i, arg := range orderedArgs {
-				if expected, ok := paramTypeForArg(fn, i); ok {
+				if expected, ok := paramTypeForArg(sig, i); ok {
 					argType := c.checkExprWithExpected(arg, expected)
 					c.requireAssignable(argType, expected, exprSpan(arg), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
 				} else {
 					c.checkExpr(arg)
 				}
 			}
-			return fn.ReturnType
+			return sig.ReturnType
 		}
 		if class, ok := info.classes[member.Name]; ok {
 			if class.decl.Object {
@@ -1760,7 +1928,10 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 		if !okMethod {
 			return unknownType
 		}
-		sig := c.instantiateMethodSignature(method.decl, info.decl, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
+		sig, ok := c.resolveMethodCallSignature(info, receiverType, method.decl, orderedArgs, member.Span)
+		if !ok {
+			return unknownType
+		}
 		for i := range orderedArgs {
 			if expected, ok := paramTypeForArg(sig, i); ok {
 				argType := c.checkExprWithExpected(orderedArgs[i], expected)
@@ -2174,6 +2345,7 @@ func (c *Checker) instantiateTypeRef(ref *parser.TypeRef, subst map[string]*Type
 
 func (c *Checker) instantiateMethodSignature(method *parser.MethodDecl, owner *parser.ClassDecl, subst map[string]*Type) Signature {
 	effective := mergeSubst(subst, c.substForDecl(owner.TypeParameters, nil))
+	effective = mergeSubst(effective, c.substForDecl(method.TypeParameters, nil))
 	params := make([]*Type, len(method.Parameters))
 	for i, param := range method.Parameters {
 		params[i] = c.instantiateTypeRef(param.Type, effective)
@@ -2183,6 +2355,19 @@ func (c *Checker) instantiateMethodSignature(method *parser.MethodDecl, owner *p
 		result = c.instantiateTypeRef(method.ReturnType, effective)
 	}
 	return Signature{Parameters: params, ReturnType: result, Variadic: len(method.Parameters) > 0 && method.Parameters[len(method.Parameters)-1].Variadic}
+}
+
+func (c *Checker) instantiateFunctionSignature(fn *parser.FunctionDecl, subst map[string]*Type) Signature {
+	effective := mergeSubst(subst, c.substForDecl(fn.TypeParameters, nil))
+	params := make([]*Type, len(fn.Parameters))
+	for i, param := range fn.Parameters {
+		params[i] = c.instantiateTypeRef(param.Type, effective)
+	}
+	return Signature{
+		Parameters: params,
+		ReturnType: c.instantiateTypeRef(fn.ReturnType, effective),
+		Variadic:   len(fn.Parameters) > 0 && fn.Parameters[len(fn.Parameters)-1].Variadic,
+	}
 }
 
 func (c *Checker) checkConstructorRules(class classInfo) {
@@ -2456,6 +2641,12 @@ func (c *Checker) resolveMethodOverload(class classInfo, receiver *Type, name st
 			continue
 		}
 		sig := c.instantiateMethodSignature(method.decl, class.decl, subst)
+		if len(method.decl.TypeParameters) > 0 {
+			inferred, ok := c.inferCallableTypeArgs(method.decl.TypeParameters, method.decl.Parameters, argTypes, subst)
+			if ok {
+				sig = c.instantiateMethodSignature(method.decl, class.decl, mergeSubst(inferred, subst))
+			}
+		}
 		if signatureMatches(sig, argTypes) {
 			matches = append(matches, method)
 		}
@@ -2547,6 +2738,12 @@ func (c *Checker) resolveNamedMethodOverload(class classInfo, receiver *Type, na
 		}
 		argTypes := c.checkArgTypes(ordered)
 		sig := c.instantiateMethodSignature(method.decl, class.decl, subst)
+		if len(method.decl.TypeParameters) > 0 {
+			inferred, ok := c.inferCallableTypeArgs(method.decl.TypeParameters, method.decl.Parameters, argTypes, subst)
+			if ok {
+				sig = c.instantiateMethodSignature(method.decl, class.decl, mergeSubst(inferred, subst))
+			}
+		}
 		if signatureMatches(sig, argTypes) {
 			matches = append(matches, candidate{method: method, args: ordered})
 		}

@@ -64,14 +64,15 @@ func (b *classBuilder) Build(class *parser.ClassDecl) (*ClassDecl, error) {
 			return nil, err
 		}
 		methods[i] = &MethodDecl{
-			Name:        method.Name,
-			Parameters:  params,
-			ReturnType:  b.types.BuildType(method.ReturnType),
-			Body:        body,
-			Private:     method.Private,
-			Constructor: method.Constructor,
-			Symbol:      b.types.lookupMethodSymbol(class.Name, method),
-			Span:        method.Span,
+			Name:           method.Name,
+			TypeParameters: b.params.buildTypeParameters(method.TypeParameters),
+			Parameters:     params,
+			ReturnType:     b.types.BuildType(method.ReturnType),
+			Body:           body,
+			Private:        method.Private,
+			Constructor:    method.Constructor,
+			Symbol:         b.types.lookupMethodSymbol(class.Name, method),
+			Span:           method.Span,
 		}
 	}
 

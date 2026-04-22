@@ -19,6 +19,10 @@ func (p *Parser) parseFunctionWithPrivate(private bool) (*FunctionDecl, error) {
 	if err != nil {
 		return nil, err
 	}
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
 	params, err := p.parseParameters()
 	if err != nil {
 		return nil, err
@@ -44,12 +48,13 @@ func (p *Parser) parseFunctionWithPrivate(private bool) (*FunctionDecl, error) {
 	}
 
 	return &FunctionDecl{
-		Name:       name.Lexeme,
-		Parameters: params,
-		ReturnType: returnType,
-		Body:       body,
-		Private:    private,
-		Span:       mergeSpans(tokenSpan(defToken), body.Span),
+		Name:           name.Lexeme,
+		TypeParameters: typeParams,
+		Parameters:     params,
+		ReturnType:     returnType,
+		Body:           body,
+		Private:        private,
+		Span:           mergeSpans(tokenSpan(defToken), body.Span),
 	}, nil
 }
 

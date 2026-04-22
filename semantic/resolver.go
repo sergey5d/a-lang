@@ -191,6 +191,11 @@ func (r *Resolver) resolveGlobals(statements []parser.Statement) {
 }
 
 func (r *Resolver) resolveFunction(fn *parser.FunctionDecl) {
+	r.pushTypeScope()
+	defer r.popTypeScope()
+	for _, param := range fn.TypeParameters {
+		r.defineType(param.Name, param.Span, "duplicate_type_parameter", "duplicate type parameter '"+param.Name+"'")
+	}
 	r.resolveTypeRef(fn.ReturnType)
 	r.pushScope()
 	defer r.popScope()
@@ -265,6 +270,11 @@ func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
 }
 
 func (r *Resolver) resolveMethod(method *parser.MethodDecl) {
+	r.pushTypeScope()
+	defer r.popTypeScope()
+	for _, param := range method.TypeParameters {
+		r.defineType(param.Name, param.Span, "duplicate_type_parameter", "duplicate type parameter '"+param.Name+"'")
+	}
 	r.resolveTypeRef(method.ReturnType)
 	r.pushScope()
 	defer r.popScope()

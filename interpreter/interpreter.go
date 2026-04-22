@@ -2057,6 +2057,20 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 	if ref == nil {
 		return true
 	}
+	if ref.ReturnType != nil {
+		switch value.(type) {
+		case *closure:
+			return true
+		}
+		if instanceValue, ok := value.(*instance); ok {
+			for _, method := range instanceValue.class.Methods {
+				if method.Name == "apply" {
+					return true
+				}
+			}
+		}
+		return false
+	}
 	if len(ref.TupleElements) > 0 {
 		tuple, ok := value.(*nativeTuple)
 		return ok && len(ref.TupleElements) == len(tuple.items)

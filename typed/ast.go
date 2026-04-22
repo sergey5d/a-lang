@@ -78,12 +78,13 @@ type Parameter struct {
 
 // FunctionDecl is a typed top-level function declaration.
 type FunctionDecl struct {
-	Name       string
-	Parameters []Parameter
-	ReturnType *typecheck.Type
-	Body       *BlockStmt
-	Symbol     SymbolRef
-	Span       parser.Span
+	Name           string
+	TypeParameters []TypeParameter
+	Parameters     []Parameter
+	ReturnType     *typecheck.Type
+	Body           *BlockStmt
+	Symbol         SymbolRef
+	Span           parser.Span
 }
 
 // InterfaceMethod is a typed interface method signature.
@@ -118,14 +119,15 @@ type FieldDecl struct {
 
 // MethodDecl is a typed class method or constructor declaration.
 type MethodDecl struct {
-	Name        string
-	Parameters  []Parameter
-	ReturnType  *typecheck.Type
-	Body        *BlockStmt
-	Private     bool
-	Constructor bool
-	Symbol      SymbolRef
-	Span        parser.Span
+	Name           string
+	TypeParameters []TypeParameter
+	Parameters     []Parameter
+	ReturnType     *typecheck.Type
+	Body           *BlockStmt
+	Private        bool
+	Constructor    bool
+	Symbol         SymbolRef
+	Span           parser.Span
 }
 
 // ClassDecl is a typed class declaration including resolved interface types.

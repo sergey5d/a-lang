@@ -49,12 +49,13 @@ type TypeParameter struct {
 
 // FunctionDecl describes a top-level function declaration.
 type FunctionDecl struct {
-	Name       string      `json:"name"`
-	Parameters []Parameter `json:"parameters"`
-	ReturnType *TypeRef    `json:"returnType"`
-	Body       *BlockStmt  `json:"body"`
-	Private    bool        `json:"private,omitempty"`
-	Span       Span        `json:"span"`
+	Name           string          `json:"name"`
+	TypeParameters []TypeParameter `json:"typeParameters,omitempty"`
+	Parameters     []Parameter     `json:"parameters"`
+	ReturnType     *TypeRef        `json:"returnType"`
+	Body           *BlockStmt      `json:"body"`
+	Private        bool            `json:"private,omitempty"`
+	Span           Span            `json:"span"`
 }
 
 // InterfaceDecl describes an interface declaration and its methods.
@@ -118,13 +119,14 @@ type FieldDecl struct {
 
 // MethodDecl describes a class method or constructor declaration.
 type MethodDecl struct {
-	Name        string      `json:"name"`
-	Parameters  []Parameter `json:"parameters"`
-	ReturnType  *TypeRef    `json:"returnType,omitempty"`
-	Body        *BlockStmt  `json:"body"`
-	Private     bool        `json:"private,omitempty"`
-	Constructor bool        `json:"constructor,omitempty"`
-	Span        Span        `json:"span"`
+	Name           string          `json:"name"`
+	TypeParameters []TypeParameter `json:"typeParameters,omitempty"`
+	Parameters     []Parameter     `json:"parameters"`
+	ReturnType     *TypeRef        `json:"returnType,omitempty"`
+	Body           *BlockStmt      `json:"body"`
+	Private        bool            `json:"private,omitempty"`
+	Constructor    bool            `json:"constructor,omitempty"`
+	Span           Span            `json:"span"`
 }
 
 // Parameter describes a named typed parameter in a callable signature.
