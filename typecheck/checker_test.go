@@ -316,6 +316,26 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeDestructuringSkipBinding(t *testing.T) {
+	src := `
+record Triple {
+	first Int
+	middle String
+	last String
+}
+
+def run() Int {
+	a Int, _, c String = Triple(1, "drop", "keep")
+	return a
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeClassDestructuringRejectsPrivateFields(t *testing.T) {
 	src := `
 class Box {

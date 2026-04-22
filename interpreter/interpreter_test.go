@@ -827,6 +827,30 @@ def run() Int {
 	}
 }
 
+func TestDestructuringSkipBinding(t *testing.T) {
+	src := `
+record Triple {
+	first Int
+	middle String
+	last String
+}
+
+def run() String {
+	a Int, _, c String = Triple(1, "drop", "keep")
+	return c
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "keep" {
+		t.Fatalf("expected keep, got %#v", value)
+	}
+}
+
 func TestNamedCallArguments(t *testing.T) {
 	src := `
 class Counter {

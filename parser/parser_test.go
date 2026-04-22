@@ -861,6 +861,27 @@ private class Hidden {
 	}
 }
 
+func TestParseDestructuringSkipBinding(t *testing.T) {
+	src := `
+def run() Int {
+	a Int, _, c String = (1, 2, "x")
+	return a
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	stmt, ok := program.Functions[0].Body.Statements[0].(*ValStmt)
+	if !ok {
+		t.Fatalf("expected binding statement, got %#v", program.Functions[0].Body.Statements[0])
+	}
+	if len(stmt.Bindings) != 3 || stmt.Bindings[1].Name != "_" {
+		t.Fatalf("expected skip binding in middle, got %#v", stmt.Bindings)
+	}
+}
+
 func TestParseInterfaceInheritance(t *testing.T) {
 	src := `
 interface Hopper {

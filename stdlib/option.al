@@ -12,10 +12,15 @@ class Option[T] {
     }
 
     def isSet() Bool = set
+
+    def isEmpty() Bool = !set
+
     def get() T = value
-    def getOr(defaultValue T) T = if set {
-        value
-    } else {
-        defaultValue
-    }
+
+    def getOr(defaultValue T) T =
+        if set {
+            value
+        } else {
+            defaultValue
+        }
 }

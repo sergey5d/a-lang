@@ -43,7 +43,9 @@ func (b *bindingStmtBuilder) Build(stmt *parser.ValStmt) (Stmt, error) {
 			Symbol:   symbol,
 			Span:     binding.Span,
 		}
-		b.ctx.defineSymbol(symbol)
+		if binding.Name != "_" {
+			b.ctx.defineSymbol(symbol)
+		}
 	}
 	return &BindingStmt{Bindings: bindings, Span: stmt.Span}, nil
 }

@@ -3,12 +3,15 @@
 # tuple inferred 6 there
 # tuple mixed 8 mixed
 # tuple mixed2 9 mixed2
+# tuple skip 14 xxx
 # record 7 world
 # record inferred 10 infer
 # record mixed 11 partial
+# record skip 15 kept
 # class 9 boxed
 # class inferred 12 class
 # class mixed 13 typed
+# class skip 16 class-skip
 # 0
 
 record Pair {
@@ -16,8 +19,20 @@ record Pair {
     right String
 }
 
+record Triple {
+    first Int
+    middle String
+    last String
+}
+
 class Box {
     value Int
+    label String
+}
+
+class Crate {
+    value Int
+    hidden String
     label String
 }
 
@@ -34,6 +49,9 @@ def main() Int {
     mixedTuple2Left, mixedTuple2Right String = (9, "mixed2")
     Term.println("tuple mixed2", mixedTuple2Left, mixedTuple2Right)
 
+    skippedTupleLeft Int, _, skippedTupleRight String = (14, "drop", "xxx")
+    Term.println("tuple skip", skippedTupleLeft, skippedTupleRight)
+
     c Int, d String = Pair(7, "world")
     Term.println("record", c, d)
 
@@ -43,6 +61,9 @@ def main() Int {
     mixedRecordLeft Int, mixedRecordRight = Pair(11, "partial")
     Term.println("record mixed", mixedRecordLeft, mixedRecordRight)
 
+    skippedRecordLeft Int, _, skippedRecordRight String = Triple(15, "drop", "kept")
+    Term.println("record skip", skippedRecordLeft, skippedRecordRight)
+
     e Int, f String = Box(9, "boxed")
     Term.println("class", e, f)
 
@@ -51,6 +72,9 @@ def main() Int {
 
     mixedClassLeft Int, mixedClassRight = Box(13, "typed")
     Term.println("class mixed", mixedClassLeft, mixedClassRight)
+
+    skippedClassLeft Int, _, skippedClassRight String = Crate(16, "drop", "class-skip")
+    Term.println("class skip", skippedClassLeft, skippedClassRight)
 
     0
 }

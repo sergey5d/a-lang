@@ -170,6 +170,9 @@ func (r *Resolver) resolveGlobals(statements []parser.Statement) {
 		}
 		for _, binding := range valStmt.Bindings {
 			r.resolveTypeRef(binding.Type)
+			if binding.Name == "_" {
+				continue
+			}
 			if previous, exists := r.globals[binding.Name]; exists {
 				r.addDiagnostic("duplicate_binding", "duplicate binding '"+binding.Name+"'", binding.Span)
 				r.addDiagnostic("duplicate_binding", "previous declaration of '"+binding.Name+"'", previous.span)
@@ -466,6 +469,9 @@ func (r *Resolver) resolveAssignment(stmt *parser.AssignmentStmt) {
 }
 
 func (r *Resolver) defineMutable(name string, span parser.Span, mutable bool, code, message string) {
+	if name == "_" {
+		return
+	}
 	current := r.currentScope()
 	if previous, exists := current[name]; exists {
 		r.addDiagnostic(code, message, span)

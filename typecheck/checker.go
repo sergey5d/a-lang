@@ -393,8 +393,10 @@ func (c *Checker) checkGlobals(statements []parser.Statement) {
 					c.addDiagnostic("invalid_deferred", "binding '"+bindingDecl.Name+"' initialized with '?' requires an explicit type", bindingDecl.Span)
 					declType = unknownType
 				}
-				c.globals[bindingDecl.Name] = binding{typ: declType, mutable: bindingDecl.Mutable}
-				c.define(bindingDecl.Name, declType, bindingDecl.Mutable)
+				if bindingDecl.Name != "_" {
+					c.globals[bindingDecl.Name] = binding{typ: declType, mutable: bindingDecl.Mutable}
+					c.define(bindingDecl.Name, declType, bindingDecl.Mutable)
+				}
 			}
 		case *parser.ExprStmt, *parser.AssignmentStmt, *parser.MultiAssignmentStmt, *parser.IfStmt, *parser.LoopStmt, *parser.ForStmt:
 			c.checkStmt(stmt)
@@ -860,7 +862,9 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 				c.addDiagnostic("invalid_deferred", "binding '"+bindingDecl.Name+"' initialized with '?' requires an explicit type", bindingDecl.Span)
 				declType = unknownType
 			}
-			c.define(bindingDecl.Name, declType, bindingDecl.Mutable)
+			if bindingDecl.Name != "_" {
+				c.define(bindingDecl.Name, declType, bindingDecl.Mutable)
+			}
 		}
 	case *parser.LocalFunctionStmt:
 		sig := Signature{Parameters: make([]*Type, len(s.Function.Parameters)), ReturnType: fromTypeRef(s.Function.ReturnType, c), Variadic: len(s.Function.Parameters) > 0 && s.Function.Parameters[len(s.Function.Parameters)-1].Variadic}

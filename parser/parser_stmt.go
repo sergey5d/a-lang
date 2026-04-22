@@ -57,7 +57,13 @@ func (p *Parser) parseLocalFunctionStmt() (Statement, error) {
 }
 
 func (p *Parser) parseBareBindingStmt() (Statement, error) {
-	start, err := p.consume(TokenIdentifier, "expected binding name")
+	var start Token
+	var err error
+	if p.check(TokenIdentifier) {
+		start, err = p.consume(TokenIdentifier, "expected binding name")
+	} else {
+		start, err = p.consume(TokenUnder, "expected binding name")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +80,11 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 		name := useStart
 		if !first || !firstIsName {
 			var err error
-			name, err = p.consume(TokenIdentifier, "expected binding name")
+			if p.check(TokenIdentifier) {
+				name, err = p.consume(TokenIdentifier, "expected binding name")
+			} else {
+				name, err = p.consume(TokenUnder, "expected binding name")
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -133,13 +143,15 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 		}
 	}
 	for _, binding := range bindings {
-		p.declare(binding.Name)
+		if binding.Name != "_" {
+			p.declare(binding.Name)
+		}
 	}
 	return stmt, nil
 }
 
 func (p *Parser) isBareBindingStart() bool {
-	if !p.check(TokenIdentifier) {
+	if !p.check(TokenIdentifier) && !p.check(TokenUnder) {
 		return false
 	}
 
@@ -163,10 +175,10 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 	sawType := false
 	sawUndeclared := false
 	for {
-		if i >= len(p.tokens) || p.tokens[i].Type != TokenIdentifier {
+		if i >= len(p.tokens) || (p.tokens[i].Type != TokenIdentifier && p.tokens[i].Type != TokenUnder) {
 			return false
 		}
-		if !p.isDeclared(p.tokens[i].Lexeme) {
+		if p.tokens[i].Type == TokenIdentifier && !p.isDeclared(p.tokens[i].Lexeme) {
 			sawUndeclared = true
 		}
 		i++

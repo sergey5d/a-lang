@@ -401,6 +401,9 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			return nil, nil, err
 		}
 		for i, binding := range s.Bindings {
+			if binding.Name == "_" {
+				continue
+			}
 			var value Value
 			if i < len(values) {
 				value = values[i]
