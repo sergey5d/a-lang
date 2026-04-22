@@ -46,7 +46,6 @@ This unlocks things like:
 
 Enums exist, but they still want:
 - pattern matching support
-- clearer case construction rules
 - eventual exhaustiveness checking
 
 Once `match` exists, enums become much more complete.
@@ -64,12 +63,10 @@ This reduces boilerplate and helps stdlib types feel native.
 
 ### 5. Collection / Query APIs
 
-The language now has `for ... yield`, but stdlib collection ergonomics still need growth.
+The language now has `for ... yield`, `map`, `flatMap`, and `forEach`, but stdlib collection ergonomics still need growth.
 
 Likely missing methods:
-- `map`
 - `filter`
-- `flatMap`
 - `fold` / `reduce`
 - `any`
 - `all`
@@ -78,13 +75,7 @@ These can mostly live in the stdlib, but may still need runtime support in place
 
 ## Medium Priority
 
-### 6. Callable Instances
-
-Objects already support `apply`.
-
-A natural follow-up is deciding whether normal class instances should also support call syntax through `apply`.
-
-### 7. Operator Overloading
+### 6. Operator Overloading
 
 This is not a core blocker, but it would help:
 - numeric wrappers
@@ -92,7 +83,7 @@ This is not a core blocker, but it would help:
 - vector-like records
 - domain-specific types
 
-### 8. Anonymous Objects / Object Literals
+### 7. Anonymous Objects / Object Literals
 
 Still useful for:
 - one-off adapters
@@ -102,24 +93,22 @@ Still useful for:
 
 There is already an example reminder for this idea.
 
-### 9. Module / Visibility Polish
+### 8. Module / Visibility Polish
 
 Current package/import support is usable, but possible future additions include:
-- private top-level functions
-- private interfaces
 - import aliases
 - selective imports
 - explicit exports later if needed
 
 ## Longer-Term Ideas
 
-### 10. Result / Either Style Error Values
+### 9. Result / Either Style Error Values
 
 `Option` exists, but a richer success/error enum would likely be useful later.
 
 This becomes much more attractive once `match` exists.
 
-### 11. Smarter Type Narrowing
+### 10. Smarter Type Narrowing
 
 Later improvements could include:
 - better narrowing after `is`
@@ -133,6 +122,5 @@ Later improvements could include:
 3. enum + pattern ergonomics
 4. derived `Eq` / `Hashed`
 5. stdlib collection/query growth
-6. callable instances
-7. operator overloading
-8. anonymous objects
+6. operator overloading
+7. anonymous objects
