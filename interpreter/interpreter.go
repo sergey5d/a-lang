@@ -3,6 +3,7 @@ package interpreter
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -1579,7 +1580,7 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 func (in *Interpreter) nativeHasMethod(receiver Value, name string) bool {
 	switch receiver.(type) {
 	case *nativeList:
-		return name == "append" || name == "get" || name == "size" || name == "iterator"
+		return name == "append" || name == "sort" || name == "get" || name == "size" || name == "iterator"
 	case *nativeListIterator:
 		return name == "hasNext" || name == "next"
 	case *nativeArray:
@@ -1603,6 +1604,8 @@ func nativeMethodParams(receiver Value, name string) ([]parser.Parameter, bool) 
 		switch name {
 		case "append":
 			return []parser.Parameter{{Name: "value"}}, true
+		case "sort":
+			return []parser.Parameter{{Name: "ordering"}}, true
 		case "get":
 			return []parser.Parameter{{Name: "index"}}, true
 		case "size":
@@ -1674,6 +1677,32 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []name
 				return nativeCallResult{err: RuntimeError{Message: "append expects 1 argument", Span: span}}, true
 			}
 			value.items = append(value.items, ordered[0])
+			return nativeCallResult{value: value}, true
+		case "sort":
+			if len(ordered) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "sort expects 1 argument", Span: span}}, true
+			}
+			ordering := ordered[0]
+			var sortErr error
+			sort.SliceStable(value.items, func(i, j int) bool {
+				if sortErr != nil {
+					return false
+				}
+				compared, err := in.invokeMethod(ordering, "compare", []Value{value.items[i], value.items[j]}, local, span)
+				if err != nil {
+					sortErr = err
+					return false
+				}
+				result, ok := compared.(int64)
+				if !ok {
+					sortErr = RuntimeError{Message: "Ordering.compare must return Int", Span: span}
+					return false
+				}
+				return result < 0
+			})
+			if sortErr != nil {
+				return nativeCallResult{err: sortErr}, true
+			}
 			return nativeCallResult{value: value}, true
 		case "get":
 			if len(ordered) != 1 {

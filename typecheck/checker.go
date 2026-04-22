@@ -203,12 +203,24 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 func builtinInterfaceInfos() map[string]interfaceInfo {
 	out := map[string]interfaceInfo{}
 
+	orderingDecl := &parser.InterfaceDecl{
+		Name:           "Ordering",
+		TypeParameters: []parser.TypeParameter{{Name: "T"}},
+		Methods: []parser.InterfaceMethod{
+			{Name: "compare", Parameters: []parser.Parameter{{Name: "left", Type: namedType("T")}, {Name: "right", Type: namedType("T")}}, ReturnType: namedType("Int")},
+		},
+	}
+	out["Ordering"] = interfaceInfo{decl: orderingDecl, methods: map[string]interfaceMethodInfo{
+		"compare": {decl: orderingDecl.Methods[0]},
+	}}
+
 	listDecl := &parser.InterfaceDecl{
 		Name:           "List",
 		TypeParameters: []parser.TypeParameter{{Name: "T"}},
 		Extends:        []*parser.TypeRef{genericType("Iterable", "T")},
 		Methods: []parser.InterfaceMethod{
 			{Name: "append", Parameters: []parser.Parameter{{Name: "value", Type: namedType("T")}}, ReturnType: genericType("List", "T")},
+			{Name: "sort", Parameters: []parser.Parameter{{Name: "ordering", Type: genericType("Ordering", "T")}}, ReturnType: genericType("List", "T")},
 			{Name: "get", Parameters: []parser.Parameter{{Name: "index", Type: namedType("Int")}}, ReturnType: genericType("Option", "T")},
 			{Name: "size", Parameters: nil, ReturnType: namedType("Int")},
 			{Name: "iterator", Parameters: nil, ReturnType: genericType("Iterator", "T")},
@@ -216,9 +228,10 @@ func builtinInterfaceInfos() map[string]interfaceInfo {
 	}
 	out["List"] = interfaceInfo{decl: listDecl, methods: map[string]interfaceMethodInfo{
 		"append":   {decl: listDecl.Methods[0]},
-		"get":      {decl: listDecl.Methods[1]},
-		"size":     {decl: listDecl.Methods[2]},
-		"iterator": {decl: listDecl.Methods[3]},
+		"sort":     {decl: listDecl.Methods[1]},
+		"get":      {decl: listDecl.Methods[2]},
+		"size":     {decl: listDecl.Methods[3]},
+		"iterator": {decl: listDecl.Methods[4]},
 	}}
 
 	setDecl := &parser.InterfaceDecl{

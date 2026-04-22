@@ -18,6 +18,69 @@
 #
 # Target a-lang shape:
 
+def syntax1(rows List[(Int, Int, String)]) {
+
+    lastX := 0
+    if _, lastY, _ <- rows.get(0) {
+        for x Int, y Int, char Rune <- rows {
+            for _ <- Range(y, lastY) {
+                Term.println()
+            }
+            for _ <- Range(lastX, x) {
+                Term.print(" ")
+            }
+
+            Term.print(char)
+            lastX := x + 1
+            lastY := y
+        }
+
+        Term.println()
+    }
+}
+
+def syntax2(rows List[(Int, Int, String)]) {
+
+    lastX := 0
+    if _, lastY Int, _ <- rows.get(0) {
+        for x Int, y _, char Rune <- rows {
+            for _ <- Range(y, lastY) {
+                Term.println()
+            }
+            for _ <- Range(lastX, x) {
+                Term.print(" ")
+            }
+
+            Term.print(char)
+            lastX := x + 1
+            lastY := y
+        }
+
+        Term.println()
+    }
+}
+
+def syntax3(rows List[(Int, Int, String)]) {
+
+    lastX := 0
+    for {
+        _, lastY Int, _ <- rows.get(0)
+         x Int, y _, char Rune <- rows
+    } yield {
+        for _ <- Range(y, lastY) {
+            Term.println()
+        }
+        for _ <- Range(lastX, x) {
+            Term.print(" ")
+        }
+        Term.print(char)
+        lastX := x + 1
+        lastY := y
+    }
+
+    Term.println()
+}
+
 def main() Unit {
     rows = [
         (0, 0, '█'),
@@ -33,28 +96,10 @@ def main() Unit {
     Term.println(rows)
 
     # TODO: requires list sort with comparator / key support.
-    rows = rows.sort(r -> (-r[1], r[0]))
-
+    #rows = rows.sort(r -> (-r[1], r[0]))
     Term.println(rows)
 
-    lastX := 0
-    _, lastY Int, _ = rows.get(0).get()
-
-    for row <- rows {
-        x Int, y Int, char Rune = row
-
-        for _ <- Range(y, lastY) {
-            Term.println()
-        }
-
-        for _ <- Range(lastX, x) {
-            Term.print(" ")
-        }
-
-        Term.print(char)
-        lastX := x + 1
-        lastY := y
-    }
-
-    Term.println()
+    syntax1(rows)
+    syntax2(rows)
+    syntax3(rows)
 }

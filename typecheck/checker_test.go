@@ -965,9 +965,14 @@ def run() Bool {
 
 func TestAnalyzeBuiltinCollectionAndTermInterfaces(t *testing.T) {
 	src := `
+object Ascending with Ordering[Int] {
+	def compare(left Int, right Int) Int = left - right
+}
+
 def run() Int {
 	items List[Int] = List(1, 2)
 	items.append(3)
+	items.sort(Ascending)
 
 	values Map[String, Int] = Map("a" : 1)
 	values.set("b", 2)
@@ -978,6 +983,25 @@ def run() Int {
 	}
 
 	return items.get(0).getOr(0) + values.get("a").getOr(0)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeListSortWithOrdering(t *testing.T) {
+	src := `
+object Descending with Ordering[Int] {
+	def compare(left Int, right Int) Int = right - left
+}
+
+def run() Int {
+	items List[Int] = List(3, 1, 2)
+	items.sort(Descending)
+	return items.get(0).getOr(0) * 100 + items.get(1).getOr(0) * 10 + items.get(2).getOr(0)
 }
 `
 

@@ -567,9 +567,14 @@ def run() Bool {
 
 func TestBuiltinCollectionsAndTerm(t *testing.T) {
 	src := `
+object Ascending with Ordering[Int] {
+	def compare(left Int, right Int) Int = left - right
+}
+
 def run() Int {
 	items = List(1, 2)
 	items.append(3)
+	items.sort(Ascending)
 
 	values = Map("a" : 1)
 	values.set("b", 2)
@@ -607,6 +612,29 @@ def run() Int {
 	}
 	if strings.TrimSpace(string(output)) != "ok done" {
 		t.Fatalf("expected Term output 'ok', got %q", string(output))
+	}
+}
+
+func TestListSortWithOrdering(t *testing.T) {
+	src := `
+object Descending with Ordering[Int] {
+	def compare(left Int, right Int) Int = right - left
+}
+
+def run() Int {
+	items = List(3, 1, 4, 2)
+	items.sort(Descending)
+	return items.get(0).getOr(0) * 1000 + items.get(1).getOr(0) * 100 + items.get(2).getOr(0) * 10 + items.get(3).getOr(0)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(4321) {
+		t.Fatalf("expected 4321, got %#v", value)
 	}
 }
 
