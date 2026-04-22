@@ -229,6 +229,7 @@ func (s *LoopStmt) GetSpan() parser.Span { return s.Span }
 type ForBinding struct {
 	Bindings []BindingDecl
 	Iterable Expr
+	Values   []Expr
 	Span     parser.Span
 }
 

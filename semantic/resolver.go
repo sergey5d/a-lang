@@ -342,12 +342,20 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 	case *parser.ForStmt:
 		r.pushScope()
 		for _, binding := range s.Bindings {
-			r.resolveExpr(binding.Iterable)
+			if binding.Iterable != nil {
+				r.resolveExpr(binding.Iterable)
+			} else {
+				for _, value := range binding.Values {
+					if value != nil {
+						r.resolveExpr(value)
+					}
+				}
+			}
 			for _, part := range binding.Bindings {
 				if part.Name == "_" {
 					continue
 				}
-				r.defineMutable(part.Name, part.Span, false, "duplicate_binding", "duplicate binding '"+part.Name+"'")
+				r.defineMutable(part.Name, part.Span, part.Mutable, "duplicate_binding", "duplicate binding '"+part.Name+"'")
 			}
 		}
 		if s.Body != nil {
@@ -425,12 +433,20 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 	case *parser.ForYieldExpr:
 		r.pushScope()
 		for _, binding := range e.Bindings {
-			r.resolveExpr(binding.Iterable)
+			if binding.Iterable != nil {
+				r.resolveExpr(binding.Iterable)
+			} else {
+				for _, value := range binding.Values {
+					if value != nil {
+						r.resolveExpr(value)
+					}
+				}
+			}
 			for _, part := range binding.Bindings {
 				if part.Name == "_" {
 					continue
 				}
-				r.defineMutable(part.Name, part.Span, false, "duplicate_binding", "duplicate binding '"+part.Name+"'")
+				r.defineMutable(part.Name, part.Span, part.Mutable, "duplicate_binding", "duplicate binding '"+part.Name+"'")
 			}
 		}
 		r.resolveBlockStatements(e.YieldBody.Statements)

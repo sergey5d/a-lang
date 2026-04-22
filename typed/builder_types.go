@@ -271,6 +271,9 @@ func (b *typeRefBuilder) iterableElementType(typ *typecheck.Type) *typecheck.Typ
 	if typ == nil {
 		return &typecheck.Type{Kind: typecheck.TypeUnknown, Name: "<unknown>"}
 	}
+	if typ.Name == "Option" && len(typ.Args) > 0 {
+		return typ.Args[0]
+	}
 	if typ.Name == "Array" && len(typ.Args) > 0 {
 		return typ.Args[0]
 	}

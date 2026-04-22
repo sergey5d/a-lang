@@ -141,9 +141,10 @@ def loops(input Int, value Int) Bool {
 
 	for {
 		x <- [value],
-		y <- [input]
+		y <- [input],
+		sum = x + y
 	} yield {
-		x + y
+		sum
 	}
 
 	return value == input
@@ -172,8 +173,11 @@ def loops(input Int, value Int) Bool {
 	}
 
 	fifth := fn.Body.Statements[4].(*ForStmt)
-	if len(fifth.Bindings) != 2 || fifth.YieldBody == nil {
+	if len(fifth.Bindings) != 3 || fifth.YieldBody == nil {
 		t.Fatalf("expected yield-style for loop, got %#v", fifth)
+	}
+	if len(fifth.Bindings[2].Values) != 1 {
+		t.Fatalf("expected third yield clause to be immutable local binding, got %#v", fifth.Bindings[2])
 	}
 }
 

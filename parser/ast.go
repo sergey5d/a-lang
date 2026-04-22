@@ -233,10 +233,12 @@ type ForStmt struct {
 
 func (*ForStmt) statementNode() {}
 
-// ForBinding binds a loop variable to an iterable expression.
+// ForBinding represents either a generator clause or an immutable local binding
+// inside a for/yield binding list.
 type ForBinding struct {
 	Bindings []Binding `json:"bindings,omitempty"`
-	Iterable Expr      `json:"iterable"`
+	Iterable Expr      `json:"iterable,omitempty"`
+	Values   []Expr    `json:"values,omitempty"`
 	Span     Span      `json:"span"`
 }
 

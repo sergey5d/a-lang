@@ -603,25 +603,44 @@ func (in *Interpreter) execForBindings(bindings []parser.ForBinding, index int, 
 	if index == len(bindings) {
 		return body(local)
 	}
-	iterable, err := in.evalExpr(bindings[index].Iterable, local)
-	if err != nil {
-		return nil, err
-	}
-	items, ok := in.iterableToSlice(iterable, local, bindings[index].Span)
-	if !ok {
-		return nil, RuntimeError{Message: "for loop expects iterable list value", Span: bindings[index].Span}
-	}
-	for _, item := range items {
-		loopEnv := newEnv(local)
-		boundValues, err := in.destructureBoundValue(bindings[index].Bindings, item, bindings[index].Span)
+	binding := bindings[index]
+	if binding.Iterable == nil {
+		values, err := in.bindingValues(binding.Bindings, binding.Values, local, binding.Span)
 		if err != nil {
 			return nil, err
 		}
-		for i, binding := range bindings[index].Bindings {
-			if binding.Name == "_" {
+		loopEnv := newEnv(local)
+		for i, part := range binding.Bindings {
+			if part.Name == "_" {
 				continue
 			}
-			loopEnv.define(binding.Name, in.coerceValueForBinding(binding.Type, boundValues[i]), false)
+			loopEnv.define(part.Name, in.coerceValueForBinding(part.Type, values[i]), part.Mutable)
+		}
+		signal, err := in.execForBindings(bindings, index+1, loopEnv, self, body)
+		if err != nil {
+			return nil, err
+		}
+		return signal, nil
+	}
+	iterable, err := in.evalExpr(binding.Iterable, local)
+	if err != nil {
+		return nil, err
+	}
+	items, ok := in.iterableToSlice(iterable, local, binding.Span)
+	if !ok {
+		return nil, RuntimeError{Message: "for loop expects iterable list value", Span: binding.Span}
+	}
+	for _, item := range items {
+		loopEnv := newEnv(local)
+		boundValues, err := in.destructureBoundValue(binding.Bindings, item, binding.Span)
+		if err != nil {
+			return nil, err
+		}
+		for i, part := range binding.Bindings {
+			if part.Name == "_" {
+				continue
+			}
+			loopEnv.define(part.Name, in.coerceValueForBinding(part.Type, boundValues[i]), false)
 		}
 		signal, err := in.execForBindings(bindings, index+1, loopEnv, self, body)
 		if err != nil {
@@ -2357,6 +2376,12 @@ func asBool(value Value, span parser.Span) (bool, error) {
 }
 
 func (in *Interpreter) iterableToSlice(value Value, local *env, span parser.Span) ([]Value, bool) {
+	if ok, unwrapped, err := in.optionBindingValue(value, local, span); err == nil {
+		if !ok {
+			return []Value{}, true
+		}
+		return []Value{unwrapped}, true
+	}
 	switch items := value.(type) {
 	case []Value:
 		return items, true

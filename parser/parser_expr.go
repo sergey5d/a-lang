@@ -181,11 +181,14 @@ func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
 }
 
 func (p *Parser) parseForYieldExprAfterStart(start Token) (Expr, error) {
-	if p.check(TokenIdentifier) && p.checkNext(TokenLeftArrow) {
-		binding, err := p.parseForBinding()
+	p.beginScope()
+	defer p.endScope()
+	if (p.check(TokenIdentifier) || p.check(TokenUnder)) && p.bindingListFollowedByArrow(p.pos) {
+		binding, err := p.parseForClause()
 		if err != nil {
 			return nil, err
 		}
+		p.declareBindings(binding.Bindings)
 		if _, err := p.consume(TokenYield, "expected 'yield' after for binding"); err != nil {
 			return nil, err
 		}

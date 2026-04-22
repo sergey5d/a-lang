@@ -1014,6 +1014,55 @@ def run() Int {
 	}
 }
 
+func TestYieldLoopsWithImmutableBindings(t *testing.T) {
+	src := `
+def run() Int {
+	items = for {
+		item <- [1, 2, 3]
+		next = item + 1
+	} yield {
+		next
+	}
+
+	return items.get(0).get() + items.get(1).get() + items.get(2).get()
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(9) {
+		t.Fatalf("expected 9, got %#v", value)
+	}
+}
+
+func TestYieldLoopsWithMutableBindings(t *testing.T) {
+	src := `
+def run() Int {
+	items = for {
+		item <- [1, 2, 3]
+		total := item
+	} yield {
+		total += 1
+		total
+	}
+
+	return items.get(0).get() + items.get(1).get() + items.get(2).get()
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(9) {
+		t.Fatalf("expected 9, got %#v", value)
+	}
+}
+
 func TestIfOptionBinding(t *testing.T) {
 	src := `
 def run() Int {

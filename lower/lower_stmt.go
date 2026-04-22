@@ -169,12 +169,36 @@ func (l *Lowerer) lowerForStmt(stmt *typed.ForStmt) ([]Stmt, error) {
 func (l *Lowerer) lowerForBindings(bindings []typed.ForBinding, body []Stmt) ([]Stmt, error) {
 	out := body
 	for i := len(bindings) - 1; i >= 0; i-- {
+		if len(bindings[i].Values) > 0 {
+			if len(bindings[i].Bindings) != 1 {
+				return nil, fmt.Errorf("lowering only supports single local for bindings, got %d", len(bindings[i].Bindings))
+			}
+			binding := bindings[i].Bindings[0]
+			var init Expr
+			var err error
+			if len(bindings[i].Values) > 0 && bindings[i].Values[0] != nil {
+				init, err = l.lowerExpr(bindings[i].Values[0])
+				if err != nil {
+					return nil, err
+				}
+			}
+			out = append([]Stmt{&VarDecl{
+				Name:    binding.Name,
+				Mutable: binding.Mode == typed.BindingMutable,
+				Type:    binding.Type,
+				Init:    init,
+			}}, out...)
+			continue
+		}
+		if len(bindings[i].Bindings) != 1 {
+			return nil, fmt.Errorf("lowering only supports single for binding, got %d", len(bindings[i].Bindings))
+		}
 		iterable, err := l.lowerExpr(bindings[i].Iterable)
 		if err != nil {
 			return nil, err
 		}
 		out = []Stmt{&ForEach{
-			Name:     bindings[i].Name,
+			Name:     bindings[i].Bindings[0].Name,
 			Iterable: iterable,
 			Body:     out,
 		}}

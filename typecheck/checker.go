@@ -847,6 +847,39 @@ func (c *Checker) destructureValueTypes(count int, valueType *Type, span parser.
 	return parts
 }
 
+func (c *Checker) defineForBindingParts(bindings []parser.Binding, bindingTypes []*Type) {
+	for i, part := range bindings {
+		if part.Name == "_" {
+			continue
+		}
+		bindingType := unknownType
+		if i < len(bindingTypes) && bindingTypes[i] != nil {
+			bindingType = bindingTypes[i]
+		}
+		if part.Type != nil {
+			declType := c.resolveDeclaredType(part.Type)
+			c.requireAssignable(bindingType, declType, part.Span, "type_mismatch", "cannot assign "+bindingType.String()+" to "+declType.String())
+			bindingType = declType
+		}
+		c.define(part.Name, bindingType, part.Mutable)
+	}
+}
+
+func (c *Checker) checkForClause(binding parser.ForBinding) {
+	if binding.Iterable != nil {
+		iterType := c.checkExpr(binding.Iterable)
+		elemType := c.iterableElementType(iterType)
+		bindingTypes := []*Type{elemType}
+		if len(binding.Bindings) > 1 {
+			bindingTypes = c.destructureValueTypes(len(binding.Bindings), elemType, binding.Span, "invalid_binding_count", "for binding")
+		}
+		c.defineForBindingParts(binding.Bindings, bindingTypes)
+		return
+	}
+	valueTypes := c.bindingValueTypes(binding.Bindings, binding.Values, binding.Span)
+	c.defineForBindingParts(binding.Bindings, valueTypes)
+}
+
 func (c *Checker) checkStmt(stmt parser.Statement) {
 	switch s := stmt.(type) {
 	case *parser.ValStmt:
@@ -987,27 +1020,7 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 	case *parser.ForStmt:
 		c.pushScope()
 		for _, binding := range s.Bindings {
-			iterType := c.checkExpr(binding.Iterable)
-			elemType := c.iterableElementType(iterType)
-			bindingTypes := []*Type{elemType}
-			if len(binding.Bindings) > 1 {
-				bindingTypes = c.destructureValueTypes(len(binding.Bindings), elemType, binding.Span, "invalid_binding_count", "for binding")
-			}
-			for i, part := range binding.Bindings {
-				if part.Name == "_" {
-					continue
-				}
-				bindingType := unknownType
-				if i < len(bindingTypes) && bindingTypes[i] != nil {
-					bindingType = bindingTypes[i]
-				}
-				if part.Type != nil {
-					declType := c.resolveDeclaredType(part.Type)
-					c.requireAssignable(bindingType, declType, part.Span, "type_mismatch", "cannot assign "+bindingType.String()+" to "+declType.String())
-					bindingType = declType
-				}
-				c.define(part.Name, bindingType, false)
-			}
+			c.checkForClause(binding)
 		}
 		if s.Body != nil {
 			c.checkBlockStatements(s.Body.Statements)
@@ -1186,27 +1199,7 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 	case *parser.ForYieldExpr:
 		c.pushScope()
 		for _, binding := range e.Bindings {
-			iterType := c.checkExpr(binding.Iterable)
-			elemType := c.iterableElementType(iterType)
-			bindingTypes := []*Type{elemType}
-			if len(binding.Bindings) > 1 {
-				bindingTypes = c.destructureValueTypes(len(binding.Bindings), elemType, binding.Span, "invalid_binding_count", "for binding")
-			}
-			for i, part := range binding.Bindings {
-				if part.Name == "_" {
-					continue
-				}
-				bindingType := unknownType
-				if i < len(bindingTypes) && bindingTypes[i] != nil {
-					bindingType = bindingTypes[i]
-				}
-				if part.Type != nil {
-					declType := c.resolveDeclaredType(part.Type)
-					c.requireAssignable(bindingType, declType, part.Span, "type_mismatch", "cannot assign "+bindingType.String()+" to "+declType.String())
-					bindingType = declType
-				}
-				c.define(part.Name, bindingType, false)
-			}
+			c.checkForClause(binding)
 		}
 		yieldType := c.checkBlockResult(e.YieldBody, "invalid_yield_expression", "yield body must end with an expression")
 		c.popScope()
@@ -2685,6 +2678,9 @@ func (c *Checker) lookupTypeInstance(name string) (*Type, bool) {
 func (c *Checker) iterableElementType(t *Type) *Type {
 	if isUnknown(t) {
 		return unknownType
+	}
+	if t.Name == "Option" && len(t.Args) == 1 {
+		return t.Args[0]
 	}
 	if t.Name == "Array" && len(t.Args) == 1 {
 		return t.Args[0]

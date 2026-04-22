@@ -1103,6 +1103,43 @@ def run(rows List[(Int, String)]) Int {
 	}
 }
 
+func TestAnalyzeForYieldImmutableBindings(t *testing.T) {
+	src := `
+def run(values List[Int]) List[Int] {
+	return for {
+		item <- values
+		next = item + 1
+	} yield {
+		next
+	}
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeForYieldMutableBindings(t *testing.T) {
+	src := `
+def run(values List[Int]) List[Int] {
+	return for {
+		item <- values
+		total := item
+	} yield {
+		total += 1
+		total
+	}
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeIsExpression(t *testing.T) {
 	src := `
 class Counter {

@@ -376,11 +376,14 @@ func (p *Parser) parseLoopStmt() (Statement, error) {
 }
 
 func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
+	p.beginScope()
+	defer p.endScope()
 	if (p.check(TokenIdentifier) || p.check(TokenUnder)) && p.bindingListFollowedByArrow(p.pos) {
-		binding, err := p.parseForBinding()
+		binding, err := p.parseForClause()
 		if err != nil {
 			return nil, err
 		}
+		p.declareBindings(binding.Bindings)
 		body, err := p.parseBlock()
 		if err != nil {
 			return nil, err
@@ -412,7 +415,7 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 	return nil, fmt.Errorf("for loop requires bindings like 'for item <- items { ... }' or a yield form")
 }
 
-func (p *Parser) parseForBinding() (ForBinding, error) {
+func (p *Parser) parseForClause() (ForBinding, error) {
 	var name Token
 	var err error
 	if p.check(TokenIdentifier) {
@@ -427,18 +430,51 @@ func (p *Parser) parseForBinding() (ForBinding, error) {
 	if err != nil {
 		return ForBinding{}, err
 	}
-	if _, err := p.consume(TokenLeftArrow, "expected '<-'"); err != nil {
-		return ForBinding{}, err
+	switch p.peek().Type {
+	case TokenLeftArrow:
+		p.advance()
+		iterable, err := p.parseExpressionWithOptions(0, false)
+		if err != nil {
+			return ForBinding{}, err
+		}
+		return ForBinding{
+			Bindings: bindings,
+			Iterable: iterable,
+			Span:     mergeSpans(tokenSpan(name), exprSpan(iterable)),
+		}, nil
+	case TokenAssign, TokenColonAssign:
+		operator := p.advance().Type
+		mutable := operator == TokenColonAssign
+		for i := range bindings {
+			bindings[i].Mutable = mutable
+		}
+		values, err := p.parseBindingInitializers(len(bindings))
+		if err != nil {
+			return ForBinding{}, err
+		}
+		for i := range bindings {
+			if i < len(values) && values[i] != nil {
+				values[i] = wrapThunkExpr(bindings[i].Type, values[i])
+			}
+		}
+		end := tokenSpan(name)
+		for i, value := range values {
+			if value != nil {
+				end = mergeSpans(end, exprSpan(value))
+				continue
+			}
+			if i < len(bindings) {
+				end = mergeSpans(end, bindings[i].Span)
+			}
+		}
+		return ForBinding{
+			Bindings: bindings,
+			Values:   values,
+			Span:     end,
+		}, nil
+	default:
+		return ForBinding{}, fmt.Errorf("expected '<-' or '=' after for bindings, got %s", p.peek().String())
 	}
-	iterable, err := p.parseExpressionWithOptions(0, false)
-	if err != nil {
-		return ForBinding{}, err
-	}
-	return ForBinding{
-		Bindings: bindings,
-		Iterable: iterable,
-		Span:     mergeSpans(tokenSpan(name), exprSpan(iterable)),
-	}, nil
 }
 
 func (p *Parser) parseForBindingsBlock() ([]ForBinding, error) {
@@ -448,15 +484,17 @@ func (p *Parser) parseForBindingsBlock() ([]ForBinding, error) {
 	var bindings []ForBinding
 	if !p.check(TokenRBrace) {
 		for {
-			binding, err := p.parseForBinding()
+			binding, err := p.parseForClause()
 			if err != nil {
 				return nil, err
 			}
 			bindings = append(bindings, binding)
+			p.declareBindings(binding.Bindings)
 			if p.match(TokenComma) {
 				continue
 			}
-			if p.check(TokenIdentifier) && p.checkNext(TokenLeftArrow) {
+			if (p.check(TokenIdentifier) || p.check(TokenUnder)) &&
+				(p.bindingListFollowedByArrow(p.pos) || p.bindingListFollowedByAssign(p.pos)) {
 				continue
 			}
 			break
@@ -466,6 +504,14 @@ func (p *Parser) parseForBindingsBlock() ([]ForBinding, error) {
 		return nil, err
 	}
 	return bindings, nil
+}
+
+func (p *Parser) declareBindings(bindings []Binding) {
+	for _, binding := range bindings {
+		if binding.Name != "_" {
+			p.declare(binding.Name)
+		}
+	}
 }
 
 func (p *Parser) isForYieldStart() bool {
