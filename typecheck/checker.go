@@ -1370,8 +1370,7 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 				}
 				return sig.ReturnType
 			}
-			argTypes := c.checkArgTypes(orderedArgs)
-			sig, ok := c.resolveFunctionCallSignature(fnDecl, argTypes, call.Span)
+			sig, ok := c.resolveFunctionCallSignature(fnDecl, orderedArgs, call.Span)
 			if !ok {
 				return unknownType
 			}
@@ -1468,23 +1467,26 @@ func (c *Checker) checkApplyCall(class classInfo, receiverType *Type, args []par
 	return sig.ReturnType
 }
 
-func (c *Checker) resolveFunctionCallSignature(fn *parser.FunctionDecl, argTypes []*Type, span parser.Span) (Signature, bool) {
+func (c *Checker) resolveFunctionCallSignature(fn *parser.FunctionDecl, args []parser.Expr, span parser.Span) (Signature, bool) {
 	sig := c.instantiateFunctionSignature(fn, nil)
+	argCount := len(args)
 	if len(fn.TypeParameters) == 0 {
+		argTypes := c.checkArgTypes(args)
 		if !signatureMatches(sig, argTypes) {
 			c.addDiagnostic("no_matching_overload", fmt.Sprintf("function '%s' does not match %d arguments", fn.Name, len(argTypes)), span)
 			return Signature{}, false
 		}
 		return sig, true
 	}
-	inferred, ok := c.inferCallableTypeArgs(fn.TypeParameters, fn.Parameters, argTypes, nil)
+	inferred, ok := c.inferCallableTypeArgsFromExprs(fn.TypeParameters, fn.Parameters, args, nil)
 	if !ok {
 		c.addDiagnostic("cannot_infer_type_args", "cannot infer type arguments for function '"+fn.Name+"'", span)
 		return Signature{}, false
 	}
 	sig = c.instantiateFunctionSignature(fn, inferred)
+	argTypes := c.checkArgTypes(args)
 	if !signatureMatches(sig, argTypes) {
-		c.addDiagnostic("no_matching_overload", fmt.Sprintf("function '%s' does not match %d arguments", fn.Name, len(argTypes)), span)
+		c.addDiagnostic("no_matching_overload", fmt.Sprintf("function '%s' does not match %d arguments", fn.Name, argCount), span)
 		return Signature{}, false
 	}
 	return sig, true
@@ -1492,26 +1494,51 @@ func (c *Checker) resolveFunctionCallSignature(fn *parser.FunctionDecl, argTypes
 
 func (c *Checker) resolveMethodCallSignature(class classInfo, receiver *Type, method *parser.MethodDecl, args []parser.Expr, span parser.Span) (Signature, bool) {
 	baseSubst := c.substForDecl(class.decl.TypeParameters, receiver.Args)
-	argTypes := c.checkArgTypes(args)
 	sig := c.instantiateMethodSignature(method, class.decl, baseSubst)
 	if len(method.TypeParameters) == 0 {
+		argTypes := c.checkArgTypes(args)
 		if !signatureMatches(sig, argTypes) {
 			c.addDiagnostic("no_matching_overload", fmt.Sprintf("no overload of method '%s' matches %d arguments", method.Name, len(argTypes)), span)
 			return Signature{}, false
 		}
 		return sig, true
 	}
-	inferred, ok := c.inferCallableTypeArgs(method.TypeParameters, method.Parameters, argTypes, baseSubst)
+	inferred, ok := c.inferCallableTypeArgsFromExprs(method.TypeParameters, method.Parameters, args, baseSubst)
 	if !ok {
 		c.addDiagnostic("cannot_infer_type_args", "cannot infer type arguments for method '"+method.Name+"'", span)
 		return Signature{}, false
 	}
 	sig = c.instantiateMethodSignature(method, class.decl, mergeSubst(inferred, baseSubst))
+	argTypes := c.checkArgTypes(args)
 	if !signatureMatches(sig, argTypes) {
 		c.addDiagnostic("no_matching_overload", fmt.Sprintf("no overload of method '%s' matches %d arguments", method.Name, len(argTypes)), span)
 		return Signature{}, false
 	}
 	return sig, true
+}
+
+func (c *Checker) inferCallableTypeArgsFromExprs(typeParams []parser.TypeParameter, params []parser.Parameter, args []parser.Expr, baseSubst map[string]*Type) (map[string]*Type, bool) {
+	if len(typeParams) == 0 {
+		return nil, true
+	}
+	if len(params) != len(args) {
+		return nil, false
+	}
+	typeParamNames := map[string]bool{}
+	for _, param := range typeParams {
+		typeParamNames[param.Name] = true
+	}
+	templateSubst := mergeSubst(c.substForDecl(typeParams, nil), baseSubst)
+	inferred := map[string]*Type{}
+	for i, param := range params {
+		template := c.instantiateTypeRef(param.Type, templateSubst)
+		contextual := replaceTypeParamsWithUnknown(template, typeParamNames)
+		argType := c.checkExprWithExpected(args[i], contextual)
+		if !inferTypeArgsFromTypes(argType, template, inferred, typeParamNames) {
+			return nil, false
+		}
+	}
+	return inferred, true
 }
 
 func (c *Checker) inferCallableTypeArgs(typeParams []parser.TypeParameter, params []parser.Parameter, argTypes []*Type, baseSubst map[string]*Type) (map[string]*Type, bool) {
@@ -1539,6 +1566,33 @@ func (c *Checker) inferCallableTypeArgs(typeParams []parser.TypeParameter, param
 		}
 	}
 	return inferred, true
+}
+
+func replaceTypeParamsWithUnknown(t *Type, names map[string]bool) *Type {
+	if t == nil {
+		return nil
+	}
+	if t.Kind == TypeParam && names[t.Name] {
+		return unknownType
+	}
+	out := *t
+	if len(t.Args) > 0 {
+		out.Args = make([]*Type, len(t.Args))
+		for i, arg := range t.Args {
+			out.Args[i] = replaceTypeParamsWithUnknown(arg, names)
+		}
+	}
+	if t.Signature != nil {
+		params := make([]*Type, len(t.Signature.Parameters))
+		for i, param := range t.Signature.Parameters {
+			params[i] = replaceTypeParamsWithUnknown(param, names)
+		}
+		sig := *t.Signature
+		sig.Parameters = params
+		sig.ReturnType = replaceTypeParamsWithUnknown(t.Signature.ReturnType, names)
+		out.Signature = &sig
+	}
+	return &out
 }
 
 func inferTypeArgsFromTypes(actual, template *Type, inferred map[string]*Type, typeParams map[string]bool) bool {
@@ -1843,8 +1897,7 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 				}
 				return fn.ReturnType
 			}
-			argTypes := c.checkArgTypes(orderedArgs)
-			sig, ok := c.resolveFunctionCallSignature(fnDecl, argTypes, member.Span)
+			sig, ok := c.resolveFunctionCallSignature(fnDecl, orderedArgs, member.Span)
 			if !ok {
 				return unknownType
 			}
@@ -1983,7 +2036,6 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			}
 			orderedArgs = reordered
 		}
-		argTypes := c.checkArgTypes(orderedArgs)
 		if receiverType.Name == "Term" && (member.Name == "println" || member.Name == "print") {
 			for _, arg := range orderedArgs {
 				c.checkExpr(arg)
@@ -1994,10 +2046,10 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 		if !ok {
 			return unknownType
 		}
-		if !validArgCount(sig, len(argTypes)) {
-			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %s arguments, got %d", member.Name, expectedArgCount(sig), len(argTypes)), member.Span)
+		if !validArgCount(sig, len(orderedArgs)) {
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %s arguments, got %d", member.Name, expectedArgCount(sig), len(orderedArgs)), member.Span)
 		}
-		for i := range argTypes {
+		for i := range orderedArgs {
 			if expected, ok := paramTypeForArg(sig, i); ok {
 				argType := c.checkExprWithExpected(orderedArgs[i], expected)
 				c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
@@ -2045,7 +2097,7 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr, expected *Type) *Type
 	returnType := unknownType
 	if expr.Body != nil {
 		returnType = c.checkExpr(expr.Body)
-		if expectedSig != nil && !isUnknown(expectedSig.ReturnType) {
+		if expectedSig != nil && !containsUnknownType(expectedSig.ReturnType) {
 			if !isUnitType(expectedSig.ReturnType) {
 				c.requireAssignable(returnType, expectedSig.ReturnType, exprSpan(expr.Body), "invalid_lambda_type", "lambda body does not match expected return type")
 			}
@@ -2070,6 +2122,31 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr, expected *Type) *Type
 		}
 	}
 	return functionType("<lambda>", Signature{Parameters: params, ReturnType: returnType})
+}
+
+func containsUnknownType(t *Type) bool {
+	if t == nil {
+		return false
+	}
+	if isUnknown(t) {
+		return true
+	}
+	for _, arg := range t.Args {
+		if containsUnknownType(arg) {
+			return true
+		}
+	}
+	if t.Signature != nil {
+		for _, param := range t.Signature.Parameters {
+			if containsUnknownType(param) {
+				return true
+			}
+		}
+		if containsUnknownType(t.Signature.ReturnType) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
@@ -2908,8 +2985,7 @@ func (c *Checker) resolveInterfaceMethodCallSignature(info interfaceInfo, receiv
 		}
 		return sig, true
 	}
-	argTypes := c.checkArgTypes(args)
-	inferred, ok := c.inferCallableTypeArgs(method.TypeParameters, method.Parameters, argTypes, baseSubst)
+	inferred, ok := c.inferCallableTypeArgsFromExprs(method.TypeParameters, method.Parameters, args, baseSubst)
 	if !ok {
 		c.addDiagnostic("cannot_infer_type_args", "cannot infer type arguments for method '"+method.Name+"'", span)
 		return Signature{}, false

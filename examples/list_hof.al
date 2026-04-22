@@ -9,6 +9,7 @@
 def main() Int {
     items List[Int] = List(1, 2, 3)
     doubled List[Int] = items.map((item Int) -> item * 2)
+    doubled2 List[Int] = items.map(item -> item * 2)
     expanded List[Int] = items.flatMap((item Int) -> List(item, item + 10))
 
     doubled.forEach((item Int) -> Term.println("item " + item))

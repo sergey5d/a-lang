@@ -668,9 +668,10 @@ func TestListMapFlatMapForEach(t *testing.T) {
 def run() Int {
 	items = List(1, 2, 3)
 	doubled = items.map((item Int) -> item * 2)
+	doubled2 = items.map(item -> item * 2)
 	expanded = items.flatMap((item Int) -> List(item, item + 10))
 	doubled.forEach((item Int) -> Term.println("item " + item))
-	return doubled.get(2).getOr(0) * 10 + expanded.get(5).getOr(0)
+	return doubled.get(2).getOr(0) * 100 + doubled2.get(1).getOr(0) * 10 + expanded.get(5).getOr(0)
 }
 `
 
@@ -693,8 +694,8 @@ def run() Int {
 	if callErr != nil {
 		t.Fatalf("Call returned error: %v", callErr)
 	}
-	if value != int64(73) {
-		t.Fatalf("expected 73, got %#v", value)
+	if value != int64(653) {
+		t.Fatalf("expected 653, got %#v", value)
 	}
 	if strings.TrimSpace(string(output)) != "item 2\nitem 4\nitem 6" {
 		t.Fatalf("unexpected output %q", string(output))

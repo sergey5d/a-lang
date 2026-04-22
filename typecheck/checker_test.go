@@ -1167,9 +1167,10 @@ func TestAnalyzeListMapFlatMapForEach(t *testing.T) {
 def run() Int {
 	items List[Int] = List(1, 2, 3)
 	doubled List[Int] = items.map((item Int) -> item * 2)
+	doubled2 List[Int] = items.map(item -> item * 2)
 	expanded List[Int] = items.flatMap((item Int) -> List(item, item + 10))
 	doubled.forEach((item Int) -> Term.println(item))
-	return doubled.get(2).getOr(0) + expanded.get(5).getOr(0)
+	return doubled.get(2).getOr(0) + doubled2.get(1).getOr(0) + expanded.get(5).getOr(0)
 }
 `
 
