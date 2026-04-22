@@ -1084,6 +1084,25 @@ def run(values List[Int], flag Bool) Int {
 	}
 }
 
+func TestAnalyzeForDestructuring(t *testing.T) {
+	src := `
+def run(rows List[(Int, String)]) Int {
+	total Int := 0
+	for left Int, right String <- rows {
+		if right == "x" {
+			total += left
+		}
+	}
+	return total
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeIsExpression(t *testing.T) {
 	src := `
 class Counter {

@@ -133,6 +133,12 @@ def loops(input Int, value Int) Bool {
 		break
 	}
 
+	for left Int, right String <- [(1, "x")] {
+		if left == value {
+			break
+		}
+	}
+
 	for {
 		x <- [value],
 		y <- [input]
@@ -161,8 +167,13 @@ def loops(input Int, value Int) Bool {
 	}
 
 	fourth := fn.Body.Statements[3].(*ForStmt)
-	if len(fourth.Bindings) != 2 || fourth.YieldBody == nil {
-		t.Fatalf("expected yield-style for loop, got %#v", fourth)
+	if len(fourth.Bindings) != 1 || len(fourth.Bindings[0].Bindings) != 2 || fourth.Body == nil {
+		t.Fatalf("expected destructuring for loop, got %#v", fourth)
+	}
+
+	fifth := fn.Body.Statements[4].(*ForStmt)
+	if len(fifth.Bindings) != 2 || fifth.YieldBody == nil {
+		t.Fatalf("expected yield-style for loop, got %#v", fifth)
 	}
 }
 

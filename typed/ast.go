@@ -227,10 +227,8 @@ func (s *LoopStmt) GetSpan() parser.Span { return s.Span }
 
 // ForBinding is a typed loop binding with an inferred element type.
 type ForBinding struct {
-	Name     string
-	Type     *typecheck.Type
+	Bindings []BindingDecl
 	Iterable Expr
-	Symbol   SymbolRef
 	Span     parser.Span
 }
 

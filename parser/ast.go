@@ -235,9 +235,9 @@ func (*ForStmt) statementNode() {}
 
 // ForBinding binds a loop variable to an iterable expression.
 type ForBinding struct {
-	Name     string `json:"name"`
-	Iterable Expr   `json:"iterable"`
-	Span     Span   `json:"span"`
+	Bindings []Binding `json:"bindings,omitempty"`
+	Iterable Expr      `json:"iterable"`
+	Span     Span      `json:"span"`
 }
 
 // ReturnStmt returns a value from a callable body.

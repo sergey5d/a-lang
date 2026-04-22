@@ -613,7 +613,16 @@ func (in *Interpreter) execForBindings(bindings []parser.ForBinding, index int, 
 	}
 	for _, item := range items {
 		loopEnv := newEnv(local)
-		loopEnv.define(bindings[index].Name, item, false)
+		boundValues, err := in.destructureBoundValue(bindings[index].Bindings, item, bindings[index].Span)
+		if err != nil {
+			return nil, err
+		}
+		for i, binding := range bindings[index].Bindings {
+			if binding.Name == "_" {
+				continue
+			}
+			loopEnv.define(binding.Name, in.coerceValueForBinding(binding.Type, boundValues[i]), false)
+		}
 		signal, err := in.execForBindings(bindings, index+1, loopEnv, self, body)
 		if err != nil {
 			return nil, err

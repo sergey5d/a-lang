@@ -52,7 +52,7 @@ func Build(program *parser.Program, info typecheck.Result) (*Program, error) {
 		multiAssignments: &multiAssignmentStmtBuilder{exprs: exprs},
 		ifs:         &ifStmtBuilder{ctx: ctx, exprs: exprs, blocks: blocks, types: typeRefs},
 		loops:       &loopStmtBuilder{blocks: blocks},
-		fors:        &forStmtBuilder{ctx: ctx, exprs: exprs, blocks: blocks},
+		fors:        &forStmtBuilder{ctx: ctx, exprs: exprs, blocks: blocks, types: typeRefs},
 		returns:     &returnStmtBuilder{exprs: exprs},
 		breaks:      &breakStmtBuilder{},
 		exprs:       &exprStmtBuilder{exprs: exprs},

@@ -989,7 +989,25 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		for _, binding := range s.Bindings {
 			iterType := c.checkExpr(binding.Iterable)
 			elemType := c.iterableElementType(iterType)
-			c.define(binding.Name, elemType, false)
+			bindingTypes := []*Type{elemType}
+			if len(binding.Bindings) > 1 {
+				bindingTypes = c.destructureValueTypes(len(binding.Bindings), elemType, binding.Span, "invalid_binding_count", "for binding")
+			}
+			for i, part := range binding.Bindings {
+				if part.Name == "_" {
+					continue
+				}
+				bindingType := unknownType
+				if i < len(bindingTypes) && bindingTypes[i] != nil {
+					bindingType = bindingTypes[i]
+				}
+				if part.Type != nil {
+					declType := c.resolveDeclaredType(part.Type)
+					c.requireAssignable(bindingType, declType, part.Span, "type_mismatch", "cannot assign "+bindingType.String()+" to "+declType.String())
+					bindingType = declType
+				}
+				c.define(part.Name, bindingType, false)
+			}
 		}
 		if s.Body != nil {
 			c.checkBlockStatements(s.Body.Statements)
@@ -1170,7 +1188,25 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		for _, binding := range e.Bindings {
 			iterType := c.checkExpr(binding.Iterable)
 			elemType := c.iterableElementType(iterType)
-			c.define(binding.Name, elemType, false)
+			bindingTypes := []*Type{elemType}
+			if len(binding.Bindings) > 1 {
+				bindingTypes = c.destructureValueTypes(len(binding.Bindings), elemType, binding.Span, "invalid_binding_count", "for binding")
+			}
+			for i, part := range binding.Bindings {
+				if part.Name == "_" {
+					continue
+				}
+				bindingType := unknownType
+				if i < len(bindingTypes) && bindingTypes[i] != nil {
+					bindingType = bindingTypes[i]
+				}
+				if part.Type != nil {
+					declType := c.resolveDeclaredType(part.Type)
+					c.requireAssignable(bindingType, declType, part.Span, "type_mismatch", "cannot assign "+bindingType.String()+" to "+declType.String())
+					bindingType = declType
+				}
+				c.define(part.Name, bindingType, false)
+			}
 		}
 		yieldType := c.checkBlockResult(e.YieldBody, "invalid_yield_expression", "yield body must end with an expression")
 		c.popScope()

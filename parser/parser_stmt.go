@@ -376,7 +376,7 @@ func (p *Parser) parseLoopStmt() (Statement, error) {
 }
 
 func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
-	if p.check(TokenIdentifier) && p.checkNext(TokenLeftArrow) {
+	if (p.check(TokenIdentifier) || p.check(TokenUnder)) && p.bindingListFollowedByArrow(p.pos) {
 		binding, err := p.parseForBinding()
 		if err != nil {
 			return nil, err
@@ -413,7 +413,17 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 }
 
 func (p *Parser) parseForBinding() (ForBinding, error) {
-	name, err := p.consume(TokenIdentifier, "expected loop variable")
+	var name Token
+	var err error
+	if p.check(TokenIdentifier) {
+		name, err = p.consume(TokenIdentifier, "expected loop variable")
+	} else {
+		name, err = p.consume(TokenUnder, "expected loop variable")
+	}
+	if err != nil {
+		return ForBinding{}, err
+	}
+	bindings, err := p.parseBindingsWithStart(name, true)
 	if err != nil {
 		return ForBinding{}, err
 	}
@@ -425,7 +435,7 @@ func (p *Parser) parseForBinding() (ForBinding, error) {
 		return ForBinding{}, err
 	}
 	return ForBinding{
-		Name:     name.Lexeme,
+		Bindings: bindings,
 		Iterable: iterable,
 		Span:     mergeSpans(tokenSpan(name), exprSpan(iterable)),
 	}, nil

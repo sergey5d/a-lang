@@ -34,9 +34,7 @@ def syntax1(rows List[(Int, Int, String)]) Unit {
     lastX := 0
     if _, initialY, _ <- rows.get(0) {
         lastY := initialY
-
-        for row <- rows {
-            x Int, y Int, char String = row
+        for x Int, y Int, char String <- rows {
             for lineStep <- Range(y, lastY) {
                 Term.println()
             }
@@ -45,7 +43,6 @@ def syntax1(rows List[(Int, Int, String)]) Unit {
                     Term.print(" ")
                 }
             }
-
             Term.print(char)
             lastX := x + 1
             lastY := y
@@ -59,9 +56,7 @@ def syntax2(rows List[(Int, Int, String)]) Unit {
     lastX := 0
     if _, initialY Int, _ <- rows.get(0) {
         lastY := initialY
-
-        for row <- rows {
-            x Int, y, char = row
+        for x, y, char <- rows {
             for lineStep <- Range(y, lastY) {
                 Term.println()
             }
@@ -70,7 +65,6 @@ def syntax2(rows List[(Int, Int, String)]) Unit {
                     Term.print(" ")
                 }
             }
-
             Term.print(char)
             lastX := x + 1
             lastY := y
@@ -85,7 +79,6 @@ def syntax3(rows List[(Int, Int, String)]) Unit {
     if first <- rows.get(0) {
         _, initialY Int, _ = first
         lastY := initialY
-
         for row <- rows {
             x, y, char String = row
             for lineStep <- Range(y, lastY) {
@@ -96,7 +89,30 @@ def syntax3(rows List[(Int, Int, String)]) Unit {
                     Term.print(" ")
                 }
             }
+            Term.print(char)
+            lastX := x + 1
+            lastY := y
+        }
 
+        Term.println()
+    }
+}
+
+def syntax4(rows List[(Int, Int, String)]) Unit {
+    lastX := 0
+    if first <- rows.get(0) {
+        _, initialY Int, _ = first
+        lastY := initialY
+        for row <- rows {
+            x, y, char String = row
+            for lineStep <- Range(y, lastY) {
+                Term.println()
+            }
+            if lastX < x {
+                for spaceStep <- Range(lastX, x) {
+                    Term.print(" ")
+                }
+            }
             Term.print(char)
             lastX := x + 1
             lastY := y

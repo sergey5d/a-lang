@@ -232,6 +232,31 @@ def run() Int {
 	}
 }
 
+func TestForDestructuring(t *testing.T) {
+	src := `
+def run() Int {
+	total Int := 0
+
+	for left Int, right String <- [(1, "x"), (2, "y"), (3, "x")] {
+		if right == "x" {
+			total += left
+		}
+	}
+
+	return total
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(4) {
+		t.Fatalf("expected 4, got %#v", value)
+	}
+}
+
 func TestFunctionImplicitReturn(t *testing.T) {
 	src := `
 def suffix(value String) String {

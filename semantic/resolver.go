@@ -343,7 +343,12 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		r.pushScope()
 		for _, binding := range s.Bindings {
 			r.resolveExpr(binding.Iterable)
-			r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
+			for _, part := range binding.Bindings {
+				if part.Name == "_" {
+					continue
+				}
+				r.defineMutable(part.Name, part.Span, false, "duplicate_binding", "duplicate binding '"+part.Name+"'")
+			}
 		}
 		if s.Body != nil {
 			r.loopDepth++
@@ -421,7 +426,12 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 		r.pushScope()
 		for _, binding := range e.Bindings {
 			r.resolveExpr(binding.Iterable)
-			r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
+			for _, part := range binding.Bindings {
+				if part.Name == "_" {
+					continue
+				}
+				r.defineMutable(part.Name, part.Span, false, "duplicate_binding", "duplicate binding '"+part.Name+"'")
+			}
 		}
 		r.resolveBlockStatements(e.YieldBody.Statements)
 		r.popScope()
