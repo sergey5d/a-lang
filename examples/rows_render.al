@@ -38,11 +38,11 @@ def syntax1(rows List[(Int, Int, String)]) Unit {
     if _, initialY, _ <- rows.get(0) {
         lastY := initialY
         for x Int, y Int, char String <- rows {
-            for lineStep <- Range(y, lastY) {
+            for lineStep <- Range.apply(y, lastY) {
                 Term.println()
             }
             if lastX < x {
-                for spaceStep <- Range(lastX, x) {
+                for spaceStep <- Range.apply(lastX, x) {
                     Term.print(" ")
                 }
             }
@@ -60,11 +60,11 @@ def syntax2(rows List[(Int, Int, String)]) Unit {
     if _, initialY Int, _ <- rows.get(0) {
         lastY := initialY
         for x, y, char <- rows {
-            for lineStep <- Range(y, lastY) {
+            for lineStep <- Range.apply(y, lastY) {
                 Term.println()
             }
             if lastX < x {
-                for spaceStep <- Range(lastX, x) {
+                for spaceStep <- Range.apply(lastX, x) {
                     Term.print(" ")
                 }
             }
@@ -84,11 +84,11 @@ def syntax3(rows List[(Int, Int, String)]) Unit {
         lastY := initialY
         for row <- rows {
             x, y, char String = row
-            for lineStep <- Range(y, lastY) {
+            for lineStep <- Range.apply(y, lastY) {
                 Term.println()
             }
             if lastX < x {
-                for spaceStep <- Range(lastX, x) {
+                for spaceStep <- Range.apply(lastX, x) {
                     Term.print(" ")
                 }
             }
@@ -110,11 +110,11 @@ def syntax4(rows List[(Int, Int, String)]) Unit {
         # just as an example
         xImmutable = x
     } yield {
-        for lineStep <- Range(y, lastY) {
+        for lineStep <- Range.apply(y, lastY) {
             Term.println()
         }
         if lastX < xImmutable {
-            for spaceStep <- Range(lastX, xImmutable) {
+            for spaceStep <- Range.apply(lastX, xImmutable) {
                 Term.print(" ")
             }
         }

@@ -133,7 +133,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 			decl.Fields = append(decl.Fields, field)
 		case TokenDef:
 			sawMethod = true
-			method, err := p.parseMethod(private, decl.Object)
+			method, err := p.parseMethod(private, false)
 			if err != nil {
 				return nil, err
 			}

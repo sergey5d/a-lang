@@ -32,12 +32,12 @@ private class RangeIterator with Iterator[Int] {
 }
 
 object Range {
-    def (start Int, end Int) IntRange {
+    def apply(start Int, end Int) IntRange {
         if start < end {
             return IntRange(start = start, end = end, step = 1)
         }
         return IntRange(start = start, end = end, step = -1)
     }
 
-    def (start Int, end Int, step Int) IntRange = IntRange(start = start, end = end, step = step)
+    def apply(start Int, end Int, step Int) IntRange = IntRange(start = start, end = end, step = step)
 }

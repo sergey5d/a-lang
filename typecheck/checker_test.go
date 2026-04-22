@@ -387,13 +387,10 @@ func TestAnalyzeObjectApplyCall(t *testing.T) {
 	src := `
 object Range {
 	def apply(end Int) Int = end
-	def (start Int, end Int) Int = start + end
 }
 
 def run() Int {
-	left Int = Range(5)
-	right Int = Range(2, 4)
-	return left + right
+	return Range.apply(5)
 }
 `
 
@@ -403,9 +400,56 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeObjectDirectCallRejected(t *testing.T) {
+	src := `
+object Range {
+	def apply(end Int) Int = end
+}
+
+def run() Int {
+	return Range(5)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	found := false
+	for _, diag := range result.Diagnostics {
+		if diag.Code == "invalid_call_target" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected invalid_call_target diagnostic, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeClassApplyCall(t *testing.T) {
 	src := `
 class Adder {
+	amount Int
+
+	def apply(value Int) Int = amount + value
+}
+
+def run() Int {
+	adder Adder = Adder(5)
+	return adder(7)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeRecordApplyCall(t *testing.T) {
+	src := `
+record Adder {
 	amount Int
 
 	def apply(value Int) Int = amount + value

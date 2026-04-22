@@ -965,11 +965,10 @@ func TestObjectApplyCall(t *testing.T) {
 	src := `
 object Range {
 	def apply(end Int) Int = end
-	def (start Int, end Int) Int = start + end
 }
 
 def run() Int {
-	return Range(5) + Range(2, 4)
+	return Range.apply(5)
 }
 `
 
@@ -978,14 +977,55 @@ def run() Int {
 	if err != nil {
 		t.Fatalf("Call returned error: %v", err)
 	}
-	if value != int64(11) {
-		t.Fatalf("expected 11, got %#v", value)
+	if value != int64(5) {
+		t.Fatalf("expected 5, got %#v", value)
+	}
+}
+
+func TestObjectDirectCallRejected(t *testing.T) {
+	src := `
+object Range {
+	def apply(end Int) Int = end
+}
+
+def run() Int {
+	return Range(5)
+}
+`
+
+	in := New(parseProgram(t, src))
+	if _, err := in.Call("run"); err == nil {
+		t.Fatalf("expected runtime error for direct object call")
 	}
 }
 
 func TestClassApplyCall(t *testing.T) {
 	src := `
 class Adder {
+	amount Int
+
+	def apply(value Int) Int = amount + value
+}
+
+def run() Int {
+	adder Adder = Adder(5)
+	return adder(7)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(12) {
+		t.Fatalf("expected 12, got %#v", value)
+	}
+}
+
+func TestRecordApplyCall(t *testing.T) {
+	src := `
+record Adder {
 	amount Int
 
 	def apply(value Int) Int = amount + value

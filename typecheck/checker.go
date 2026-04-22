@@ -1263,7 +1263,11 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 		}
 		if class, ok := c.classes[ident.Name]; ok {
 			if class.decl.Object {
-				return c.checkObjectApplyCall(class, call.Args, call.Span)
+				for _, arg := range call.Args {
+					c.checkExpr(arg.Value)
+				}
+				c.addDiagnostic("invalid_call_target", "object '"+class.decl.Name+"' is a singleton and cannot be called", call.Span)
+				return unknownType
 			}
 			return c.checkConstructorCall(class, call)
 		}
@@ -1300,9 +1304,6 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 	calleeType := c.checkExpr(call.Callee)
 	if calleeType.Kind == TypeClass {
 		if info, ok := c.classes[calleeType.Name]; ok {
-			if info.decl.Object {
-				return c.checkObjectApplyCall(info, call.Args, call.Span)
-			}
 			return c.checkInstanceApplyCall(info, calleeType, call.Args, call.Span)
 		}
 	}
@@ -1370,10 +1371,6 @@ func (c *Checker) checkApplyCall(class classInfo, receiverType *Type, args []par
 		}
 	}
 	return sig.ReturnType
-}
-
-func (c *Checker) checkObjectApplyCall(class classInfo, args []parser.CallArg, span parser.Span) *Type {
-	return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, args, span, "object '"+class.decl.Name+"' is not callable")
 }
 
 func (c *Checker) checkInstanceApplyCall(class classInfo, receiverType *Type, args []parser.CallArg, span parser.Span) *Type {
@@ -1639,7 +1636,9 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 		}
 		if class, ok := info.classes[member.Name]; ok {
 			if class.decl.Object {
-				return c.checkObjectApplyCall(class, args, member.Span)
+				c.checkArgTypes(callArgValues(args))
+				c.addDiagnostic("invalid_call_target", "object '"+class.decl.Name+"' is a singleton and cannot be called", member.Span)
+				return unknownType
 			}
 			call := &parser.CallExpr{Callee: member, Args: args, Span: member.Span}
 			return c.checkConstructorCall(class, call)

@@ -838,22 +838,15 @@ object A {
 	}
 }
 
-func TestParseObjectShortApplyDecl(t *testing.T) {
+func TestParseObjectShortApplyDeclRejected(t *testing.T) {
 	src := `
 object Range {
 	def (end Int) Int = end
 }
 `
 
-	program, err := Parse(src)
-	if err != nil {
-		t.Fatalf("Parse returned error: %v", err)
-	}
-	if len(program.Classes) != 1 || len(program.Classes[0].Methods) != 1 {
-		t.Fatalf("unexpected object declaration %#v", program.Classes)
-	}
-	if program.Classes[0].Methods[0].Name != "apply" {
-		t.Fatalf("expected short object method to normalize to apply, got %#v", program.Classes[0].Methods[0])
+	if _, err := Parse(src); err == nil {
+		t.Fatalf("expected parse error for short object apply declaration")
 	}
 }
 

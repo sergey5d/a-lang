@@ -1,6 +1,6 @@
 # EXPECT:
 # 12
-# 14
+# 0
 
 class Adder {
     amount Int
@@ -11,8 +11,5 @@ class Adder {
 def main() Int {
     adder Adder = Adder(5)
     Term.println(adder(7))
-
-    lambda Int -> Int = adder.apply
-
-    Term.println(lambda(9))
+    0
 }

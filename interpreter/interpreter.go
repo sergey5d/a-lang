@@ -1144,6 +1144,9 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 		}
 		return in.callClosure(fn, namedArgValues(args))
 	case *instance:
+		if fn.class.Object {
+			return nil, RuntimeError{Message: "object '" + fn.class.Name + "' is a singleton and cannot be called", Span: call.Span}
+		}
 		return in.callApplyMethod(fn, args, call.Args, local, call.Span)
 	default:
 		return nil, RuntimeError{Message: "value is not callable", Span: call.Span}
@@ -1257,15 +1260,7 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 		}
 		if class, ok := mod.classes[member.Name]; ok {
 			if class.Object {
-				slot, ok := mod.globals.get(member.Name)
-				if !ok {
-					return nil, RuntimeError{Message: "unknown member '" + member.Name + "'", Span: member.Span}
-				}
-				obj, ok := slot.value.(*instance)
-				if !ok {
-					return nil, RuntimeError{Message: "object '" + member.Name + "' is not initialized", Span: member.Span}
-				}
-				return mod.callApplyMethod(obj, args, argExprs, local, member.Span)
+				return nil, RuntimeError{Message: "object '" + member.Name + "' is a singleton and cannot be called", Span: member.Span}
 			}
 			if hasNamedParserArgs(argExprs) {
 				reordered, err := reorderConstructorValueArgs(class, args, member.Span)

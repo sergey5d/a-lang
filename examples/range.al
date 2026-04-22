@@ -20,28 +20,28 @@
 
 def main() Unit {
     total Int := 0
-    for item <- Range(1, 4) {
+    for item <- Range.apply(1, 4) {
         Term.println("range", item)
         total := total + item
     }
     Term.println("total", total)
 
     multiplied := 1
-    for item <- Range(10, 14) {
+    for item <- Range.apply(10, 14) {
         Term.println("another range", item)
         multiplied *= item
     }
     Term.println("another multiplied", multiplied)
 
     descendingTotal := 0
-    for item <- Range(5, 1) {
+    for item <- Range.apply(5, 1) {
         Term.println("descending", item)
         descendingTotal += item
     }
     Term.println("descending total", descendingTotal)
 
     steppedTotal := 0
-    for item <- Range(10, 4, -2) {
+    for item <- Range.apply(10, 4, -2) {
         Term.println("stepped", item)
         steppedTotal += item
     }
