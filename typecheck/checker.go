@@ -146,6 +146,9 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 			interfaces:    map[string]interfaceInfo{},
 		}
 		for _, fn := range imported.Program.Functions {
+			if fn.Private && !samePackage {
+				continue
+			}
 			params := make([]*Type, len(fn.Parameters))
 			for i, param := range fn.Parameters {
 				params[i] = fromTypeRef(param.Type, c)
@@ -158,6 +161,9 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 			info.functionDecls[fn.Name] = fn
 		}
 		for _, decl := range imported.Program.Interfaces {
+			if decl.Private && !samePackage {
+				continue
+			}
 			qualified := imported.Path + "::" + decl.Name
 			iface := interfaceInfo{
 				decl:    decl,
@@ -1291,19 +1297,21 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 		return c.checkMethodCall(member, call.Args)
 	}
 
+	calleeType := c.checkExpr(call.Callee)
+	if calleeType.Kind == TypeClass {
+		if info, ok := c.classes[calleeType.Name]; ok {
+			if info.decl.Object {
+				return c.checkObjectApplyCall(info, call.Args, call.Span)
+			}
+			return c.checkInstanceApplyCall(info, calleeType, call.Args, call.Span)
+		}
+	}
 	if hasNamedCallArgs(call.Args) {
 		for _, arg := range call.Args {
 			c.checkExpr(arg.Value)
 		}
-		c.addDiagnostic("invalid_named_argument", "named arguments require a direct function, method, or constructor call", call.Span)
+		c.addDiagnostic("invalid_named_argument", "named arguments require a direct function, method, constructor, or callable object", call.Span)
 		return unknownType
-	}
-
-	calleeType := c.checkExpr(call.Callee)
-	if calleeType.Kind == TypeClass {
-		if info, ok := c.classes[calleeType.Name]; ok && info.decl.Object {
-			return c.checkObjectApplyCall(info, call.Args, call.Span)
-		}
 	}
 	if calleeType.Kind != TypeFunction || calleeType.Signature == nil {
 		for _, arg := range call.Args {
@@ -1328,16 +1336,15 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 	return sig.ReturnType
 }
 
-func (c *Checker) checkObjectApplyCall(class classInfo, args []parser.CallArg, span parser.Span) *Type {
+func (c *Checker) checkApplyCall(class classInfo, receiverType *Type, args []parser.CallArg, span parser.Span, missingMessage string) *Type {
 	applyMethods, ok := class.methods["apply"]
 	if !ok || len(applyMethods) == 0 {
 		for _, arg := range args {
 			c.checkExpr(arg.Value)
 		}
-		c.addDiagnostic("invalid_call_target", "object '"+class.decl.Name+"' is not callable", span)
+		c.addDiagnostic("invalid_call_target", missingMessage, span)
 		return unknownType
 	}
-	receiverType := &Type{Kind: TypeClass, Name: class.name}
 	var (
 		method      methodInfo
 		okMethod    bool
@@ -1363,6 +1370,14 @@ func (c *Checker) checkObjectApplyCall(class classInfo, args []parser.CallArg, s
 		}
 	}
 	return sig.ReturnType
+}
+
+func (c *Checker) checkObjectApplyCall(class classInfo, args []parser.CallArg, span parser.Span) *Type {
+	return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, args, span, "object '"+class.decl.Name+"' is not callable")
+}
+
+func (c *Checker) checkInstanceApplyCall(class classInfo, receiverType *Type, args []parser.CallArg, span parser.Span) *Type {
+	return c.checkApplyCall(class, receiverType, args, span, "value of type '"+receiverType.String()+"' is not callable")
 }
 
 func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr) *Type {

@@ -53,12 +53,14 @@ type FunctionDecl struct {
 	Parameters []Parameter `json:"parameters"`
 	ReturnType *TypeRef    `json:"returnType"`
 	Body       *BlockStmt  `json:"body"`
+	Private    bool        `json:"private,omitempty"`
 	Span       Span        `json:"span"`
 }
 
 // InterfaceDecl describes an interface declaration and its methods.
 type InterfaceDecl struct {
 	Name           string            `json:"name"`
+	Private        bool              `json:"private,omitempty"`
 	TypeParameters []TypeParameter   `json:"typeParameters,omitempty"`
 	Extends        []*TypeRef        `json:"extends,omitempty"`
 	Methods        []InterfaceMethod `json:"methods"`

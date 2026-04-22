@@ -983,6 +983,30 @@ def run() Int {
 	}
 }
 
+func TestClassApplyCall(t *testing.T) {
+	src := `
+class Adder {
+	amount Int
+
+	def apply(value Int) Int = amount + value
+}
+
+def run() Int {
+	adder Adder = Adder(5)
+	return adder(7)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(12) {
+		t.Fatalf("expected 12, got %#v", value)
+	}
+}
+
 func TestImplicitPrimaryConstructorAndThisDelegation(t *testing.T) {
 	src := `
 class Counter {

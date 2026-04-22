@@ -1,6 +1,14 @@
 package parser
 
 func (p *Parser) parseInterface() (*InterfaceDecl, error) {
+	return p.parseInterfaceWithPrivate(false)
+}
+
+func (p *Parser) parsePrivateInterface() (*InterfaceDecl, error) {
+	return p.parseInterfaceWithPrivate(true)
+}
+
+func (p *Parser) parseInterfaceWithPrivate(private bool) (*InterfaceDecl, error) {
 	start, err := p.consume(TokenInterface, "expected 'interface'")
 	if err != nil {
 		return nil, err
@@ -13,7 +21,7 @@ func (p *Parser) parseInterface() (*InterfaceDecl, error) {
 	if err != nil {
 		return nil, err
 	}
-	decl := &InterfaceDecl{Name: name.Lexeme, TypeParameters: typeParams}
+	decl := &InterfaceDecl{Name: name.Lexeme, Private: private, TypeParameters: typeParams}
 	if p.match(TokenWith) {
 		for {
 			target, err := p.parseTypeRef()

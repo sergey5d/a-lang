@@ -403,6 +403,26 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeClassApplyCall(t *testing.T) {
+	src := `
+class Adder {
+	amount Int
+
+	def apply(value Int) Int = amount + value
+}
+
+def run() Int {
+	adder Adder = Adder(5)
+	return adder(7)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeModuleAllowsPrivateClassWithinSamePackage(t *testing.T) {
 	dir := t.TempDir()
 	writeModuleFile(t, filepath.Join(dir, "app.al"), `
@@ -450,6 +470,70 @@ import lib
 def run() Int {
 	value = lib.Hidden()
 	return 0
+}
+`)
+
+	mod, err := module.Load(filepath.Join(dir, "main.al"))
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	result := AnalyzeModule(mod)
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	found := false
+	for _, diag := range result.Diagnostics {
+		if diag.Code == "unknown_member" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected unknown_member diagnostic, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeModuleAllowsPrivateFunctionWithinSamePackage(t *testing.T) {
+	dir := t.TempDir()
+	writeModuleFile(t, filepath.Join(dir, "app.al"), `
+package app
+
+private def hidden() Int = 7
+`)
+	writeModuleFile(t, filepath.Join(dir, "main.al"), `
+package app
+
+import app
+
+def run() Int {
+	return app.hidden()
+}
+`)
+
+	mod, err := module.Load(filepath.Join(dir, "main.al"))
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	result := AnalyzeModule(mod)
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeModuleRejectsPrivateFunctionAcrossPackages(t *testing.T) {
+	dir := t.TempDir()
+	writeModuleFile(t, filepath.Join(dir, "lib.al"), `
+package lib
+
+private def hidden() Int = 7
+`)
+	writeModuleFile(t, filepath.Join(dir, "main.al"), `
+package app
+
+import lib
+
+def run() Int {
+	return lib.hidden()
 }
 `)
 

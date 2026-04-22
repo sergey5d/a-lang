@@ -876,6 +876,27 @@ private class Hidden {
 	}
 }
 
+func TestParsePrivateTopLevelDecls(t *testing.T) {
+	src := `
+private def helper() Int = 1
+
+private interface Hidden {
+	def value() Int
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Functions) != 1 || !program.Functions[0].Private {
+		t.Fatalf("expected private function, got %#v", program.Functions)
+	}
+	if len(program.Interfaces) != 1 || !program.Interfaces[0].Private {
+		t.Fatalf("expected private interface, got %#v", program.Interfaces)
+	}
+}
+
 func TestParseDestructuringSkipBinding(t *testing.T) {
 	src := `
 def run() Int {

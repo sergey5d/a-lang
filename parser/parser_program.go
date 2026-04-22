@@ -69,6 +69,18 @@ func (p *Parser) parseProgram() (*Program, error) {
 		case TokenPrivate:
 			p.advance()
 			switch p.peek().Type {
+			case TokenDef:
+				fn, err := p.parsePrivateFunction()
+				if err != nil {
+					return nil, err
+				}
+				program.Functions = append(program.Functions, fn)
+			case TokenInterface:
+				decl, err := p.parsePrivateInterface()
+				if err != nil {
+					return nil, err
+				}
+				program.Interfaces = append(program.Interfaces, decl)
 			case TokenClass:
 				decl, err := p.parsePrivateClass()
 				if err != nil {
@@ -94,7 +106,7 @@ func (p *Parser) parseProgram() (*Program, error) {
 				}
 				program.Classes = append(program.Classes, decl)
 			default:
-				return nil, fmt.Errorf("'private' is only supported for top-level class-like declarations")
+				return nil, fmt.Errorf("'private' is only supported for top-level declarations")
 			}
 		default:
 			stmt, err := p.parseStatement()

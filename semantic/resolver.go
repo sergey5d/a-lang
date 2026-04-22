@@ -91,6 +91,9 @@ func moduleImportInfo(mod *module.LoadedModule) map[string]importInfo {
 			interfaces: map[string]parser.Span{},
 		}
 		for _, fn := range imported.Program.Functions {
+			if fn.Private && !samePackage {
+				continue
+			}
 			info.functions[fn.Name] = fn.Span
 		}
 		for _, class := range imported.Program.Classes {
@@ -100,6 +103,9 @@ func moduleImportInfo(mod *module.LoadedModule) map[string]importInfo {
 			info.classes[class.Name] = class.Span
 		}
 		for _, iface := range imported.Program.Interfaces {
+			if iface.Private && !samePackage {
+				continue
+			}
 			info.interfaces[iface.Name] = iface.Span
 		}
 		out[alias] = info
