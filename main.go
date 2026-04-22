@@ -8,8 +8,10 @@ import (
 	"a-lang/typecheck"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func main() {
@@ -29,8 +31,14 @@ func main() {
 	typeResult := typecheck.AnalyzeModule(loaded)
 	diagnostics = append(diagnostics, typeResult.Diagnostics...)
 	if len(diagnostics) > 0 {
+		seen := map[string]bool{}
 		for _, diagnostic := range diagnostics {
-			fmt.Fprintln(os.Stderr, diagnostic.Error())
+			message := diagnostic.Error()
+			if seen[message] {
+				continue
+			}
+			seen[message] = true
+			fmt.Fprintln(os.Stderr, message)
 		}
 		os.Exit(1)
 	}
@@ -66,18 +74,93 @@ func main() {
 			os.Exit(1)
 		}
 		in := interpreter.NewModule(loaded)
+		srcBytes, readErr := os.ReadFile(os.Args[1])
+		if readErr != nil {
+			fmt.Fprintf(os.Stderr, "read source: %v\n", readErr)
+			os.Exit(1)
+		}
+		expected, hasExpected, err := parseExpectedOutput(string(srcBytes))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "parse expected output: %v\n", err)
+			os.Exit(1)
+		}
+		if !hasExpected {
+			value, err := in.Call(entry, args...)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			if value != nil {
+				fmt.Println(value)
+			}
+			return
+		}
+
+		oldStdout := os.Stdout
+		reader, writer, err := os.Pipe()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "pipe: %v\n", err)
+			os.Exit(1)
+		}
+		os.Stdout = writer
 		value, err := in.Call(entry, args...)
+		_ = writer.Close()
+		os.Stdout = oldStdout
+		output, _ := io.ReadAll(reader)
+		_ = reader.Close()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+		actual := string(output)
 		if value != nil {
-			fmt.Println(value)
+			actual += fmt.Sprintln(value)
 		}
+		if normalizeExampleOutput(actual) != normalizeExampleOutput(expected) {
+			fmt.Fprintf(os.Stderr, "example output mismatch\nexpected:\n%s\nactual:\n%s", expected, actual)
+			os.Exit(1)
+		}
+		fmt.Print(actual)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown mode %q\n", mode)
 		os.Exit(1)
 	}
+}
+
+func parseExpectedOutput(src string) (string, bool, error) {
+	lines := strings.Split(src, "\n")
+	start := -1
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "# EXPECT:" {
+			start = i + 1
+			break
+		}
+		if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+			return "", false, nil
+		}
+	}
+	if start == -1 {
+		return "", false, nil
+	}
+
+	var out []string
+	for i := start; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if !strings.HasPrefix(trimmed, "#") {
+			break
+		}
+		content := strings.TrimPrefix(trimmed, "#")
+		if strings.HasPrefix(content, " ") {
+			content = content[1:]
+		}
+		out = append(out, content)
+	}
+	return strings.Join(out, "\n"), true, nil
+}
+
+func normalizeExampleOutput(s string) string {
+	return strings.TrimRight(s, "\n")
 }
 
 func findFunction(program *parser.Program, name string) *parser.FunctionDecl {

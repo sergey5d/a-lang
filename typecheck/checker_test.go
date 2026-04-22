@@ -1268,6 +1268,24 @@ def run(values List[Int]) List[Int] {
 	}
 }
 
+func TestAnalyzeRejectsUselessExpressionStatement(t *testing.T) {
+	src := `
+def run() Int {
+	value = 1
+	value
+	return value
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if result.Diagnostics[0].Code != "useless_expression" {
+		t.Fatalf("expected useless_expression, got %#v", result.Diagnostics[0])
+	}
+}
+
 func TestAnalyzeIsExpression(t *testing.T) {
 	src := `
 class Counter {

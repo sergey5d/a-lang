@@ -911,6 +911,30 @@ def run() Int {
 	}
 }
 
+func TestParseStatementBoundaryBeforeTypedBinding(t *testing.T) {
+	src := `
+def run() Unit {
+	xxx
+	lambda6 = (left Int, right Int) -> left + right
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	fn := program.Functions[0]
+	if len(fn.Body.Statements) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(fn.Body.Statements))
+	}
+	if _, ok := fn.Body.Statements[0].(*ExprStmt); !ok {
+		t.Fatalf("expected first statement to stay an expression statement, got %T", fn.Body.Statements[0])
+	}
+	if _, ok := fn.Body.Statements[1].(*ValStmt); !ok {
+		t.Fatalf("expected second statement to be a binding, got %T", fn.Body.Statements[1])
+	}
+}
+
 func TestParseInterfaceInheritance(t *testing.T) {
 	src := `
 interface Hopper {

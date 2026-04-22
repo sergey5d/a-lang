@@ -6,6 +6,38 @@ import (
 	"a-lang/parser"
 )
 
+func TestParseExpectedOutput(t *testing.T) {
+	src := `# EXPECT:
+# a
+# b
+
+def main() Unit {
+}`
+
+	expected, ok, err := parseExpectedOutput(src)
+	if err != nil {
+		t.Fatalf("parseExpectedOutput returned error: %v", err)
+	}
+	if !ok {
+		t.Fatalf("expected # EXPECT header to be found")
+	}
+	if expected != "a\nb" {
+		t.Fatalf("expected two-line output, got %q", expected)
+	}
+}
+
+func TestParseExpectedOutputMissing(t *testing.T) {
+	src := `def main() Unit {}`
+
+	_, ok, err := parseExpectedOutput(src)
+	if err != nil {
+		t.Fatalf("parseExpectedOutput returned error: %v", err)
+	}
+	if ok {
+		t.Fatalf("expected no # EXPECT header")
+	}
+}
+
 func TestParseCLIArgsScalars(t *testing.T) {
 	fn := &parser.FunctionDecl{
 		Name: "main",

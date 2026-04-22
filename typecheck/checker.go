@@ -853,6 +853,38 @@ func (c *Checker) destructureValueTypes(count int, valueType *Type, span parser.
 	return parts
 }
 
+func (c *Checker) exprHasEffect(expr parser.Expr) bool {
+	switch e := expr.(type) {
+	case *parser.CallExpr:
+		return true
+	case *parser.GroupExpr:
+		return c.exprHasEffect(e.Inner)
+	case *parser.IfExpr:
+		return c.blockHasEffect(e.Then) || c.blockHasEffect(e.Else)
+	case *parser.ForYieldExpr:
+		return c.blockHasEffect(e.YieldBody)
+	default:
+		return false
+	}
+}
+
+func (c *Checker) blockHasEffect(block *parser.BlockStmt) bool {
+	if block == nil {
+		return false
+	}
+	for _, stmt := range block.Statements {
+		switch s := stmt.(type) {
+		case *parser.ExprStmt:
+			if c.exprHasEffect(s.Expr) {
+				return true
+			}
+		default:
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Checker) defineForBindingParts(bindings []parser.Binding, bindingTypes []*Type) {
 	for i, part := range bindings {
 		if part.Name == "_" {
@@ -1004,23 +1036,23 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 				}
 				c.define(binding.Name, bindingType, false)
 			}
-			c.checkBlockStatements(s.Then.Statements)
+			c.checkBlockStatements(s.Then.Statements, false)
 			c.popScope()
 		} else {
 			condType := c.checkExpr(s.Condition)
 			c.requireAssignable(condType, builtin("Bool"), exprSpan(s.Condition), "invalid_condition_type", "if condition must be Bool")
-			_ = c.checkBlock(s.Then)
+			c.checkBlockStatements(s.Then.Statements, false)
 		}
 		if s.ElseIf != nil {
 			c.checkStmt(s.ElseIf)
 		}
 		if s.Else != nil {
-			_ = c.checkBlock(s.Else)
+			c.checkBlockStatements(s.Else.Statements, false)
 		}
 	case *parser.LoopStmt:
 		c.pushScope()
 		if s.Body != nil {
-			c.checkBlockStatements(s.Body.Statements)
+			c.checkBlockStatements(s.Body.Statements, false)
 		}
 		c.popScope()
 	case *parser.ForStmt:
@@ -1029,10 +1061,10 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			c.checkForClause(binding)
 		}
 		if s.Body != nil {
-			c.checkBlockStatements(s.Body.Statements)
+			c.checkBlockStatements(s.Body.Statements, false)
 		}
 		if s.YieldBody != nil {
-			c.checkBlockStatements(s.YieldBody.Statements)
+			c.checkBlockStatements(s.YieldBody.Statements, true)
 		}
 		c.popScope()
 	case *parser.ReturnStmt:
@@ -1055,14 +1087,24 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			c.requireAssignable(valueType, expected, s.Span, "invalid_return_type", "cannot return "+valueType.String()+" from function returning "+expected.String())
 		}
 	case *parser.ExprStmt:
+		before := len(c.diagnostics)
 		c.checkExpr(s.Expr)
+		if len(c.diagnostics) == before && !c.exprHasEffect(s.Expr) {
+			c.addDiagnostic("useless_expression", "expression statement has no effect", s.Span)
+		}
 	}
 }
 
-func (c *Checker) checkBlockStatements(statements []parser.Statement) {
+func (c *Checker) checkBlockStatements(statements []parser.Statement, allowTailExpr bool) {
 	c.pushScope()
 	defer c.popScope()
-	for _, stmt := range statements {
+	for i, stmt := range statements {
+		if allowTailExpr && i == len(statements)-1 {
+			if exprStmt, ok := stmt.(*parser.ExprStmt); ok {
+				c.checkExpr(exprStmt.Expr)
+				return
+			}
+		}
 		c.checkStmt(stmt)
 	}
 }

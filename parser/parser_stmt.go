@@ -140,7 +140,7 @@ func (p *Parser) parseBindingsWithStart(start Token, firstIsName bool) ([]Bindin
 		}
 		binding.Name = name.Lexeme
 		binding.Span = tokenSpan(name)
-		if p.check(TokenIdentifier) || p.check(TokenLParen) {
+		if p.bindingTypeStartsOnSameLine(name) && (p.check(TokenIdentifier) || p.check(TokenLParen)) {
 			typeRef, err := p.parseTypeRef()
 			if err != nil {
 				return nil, err
@@ -190,7 +190,7 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 			sawUndeclared = true
 		}
 		i++
-		if i < len(p.tokens) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen) {
+		if i < len(p.tokens) && p.sameLineTokens(i-1, i) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen) {
 			end, ok := p.scanTypeRef(i)
 			if !ok {
 				return false
@@ -340,7 +340,7 @@ func (p *Parser) bindingListFollowedByArrow(start int) bool {
 
 	i := start + 1
 	for {
-		if i < len(p.tokens) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen) {
+		if i < len(p.tokens) && p.sameLineTokens(i-1, i) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen) {
 			end, ok := p.scanTypeRef(i)
 			if !ok {
 				return false
@@ -359,6 +359,24 @@ func (p *Parser) bindingListFollowedByArrow(start int) bool {
 		}
 		i++
 	}
+}
+
+func (p *Parser) bindingTypeStartsOnSameLine(name Token) bool {
+	if p.pos >= len(p.tokens) {
+		return false
+	}
+	return sameLine(name, p.tokens[p.pos])
+}
+
+func (p *Parser) sameLineTokens(leftIndex, rightIndex int) bool {
+	if leftIndex < 0 || rightIndex < 0 || leftIndex >= len(p.tokens) || rightIndex >= len(p.tokens) {
+		return false
+	}
+	return sameLine(p.tokens[leftIndex], p.tokens[rightIndex])
+}
+
+func sameLine(left Token, right Token) bool {
+	return left.EndLine == right.Line
 }
 
 func (p *Parser) parseForStmt() (Statement, error) {
