@@ -226,6 +226,9 @@ func builtinInterfaceInfos() map[string]interfaceInfo {
 		Extends:        []*parser.TypeRef{genericType("Iterable", "T")},
 		Methods: []parser.InterfaceMethod{
 			{Name: "append", Parameters: []parser.Parameter{{Name: "value", Type: namedType("T")}}, ReturnType: genericType("List", "T")},
+			{Name: "map", TypeParameters: []parser.TypeParameter{{Name: "X"}}, Parameters: []parser.Parameter{{Name: "f", Type: functionTypeRef(namedType("T"), namedType("X"))}}, ReturnType: genericType("List", "X")},
+			{Name: "flatMap", TypeParameters: []parser.TypeParameter{{Name: "X"}}, Parameters: []parser.Parameter{{Name: "f", Type: functionTypeRef(namedType("T"), genericType("List", "X"))}}, ReturnType: genericType("List", "X")},
+			{Name: "forEach", Parameters: []parser.Parameter{{Name: "f", Type: functionTypeRef(namedType("T"), namedType("Unit"))}}, ReturnType: namedType("Unit")},
 			{Name: "sort", Parameters: []parser.Parameter{{Name: "ordering", Type: genericType("Ordering", "T")}}, ReturnType: genericType("List", "T")},
 			{Name: "get", Parameters: []parser.Parameter{{Name: "index", Type: namedType("Int")}}, ReturnType: genericType("Option", "T")},
 			{Name: "size", Parameters: nil, ReturnType: namedType("Int")},
@@ -234,10 +237,13 @@ func builtinInterfaceInfos() map[string]interfaceInfo {
 	}
 	out["List"] = interfaceInfo{decl: listDecl, methods: map[string]interfaceMethodInfo{
 		"append":   {decl: listDecl.Methods[0]},
-		"sort":     {decl: listDecl.Methods[1]},
-		"get":      {decl: listDecl.Methods[2]},
-		"size":     {decl: listDecl.Methods[3]},
-		"iterator": {decl: listDecl.Methods[4]},
+		"map":      {decl: listDecl.Methods[1]},
+		"flatMap":  {decl: listDecl.Methods[2]},
+		"forEach":  {decl: listDecl.Methods[3]},
+		"sort":     {decl: listDecl.Methods[4]},
+		"get":      {decl: listDecl.Methods[5]},
+		"size":     {decl: listDecl.Methods[6]},
+		"iterator": {decl: listDecl.Methods[7]},
 	}}
 
 	setDecl := &parser.InterfaceDecl{
@@ -312,6 +318,17 @@ func genericType(name string, args ...string) *parser.TypeRef {
 		ref.Arguments = append(ref.Arguments, namedType(arg))
 	}
 	return ref
+}
+
+func functionTypeRef(params ...*parser.TypeRef) *parser.TypeRef {
+	if len(params) == 0 {
+		return &parser.TypeRef{Name: "func"}
+	}
+	return &parser.TypeRef{
+		Name:           "func",
+		ParameterTypes: params[:len(params)-1],
+		ReturnType:     params[len(params)-1],
+	}
 }
 
 func (c *Checker) collectDecls(program *parser.Program) {
@@ -1973,7 +1990,10 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			}
 			return receiverType
 		}
-		sig := c.instantiateInterfaceMethodSignature(method.decl, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
+		sig, ok := c.resolveInterfaceMethodCallSignature(info, receiverType, method.decl, orderedArgs, member.Span)
+		if !ok {
+			return unknownType
+		}
 		if !validArgCount(sig, len(argTypes)) {
 			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %s arguments, got %d", member.Name, expectedArgCount(sig), len(argTypes)), member.Span)
 		}
@@ -2866,15 +2886,40 @@ func hasPrivateOnlyMatch(methods []methodInfo, owner *parser.ClassDecl, c *Check
 }
 
 func (c *Checker) instantiateInterfaceMethodSignature(method parser.InterfaceMethod, subst map[string]*Type) Signature {
+	effective := mergeSubst(subst, c.substForDecl(method.TypeParameters, nil))
 	params := make([]*Type, len(method.Parameters))
 	for i, param := range method.Parameters {
-		params[i] = c.instantiateTypeRef(param.Type, subst)
+		params[i] = c.instantiateTypeRef(param.Type, effective)
 	}
 	return Signature{
 		Parameters: params,
-		ReturnType: c.instantiateTypeRef(method.ReturnType, subst),
+		ReturnType: c.instantiateTypeRef(method.ReturnType, effective),
 		Variadic:   len(method.Parameters) > 0 && method.Parameters[len(method.Parameters)-1].Variadic,
 	}
+}
+
+func (c *Checker) resolveInterfaceMethodCallSignature(info interfaceInfo, receiver *Type, method parser.InterfaceMethod, args []parser.Expr, span parser.Span) (Signature, bool) {
+	baseSubst := c.substForDecl(info.decl.TypeParameters, receiver.Args)
+	sig := c.instantiateInterfaceMethodSignature(method, baseSubst)
+	if len(method.TypeParameters) == 0 {
+		if !validArgCount(sig, len(args)) {
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %s arguments, got %d", method.Name, expectedArgCount(sig), len(args)), span)
+			return Signature{}, false
+		}
+		return sig, true
+	}
+	argTypes := c.checkArgTypes(args)
+	inferred, ok := c.inferCallableTypeArgs(method.TypeParameters, method.Parameters, argTypes, baseSubst)
+	if !ok {
+		c.addDiagnostic("cannot_infer_type_args", "cannot infer type arguments for method '"+method.Name+"'", span)
+		return Signature{}, false
+	}
+	sig = c.instantiateInterfaceMethodSignature(method, mergeSubst(inferred, baseSubst))
+	if !validArgCount(sig, len(args)) {
+		c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %s arguments, got %d", method.Name, expectedArgCount(sig), len(args)), span)
+		return Signature{}, false
+	}
+	return sig, true
 }
 
 func (c *Checker) substForDecl(params []parser.TypeParameter, args []*Type) map[string]*Type {

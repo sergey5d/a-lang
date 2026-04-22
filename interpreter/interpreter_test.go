@@ -663,6 +663,44 @@ def run() Int {
 	}
 }
 
+func TestListMapFlatMapForEach(t *testing.T) {
+	src := `
+def run() Int {
+	items = List(1, 2, 3)
+	doubled = items.map((item Int) -> item * 2)
+	expanded = items.flatMap((item Int) -> List(item, item + 10))
+	doubled.forEach((item Int) -> Term.println("item " + item))
+	return doubled.get(2).getOr(0) * 10 + expanded.get(5).getOr(0)
+}
+`
+
+	in := New(parseProgram(t, src))
+
+	oldStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe returned error: %v", err)
+	}
+	os.Stdout = writer
+
+	value, callErr := in.Call("run")
+
+	_ = writer.Close()
+	os.Stdout = oldStdout
+	output, _ := io.ReadAll(reader)
+	_ = reader.Close()
+
+	if callErr != nil {
+		t.Fatalf("Call returned error: %v", callErr)
+	}
+	if value != int64(73) {
+		t.Fatalf("expected 73, got %#v", value)
+	}
+	if strings.TrimSpace(string(output)) != "item 2\nitem 4\nitem 6" {
+		t.Fatalf("unexpected output %q", string(output))
+	}
+}
+
 func TestOptionRuntime(t *testing.T) {
 	src := `
 def run() Int {

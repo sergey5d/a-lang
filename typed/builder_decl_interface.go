@@ -17,10 +17,11 @@ func (b *interfaceBuilder) Build(iface *parser.InterfaceDecl) (*InterfaceDecl, e
 	methods := make([]InterfaceMethod, len(iface.Methods))
 	for i, method := range iface.Methods {
 		methods[i] = InterfaceMethod{
-			Name:       method.Name,
-			Parameters: b.params.buildParameters(method.Parameters),
-			ReturnType: b.types.BuildType(method.ReturnType),
-			Span:       method.Span,
+			Name:           method.Name,
+			TypeParameters: b.params.buildTypeParameters(method.TypeParameters),
+			Parameters:     b.params.buildParameters(method.Parameters),
+			ReturnType:     b.types.BuildType(method.ReturnType),
+			Span:           method.Span,
 		}
 	}
 	extends := make([]*typecheck.Type, len(iface.Extends))

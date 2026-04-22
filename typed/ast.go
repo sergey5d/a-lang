@@ -89,10 +89,11 @@ type FunctionDecl struct {
 
 // InterfaceMethod is a typed interface method signature.
 type InterfaceMethod struct {
-	Name       string
-	Parameters []Parameter
-	ReturnType *typecheck.Type
-	Span       parser.Span
+	Name           string
+	TypeParameters []TypeParameter
+	Parameters     []Parameter
+	ReturnType     *typecheck.Type
+	Span           parser.Span
 }
 
 // InterfaceDecl is a typed interface declaration.

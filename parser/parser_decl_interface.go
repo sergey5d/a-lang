@@ -61,6 +61,10 @@ func (p *Parser) parseInterfaceMethod() (InterfaceMethod, error) {
 	if err != nil {
 		return InterfaceMethod{}, err
 	}
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return InterfaceMethod{}, err
+	}
 	params, err := p.parseParameters()
 	if err != nil {
 		return InterfaceMethod{}, err
@@ -70,9 +74,10 @@ func (p *Parser) parseInterfaceMethod() (InterfaceMethod, error) {
 		return InterfaceMethod{}, err
 	}
 	return InterfaceMethod{
-		Name:       name.Lexeme,
-		Parameters: params,
-		ReturnType: returnType,
-		Span:       mergeSpans(tokenSpan(start), typeSpan(returnType)),
+		Name:           name.Lexeme,
+		TypeParameters: typeParams,
+		Parameters:     params,
+		ReturnType:     returnType,
+		Span:           mergeSpans(tokenSpan(start), typeSpan(returnType)),
 	}, nil
 }

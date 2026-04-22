@@ -70,10 +70,11 @@ type InterfaceDecl struct {
 
 // InterfaceMethod describes a method signature inside an interface.
 type InterfaceMethod struct {
-	Name       string      `json:"name"`
-	Parameters []Parameter `json:"parameters"`
-	ReturnType *TypeRef    `json:"returnType"`
-	Span       Span        `json:"span"`
+	Name           string          `json:"name"`
+	TypeParameters []TypeParameter `json:"typeParameters,omitempty"`
+	Parameters     []Parameter     `json:"parameters"`
+	ReturnType     *TypeRef        `json:"returnType"`
+	Span           Span            `json:"span"`
 }
 
 // ClassDecl describes a class declaration, its fields, and its methods.

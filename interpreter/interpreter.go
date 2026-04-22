@@ -1626,7 +1626,7 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 func (in *Interpreter) nativeHasMethod(receiver Value, name string) bool {
 	switch receiver.(type) {
 	case *nativeList:
-		return name == "append" || name == "sort" || name == "get" || name == "size" || name == "iterator"
+		return name == "append" || name == "map" || name == "flatMap" || name == "forEach" || name == "sort" || name == "get" || name == "size" || name == "iterator"
 	case *nativeListIterator:
 		return name == "hasNext" || name == "next"
 	case *nativeArray:
@@ -1650,6 +1650,8 @@ func nativeMethodParams(receiver Value, name string) ([]parser.Parameter, bool) 
 		switch name {
 		case "append":
 			return []parser.Parameter{{Name: "value"}}, true
+		case "map", "flatMap", "forEach":
+			return []parser.Parameter{{Name: "f"}}, true
 		case "sort":
 			return []parser.Parameter{{Name: "ordering"}}, true
 		case "get":
@@ -1724,6 +1726,46 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []name
 			}
 			value.items = append(value.items, ordered[0])
 			return nativeCallResult{value: value}, true
+		case "map":
+			if len(ordered) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "map expects 1 argument", Span: span}}, true
+			}
+			out := &nativeList{items: make([]Value, 0, len(value.items))}
+			for _, item := range value.items {
+				mapped, err := in.invokeCallableValue(ordered[0], []Value{item}, local, span)
+				if err != nil {
+					return nativeCallResult{err: err}, true
+				}
+				out.items = append(out.items, mapped)
+			}
+			return nativeCallResult{value: out}, true
+		case "flatMap":
+			if len(ordered) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "flatMap expects 1 argument", Span: span}}, true
+			}
+			out := &nativeList{items: []Value{}}
+			for _, item := range value.items {
+				mapped, err := in.invokeCallableValue(ordered[0], []Value{item}, local, span)
+				if err != nil {
+					return nativeCallResult{err: err}, true
+				}
+				listValue, ok := mapped.(*nativeList)
+				if !ok {
+					return nativeCallResult{err: RuntimeError{Message: "flatMap function must return List", Span: span}}, true
+				}
+				out.items = append(out.items, listValue.items...)
+			}
+			return nativeCallResult{value: out}, true
+		case "forEach":
+			if len(ordered) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "forEach expects 1 argument", Span: span}}, true
+			}
+			for _, item := range value.items {
+				if _, err := in.invokeCallableValue(ordered[0], []Value{item}, local, span); err != nil {
+					return nativeCallResult{err: err}, true
+				}
+			}
+			return nativeCallResult{value: nil}, true
 		case "sort":
 			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "sort expects 1 argument", Span: span}}, true
@@ -1921,6 +1963,26 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []name
 		}
 	}
 	return nativeCallResult{}, false
+}
+
+func (in *Interpreter) invokeCallableValue(callee Value, args []Value, local *env, span parser.Span) (Value, error) {
+	switch fn := callee.(type) {
+	case *closure:
+		return in.callClosure(fn, args)
+	case builtinRef:
+		return in.callBuiltin(fn.name, nil, args, local, span)
+	case *instance:
+		if fn.class.Object {
+			return nil, RuntimeError{Message: "object '" + fn.class.Name + "' is a singleton and cannot be called", Span: span}
+		}
+		named := make([]namedValueArg, len(args))
+		for i, arg := range args {
+			named[i] = namedValueArg{Value: arg, Span: span}
+		}
+		return in.callApplyMethod(fn, named, nil, local, span)
+	default:
+		return nil, RuntimeError{Message: "value is not callable", Span: span}
+	}
 }
 
 func nativeKey(value Value, span parser.Span, local *env, in *Interpreter) (string, error) {

@@ -1162,6 +1162,23 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeListMapFlatMapForEach(t *testing.T) {
+	src := `
+def run() Int {
+	items List[Int] = List(1, 2, 3)
+	doubled List[Int] = items.map((item Int) -> item * 2)
+	expanded List[Int] = items.flatMap((item Int) -> List(item, item + 10))
+	doubled.forEach((item Int) -> Term.println(item))
+	return doubled.get(2).getOr(0) + expanded.get(5).getOr(0)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeTermPrintlnAnyTypes(t *testing.T) {
 	src := `
 def run() Int {
