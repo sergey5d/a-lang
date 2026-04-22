@@ -448,7 +448,16 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			}
 			if set {
 				thenEnv := newEnv(local)
-				thenEnv.define(s.BindingName, value, false)
+				boundValues, err := in.destructureBoundValue(s.Bindings, value, s.Span)
+				if err != nil {
+					return nil, nil, err
+				}
+				for i, binding := range s.Bindings {
+					if binding.Name == "_" {
+						continue
+					}
+					thenEnv.define(binding.Name, in.coerceValueForBinding(binding.Type, boundValues[i]), false)
+				}
 				return in.execBlock(s.Then, thenEnv, self)
 			}
 		} else {
@@ -518,6 +527,20 @@ func (in *Interpreter) optionBindingValue(optionValue Value, local *env, span pa
 	default:
 		return false, nil, RuntimeError{Message: "if binding requires Option[T]", Span: span}
 	}
+}
+
+func (in *Interpreter) destructureBoundValue(bindings []parser.Binding, value Value, span parser.Span) ([]Value, error) {
+	if len(bindings) <= 1 {
+		return []Value{value}, nil
+	}
+	items, kind, ok := destructurableValues(value)
+	if !ok {
+		return nil, RuntimeError{Message: fmt.Sprintf("if binding expects %d values, got 1", len(bindings)), Span: span}
+	}
+	if len(items) != len(bindings) {
+		return nil, RuntimeError{Message: fmt.Sprintf("if binding expects %d %s values, got %d", len(bindings), kind, len(items)), Span: span}
+	}
+	return append([]Value(nil), items...), nil
 }
 
 func (in *Interpreter) execFor(stmt *parser.ForStmt, local *env, self *instance) (Value, any, error) {

@@ -1,33 +1,49 @@
-# SKIP: target sample for row rendering once sort/comparator support is added
-#
-# Python source:
-#   print(rows)
-#   rows.sort(key = lambda r: (-r[1], r[0]))
-#   print(rows)
-#   last_x = 0
-#   last_y = rows[0][1]
-#   for x, y, char in rows:
-#     for _ in range(y, last_y):
-#       print()
-#     for _ in range(last_x, x):
-#       print(" ", end = "")
-#     print(char, end = "")
-#     last_x = x + 1
-#     last_y = y
-#   print()
-#
-# Target a-lang shape:
+# EXPECT:
+# 3578
+# 246
+# 1
+# 3578
+# 246
+# 1
+# 3578
+# 246
+# 1
 
-def syntax1(rows List[(Int, Int, String)]) {
+object RowOrdering with Ordering[(Int, Int, String)] {
+    def compare(left (Int, Int, String), right (Int, Int, String)) Int {
+        leftX Int, leftY Int, _ = left
+        rightX Int, rightY Int, _ = right
 
+        if leftY > rightY {
+            return -1
+        }
+        if leftY < rightY {
+            return 1
+        }
+        if leftX < rightX {
+            return -1
+        }
+        if leftX > rightX {
+            return 1
+        }
+        return 0
+    }
+}
+
+def syntax1(rows List[(Int, Int, String)]) Unit {
     lastX := 0
-    if _, lastY, _ <- rows.get(0) {
-        for x Int, y Int, char Rune <- rows {
-            for _ <- Range(y, lastY) {
+    if _, initialY, _ <- rows.get(0) {
+        lastY := initialY
+
+        for row <- rows {
+            x Int, y Int, char String = row
+            for lineStep <- Range(y, lastY) {
                 Term.println()
             }
-            for _ <- Range(lastX, x) {
-                Term.print(" ")
+            if lastX < x {
+                for spaceStep <- Range(lastX, x) {
+                    Term.print(" ")
+                }
             }
 
             Term.print(char)
@@ -39,16 +55,20 @@ def syntax1(rows List[(Int, Int, String)]) {
     }
 }
 
-def syntax2(rows List[(Int, Int, String)]) {
-
+def syntax2(rows List[(Int, Int, String)]) Unit {
     lastX := 0
-    if _, lastY Int, _ <- rows.get(0) {
-        for x Int, y _, char Rune <- rows {
-            for _ <- Range(y, lastY) {
+    if _, initialY Int, _ <- rows.get(0) {
+        lastY := initialY
+
+        for row <- rows {
+            x Int, y, char = row
+            for lineStep <- Range(y, lastY) {
                 Term.println()
             }
-            for _ <- Range(lastX, x) {
-                Term.print(" ")
+            if lastX < x {
+                for spaceStep <- Range(lastX, x) {
+                    Term.print(" ")
+                }
             }
 
             Term.print(char)
@@ -60,44 +80,44 @@ def syntax2(rows List[(Int, Int, String)]) {
     }
 }
 
-def syntax3(rows List[(Int, Int, String)]) {
-
+def syntax3(rows List[(Int, Int, String)]) Unit {
     lastX := 0
-    for {
-        _, lastY Int, _ <- rows.get(0)
-         x Int, y _, char Rune <- rows
-    } yield {
-        for _ <- Range(y, lastY) {
-            Term.println()
-        }
-        for _ <- Range(lastX, x) {
-            Term.print(" ")
-        }
-        Term.print(char)
-        lastX := x + 1
-        lastY := y
-    }
+    if first <- rows.get(0) {
+        _, initialY Int, _ = first
+        lastY := initialY
 
-    Term.println()
+        for row <- rows {
+            x, y, char String = row
+            for lineStep <- Range(y, lastY) {
+                Term.println()
+            }
+            if lastX < x {
+                for spaceStep <- Range(lastX, x) {
+                    Term.print(" ")
+                }
+            }
+
+            Term.print(char)
+            lastX := x + 1
+            lastY := y
+        }
+
+        Term.println()
+    }
 }
 
 def main() Unit {
-    rows = [
-        (0, 0, '█'),
-        (0, 1, '█'),
-        (0, 2, '█'),
-        (1, 1, '▀'),
-        (1, 2, '▀'),
-        (2, 1, '▀'),
-        (2, 2, '▀'),
-        (3, 2, '▀')
+    rows List[(Int, Int, String)] = [
+        (0, 0, "1"),
+        (0, 1, "2"),
+        (0, 2, "3"),
+        (1, 1, "4"),
+        (1, 2, "5"),
+        (2, 1, "6"),
+        (2, 2, "7"),
+        (3, 2, "8")
     ]
-
-    Term.println(rows)
-
-    # TODO: requires list sort with comparator / key support.
-    #rows = rows.sort(r -> (-r[1], r[0]))
-    Term.println(rows)
+    rows.sort(RowOrdering)
 
     syntax1(rows)
     syntax2(rows)

@@ -1014,3 +1014,24 @@ def run() Int {
 		t.Fatalf("expected 5, got %#v", value)
 	}
 }
+
+func TestIfOptionDestructuring(t *testing.T) {
+	src := `
+def run() String {
+	found Option[(Int, String, Bool)] = Some((1, "ok", true))
+	if _, name String, _ <- found {
+		return name
+	}
+	return "missing"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "ok" {
+		t.Fatalf("expected %q, got %#v", "ok", value)
+	}
+}

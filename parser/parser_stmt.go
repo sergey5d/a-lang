@@ -71,40 +71,9 @@ func (p *Parser) parseBareBindingStmt() (Statement, error) {
 }
 
 func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (Statement, error) {
-	var bindings []Binding
-	useStart := start
-	first := true
-	for {
-		binding := Binding{}
-
-		name := useStart
-		if !first || !firstIsName {
-			var err error
-			if p.check(TokenIdentifier) {
-				name, err = p.consume(TokenIdentifier, "expected binding name")
-			} else {
-				name, err = p.consume(TokenUnder, "expected binding name")
-			}
-			if err != nil {
-				return nil, err
-			}
-		}
-		binding.Name = name.Lexeme
-		binding.Span = tokenSpan(name)
-		if p.check(TokenIdentifier) || p.check(TokenLParen) {
-			typeRef, err := p.parseTypeRef()
-			if err != nil {
-				return nil, err
-			}
-			binding.Type = typeRef
-			binding.Span = mergeSpans(binding.Span, typeSpan(typeRef))
-		}
-		bindings = append(bindings, binding)
-		if !p.match(TokenComma) {
-			break
-		}
-		first = false
-		useStart = Token{}
+	bindings, err := p.parseBindingsWithStart(start, firstIsName)
+	if err != nil {
+		return nil, err
 	}
 
 	operator := p.peek().Type
@@ -148,6 +117,45 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 		}
 	}
 	return stmt, nil
+}
+
+func (p *Parser) parseBindingsWithStart(start Token, firstIsName bool) ([]Binding, error) {
+	var bindings []Binding
+	useStart := start
+	first := true
+	for {
+		binding := Binding{}
+
+		name := useStart
+		if !first || !firstIsName {
+			var err error
+			if p.check(TokenIdentifier) {
+				name, err = p.consume(TokenIdentifier, "expected binding name")
+			} else {
+				name, err = p.consume(TokenUnder, "expected binding name")
+			}
+			if err != nil {
+				return nil, err
+			}
+		}
+		binding.Name = name.Lexeme
+		binding.Span = tokenSpan(name)
+		if p.check(TokenIdentifier) || p.check(TokenLParen) {
+			typeRef, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			binding.Type = typeRef
+			binding.Span = mergeSpans(binding.Span, typeSpan(typeRef))
+		}
+		bindings = append(bindings, binding)
+		if !p.match(TokenComma) {
+			break
+		}
+		first = false
+		useStart = Token{}
+	}
+	return bindings, nil
 }
 
 func (p *Parser) isBareBindingStart() bool {
@@ -267,19 +275,29 @@ func (p *Parser) parseIfStmt() (Statement, error) {
 
 func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
 	stmt := &IfStmt{}
-	if p.check(TokenIdentifier) && p.checkNext(TokenLeftArrow) {
-		name, err := p.consume(TokenIdentifier, "expected binding name after 'if'")
+	if (p.check(TokenIdentifier) || p.check(TokenUnder)) && p.bindingListFollowedByArrow(p.pos) {
+		var name Token
+		var err error
+		if p.check(TokenIdentifier) {
+			name, err = p.consume(TokenIdentifier, "expected binding name after 'if'")
+		} else {
+			name, err = p.consume(TokenUnder, "expected binding name after 'if'")
+		}
 		if err != nil {
 			return nil, err
 		}
-		if _, err := p.consume(TokenLeftArrow, "expected '<-' after if binding name"); err != nil {
+		bindings, err := p.parseBindingsWithStart(name, true)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := p.consume(TokenLeftArrow, "expected '<-' after if binding"); err != nil {
 			return nil, err
 		}
 		value, err := p.parseExpressionWithOptions(0, false)
 		if err != nil {
 			return nil, err
 		}
-		stmt.BindingName = name.Lexeme
+		stmt.Bindings = bindings
 		stmt.BindingValue = value
 	} else {
 		condition, err := p.parseExpressionWithOptions(0, false)
@@ -313,6 +331,34 @@ func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
 	}
 	stmt.Span = mergeSpans(tokenSpan(start), thenBlock.Span)
 	return stmt, nil
+}
+
+func (p *Parser) bindingListFollowedByArrow(start int) bool {
+	if start >= len(p.tokens) || (p.tokens[start].Type != TokenIdentifier && p.tokens[start].Type != TokenUnder) {
+		return false
+	}
+
+	i := start + 1
+	for {
+		if i < len(p.tokens) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen) {
+			end, ok := p.scanTypeRef(i)
+			if !ok {
+				return false
+			}
+			i = end
+		}
+		if i < len(p.tokens) && p.tokens[i].Type == TokenLeftArrow {
+			return true
+		}
+		if i >= len(p.tokens) || p.tokens[i].Type != TokenComma {
+			return false
+		}
+		i++
+		if i >= len(p.tokens) || (p.tokens[i].Type != TokenIdentifier && p.tokens[i].Type != TokenUnder) {
+			return false
+		}
+		i++
+	}
 }
 
 func (p *Parser) parseForStmt() (Statement, error) {

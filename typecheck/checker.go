@@ -780,15 +780,7 @@ func (c *Checker) bindingValueTypes(bindings []parser.Binding, values []parser.E
 	}
 	if len(values) == 1 {
 		valueType := c.checkExpr(values[0])
-		parts, kind, ok := c.destructurableValueTypes(valueType)
-		if !ok {
-			c.addDiagnostic("invalid_binding_count", fmt.Sprintf("binding expects %d values, got 1", len(bindings)), span)
-			return []*Type{valueType}
-		}
-		if len(parts) != len(bindings) {
-			c.addDiagnostic("invalid_binding_count", fmt.Sprintf("binding expects %d %s values, got %d", len(bindings), kind, len(parts)), span)
-		}
-		return parts
+		return c.destructureValueTypes(len(bindings), valueType, span, "invalid_binding_count", "binding")
 	}
 	for _, value := range values {
 		c.checkExpr(value)
@@ -807,15 +799,7 @@ func (c *Checker) assignmentValueTypes(targetCount int, values []parser.Expr, sp
 	}
 	if len(values) == 1 {
 		valueType := c.checkExpr(values[0])
-		parts, kind, ok := c.destructurableValueTypes(valueType)
-		if !ok {
-			c.addDiagnostic("invalid_assignment_count", fmt.Sprintf("assignment expects %d values, got 1", targetCount), span)
-			return []*Type{valueType}
-		}
-		if len(parts) != targetCount {
-			c.addDiagnostic("invalid_assignment_count", fmt.Sprintf("assignment expects %d %s values, got %d", targetCount, kind, len(parts)), span)
-		}
-		return parts
+		return c.destructureValueTypes(targetCount, valueType, span, "invalid_assignment_count", "assignment")
 	}
 	for _, value := range values {
 		c.checkExpr(value)
@@ -849,6 +833,18 @@ func (c *Checker) destructurableValueTypes(valueType *Type) ([]*Type, string, bo
 		out[i] = c.instantiateTypeRef(field.Type, subst)
 	}
 	return out, "destructured", true
+}
+
+func (c *Checker) destructureValueTypes(count int, valueType *Type, span parser.Span, code string, context string) []*Type {
+	parts, kind, ok := c.destructurableValueTypes(valueType)
+	if !ok {
+		c.addDiagnostic(code, fmt.Sprintf("%s expects %d values, got 1", context, count), span)
+		return []*Type{valueType}
+	}
+	if len(parts) != count {
+		c.addDiagnostic(code, fmt.Sprintf("%s expects %d %s values, got %d", context, count, kind, len(parts)), span)
+	}
+	return parts
 }
 
 func (c *Checker) checkStmt(stmt parser.Statement) {
@@ -949,8 +945,26 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 				c.addDiagnostic("invalid_condition_type", "if binding requires Option[T]", exprSpan(s.BindingValue))
 				elemType = unknownType
 			}
+			bindingTypes := []*Type{elemType}
+			if len(s.Bindings) > 1 {
+				bindingTypes = c.destructureValueTypes(len(s.Bindings), elemType, s.Span, "invalid_binding_count", "if binding")
+			}
 			c.pushScope()
-			c.define(s.BindingName, elemType, false)
+			for i, binding := range s.Bindings {
+				if binding.Name == "_" {
+					continue
+				}
+				bindingType := unknownType
+				if i < len(bindingTypes) && bindingTypes[i] != nil {
+					bindingType = bindingTypes[i]
+				}
+				if binding.Type != nil {
+					declType := c.resolveDeclaredType(binding.Type)
+					c.requireAssignable(bindingType, declType, binding.Span, "type_mismatch", "cannot assign "+bindingType.String()+" to "+declType.String())
+					bindingType = declType
+				}
+				c.define(binding.Name, bindingType, false)
+			}
 			c.checkBlockStatements(s.Then.Statements)
 			c.popScope()
 		} else {

@@ -315,7 +315,12 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		if s.BindingValue != nil {
 			r.resolveExpr(s.BindingValue)
 			r.pushScope()
-			r.defineMutable(s.BindingName, s.Span, false, "duplicate_binding", "duplicate binding '"+s.BindingName+"'")
+			for _, binding := range s.Bindings {
+				if binding.Name == "_" {
+					continue
+				}
+				r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
+			}
 			r.resolveBlockStatements(s.Then.Statements)
 			r.popScope()
 		} else {

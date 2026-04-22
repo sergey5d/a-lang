@@ -1396,14 +1396,39 @@ def run(value Option[Int]) Unit {
 	if !ok {
 		t.Fatalf("expected first statement to be if, got %T", fn.Body.Statements[0])
 	}
-	if ifStmt.BindingName != "item" {
-		t.Fatalf("expected binding name 'item', got %q", ifStmt.BindingName)
+	if len(ifStmt.Bindings) != 1 || ifStmt.Bindings[0].Name != "item" {
+		t.Fatalf("expected binding name 'item', got %#v", ifStmt.Bindings)
 	}
 	if ifStmt.BindingValue == nil {
 		t.Fatalf("expected binding value to be populated")
 	}
 	if ifStmt.Condition != nil {
 		t.Fatalf("expected boolean condition to be empty for option-binding if")
+	}
+}
+
+func TestParseIfOptionDestructuring(t *testing.T) {
+	src := `
+def run(value Option[(Int, String, Bool)]) Unit {
+	if _, name String, _ <- value {
+		Term.println(name)
+	}
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	ifStmt := program.Functions[0].Body.Statements[0].(*IfStmt)
+	if len(ifStmt.Bindings) != 3 {
+		t.Fatalf("expected 3 bindings, got %#v", ifStmt.Bindings)
+	}
+	if ifStmt.Bindings[0].Name != "_" || ifStmt.Bindings[1].Name != "name" || ifStmt.Bindings[2].Name != "_" {
+		t.Fatalf("unexpected bindings %#v", ifStmt.Bindings)
+	}
+	if ifStmt.Bindings[1].Type == nil || ifStmt.Bindings[1].Type.Name != "String" {
+		t.Fatalf("expected explicit String binding type, got %#v", ifStmt.Bindings[1].Type)
 	}
 }
 

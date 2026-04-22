@@ -205,7 +205,7 @@ func (s *MultiAssignmentStmt) GetSpan() parser.Span { return s.Span }
 // IfStmt is a typed if / else-if / else chain.
 type IfStmt struct {
 	Condition    Expr
-	BindingName  string
+	Bindings     []BindingDecl
 	BindingValue Expr
 	Then         *BlockStmt
 	ElseIf       *IfStmt

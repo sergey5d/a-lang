@@ -1320,3 +1320,19 @@ def run(value Int) Int {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }
+
+func TestAnalyzeIfOptionDestructuring(t *testing.T) {
+	src := `
+def run(value Option[(Int, String, Bool)]) String {
+	if _, name String, _ <- value {
+		return name
+	}
+	return "missing"
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
