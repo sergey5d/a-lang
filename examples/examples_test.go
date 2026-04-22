@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -49,12 +50,50 @@ func TestExamples(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			t.Logf("running %s", name)
-			expected, err := parseExpectedOutput(src)
-			if err != nil {
-				if err == errMissingExpectedHeader {
+			expectedOutput, outputErr := parseExpectedOutput(src)
+			expectedFailure, failureErr := parseExpectedFailure(src)
+			expectedFailureRegex, failureRegexErr := parseExpectedFailureRegex(src)
+			switch {
+			case countDefined(outputErr == nil, failureErr == nil, failureRegexErr == nil) > 1:
+				t.Fatalf("example %s cannot declare more than one of # EXPECT, # FAIL, or # FAIL_REGEX", name)
+			case outputErr == errMissingExpectedHeader && failureErr == errMissingFailureHeader && failureRegexErr == errMissingFailureRegexHeader:
+				t.Skipf("skipping %s: no # EXPECT, # FAIL, or # FAIL_REGEX header", name)
+			case outputErr != nil && outputErr != errMissingExpectedHeader:
+				t.Fatalf("parseExpectedOutput returned error: %v", outputErr)
+			case failureErr != nil && failureErr != errMissingFailureHeader:
+				t.Fatalf("parseExpectedFailure returned error: %v", failureErr)
+			case failureRegexErr != nil && failureRegexErr != errMissingFailureRegexHeader:
+				t.Fatalf("parseExpectedFailureRegex returned error: %v", failureRegexErr)
+			}
+
+			if failureErr == nil {
+				actualFailure := runExampleFailure(path)
+				if normalizeExampleOutput(actualFailure) != normalizeExampleOutput(expectedFailure) {
+					t.Fatalf("unexpected failure\nexpected:\n%s\nactual:\n%s", expectedFailure, actualFailure)
+				}
+				t.Logf("passed %s", name)
+				return
+			}
+			if failureRegexErr == nil {
+				actualFailure := normalizeExampleOutput(runExampleFailure(path))
+				pattern := "(?s)^" + expectedFailureRegex + "$"
+				matched, err := regexp.MatchString(pattern, actualFailure)
+				if err != nil {
+					t.Fatalf("invalid failure regex: %v", err)
+				}
+				if !matched {
+					t.Fatalf("unexpected failure\nexpected regex:\n%s\nactual:\n%s", expectedFailureRegex, actualFailure)
+				}
+				t.Logf("passed %s", name)
+				return
+			}
+
+			expected := expectedOutput
+			if outputErr != nil {
+				if outputErr == errMissingExpectedHeader {
 					t.Skipf("skipping %s: no # EXPECT header", name)
 				}
-				t.Fatalf("parseExpectedOutput returned error: %v", err)
+				t.Fatalf("parseExpectedOutput returned error: %v", outputErr)
 			}
 
 			loaded, err := module.Load(path)
@@ -105,13 +144,27 @@ func TestExamples(t *testing.T) {
 }
 
 var errMissingExpectedHeader = fmt.Errorf("missing '# EXPECT:' header")
+var errMissingFailureHeader = fmt.Errorf("missing '# FAIL:' header")
+var errMissingFailureRegexHeader = fmt.Errorf("missing '# FAIL_REGEX:' header")
 
 func parseExpectedOutput(src string) (string, error) {
+	return parseCommentBlock(src, "# EXPECT:")
+}
+
+func parseExpectedFailure(src string) (string, error) {
+	return parseCommentBlock(src, "# FAIL:")
+}
+
+func parseExpectedFailureRegex(src string) (string, error) {
+	return parseCommentBlock(src, "# FAIL_REGEX:")
+}
+
+func parseCommentBlock(src, header string) (string, error) {
 	lines := strings.Split(src, "\n")
 	start := -1
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "# EXPECT:" {
+		if trimmed == header {
 			start = i + 1
 			break
 		}
@@ -120,7 +173,16 @@ func parseExpectedOutput(src string) (string, error) {
 		}
 	}
 	if start == -1 {
-		return "", errMissingExpectedHeader
+		switch header {
+		case "# EXPECT:":
+			return "", errMissingExpectedHeader
+		case "# FAIL:":
+			return "", errMissingFailureHeader
+		case "# FAIL_REGEX:":
+			return "", errMissingFailureRegexHeader
+		default:
+			return "", fmt.Errorf("missing %q header", header)
+		}
 	}
 
 	var out []string
@@ -136,6 +198,45 @@ func parseExpectedOutput(src string) (string, error) {
 		out = append(out, content)
 	}
 	return strings.Join(out, "\n"), nil
+}
+
+func countDefined(values ...bool) int {
+	count := 0
+	for _, value := range values {
+		if value {
+			count++
+		}
+	}
+	return count
+}
+
+func runExampleFailure(path string) string {
+	loaded, err := module.Load(path)
+	if err != nil {
+		return err.Error()
+	}
+	diagnostics := semantic.AnalyzeModule(loaded)
+	typeResult := typecheck.AnalyzeModule(loaded)
+	diagnostics = append(diagnostics, typeResult.Diagnostics...)
+	if len(diagnostics) > 0 {
+		var messages []string
+		seen := map[string]bool{}
+		for _, diagnostic := range diagnostics {
+			message := diagnostic.Error()
+			if seen[message] {
+				continue
+			}
+			seen[message] = true
+			messages = append(messages, message)
+		}
+		return strings.Join(messages, "\n")
+	}
+
+	in := interpreter.NewModule(loaded)
+	if _, err := in.Call("main"); err != nil {
+		return err.Error()
+	}
+	return "expected example to fail, but it succeeded"
 }
 
 func normalizeExampleOutput(s string) string {

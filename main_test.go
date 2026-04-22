@@ -1,9 +1,11 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"a-lang/parser"
+	"a-lang/semantic"
 )
 
 func TestParseExpectedOutput(t *testing.T) {
@@ -99,5 +101,31 @@ func TestParseCLIArgsRejectsWrongArity(t *testing.T) {
 	_, err := parseCLIArgs(fn, nil)
 	if err == nil {
 		t.Fatalf("expected arity error")
+	}
+}
+
+func TestFormatDiagnosticIncludesSourceExcerpt(t *testing.T) {
+	src := "x = 1\nmissing\nz = 3\n"
+	diagnostic := semantic.Diagnostic{
+		Code:    "undefined_name",
+		Message: "undefined name 'missing'",
+		Span: parser.Span{
+			Start: parser.Position{Line: 2, Column: 1},
+			End:   parser.Position{Line: 2, Column: 8},
+		},
+	}
+
+	formatted := formatDiagnostic(diagnostic, src)
+	if !strings.Contains(formatted, "undefined_name at 2:1: undefined name 'missing'") {
+		t.Fatalf("expected headline in formatted diagnostic, got %q", formatted)
+	}
+	if !strings.Contains(formatted, "1 │ x = 1") {
+		t.Fatalf("expected previous line in formatted diagnostic, got %q", formatted)
+	}
+	if !strings.Contains(formatted, "2 │ missing") {
+		t.Fatalf("expected target line in formatted diagnostic, got %q", formatted)
+	}
+	if !strings.Contains(formatted, "│ ^^^^^^^") {
+		t.Fatalf("expected caret underline in formatted diagnostic, got %q", formatted)
 	}
 }

@@ -20,6 +20,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	srcBytes, readErr := os.ReadFile(os.Args[1])
+	src := ""
+	if readErr == nil {
+		src = string(srcBytes)
+	}
+
 	loaded, err := module.Load(os.Args[1])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load error: %v\n", err)
@@ -33,7 +39,7 @@ func main() {
 	if len(diagnostics) > 0 {
 		seen := map[string]bool{}
 		for _, diagnostic := range diagnostics {
-			message := diagnostic.Error()
+			message := formatDiagnostic(diagnostic, src)
 			if seen[message] {
 				continue
 			}
@@ -74,7 +80,6 @@ func main() {
 			os.Exit(1)
 		}
 		in := interpreter.NewModule(loaded)
-		srcBytes, readErr := os.ReadFile(os.Args[1])
 		if readErr != nil {
 			fmt.Fprintf(os.Stderr, "read source: %v\n", readErr)
 			os.Exit(1)
@@ -87,7 +92,7 @@ func main() {
 		if !hasExpected {
 			value, err := in.Call(entry, args...)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(os.Stderr, formatRuntimeError(err, src))
 				os.Exit(1)
 			}
 			if value != nil {
@@ -109,7 +114,7 @@ func main() {
 		output, _ := io.ReadAll(reader)
 		_ = reader.Close()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, formatRuntimeError(err, src))
 			os.Exit(1)
 		}
 		actual := string(output)
@@ -125,6 +130,71 @@ func main() {
 		fmt.Fprintf(os.Stderr, "unknown mode %q\n", mode)
 		os.Exit(1)
 	}
+}
+
+func formatDiagnostic(d semantic.Diagnostic, src string) string {
+	return formatSpanMessage(d.Error(), d.Span, src)
+}
+
+func formatRuntimeError(err error, src string) string {
+	runtimeErr, ok := err.(interpreter.RuntimeError)
+	if !ok {
+		return err.Error()
+	}
+	return formatSpanMessage(runtimeErr.Error(), runtimeErr.Span, src)
+}
+
+func formatSpanMessage(message string, span parser.Span, src string) string {
+	lines := strings.Split(src, "\n")
+	line := span.Start.Line
+	if line <= 0 || line > len(lines) {
+		return message
+	}
+
+	startLine := maxInt(1, line-1)
+	endLine := minInt(len(lines), line+1)
+	gutterWidth := len(strconv.Itoa(endLine))
+	target := lines[line-1]
+
+	startCol := span.Start.Column
+	if startCol <= 0 {
+		startCol = 1
+	}
+	if startCol > len([]rune(target))+1 {
+		startCol = len([]rune(target)) + 1
+	}
+	underlineLen := 1
+	if span.End.Line == span.Start.Line && span.End.Column > span.Start.Column {
+		underlineLen = span.End.Column - span.Start.Column
+	}
+	if underlineLen <= 0 {
+		underlineLen = 1
+	}
+
+	var b strings.Builder
+	b.WriteString(message)
+	b.WriteString("\n\n")
+	for i := startLine; i <= endLine; i++ {
+		fmt.Fprintf(&b, "%*d │ %s\n", gutterWidth, i, lines[i-1])
+		if i == line {
+			fmt.Fprintf(&b, "%s │ %s%s\n", strings.Repeat(" ", gutterWidth), strings.Repeat(" ", startCol-1), strings.Repeat("^", underlineLen))
+		}
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func parseExpectedOutput(src string) (string, bool, error) {
