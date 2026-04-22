@@ -9,35 +9,50 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
 
 func TestExamples(t *testing.T) {
-	paths, err := filepath.Glob("*.al")
+	var paths []string
+	err := filepath.WalkDir(".", func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) == ".al" {
+			paths = append(paths, path)
+		}
+		return nil
+	})
 	if err != nil {
-		t.Fatalf("Glob returned error: %v", err)
+		t.Fatalf("WalkDir returned error: %v", err)
 	}
+	sort.Strings(paths)
 	if len(paths) == 0 {
-		t.Fatalf("expected at least one example in examples/*.al")
+		t.Fatalf("expected at least one example in examples/")
 	}
 
 	for _, path := range paths {
 		path := path
+		name := strings.TrimPrefix(filepath.ToSlash(path), "./")
 		srcBytes, err := os.ReadFile(path)
 		if err != nil {
-			t.Fatalf("ReadFile returned error for %s: %v", filepath.Base(path), err)
+			t.Fatalf("ReadFile returned error for %s: %v", name, err)
 		}
 		src := string(srcBytes)
 		if shouldSkipExample(src) {
 			continue
 		}
-		t.Run(filepath.Base(path), func(t *testing.T) {
-			t.Logf("running %s", filepath.Base(path))
+		t.Run(name, func(t *testing.T) {
+			t.Logf("running %s", name)
 			expected, err := parseExpectedOutput(src)
 			if err != nil {
 				if err == errMissingExpectedHeader {
-					t.Skipf("skipping %s: no # EXPECT header", filepath.Base(path))
+					t.Skipf("skipping %s: no # EXPECT header", name)
 				}
 				t.Fatalf("parseExpectedOutput returned error: %v", err)
 			}
@@ -84,7 +99,7 @@ func TestExamples(t *testing.T) {
 			if normalizeExampleOutput(actual) != normalizeExampleOutput(expected) {
 				t.Fatalf("unexpected output\nexpected:\n%s\nactual:\n%s", expected, actual)
 			}
-			t.Logf("passed %s", filepath.Base(path))
+			t.Logf("passed %s", name)
 		})
 	}
 }
