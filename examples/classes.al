@@ -10,8 +10,13 @@ class A {
 
     private malnutritioned Bool := false
 
-    def this(maturity Int) {
-        this(age = maturity - 15, name = "5")
+    # explicit call to primary constructor
+    def this(maturity Int) = this(maturity - 15, "5")
+
+    def this(name String) {
+        # no need to call primary constructor if we init all fields in secondary constructor
+        this.name = name
+        age = 15
     }
 
     def trueAge() Int = age
