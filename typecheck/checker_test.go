@@ -1180,6 +1180,60 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeGenericBounds(t *testing.T) {
+	src := `
+object Ascending with Ordering[Int] {
+	def compare(left Int, right Int) Int = left - right
+}
+
+class Box[T with Ordering[T]] {
+	value T
+}
+
+class Mapper {
+	def pick[X with Ordering[X]](value X) X = value
+}
+
+def pick[T with Ordering[T]](value T) T = value
+
+def run() Int {
+	box Box[Int] = ?
+	mapper Mapper = Mapper()
+	value Int = pick(3)
+	return value + mapper.pick(4)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeGenericBoundsRejectMissingWitness(t *testing.T) {
+	src := `
+class Box[T with Ordering[T]] {
+	value T
+}
+
+def pick[T with Ordering[T]](value T) T = value
+
+def run() Int {
+	box Box[String] = ?
+	value String = pick("x")
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics for missing Ordering[String] witness")
+	}
+	if result.Diagnostics[0].Code != "type_argument_bound" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
 func TestAnalyzeTermPrintlnAnyTypes(t *testing.T) {
 	src := `
 def run() Int {

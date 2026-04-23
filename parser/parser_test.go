@@ -868,6 +868,39 @@ class Mapper {
 	}
 }
 
+func TestParseGenericBounds(t *testing.T) {
+	src := `
+def sort[T with Ordering[T]](value T) T = value
+
+class Box[T with Ordering[T]] {
+	value T
+
+	def map[X with Eq[X]](fn T -> X) X = fn(value)
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Functions) != 1 || len(program.Functions[0].TypeParameters) != 1 {
+		t.Fatalf("expected bounded generic function, got %#v", program.Functions)
+	}
+	if len(program.Functions[0].TypeParameters[0].Bounds) != 1 {
+		t.Fatalf("expected function bound, got %#v", program.Functions[0].TypeParameters[0])
+	}
+	assertTypeRef(t, program.Functions[0].TypeParameters[0].Bounds[0], "Ordering", "T")
+	if len(program.Classes) != 1 || len(program.Classes[0].TypeParameters) != 1 {
+		t.Fatalf("expected bounded generic class, got %#v", program.Classes)
+	}
+	assertTypeRef(t, program.Classes[0].TypeParameters[0].Bounds[0], "Ordering", "T")
+	method := program.Classes[0].Methods[0]
+	if len(method.TypeParameters) != 1 || len(method.TypeParameters[0].Bounds) != 1 {
+		t.Fatalf("expected bounded generic method, got %#v", method)
+	}
+	assertTypeRef(t, method.TypeParameters[0].Bounds[0], "Eq", "X")
+}
+
 func TestParseObjectShortApplyDeclRejected(t *testing.T) {
 	src := `
 object Range {

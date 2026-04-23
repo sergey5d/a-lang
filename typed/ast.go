@@ -64,8 +64,9 @@ type Program struct {
 
 // TypeParameter carries a generic type parameter name through the typed tree.
 type TypeParameter struct {
-	Name string
-	Span parser.Span
+	Name   string
+	Bounds []*typecheck.Type
+	Span   parser.Span
 }
 
 // Parameter is a typed callable parameter with an attached symbol.

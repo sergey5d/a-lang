@@ -196,6 +196,7 @@ func (r *Resolver) resolveFunction(fn *parser.FunctionDecl) {
 	for _, param := range fn.TypeParameters {
 		r.defineType(param.Name, param.Span, "duplicate_type_parameter", "duplicate type parameter '"+param.Name+"'")
 	}
+	r.resolveTypeParameterBounds(fn.TypeParameters)
 	r.resolveTypeRef(fn.ReturnType)
 	r.pushScope()
 	defer r.popScope()
@@ -213,6 +214,7 @@ func (r *Resolver) resolveInterface(decl *parser.InterfaceDecl) {
 	for _, param := range decl.TypeParameters {
 		r.defineType(param.Name, param.Span, "duplicate_type_parameter", "duplicate type parameter '"+param.Name+"'")
 	}
+	r.resolveTypeParameterBounds(decl.TypeParameters)
 	for _, parent := range decl.Extends {
 		r.resolveTypeRef(parent)
 	}
@@ -221,6 +223,7 @@ func (r *Resolver) resolveInterface(decl *parser.InterfaceDecl) {
 		for _, param := range method.TypeParameters {
 			r.defineType(param.Name, param.Span, "duplicate_type_parameter", "duplicate type parameter '"+param.Name+"'")
 		}
+		r.resolveTypeParameterBounds(method.TypeParameters)
 		r.resolveTypeRef(method.ReturnType)
 		for _, param := range method.Parameters {
 			r.resolveTypeRef(param.Type)
@@ -235,6 +238,7 @@ func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
 	for _, param := range decl.TypeParameters {
 		r.defineType(param.Name, param.Span, "duplicate_type_parameter", "duplicate type parameter '"+param.Name+"'")
 	}
+	r.resolveTypeParameterBounds(decl.TypeParameters)
 	for _, target := range decl.Implements {
 		r.resolveTypeRef(target)
 	}
@@ -280,6 +284,7 @@ func (r *Resolver) resolveMethod(method *parser.MethodDecl) {
 	for _, param := range method.TypeParameters {
 		r.defineType(param.Name, param.Span, "duplicate_type_parameter", "duplicate type parameter '"+param.Name+"'")
 	}
+	r.resolveTypeParameterBounds(method.TypeParameters)
 	r.resolveTypeRef(method.ReturnType)
 	r.pushScope()
 	defer r.popScope()
@@ -602,6 +607,14 @@ func (r *Resolver) resolveTypeRef(ref *parser.TypeRef) {
 	r.addDiagnostic("undefined_type", "undefined type '"+ref.Name+"'", ref.Span)
 }
 
+func (r *Resolver) resolveTypeParameterBounds(params []parser.TypeParameter) {
+	for _, param := range params {
+		for _, bound := range param.Bounds {
+			r.resolveTypeRef(bound)
+		}
+	}
+}
+
 func (r *Resolver) isTypeParameter(name string) bool {
 	for i := len(r.typeScopes) - 1; i >= 0; i-- {
 		if _, ok := r.typeScopes[i][name]; ok {
@@ -619,7 +632,7 @@ func builtinTypeArity(name string) (int, bool) {
 		return 1, true
 	case "Map":
 		return 2, true
-	case "Eq":
+	case "Eq", "Ordering":
 		return 1, true
 	default:
 		return 0, false

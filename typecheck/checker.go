@@ -395,6 +395,12 @@ func (c *Checker) checkProgram(program *parser.Program) {
 }
 
 func (c *Checker) checkInterface(decl *parser.InterfaceDecl) {
+	c.pushTypeScope()
+	defer c.popTypeScope()
+	for _, param := range decl.TypeParameters {
+		c.currentTypeScope()[param.Name] = TypeParam
+	}
+	c.validateTypeParameterBounds(decl.TypeParameters)
 	for _, parent := range decl.Extends {
 		parentType := c.resolveDeclaredType(parent)
 		if parentType.Kind != TypeInterface {
@@ -448,6 +454,7 @@ func (c *Checker) checkFunction(fn *parser.FunctionDecl) {
 	for _, param := range fn.TypeParameters {
 		c.currentTypeScope()[param.Name] = TypeParam
 	}
+	c.validateTypeParameterBounds(fn.TypeParameters)
 
 	c.pushScope()
 	defer c.popScope()
@@ -476,6 +483,7 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 	for _, param := range decl.TypeParameters {
 		c.currentTypeScope()[param.Name] = TypeParam
 	}
+	c.validateTypeParameterBounds(decl.TypeParameters)
 
 	for _, field := range decl.Fields {
 		if decl.Object && !field.Mutable && field.Initializer == nil {
@@ -520,6 +528,7 @@ func (c *Checker) checkMethod(method *parser.MethodDecl, owner *parser.ClassDecl
 	for _, param := range method.TypeParameters {
 		c.currentTypeScope()[param.Name] = TypeParam
 	}
+	c.validateTypeParameterBounds(method.TypeParameters)
 
 	c.pushScope()
 	defer c.popScope()
@@ -1483,6 +1492,9 @@ func (c *Checker) resolveFunctionCallSignature(fn *parser.FunctionDecl, args []p
 		c.addDiagnostic("cannot_infer_type_args", "cannot infer type arguments for function '"+fn.Name+"'", span)
 		return Signature{}, false
 	}
+	if !c.checkTypeArgBounds(c.typeArgsInOrder(fn.TypeParameters, inferred), fn.TypeParameters, span) {
+		return Signature{}, false
+	}
 	sig = c.instantiateFunctionSignature(fn, inferred)
 	argTypes := c.checkArgTypes(args)
 	if !signatureMatches(sig, argTypes) {
@@ -1506,6 +1518,9 @@ func (c *Checker) resolveMethodCallSignature(class classInfo, receiver *Type, me
 	inferred, ok := c.inferCallableTypeArgsFromExprs(method.TypeParameters, method.Parameters, args, baseSubst)
 	if !ok {
 		c.addDiagnostic("cannot_infer_type_args", "cannot infer type arguments for method '"+method.Name+"'", span)
+		return Signature{}, false
+	}
+	if !c.checkTypeArgBounds(c.typeArgsInOrder(method.TypeParameters, inferred), method.TypeParameters, span) {
 		return Signature{}, false
 	}
 	sig = c.instantiateMethodSignature(method, class.decl, mergeSubst(inferred, baseSubst))
@@ -2396,7 +2411,9 @@ func (c *Checker) canAccessPrivate(owner *parser.ClassDecl) bool {
 }
 
 func (c *Checker) resolveDeclaredType(ref *parser.TypeRef) *Type {
-	return c.instantiateTypeRef(ref, nil)
+	typ := c.instantiateTypeRef(ref, nil)
+	c.validateTypeRefBounds(ref, typ)
+	return typ
 }
 
 func (c *Checker) instantiateTypeRef(ref *parser.TypeRef, subst map[string]*Type) *Type {
@@ -2438,6 +2455,28 @@ func (c *Checker) instantiateTypeRef(ref *parser.TypeRef, subst map[string]*Type
 		kind = TypeUnknown
 	}
 	return &Type{Kind: kind, Name: ref.Name, Args: args}
+}
+
+func (c *Checker) validateTypeParameterBounds(params []parser.TypeParameter) {
+	for _, param := range params {
+		for _, bound := range param.Bounds {
+			boundType := c.resolveDeclaredType(bound)
+			if boundType.Kind != TypeInterface {
+				c.addDiagnostic("invalid_type_bound", "type parameter '"+param.Name+"' bound must be an interface", bound.Span)
+			}
+		}
+	}
+}
+
+func (c *Checker) validateTypeRefBounds(ref *parser.TypeRef, typ *Type) {
+	if ref == nil || typ == nil || len(ref.Arguments) == 0 {
+		return
+	}
+	params, ok := c.typeParametersForName(ref.Name)
+	if !ok || len(params) == 0 || len(params) != len(typ.Args) {
+		return
+	}
+	c.checkTypeArgBounds(typ.Args, params, ref.Span)
 }
 
 func (c *Checker) instantiateMethodSignature(method *parser.MethodDecl, owner *parser.ClassDecl, subst map[string]*Type) Signature {
@@ -2990,6 +3029,9 @@ func (c *Checker) resolveInterfaceMethodCallSignature(info interfaceInfo, receiv
 		c.addDiagnostic("cannot_infer_type_args", "cannot infer type arguments for method '"+method.Name+"'", span)
 		return Signature{}, false
 	}
+	if !c.checkTypeArgBounds(c.typeArgsInOrder(method.TypeParameters, inferred), method.TypeParameters, span) {
+		return Signature{}, false
+	}
 	sig = c.instantiateInterfaceMethodSignature(method, mergeSubst(inferred, baseSubst))
 	if !validArgCount(sig, len(args)) {
 		c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %s arguments, got %d", method.Name, expectedArgCount(sig), len(args)), span)
@@ -3209,6 +3251,72 @@ func (c *Checker) interfaceAssignable(actual, expected *Type, seen map[string]bo
 	return false
 }
 
+func (c *Checker) typeParametersForName(name string) ([]parser.TypeParameter, bool) {
+	if info, ok := c.classes[name]; ok {
+		return info.decl.TypeParameters, true
+	}
+	if info, ok := c.interfaces[name]; ok {
+		return info.decl.TypeParameters, true
+	}
+	return nil, false
+}
+
+func (c *Checker) typeArgsInOrder(params []parser.TypeParameter, subst map[string]*Type) []*Type {
+	args := make([]*Type, len(params))
+	for i, param := range params {
+		if subst != nil {
+			args[i] = subst[param.Name]
+		}
+		if args[i] == nil {
+			args[i] = unknownType
+		}
+	}
+	return args
+}
+
+func (c *Checker) checkTypeArgBounds(args []*Type, params []parser.TypeParameter, span parser.Span) bool {
+	if len(args) != len(params) {
+		return false
+	}
+	subst := c.substForDecl(params, args)
+	ok := true
+	for i, param := range params {
+		for _, bound := range param.Bounds {
+			expected := c.instantiateTypeRef(bound, subst)
+			if !c.typeSatisfiesBound(args[i], expected) {
+				c.addDiagnostic("type_argument_bound", "type argument "+args[i].String()+" does not satisfy bound "+expected.String()+" for '"+param.Name+"'", span)
+				ok = false
+			}
+		}
+	}
+	return ok
+}
+
+func (c *Checker) typeSatisfiesBound(actual, bound *Type) bool {
+	if isUnknown(actual) || isUnknown(bound) {
+		return true
+	}
+	if c.isAssignable(actual, bound) {
+		return true
+	}
+	if bound.Kind == TypeInterface && c.hasBoundWitness(bound) {
+		return true
+	}
+	return false
+}
+
+func (c *Checker) hasBoundWitness(expected *Type) bool {
+	for _, info := range c.classes {
+		if !info.decl.Object {
+			continue
+		}
+		if c.isAssignable(&Type{Kind: TypeClass, Name: info.name, Args: nil}, expected) {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Checker) addDiagnostic(code, message string, span parser.Span) {
 	c.diagnostics = append(c.diagnostics, semantic.Diagnostic{Code: code, Message: message, Span: span})
 }
@@ -3307,7 +3415,7 @@ func isBuiltinType(name string) bool {
 
 func isBuiltinInterfaceType(name string) bool {
 	switch name {
-	case "Eq", "List", "Set", "Map", "Term", "Option":
+	case "Eq", "Ordering", "List", "Set", "Map", "Term", "Option":
 		return true
 	default:
 		return false

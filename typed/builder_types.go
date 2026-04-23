@@ -29,7 +29,11 @@ func (b *parameterBuilder) buildParameters(params []parser.Parameter) []Paramete
 func (b *parameterBuilder) buildTypeParameters(params []parser.TypeParameter) []TypeParameter {
 	out := make([]TypeParameter, len(params))
 	for i, param := range params {
-		out[i] = TypeParameter{Name: param.Name, Span: param.Span}
+		bounds := make([]*typecheck.Type, len(param.Bounds))
+		for j, bound := range param.Bounds {
+			bounds[j] = (&typeRefBuilder{ctx: b.ctx}).BuildType(bound)
+		}
+		out[i] = TypeParameter{Name: param.Name, Bounds: bounds, Span: param.Span}
 	}
 	return out
 }

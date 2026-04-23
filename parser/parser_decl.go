@@ -124,7 +124,16 @@ func (p *Parser) parseTypeParameters() ([]TypeParameter, error) {
 			if err != nil {
 				return nil, err
 			}
-			params = append(params, TypeParameter{Name: name.Lexeme, Span: tokenSpan(name)})
+			param := TypeParameter{Name: name.Lexeme, Span: tokenSpan(name)}
+			if p.match(TokenWith) {
+				bound, err := p.parseTypeRef()
+				if err != nil {
+					return nil, err
+				}
+				param.Bounds = append(param.Bounds, bound)
+				param.Span = mergeSpans(tokenSpan(name), typeSpan(bound))
+			}
+			params = append(params, param)
 			if !p.match(TokenComma) {
 				break
 			}

@@ -43,8 +43,9 @@ type TypeRef struct {
 
 // TypeParameter declares a generic type parameter name.
 type TypeParameter struct {
-	Name string `json:"name"`
-	Span Span   `json:"span"`
+	Name   string     `json:"name"`
+	Bounds []*TypeRef `json:"bounds,omitempty"`
+	Span   Span       `json:"span"`
 }
 
 // FunctionDecl describes a top-level function declaration.
