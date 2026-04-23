@@ -15,9 +15,9 @@ class Mapper {
 }
 
 def pick[T with Ordering[T]](value T) T = value
+def useBox(value Box[Int]) Int = value.value
 
 def main() Int {
-    box Box[Int] = ?
     mapper Mapper = Mapper()
     Term.println(pick(3) + mapper.pick(4))
     0

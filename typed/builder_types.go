@@ -94,7 +94,7 @@ func (b *typeRefBuilder) kindOf(name string) typecheck.TypeKind {
 		return typecheck.TypeInterface
 	}
 	switch name {
-		case "Int", "Float", "Bool", "String", "Rune", "Decimal", "Array", "Unit":
+		case "Int", "Float", "Bool", "Str", "Rune", "Decimal", "Array", "Unit":
 			return typecheck.TypeBuiltin
 	}
 	return typecheck.TypeUnknown

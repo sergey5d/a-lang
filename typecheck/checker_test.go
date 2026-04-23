@@ -234,7 +234,7 @@ func TestAnalyzeImplicitPrimaryConstructorAndThisDelegation(t *testing.T) {
 	src := `
 class Counter {
 	count Int
-	label String
+	label Str
 	private seen Bool := false
 
 	def this(seed Int) {
@@ -275,7 +275,7 @@ func TestAnalyzeRecordUpdateExpr(t *testing.T) {
 	src := `
 record Amount {
 	amount Int
-	description String
+	description Str
 }
 
 def run() Int {
@@ -295,17 +295,17 @@ func TestAnalyzeRecordAndClassDestructuring(t *testing.T) {
 	src := `
 record Pair {
 	left Int
-	right String
+	right Str
 }
 
 class Box {
 	value Int
-	label String
+	label Str
 }
 
 def run() Int {
-	a Int, b String = Pair(5, "x")
-	c Int, d String = Box(7, "y")
+	a Int, b Str = Pair(5, "x")
+	c Int, d Str = Box(7, "y")
 	return a + c
 }
 `
@@ -320,12 +320,12 @@ func TestAnalyzeDestructuringSkipBinding(t *testing.T) {
 	src := `
 record Triple {
 	first Int
-	middle String
-	last String
+	middle Str
+	last Str
 }
 
 def run() Int {
-	a Int, _, c String = Triple(1, "drop", "keep")
+	a Int, _, c Str = Triple(1, "drop", "keep")
 	return a
 }
 `
@@ -340,11 +340,11 @@ func TestAnalyzeClassDestructuringRejectsPrivateFields(t *testing.T) {
 	src := `
 class Box {
 	value Int
-	private hidden String = "x"
+	private hidden Str = "x"
 }
 
 def run() Int {
-	a Int, b String = Box(7)
+	a Int, b Str = Box(7)
 	return a
 }
 `
@@ -604,14 +604,14 @@ def run() Int {
 func TestAnalyzeInterfaceImplementation(t *testing.T) {
 	src := `
 interface Stringable {
-	def show() String
+	def show() Str
 }
 
 class Good with Stringable {
 	def init() {
 	}
 
-	def show() String {
+	def show() Str {
 		return "ok"
 	}
 }
@@ -634,22 +634,22 @@ class Bad with Stringable {
 func TestAnalyzeInterfaceInheritance(t *testing.T) {
 	src := `
 interface Hopper {
-	def hop() String
+	def hop() Str
 }
 
 interface Jumper {
-	def jump(steps Int) String
+	def jump(steps Int) Str
 }
 
 interface Acrobat with Hopper, Jumper {
 }
 
 class Rabbit with Acrobat {
-	def hop() String = "hop"
-	def jump(steps Int) String = "jump " + steps
+	def hop() Str = "hop"
+	def jump(steps Int) Str = "jump " + steps
 }
 
-def run() String {
+def run() Str {
 	rabbit = Rabbit()
 	return rabbit.hop() + " " + rabbit.jump(3)
 }
@@ -1031,9 +1031,9 @@ class Mapper {
 	}
 }
 
-def run() String {
+def run() Str {
 	mapper Mapper = Mapper()
-	mapped String = mapper.map(5, (x Int) -> "value=" + x)
+	mapped Str = mapper.map(5, (x Int) -> "value=" + x)
 	return id(mapped)
 }
 `
@@ -1125,7 +1125,7 @@ def run() Int {
 	items.append(3)
 	items.sort(Ascending)
 
-	values Map[String, Int] = Map("a" : 1)
+	values Map[Str, Int] = Map("a" : 1)
 	values.set("b", 2)
 
 	seen Set[Int] = Set(1, 2)
@@ -1195,9 +1195,9 @@ class Mapper {
 }
 
 def pick[T with Ordering[T]](value T) T = value
+def useBox(value Box[Int]) Int = value.value
 
 def run() Int {
-	box Box[Int] = ?
 	mapper Mapper = Mapper()
 	value Int = pick(3)
 	return value + mapper.pick(4)
@@ -1211,26 +1211,47 @@ def run() Int {
 }
 
 func TestAnalyzeGenericBoundsRejectMissingWitness(t *testing.T) {
-	src := `
+src := `
 class Box[T with Ordering[T]] {
 	value T
 }
 
 def pick[T with Ordering[T]](value T) T = value
+def badBox(value Box[Str]) Int = 0
 
 def run() Int {
-	box Box[String] = ?
-	value String = pick("x")
+	value Str = pick("x")
 	return 0
 }
 `
 
 	result := Analyze(parseProgram(t, src))
 	if len(result.Diagnostics) == 0 {
-		t.Fatalf("expected diagnostics for missing Ordering[String] witness")
+		t.Fatalf("expected diagnostics for missing Ordering[Str] witness")
 	}
 	if result.Diagnostics[0].Code != "type_argument_bound" {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
+func TestAnalyzeRejectDeferredBindingsOutsideClasses(t *testing.T) {
+	src := `
+value Int = ?
+
+def run() Int {
+	local Int := ?
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics, got %#v", result.Diagnostics)
+	}
+	for _, diag := range result.Diagnostics {
+		if diag.Code != "invalid_deferred" {
+			t.Fatalf("unexpected diagnostic %#v", diag)
+		}
 	}
 }
 
@@ -1268,7 +1289,7 @@ def run() Int {
 
 func TestAnalyzeStringConcatenation(t *testing.T) {
 	src := `
-def run() String {
+def run() Str {
 	count Int = 10
 	return "counter " + count
 }
@@ -1309,9 +1330,9 @@ def run(values List[Int], flag Bool) Int {
 
 func TestAnalyzeForDestructuring(t *testing.T) {
 	src := `
-def run(rows List[(Int, String)]) Int {
+def run(rows List[(Int, Str)]) Int {
 	total Int := 0
-	for left Int, right String <- rows {
+	for left Int, right Str <- rows {
 		if right == "x" {
 			total += left
 		}
@@ -1401,12 +1422,12 @@ def run() Bool {
 func TestAnalyzeNamedCallArguments(t *testing.T) {
 	src := `
 class Counter {
-	def set(value Int, label String) Int {
+	def set(value Int, label Str) Int {
 		return value
 	}
 }
 
-def doSomething(a String, b Int) Int {
+def doSomething(a Str, b Int) Int {
 	return b
 }
 
@@ -1486,11 +1507,11 @@ def run() Int {
 
 func TestAnalyzeFunctionImplicitReturn(t *testing.T) {
 	src := `
-def suffix(value String) String {
+def suffix(value Str) Str {
 	value + "!"
 }
 
-def run() String {
+def run() Str {
 	suffix("hello")
 }
 `
@@ -1541,7 +1562,7 @@ func TestAnalyzeMultiAssignmentStmt(t *testing.T) {
 	src := `
 def run() Int {
 	a Int := 0
-	b String := ""
+	b Str := ""
 	a, b := 1, "ok"
 	a
 }
@@ -1620,8 +1641,8 @@ def run(value Int) Int {
 
 func TestAnalyzeIfOptionDestructuring(t *testing.T) {
 	src := `
-def run(value Option[(Int, String, Bool)]) String {
-	if _, name String, _ <- value {
+def run(value Option[(Int, Str, Bool)]) Str {
+	if _, name Str, _ <- value {
 		return name
 	}
 	return "missing"

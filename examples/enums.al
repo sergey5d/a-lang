@@ -7,7 +7,7 @@
 # Fully defined where all attributes have values.
 
 enum Color {
-    color String
+    color Str
     temperature Int
 
     def isReddish() Bool = temperature % 5 == 0

@@ -8,12 +8,12 @@
 # 0
 
 class Formatter {
-	def format(prefix String, value Int) String {
+	def format(prefix Str, value Int) Str {
 		return prefix + value
 	}
 }
 
-def format(prefix String, value Int) String {
+def format(prefix Str, value Int) Str {
 	return prefix + value
 }
 

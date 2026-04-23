@@ -5,14 +5,14 @@
 #
 # a = object {
 #     amount = 5
-#     def makeSomething() String = "xaxa"
+#     def makeSomething() Str = "xaxa"
 # }
 #
 # Or, if we ever decide bare braces are worth the grammar tradeoff:
 #
 # a = {
 #     amount = 5
-#     def makeSomething() String = "xaxa"
+#     def makeSomething() Str = "xaxa"
 # }
 #
 # Questions to settle later:

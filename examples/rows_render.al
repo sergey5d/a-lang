@@ -12,8 +12,8 @@
 # 246
 # 1
 
-object RowOrdering with Ordering[(Int, Int, String)] {
-    def compare(left (Int, Int, String), right (Int, Int, String)) Int {
+object RowOrdering with Ordering[(Int, Int, Str)] {
+    def compare(left (Int, Int, Str), right (Int, Int, Str)) Int {
         leftX Int, leftY Int, _ = left
         rightX Int, rightY Int, _ = right
 
@@ -33,11 +33,11 @@ object RowOrdering with Ordering[(Int, Int, String)] {
     }
 }
 
-def syntax1(rows List[(Int, Int, String)]) Unit {
+def syntax1(rows List[(Int, Int, Str)]) Unit {
     lastX := 0
     if _, initialY, _ <- rows.get(0) {
         lastY := initialY
-        for x Int, y Int, char String <- rows {
+        for x Int, y Int, char Str <- rows {
             for lineStep <- Range.apply(y, lastY) {
                 Term.println()
             }
@@ -55,7 +55,7 @@ def syntax1(rows List[(Int, Int, String)]) Unit {
     }
 }
 
-def syntax2(rows List[(Int, Int, String)]) Unit {
+def syntax2(rows List[(Int, Int, Str)]) Unit {
     lastX := 0
     if _, initialY Int, _ <- rows.get(0) {
         lastY := initialY
@@ -77,13 +77,13 @@ def syntax2(rows List[(Int, Int, String)]) Unit {
     }
 }
 
-def syntax3(rows List[(Int, Int, String)]) Unit {
+def syntax3(rows List[(Int, Int, Str)]) Unit {
     lastX := 0
     if first <- rows.get(0) {
         _, initialY Int, _ = first
         lastY := initialY
         for row <- rows {
-            x, y, char String = row
+            x, y, char Str = row
             for lineStep <- Range.apply(y, lastY) {
                 Term.println()
             }
@@ -101,12 +101,12 @@ def syntax3(rows List[(Int, Int, String)]) Unit {
     }
 }
 
-def syntax4(rows List[(Int, Int, String)]) Unit {
+def syntax4(rows List[(Int, Int, Str)]) Unit {
     lastX := 0
     for {
         _, initialY Int, _ <- rows.get(0)
         lastY := initialY
-        x, y, char String <- rows
+        x, y, char Str <- rows
         # just as an example
         xImmutable = x
     } yield {
@@ -127,7 +127,7 @@ def syntax4(rows List[(Int, Int, String)]) Unit {
 }
 
 def main() Unit {
-    rows List[(Int, Int, String)] = [
+    rows List[(Int, Int, Str)] = [
         (0, 0, "1"),
         (0, 1, "2"),
         (0, 2, "3"),

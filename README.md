@@ -109,8 +109,8 @@ total Int = pair.value + renamed.left
 
 The current tuple model is structural by element type and order:
 
-- unnamed tuple types use `(Int, String)`
-- named tuple types use `(value Int, label String)`
+- unnamed tuple types use `(Int, Str)`
+- named tuple types use `(value Int, label Str)`
 - tuple literals use `(1, "ok")`
 - tuples can be destructured into multiple bindings
 

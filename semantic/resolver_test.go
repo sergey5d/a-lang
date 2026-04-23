@@ -210,7 +210,7 @@ interface Mapper[K, V] {
 }
 
 interface Stringable {
-	def show() String
+	def show() Str
 }
 
 class Box[T] with Mapper[T, Stringable] {
@@ -227,18 +227,18 @@ class Box[T] with Mapper[T, Stringable] {
 
 class SolidWork with Stringable {
 	private a List[Int]
-	private b Map[String, Bool] := ?
+	private b Map[Str, Bool] := ?
 
 	def init(a Int, b Bool) {
 		this.a = a
 		this.b = b
 	}
 
-	def show() String {
+	def show() Str {
 		return this.buildLabel()
 	}
 
-	private def buildLabel() String {
+	private def buildLabel() Str {
 		return this.a.show()
 	}
 }
@@ -258,10 +258,10 @@ class Store[T] {
 	values List[T]
 }
 
-def useStore(input Map[String, List[Int]]) List[Map[String, Int]] {
+def useStore(input Map[Str, List[Int]]) List[Map[Str, Int]] {
 	store Store[Int] = Store(input)
 	bad Unknown[Int] = store
-	wrong List[Int, String] = []
+	wrong List[Int, Str] = []
 	return [Map()]
 }
 `

@@ -159,7 +159,7 @@ class Adder {
 		return value + 1
 	}
 
-	def add(value String) Int {
+	def add(value Str) Int {
 		return 99
 	}
 }
@@ -237,7 +237,7 @@ func TestForDestructuring(t *testing.T) {
 def run() Int {
 	total Int := 0
 
-	for left Int, right String <- [(1, "x"), (2, "y"), (3, "x")] {
+	for left Int, right Str <- [(1, "x"), (2, "y"), (3, "x")] {
 		if right == "x" {
 			total += left
 		}
@@ -259,11 +259,11 @@ def run() Int {
 
 func TestFunctionImplicitReturn(t *testing.T) {
 	src := `
-def suffix(value String) String {
+def suffix(value Str) Str {
 	value + "!"
 }
 
-def run() String {
+def run() Str {
 	suffix("hello")
 }
 `
@@ -356,7 +356,7 @@ def run() Int {
 
 func TestFunctionWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
 	src := `
-def suffix(value String) {
+def suffix(value Str) {
 	value + "!"
 }
 
@@ -397,7 +397,7 @@ def run() Int {
 func TestVariadicFunctionAndMethod(t *testing.T) {
 	src := `
 class Printer {
-	def count(values String...) Int = values.size()
+	def count(values Str...) Int = values.size()
 }
 
 def sum(values Int...) Int {
@@ -726,7 +726,7 @@ def run() Int {
 
 func TestStringConcatenation(t *testing.T) {
 	src := `
-def run() String {
+def run() Str {
 	count Int = 10
 	return "counter " + count
 }
@@ -818,7 +818,7 @@ class Counter {
 
 def run() Bool {
 	counter = Counter()
-	return counter is Counter && "x" is String && !(counter is String)
+	return counter is Counter && "x" is Str && !(counter is Str)
 }
 `
 
@@ -835,19 +835,19 @@ def run() Bool {
 func TestInterfaceInheritanceIsExpression(t *testing.T) {
 	src := `
 interface Hopper {
-	def hop() String
+	def hop() Str
 }
 
 interface Jumper {
-	def jump(steps Int) String
+	def jump(steps Int) Str
 }
 
 interface Acrobat with Hopper, Jumper {
 }
 
 class Rabbit with Acrobat {
-	def hop() String = "hop"
-	def jump(steps Int) String = "jump " + steps
+	def hop() Str = "hop"
+	def jump(steps Int) Str = "jump " + steps
 }
 
 def run() Bool {
@@ -870,7 +870,7 @@ func TestRecordUpdateExpr(t *testing.T) {
 	src := `
 record Amount {
 	amount Int
-	description String
+	description Str
 }
 
 def run() Bool {
@@ -894,17 +894,17 @@ func TestRecordAndClassDestructuring(t *testing.T) {
 	src := `
 record Pair {
 	left Int
-	right String
+	right Str
 }
 
 class Box {
 	value Int
-	label String
+	label Str
 }
 
 def run() Int {
-	a Int, b String = Pair(5, "x")
-	c Int, d String = Box(7, "y")
+	a Int, b Str = Pair(5, "x")
+	c Int, d Str = Box(7, "y")
 	return a + c
 }
 `
@@ -923,12 +923,12 @@ func TestDestructuringSkipBinding(t *testing.T) {
 	src := `
 record Triple {
 	first Int
-	middle String
-	last String
+	middle Str
+	last Str
 }
 
-def run() String {
-	a Int, _, c String = Triple(1, "drop", "keep")
+def run() Str {
+	a Int, _, c Str = Triple(1, "drop", "keep")
 	return c
 }
 `
@@ -946,12 +946,12 @@ def run() String {
 func TestNamedCallArguments(t *testing.T) {
 	src := `
 class Counter {
-	def set(value Int, label String) Int {
+	def set(value Int, label Str) Int {
 		return value
 	}
 }
 
-def doSomething(a String, b Int) Int {
+def doSomething(a Str, b Int) Int {
 	return b
 }
 
@@ -1090,7 +1090,7 @@ func TestImplicitPrimaryConstructorAndThisDelegation(t *testing.T) {
 	src := `
 class Counter {
 	count Int
-	label String
+	label Str
 	private seen Bool := false
 
 	def this(seed Int) {
@@ -1194,9 +1194,9 @@ def run() Int {
 
 func TestIfOptionDestructuring(t *testing.T) {
 	src := `
-def run() String {
-	found Option[(Int, String, Bool)] = Some((1, "ok", true))
-	if _, name String, _ <- found {
+def run() Str {
+	found Option[(Int, Str, Bool)] = Some((1, "ok", true))
+	if _, name Str, _ <- found {
 		return name
 	}
 	return "missing"

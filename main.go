@@ -280,7 +280,7 @@ func parseCLIArg(ref *parser.TypeRef, raw string) (interpreter.Value, error) {
 			return nil, fmt.Errorf("expected Bool, got %q", raw)
 		}
 		return value, nil
-	case "String":
+	case "Str":
 		return raw, nil
 	case "Rune":
 		runes := []rune(raw)

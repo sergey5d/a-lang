@@ -13,7 +13,7 @@ def doSomeWork(a Int, b Int) Bool {
 	tuple2 = a : b : c
 	tuple21 = a : b : c
 	array = Array(1, 2, 3)
-	string String = "xxx"
+	string Str = "xxx"
 	a int = 65
 
 	a Int, b Int64 = 1, 3
@@ -133,7 +133,7 @@ def loops(input Int, value Int) Bool {
 		break
 	}
 
-	for left Int, right String <- [(1, "x")] {
+	for left Int, right Str <- [(1, "x")] {
 		if left == value {
 			break
 		}
@@ -230,7 +230,7 @@ def run(values List[Int], flag Bool) Int {
 func TestParseIsExpression(t *testing.T) {
 	src := `
 def run(value Any) Bool {
-	return value is String
+	return value is Str
 }
 `
 
@@ -245,8 +245,8 @@ def run(value Any) Bool {
 	if !ok {
 		t.Fatalf("expected return value to be is expression, got %T", ret.Value)
 	}
-	if isExpr.Target == nil || isExpr.Target.Name != "String" {
-		t.Fatalf("expected is target String, got %#v", isExpr.Target)
+	if isExpr.Target == nil || isExpr.Target.Name != "Str" {
+		t.Fatalf("expected is target Str, got %#v", isExpr.Target)
 	}
 }
 
@@ -332,7 +332,7 @@ class Broken {
 
 func TestParseExpressionBodiedDefs(t *testing.T) {
 	src := `
-def suffix(value String) String = value + "!"
+def suffix(value Str) Str = value + "!"
 
 class Counter {
 	def value() Int = 1
@@ -467,7 +467,7 @@ def run() {
 
 func TestParseVariadicParameter(t *testing.T) {
 	src := `
-def printAll(values String...) {
+def printAll(values Str...) {
 	values.size()
 }
 `
@@ -527,8 +527,8 @@ def run() Int {
 
 func TestParseTupleLiteralAndType(t *testing.T) {
 	src := `
-def run() (value Int, label String) {
-	pair (value Int, label String) = (1, "ok")
+def run() (value Int, label Str) {
+	pair (value Int, label Str) = (1, "ok")
 	pair
 }
 `
@@ -700,7 +700,7 @@ interface Mapper[K, V] {
 }
 
 interface Stringable {
-	def show() String
+	def show() Str
 }
 
 class Box[T] with Mapper[T, Stringable] {
@@ -717,25 +717,25 @@ class Box[T] with Mapper[T, Stringable] {
 
 class SolidWork with Stringable {
 	private a List[Int]
-	private b Map[String, Bool] := ?
+	private b Map[Str, Bool] := ?
 
 	def init(a Int, b Bool) {
 		this.a = a
 		this.b = b
 	}
 
-	def show() String {
+	def show() Str {
 	}
 
 	def addOne(one Int) Int {
 	}
 
-	private def buildLabel() String {
+	private def buildLabel() Str {
 	}
 }
 
 class RecordKeeper {
-	entries Set[String]
+	entries Set[Str]
 	private approved Bool
 }
 
@@ -781,7 +781,7 @@ solidWork = SolidWork(1, false)
 		t.Fatalf("unexpected class members %#v", cls)
 	}
 	assertTypeRef(t, cls.Fields[0].Type, "List", "Int")
-	assertTypeRef(t, cls.Fields[1].Type, "Map", "String", "Bool")
+	assertTypeRef(t, cls.Fields[1].Type, "Map", "Str", "Bool")
 	if !cls.Fields[0].Private || !cls.Fields[1].Private {
 		t.Fatalf("expected first class fields to be private")
 	}
@@ -797,9 +797,9 @@ func TestParseRecordDecl(t *testing.T) {
 	src := `
 record Amount {
 	amount Int
-	description String
+	description Str
 
-	def label() String = description
+	def label() Str = description
 }
 `
 
@@ -956,7 +956,7 @@ private interface Hidden {
 func TestParseDestructuringSkipBinding(t *testing.T) {
 	src := `
 def run() Int {
-	a Int, _, c String = (1, 2, "x")
+	a Int, _, c Str = (1, 2, "x")
 	return a
 }
 `
@@ -1001,11 +1001,11 @@ def run() Unit {
 func TestParseInterfaceInheritance(t *testing.T) {
 	src := `
 interface Hopper {
-	def hop() String
+	def hop() Str
 }
 
 interface Acrobat with Hopper {
-	def land() String
+	def land() Str
 }
 `
 
@@ -1029,7 +1029,7 @@ func TestParseRecordUpdateExpr(t *testing.T) {
 	src := `
 record Amount {
 	amount Int
-	description String
+	description Str
 }
 
 def run() Amount {
@@ -1270,7 +1270,7 @@ def vars(b Int) Bool {
 
 func TestParseNamedCallArguments(t *testing.T) {
 	src := `
-def doSomething(a String, b Int) Unit {
+def doSomething(a Str, b Int) Unit {
 }
 
 def main() Unit {
@@ -1407,8 +1407,8 @@ class Store[T] {
 	}
 }
 
-def wrap(input Map[String, List[Int]]) List[Map[String, Int]] {
-	cache Map[String, List[Int]] = input
+def wrap(input Map[Str, List[Int]]) List[Map[Str, Int]] {
+	cache Map[Str, List[Int]] = input
 	return [cache]
 }
 `
@@ -1420,7 +1420,7 @@ def wrap(input Map[String, List[Int]]) List[Map[String, Int]] {
 
 	assertTypeRef(t, program.Interfaces[0].Methods[0].ReturnType, "Map", "K", "V")
 	assertTypeRef(t, program.Classes[0].Fields[0].Type, "List", "T")
-	assertTypeRef(t, program.Functions[0].Parameters[0].Type, "Map", "String", "List")
+	assertTypeRef(t, program.Functions[0].Parameters[0].Type, "Map", "Str", "List")
 	if len(program.Functions[0].Parameters[0].Type.Arguments[1].Arguments) != 1 || program.Functions[0].Parameters[0].Type.Arguments[1].Arguments[0].Name != "Int" {
 		t.Fatalf("expected nested generic type argument, got %#v", program.Functions[0].Parameters[0].Type)
 	}
@@ -1436,7 +1436,7 @@ def apply(value Int, f Int -> Int) Int {
 	return f(value)
 }
 
-def pair(f (Int, String) -> Bool) Bool {
+def pair(f (Int, Str) -> Bool) Bool {
 	return false
 }
 `
@@ -1458,7 +1458,7 @@ def pair(f (Int, String) -> Bool) Bool {
 		t.Fatalf("expected two-parameter function type, got %#v", pairType)
 	}
 	assertTypeRef(t, pairType.ParameterTypes[0], "Int")
-	assertTypeRef(t, pairType.ParameterTypes[1], "String")
+	assertTypeRef(t, pairType.ParameterTypes[1], "Str")
 	assertTypeRef(t, pairType.ReturnType, "Bool")
 }
 
@@ -1525,8 +1525,8 @@ def run(value Option[Int]) Unit {
 
 func TestParseIfOptionDestructuring(t *testing.T) {
 	src := `
-def run(value Option[(Int, String, Bool)]) Unit {
-	if _, name String, _ <- value {
+def run(value Option[(Int, Str, Bool)]) Unit {
+	if _, name Str, _ <- value {
 		Term.println(name)
 	}
 }
@@ -1543,8 +1543,8 @@ def run(value Option[(Int, String, Bool)]) Unit {
 	if ifStmt.Bindings[0].Name != "_" || ifStmt.Bindings[1].Name != "name" || ifStmt.Bindings[2].Name != "_" {
 		t.Fatalf("unexpected bindings %#v", ifStmt.Bindings)
 	}
-	if ifStmt.Bindings[1].Type == nil || ifStmt.Bindings[1].Type.Name != "String" {
-		t.Fatalf("expected explicit String binding type, got %#v", ifStmt.Bindings[1].Type)
+	if ifStmt.Bindings[1].Type == nil || ifStmt.Bindings[1].Type.Name != "Str" {
+		t.Fatalf("expected explicit Str binding type, got %#v", ifStmt.Bindings[1].Type)
 	}
 }
 

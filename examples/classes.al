@@ -6,14 +6,14 @@
 
 class A {
     age Int
-    name String
+    name Str
 
     private malnutritioned Bool := false
 
     # explicit call to primary constructor
     def this(maturity Int) = this(maturity - 15, "5")
 
-    def this(name String) {
+    def this(name Str) {
         # no need to call primary constructor if we init all fields in secondary constructor
         this.name = name
         age = 15
@@ -21,13 +21,13 @@ class A {
 
     def trueAge() Int = age
 
-    def trueName() String = name
+    def trueName() Str = name
 }
 
 class B {
     # immutable member variables
     private age Int
-    private name String
+    private name Str
     # initialized mutable variable
     private malnutritioned Bool := false
     # not yet initialized mutable variable
@@ -35,7 +35,7 @@ class B {
     # not yet initialized immutable variable (syntax is for consistency only)
     private questionable Int = ?
 
-    def this(age Int, name String) {
+    def this(age Int, name Str) {
         this.age = age
         this.name = name
         this.unassigned := 1.1
@@ -44,7 +44,7 @@ class B {
 
     def trueAge() Int = age
 
-    def trueName() String = name
+    def trueName() Str = name
 }
 
 def main() Unit {

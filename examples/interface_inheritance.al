@@ -6,20 +6,20 @@
 # true
 
 interface Hopper {
-    def hop() String
+    def hop() Str
 }
 
 interface Jumper {
-    def jump(steps Int) String
+    def jump(steps Int) Str
 }
 
 interface Acrobat with Hopper, Jumper {
 }
 
 class Rabbit with Acrobat {
-    def hop() String = "hop"
+    def hop() Str = "hop"
 
-    def jump(steps Int) String = "jump " + steps
+    def jump(steps Int) Str = "jump " + steps
 }
 
 def main() Unit {

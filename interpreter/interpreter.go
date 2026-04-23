@@ -2138,7 +2138,7 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 		return ok && len(ref.TupleElements) == len(tuple.items)
 	}
 	switch ref.Name {
-	case "", "Unit", "Int", "Float", "Bool", "String", "Rune", "List", "Iterable", "Iterator", "Set", "Map", "Option", "Array", "Term":
+	case "", "Unit", "Int", "Float", "Bool", "Str", "Rune", "List", "Iterable", "Iterator", "Set", "Map", "Option", "Array", "Term":
 	default:
 		if _, ok := in.classes[ref.Name]; !ok {
 			if _, ok := in.interfaces[ref.Name]; !ok {
@@ -2158,7 +2158,7 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 	case "Bool":
 		_, ok := value.(bool)
 		return ok
-	case "String":
+	case "Str":
 		_, ok := value.(string)
 		return ok
 	case "Rune":
@@ -2686,7 +2686,7 @@ func zeroValue(ref *parser.TypeRef) Value {
 		return float64(0)
 	case "Bool":
 		return false
-	case "String":
+	case "Str":
 		return ""
 	case "Rune":
 		return rune(0)

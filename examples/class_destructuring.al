@@ -9,17 +9,17 @@
 
 class Box {
     value Int
-    label String
+    label Str
 }
 
 class Crate {
     value Int
-    hidden String
-    label String
+    hidden Str
+    label Str
 }
 
 def main() Int {
-    e Int, f String = Box(9, "boxed")
+    e Int, f Str = Box(9, "boxed")
     Term.println("class", e, f)
 
     inferredClassLeft, inferredClassRight = Box(12, "class")
@@ -34,7 +34,7 @@ def main() Int {
     _, skippedOnlyClassValue = Box(25, "class-only")
     Term.println("class skip only", skippedOnlyClassValue)
 
-    skippedClassLeft Int, _, skippedClassRight String = Crate(16, "drop", "class-skip")
+    skippedClassLeft Int, _, skippedClassRight Str = Crate(16, "drop", "class-skip")
     Term.println("class skip", skippedClassLeft, skippedClassRight)
 
     0

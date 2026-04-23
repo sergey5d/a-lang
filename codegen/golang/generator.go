@@ -437,7 +437,7 @@ func goType(t *typecheck.Type) string {
 			return "float64"
 		case "Bool":
 			return "bool"
-		case "String":
+		case "Str":
 			return "string"
 		case "Rune":
 			return "rune"

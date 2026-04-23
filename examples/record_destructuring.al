@@ -9,17 +9,17 @@
 
 record Pair {
     left Int
-    right String
+    right Str
 }
 
 record Triple {
     first Int
-    middle String
-    last String
+    middle Str
+    last Str
 }
 
 def main() Int {
-    c Int, d String = Pair(7, "world")
+    c Int, d Str = Pair(7, "world")
     Term.println("record", c, d)
 
     inferredRecordLeft, inferredRecordRight = Pair(10, "infer")
@@ -34,7 +34,7 @@ def main() Int {
     _, skippedOnlyRecordValue = Pair(23, "visible")
     Term.println("record skip only", skippedOnlyRecordValue)
 
-    skippedRecordLeft Int, _, skippedRecordRight String = Triple(15, "drop", "kept")
+    skippedRecordLeft Int, _, skippedRecordRight Str = Triple(15, "drop", "kept")
     Term.println("record skip", skippedRecordLeft, skippedRecordRight)
 
     0

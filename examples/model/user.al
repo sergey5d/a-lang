@@ -5,10 +5,10 @@
 package user
 
 class Person {
-    name String
+    name Str
     age Int
 
-    def name() String = name
+    def name() Str = name
 
     def age() Int = age
 }

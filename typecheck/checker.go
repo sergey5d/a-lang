@@ -281,8 +281,8 @@ func builtinInterfaceInfos() map[string]interfaceInfo {
 	termDecl := &parser.InterfaceDecl{
 		Name: "Term",
 		Methods: []parser.InterfaceMethod{
-			{Name: "print", Parameters: []parser.Parameter{{Name: "value", Type: namedType("String")}}, ReturnType: namedType("Term")},
-			{Name: "println", Parameters: []parser.Parameter{{Name: "value", Type: namedType("String"), Variadic: true}}, ReturnType: namedType("Term")},
+			{Name: "print", Parameters: []parser.Parameter{{Name: "value", Type: namedType("Str")}}, ReturnType: namedType("Term")},
+			{Name: "println", Parameters: []parser.Parameter{{Name: "value", Type: namedType("Str"), Variadic: true}}, ReturnType: namedType("Term")},
 		},
 	}
 	out["Term"] = interfaceInfo{decl: termDecl, methods: map[string]interfaceMethodInfo{
@@ -416,6 +416,9 @@ func (c *Checker) checkGlobals(statements []parser.Statement) {
 		switch s := stmt.(type) {
 		case *parser.ValStmt:
 			for i, bindingDecl := range s.Bindings {
+				if bindingDecl.Deferred {
+					c.addDiagnostic("invalid_deferred", "binding '"+bindingDecl.Name+"' cannot be initialized with '?' outside class fields", bindingDecl.Span)
+				}
 				valueType := unknownType
 				hasValue := i < len(s.Values) && s.Values[i] != nil
 				if hasValue {
@@ -432,7 +435,7 @@ func (c *Checker) checkGlobals(statements []parser.Statement) {
 						c.requireAssignable(valueType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+valueType.String()+" to "+declType.String())
 					}
 				} else if !hasValue {
-					c.addDiagnostic("invalid_deferred", "binding '"+bindingDecl.Name+"' initialized with '?' requires an explicit type", bindingDecl.Span)
+					c.addDiagnostic("invalid_deferred", "binding '"+bindingDecl.Name+"' cannot be initialized with '?' outside class fields", bindingDecl.Span)
 					declType = unknownType
 				}
 				if bindingDecl.Name != "_" {
@@ -964,6 +967,9 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 	case *parser.ValStmt:
 		valueTypes := c.bindingValueTypes(s.Bindings, s.Values, s.Span)
 		for i, bindingDecl := range s.Bindings {
+			if bindingDecl.Deferred {
+				c.addDiagnostic("invalid_deferred", "binding '"+bindingDecl.Name+"' cannot be initialized with '?' outside class fields", bindingDecl.Span)
+			}
 			valueType := unknownType
 			hasValue := i < len(valueTypes) && valueTypes[i] != nil
 			if hasValue {
@@ -980,7 +986,7 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			if bindingDecl.Type != nil {
 				declType = c.resolveDeclaredType(bindingDecl.Type)
 			} else if !hasValue {
-				c.addDiagnostic("invalid_deferred", "binding '"+bindingDecl.Name+"' initialized with '?' requires an explicit type", bindingDecl.Span)
+				c.addDiagnostic("invalid_deferred", "binding '"+bindingDecl.Name+"' cannot be initialized with '?' outside class fields", bindingDecl.Span)
 				declType = unknownType
 			}
 			if bindingDecl.Name != "_" {
@@ -1220,7 +1226,7 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 	case *parser.BoolLiteral:
 		result = builtin("Bool")
 	case *parser.StringLiteral:
-		result = builtin("String")
+		result = builtin("Str")
 	case *parser.UnitLiteral:
 		result = builtin("Unit")
 	case *parser.ListLiteral:
@@ -2263,11 +2269,11 @@ func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*
 func (c *Checker) checkBinaryOperation(left, right *Type, op string, span parser.Span) *Type {
 	switch op {
 	case "+":
-		if sameType(left, builtin("String")) || sameType(right, builtin("String")) {
-			return builtin("String")
+		if sameType(left, builtin("Str")) || sameType(right, builtin("Str")) {
+			return builtin("Str")
 		}
 		if !isNumeric(left) || !isNumeric(right) {
-			c.addDiagnostic("invalid_binary_operand", "operator + requires numeric operands unless one side is String", span)
+			c.addDiagnostic("invalid_binary_operand", "operator + requires numeric operands unless one side is Str", span)
 			return unknownType
 		}
 		if !sameType(left, right) {
@@ -3158,7 +3164,7 @@ func (c *Checker) supportsEquality(t *Type) bool {
 	switch t.Kind {
 	case TypeBuiltin:
 		switch t.Name {
-		case "Int", "Int64", "Bool", "String", "Rune", "Float", "Float64":
+		case "Int", "Int64", "Bool", "Str", "Rune", "Float", "Float64":
 			return true
 		default:
 			return false
@@ -3406,7 +3412,7 @@ func isUnitType(t *Type) bool {
 
 func isBuiltinType(name string) bool {
 	switch name {
-	case "Int", "Int64", "Bool", "String", "Rune", "Float", "Float64", "Array", "Unit":
+	case "Int", "Int64", "Bool", "Str", "Rune", "Float", "Float64", "Array", "Unit":
 		return true
 	default:
 		return false
@@ -3448,7 +3454,7 @@ func isOrdered(t *Type) bool {
 		return true
 	}
 	switch t.Name {
-	case "Int", "Int64", "Float", "Float64", "String", "Rune":
+	case "Int", "Int64", "Float", "Float64", "Str", "Rune":
 		return true
 	default:
 		return false

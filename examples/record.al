@@ -14,16 +14,16 @@
 # records are read only and do not allow mutable fields
 
 interface Hopper {
-    def hop() String
+    def hop() Str
 }
 
 interface Jumper {
-    def jump(steps Int) String
+    def jump(steps Int) Str
 }
 
 record Amount with Hopper, Jumper {
     amount Int
-    description String
+    description Str
     count Int
 
     def multiple(other Amount) Amount = Amount(
@@ -36,9 +36,9 @@ record Amount with Hopper, Jumper {
         Term.println("amount:", amount)
     }
 
-    def hop() String = "Hop-hop"
+    def hop() Str = "Hop-hop"
 
-    def jump(steps Int) String = "Jump " + steps + " steps"
+    def jump(steps Int) Str = "Jump " + steps + " steps"
 }
 
 a1 = Amount(10, "description", 5)

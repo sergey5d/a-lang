@@ -10,7 +10,7 @@ class Adder {
 		this.base + value
 	}
 
-	def add(value String) Int {
+	def add(value Str) Int {
 	    Term.println("value added string " + value)
     	this.base + 4
     }
@@ -25,11 +25,11 @@ class Adder {
         }
     }
 
-    def tupleFun() (Int, String) = (1, "fun")
+    def tupleFun() (Int, Str) = (1, "fun")
 
-    def tupleFun2() (amount Int, descr String) = (2, "fun2")
+    def tupleFun2() (amount Int, descr Str) = (2, "fun2")
 
-    def tupleFun3() (amount Int, descr String) {
+    def tupleFun3() (amount Int, descr Str) {
         return (2, "fun2")
     }
 }
@@ -54,15 +54,15 @@ class Bucket {
 
 third := "some string"
 
-def suckItAll(val String) String {
+def suckItAll(val Str) Str {
     return val + " - hehe"
 }
 
-def suckItAll2(val String) String {
+def suckItAll2(val Str) Str {
     val + " - hehe 2"
 }
 
-def suckItAll23(val String) Int {
+def suckItAll23(val Str) Int {
     23
 }
 

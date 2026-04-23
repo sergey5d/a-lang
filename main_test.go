@@ -47,7 +47,7 @@ func TestParseCLIArgsScalars(t *testing.T) {
 			{Name: "count", Type: &parser.TypeRef{Name: "Int"}},
 			{Name: "ratio", Type: &parser.TypeRef{Name: "Float"}},
 			{Name: "flag", Type: &parser.TypeRef{Name: "Bool"}},
-			{Name: "name", Type: &parser.TypeRef{Name: "String"}},
+			{Name: "name", Type: &parser.TypeRef{Name: "Str"}},
 			{Name: "mark", Type: &parser.TypeRef{Name: "Rune"}},
 		},
 	}
@@ -69,7 +69,7 @@ func TestParseCLIArgsScalars(t *testing.T) {
 		t.Fatalf("expected Bool arg true, got %#v", args[2])
 	}
 	if args[3] != "alice" {
-		t.Fatalf("expected String arg alice, got %#v", args[3])
+		t.Fatalf("expected Str arg alice, got %#v", args[3])
 	}
 	if args[4] != rune('x') {
 		t.Fatalf("expected Rune arg 'x', got %#v", args[4])
