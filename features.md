@@ -26,23 +26,9 @@ Good later scope:
 - record/class destructuring by field
 - exhaustiveness checking
 
-### 2. Generics With Type Bounds
-
-Generic bounds are the other major missing feature.
-
-Why it matters:
-- stdlib constraints like `Ordering`, `Eq`, `Hashed`
-- generic collection APIs
-- safer reusable abstractions
-
-This unlocks things like:
-- bounded sort helpers
-- constrained collection methods
-- conditional derivations
-
 ## Important Next Tier
 
-### 3. Enum Ergonomics
+### 2. Enum Ergonomics
 
 Enums exist, but they still want:
 - pattern matching support
@@ -50,7 +36,7 @@ Enums exist, but they still want:
 
 Once `match` exists, enums become much more complete.
 
-### 4. Derived Protocols
+### 3. Derived Protocols
 
 Records should eventually support auto-derived protocols.
 
@@ -61,7 +47,7 @@ Likely targets:
 
 This reduces boilerplate and helps stdlib types feel native.
 
-### 5. Collection / Query APIs
+### 4. Collection / Query APIs
 
 The language now has `for ... yield`, `map`, `flatMap`, and `forEach`, but stdlib collection ergonomics still need growth.
 
@@ -75,7 +61,7 @@ These can mostly live in the stdlib, but may still need runtime support in place
 
 ## Medium Priority
 
-### 6. Operator Overloading
+### 5. Operator Overloading
 
 This is not a core blocker, but it would help:
 - numeric wrappers
@@ -83,7 +69,7 @@ This is not a core blocker, but it would help:
 - vector-like records
 - domain-specific types
 
-### 7. Anonymous Objects / Object Literals
+### 6. Anonymous Objects / Object Literals
 
 Still useful for:
 - one-off adapters
@@ -93,7 +79,7 @@ Still useful for:
 
 There is already an example reminder for this idea.
 
-### 8. Module / Visibility Polish
+### 7. Module / Visibility Polish
 
 Current package/import support is usable, but possible future additions include:
 - import aliases
@@ -102,13 +88,13 @@ Current package/import support is usable, but possible future additions include:
 
 ## Longer-Term Ideas
 
-### 9. Result / Either Style Error Values
+### 8. Result / Either Style Error Values
 
 `Option` exists, but a richer success/error enum would likely be useful later.
 
 This becomes much more attractive once `match` exists.
 
-### 10. Smarter Type Narrowing
+### 9. Smarter Type Narrowing
 
 Later improvements could include:
 - better narrowing after `is`
@@ -154,9 +140,8 @@ Current leaning:
 ## Suggested Priority Order
 
 1. `match`
-2. generic bounds
-3. enum + pattern ergonomics
-4. derived `Eq` / `Hashed`
-5. stdlib collection/query growth
-6. operator overloading
-7. anonymous objects
+2. enum + pattern ergonomics
+3. derived `Eq` / `Hashed`
+4. stdlib collection/query growth
+5. operator overloading
+6. anonymous objects

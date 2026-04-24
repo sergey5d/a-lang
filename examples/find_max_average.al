@@ -1,0 +1,42 @@
+# EXPECT:
+# 12.75
+# 0
+
+def findMaxAverage(nums Array[Float], k Int) Float {
+    if nums.size() < k {
+        return -1.
+    }
+
+    total Float := 0.
+    divisor Float := 0.
+
+    for idx <- Range(0, k) {
+        total += nums[idx]
+        divisor += 1.
+    }
+
+    maxTotal Float := total
+    numsLen Int = nums.size()
+
+    for idx <- Range(k, numsLen) {
+        total += nums[idx] - nums[idx - k]
+        if total > maxTotal {
+            maxTotal += total - maxTotal
+        }
+    }
+
+    return maxTotal / divisor
+}
+
+def main() Int {
+    nums Array[Float] = Array(6)
+    nums[0] := 1.
+    nums[1] := 12.
+    nums[2] := -5.
+    nums[3] := -6.
+    nums[4] := 50.
+    nums[5] := 3.
+
+    Term.println(findMaxAverage(nums, 4))
+    0
+}
