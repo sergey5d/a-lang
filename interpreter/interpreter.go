@@ -1144,9 +1144,6 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 		}
 		return in.callClosure(fn, namedArgValues(args))
 	case *instance:
-		if fn.class.Object {
-			return nil, RuntimeError{Message: "object '" + fn.class.Name + "' is a singleton and cannot be called", Span: call.Span}
-		}
 		return in.callApplyMethod(fn, args, call.Args, local, call.Span)
 	default:
 		return nil, RuntimeError{Message: "value is not callable", Span: call.Span}

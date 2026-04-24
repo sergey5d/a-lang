@@ -400,7 +400,7 @@ def run() Int {
 	}
 }
 
-func TestAnalyzeObjectDirectCallRejected(t *testing.T) {
+func TestAnalyzeObjectDirectCall(t *testing.T) {
 	src := `
 object Range {
 	def apply(end Int) Int = end
@@ -412,18 +412,8 @@ def run() Int {
 `
 
 	result := Analyze(parseProgram(t, src))
-	if len(result.Diagnostics) == 0 {
-		t.Fatalf("expected diagnostics, got none")
-	}
-	found := false
-	for _, diag := range result.Diagnostics {
-		if diag.Code == "invalid_call_target" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected invalid_call_target diagnostic, got %#v", result.Diagnostics)
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
 	}
 }
 

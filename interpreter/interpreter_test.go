@@ -1021,7 +1021,7 @@ def run() Int {
 	}
 }
 
-func TestObjectDirectCallRejected(t *testing.T) {
+func TestObjectDirectCall(t *testing.T) {
 	src := `
 object Range {
 	def apply(end Int) Int = end
@@ -1033,8 +1033,12 @@ def run() Int {
 `
 
 	in := New(parseProgram(t, src))
-	if _, err := in.Call("run"); err == nil {
-		t.Fatalf("expected runtime error for direct object call")
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(5) {
+		t.Fatalf("expected 5, got %#v", value)
 	}
 }
 

@@ -20,7 +20,7 @@
 
 def main() Unit {
     total Int := 0
-    for item <- Range.apply(1, 4) {
+    for item <- Range(1, 4) {
         Term.println("range", item)
         total := total + item
     }

@@ -1352,11 +1352,7 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 		}
 		if class, ok := c.classes[ident.Name]; ok {
 			if class.decl.Object {
-				for _, arg := range call.Args {
-					c.checkExpr(arg.Value)
-				}
-				c.addDiagnostic("invalid_call_target", "object '"+class.decl.Name+"' is a singleton and cannot be called", call.Span)
-				return unknownType
+				return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, call.Args, call.Span, "object '"+class.decl.Name+"' is not callable")
 			}
 			return c.checkConstructorCall(class, call)
 		}
