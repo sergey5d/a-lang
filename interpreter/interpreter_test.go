@@ -125,7 +125,7 @@ func TestClassesAndMethods(t *testing.T) {
 class Counter {
 	private count Int := ?
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
@@ -185,7 +185,7 @@ func TestMethodWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
 class Counter {
 	private count Int := ?
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
@@ -621,7 +621,7 @@ func TestMethodReferenceRequiresCall(t *testing.T) {
 class Counter {
 	private count Int := ?
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
@@ -692,7 +692,7 @@ func TestClassEqualityUsesEquals(t *testing.T) {
 class Counter {
 	private count Int
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 

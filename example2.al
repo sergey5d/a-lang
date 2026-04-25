@@ -2,7 +2,7 @@ class Counter with Eq[Counter] {
 	private count Int
 	private ticks Int := 0
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
@@ -19,7 +19,7 @@ class Counter with Eq[Counter] {
 class Box[T] {
 	private value T
 
-	def init(value T) {
+	def this(value T) {
 		this.value = value
 	}
 

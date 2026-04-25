@@ -219,7 +219,7 @@ func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, e
 	if err != nil {
 		return nil, err
 	}
-	constructor := nameLexeme == "init" || nameLexeme == "this"
+	constructor := nameLexeme == "this"
 	var returnType *TypeRef
 	if !constructor && !p.check(TokenLBrace) && !p.check(TokenAssign) {
 		typ, err := p.parseTypeRef()

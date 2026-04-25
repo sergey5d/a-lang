@@ -283,7 +283,7 @@ func TestAnalyzeConstructorFieldAssignmentAllowsEquals(t *testing.T) {
 class Box {
 	value Int
 
-	def init(value Int) {
+	def this(value Int) {
 		this.value = value
 	}
 }
@@ -367,7 +367,7 @@ func TestAnalyzeClassMembersAndConstructors(t *testing.T) {
 class Counter {
 	private count Int := ?
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
@@ -882,12 +882,12 @@ def run() Str {
 	}
 }
 
-func TestAnalyzeImmutableFieldAssignmentInInit(t *testing.T) {
+func TestAnalyzeImmutableFieldAssignmentInConstructor(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
@@ -903,12 +903,35 @@ class Counter {
 	}
 }
 
-func TestAnalyzeImmutableFieldAssignmentOutsideInit(t *testing.T) {
+func TestAnalyzeImmutableFieldAssignmentInInitMethodFails(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
 
 	def init(count Int) {
+		this.count = count
+	}
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "constructor_required" {
+		t.Fatalf("unexpected first diagnostic %#v", result.Diagnostics[0])
+	}
+	if result.Diagnostics[1].Code != "assign_immutable" {
+		t.Fatalf("unexpected second diagnostic %#v", result.Diagnostics[1])
+	}
+}
+
+func TestAnalyzeImmutableFieldAssignmentOutsideConstructor(t *testing.T) {
+	src := `
+class Counter {
+	private count Int
+
+	def this(count Int) {
 		this.count = count
 	}
 
@@ -933,7 +956,7 @@ func TestAnalyzePrivateAccessOutsideClass(t *testing.T) {
 class SecretBox {
 	private value Int
 
-	def init(value Int) {
+	def this(value Int) {
 		this.value = value
 	}
 
@@ -966,7 +989,7 @@ func TestAnalyzePrivateAccessInsideClass(t *testing.T) {
 class SecretBox {
 	private value Int
 
-	def init(value Int) {
+	def this(value Int) {
 		this.value = value
 	}
 
@@ -991,7 +1014,7 @@ func TestAnalyzeMethodOverloadResolution(t *testing.T) {
 class Counter {
 	private count Int
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
@@ -1025,7 +1048,7 @@ func TestAnalyzeNoMatchingMethodOverload(t *testing.T) {
 class Counter {
 	private count Int
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
@@ -1054,7 +1077,7 @@ func TestAnalyzeMethodReferenceWithoutCall(t *testing.T) {
 class Counter {
 	private count Int
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
@@ -1084,11 +1107,11 @@ func TestAnalyzeDuplicateConstructorOverload(t *testing.T) {
 class Counter {
 	private count Int
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
-	def init(value Int) {
+	def this(value Int) {
 		this.count = value
 	}
 }
@@ -1125,7 +1148,7 @@ class Counter {
 	private count Int
 	private seen Bool := ?
 
-	def init() {
+	def this() {
 		this.seen = false
 	}
 }
@@ -1194,7 +1217,7 @@ func TestAnalyzeLambdaCanUseEnclosingGenericType(t *testing.T) {
 class Box[T] {
 	private value T
 
-	def init(value T) {
+	def this(value T) {
 		this.value = value
 	}
 
@@ -1287,7 +1310,7 @@ func TestAnalyzeEqSupportsClassEquality(t *testing.T) {
 class Counter with Eq[Counter] {
 	private count Int
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
@@ -1314,7 +1337,7 @@ func TestAnalyzeClassEqualityRequiresEq(t *testing.T) {
 class Counter {
 	private count Int
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 }

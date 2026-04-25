@@ -22,7 +22,7 @@ func TestProgramFromTyped(t *testing.T) {
 class Counter {
 	private count Int := ?
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 

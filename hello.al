@@ -1,7 +1,7 @@
 class Adder {
 	private base Int
 
-	def init(base Int) {
+	def this(base Int) {
 		this.base = base
 	}
 
@@ -39,7 +39,7 @@ class Adder {
 class Bucket {
     base Int := ?
 
-    def init(a Int) {
+    def this(a Int) {
         this.base = a
     }
 

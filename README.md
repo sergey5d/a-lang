@@ -47,7 +47,7 @@ Before running, the CLI always:
 class Counter {
 	private count Int := ?
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 

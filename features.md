@@ -105,6 +105,18 @@ Later improvements could include:
 
 ## TBD
 
+### Interface Implementation Syntax
+
+`impl def` is implemented now, but the language still needs a final decision on whether this should remain the required syntax for interface method implementations.
+
+Open question:
+- keep `impl def` as the explicit implementation marker
+- or simplify back to plain `def` and rely on interface conformance checking only
+
+Current leaning:
+- keep `impl def` for now because it makes interface implementation explicit
+- but this is still a language-design decision, not fully settled
+
 ### Match Totality / Partial Match Behavior
 
 `match` now exists, but the language still needs a clear rule for what happens when no case matches.

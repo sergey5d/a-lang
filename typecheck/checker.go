@@ -2802,7 +2802,7 @@ func (c *Checker) checkFieldAssignment(expr *parser.MemberExpr, receiverType *Ty
 	if c.canAssignImmutableField(expr, info.decl) {
 		return fieldType, true, true
 	}
-	c.addDiagnostic("assign_immutable", "cannot assign to immutable field '"+expr.Name+"' outside init", expr.Span)
+	c.addDiagnostic("assign_immutable", "cannot assign to immutable field '"+expr.Name+"' outside constructor", expr.Span)
 	return fieldType, false, true
 }
 
@@ -2927,7 +2927,7 @@ func (c *Checker) instantiateFunctionSignature(fn *parser.FunctionDecl, subst ma
 func (c *Checker) checkConstructorRules(class classInfo) {
 	if len(class.constructors) == 0 {
 		if missing := c.uninitializedLetFields(class.decl, nil); len(missing) > 0 {
-			c.addDiagnostic("constructor_required", "class '"+class.decl.Name+"' requires init to initialize immutable fields: "+joinNames(missing), class.decl.Span)
+			c.addDiagnostic("constructor_required", "class '"+class.decl.Name+"' requires a constructor to initialize immutable fields: "+joinNames(missing), class.decl.Span)
 		}
 		return
 	}
@@ -2941,7 +2941,7 @@ func (c *Checker) checkConstructorRules(class classInfo) {
 		}
 		seen[key] = ctor
 		if missing := c.uninitializedLetFields(class.decl, ctor); len(missing) > 0 {
-			c.addDiagnostic("uninitialized_field", "constructor 'init' must initialize immutable fields: "+joinNames(missing), ctor.Span)
+			c.addDiagnostic("uninitialized_field", "constructor 'this' must initialize immutable fields: "+joinNames(missing), ctor.Span)
 		}
 	}
 }

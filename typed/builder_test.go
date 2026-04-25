@@ -22,7 +22,7 @@ class Counter {
 	private count Int
 	private ticks Int := 0
 
-	def init(count Int) {
+	def this(count Int) {
 		this.count = count
 	}
 
