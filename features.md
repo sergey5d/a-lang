@@ -104,7 +104,7 @@ Later improvements could include:
 
 Open options under discussion:
 
-1. Require exhaustive `match` expressions
+1. Keep exhaustive `match` expressions
    Shape:
    - `match value { ... }` returns `T`
    - missing cases are a compile error
@@ -113,38 +113,28 @@ Open options under discussion:
    - strongest enum / `Option` ergonomics
    - needs exhaustiveness checking
 
-2. Split total and partial forms
+2. Add `match?` as the partial form
    Possible shapes:
    - `match value { ... }` returns `T`
    - `match? value { ... }` returns `Option[T]`
-   or some similar exact-vs-partial distinction
    Good fit:
    - explicit
-   - lets users choose strict vs partial matching
-   Cost:
-   - more syntax to teach
+   - very compact
+   - keeps plain `match` as the total form
 
-3. Make all `match` expressions return `Option[T]`
-   Shape:
-   - `match value { ... }` returns `Option[T]`
+3. Add `try match` as the partial form
+   Possible shapes:
+   - `match value { ... }` returns `T`
+   - `try match value { ... }` returns `Option[T]`
    Good fit:
-   - never throws
-   Cost:
-   - makes ordinary exhaustive matches noisier
-   - weakens `match` as a primary expression form
-
-4. Differentiate statements and expressions
-   Shape:
-   - statement `match` may be partial
-   - expression `match` must be exhaustive and return `T`
-   Good fit:
-   - practical
-   - keeps expression form safe without forcing `Option` everywhere
+   - explicit
+   - keyword-only
+   - keeps plain `match` as the total form
 
 Current leaning:
 - avoid runtime "no match" exceptions as a normal language outcome
-- keep expression `match` total if possible
-- if partial matching is needed, prefer a separate explicit form over silently returning `Option[T]` everywhere
+- keep `match` as the exhaustive / total form
+- if partial matching is needed, the current syntax candidates are `match?` and `try match`
 
 ### Constructor / Companion Design
 
