@@ -13,7 +13,7 @@
 # 1
 
 object RowOrdering with Ordering[(Int, Int, Str)] {
-    def compare(left (Int, Int, Str), right (Int, Int, Str)) Int {
+    impl def compare(left (Int, Int, Str), right (Int, Int, Str)) Int {
         leftX Int, leftY Int, _ = left
         rightX Int, rightY Int, _ = right
 

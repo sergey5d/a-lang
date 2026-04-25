@@ -16,6 +16,7 @@ const (
 	TokenBool       TokenType = "BOOL"
 
 	TokenDef        TokenType = "DEF"
+	TokenImpl       TokenType = "IMPL"
 	TokenPackage    TokenType = "PACKAGE"
 	TokenImport     TokenType = "IMPORT"
 	TokenAs         TokenType = "AS"
@@ -83,6 +84,7 @@ const (
 
 var keywords = map[string]TokenType{
 	"def":        TokenDef,
+	"impl":       TokenImpl,
 	"package":    TokenPackage,
 	"import":     TokenImport,
 	"as":         TokenAs,

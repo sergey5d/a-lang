@@ -5,11 +5,11 @@ interface Named {
 }
 
 class A with Named {
-    def label() Str = "A"
+    impl def label() Str = "A"
 }
 
 class B with Named {
-    def label() Str = "B"
+    impl def label() Str = "B"
 }
 
 object C {

@@ -281,9 +281,11 @@ Class:
 class Box[T] with Named {
     value T
 
-    def label() Str = "box"
+    impl def label() Str = "box"
 }
 ```
+
+When a class, record, or object implements an interface method, that method must be written with `impl def` instead of plain `def`.
 
 Object:
 
@@ -308,6 +310,18 @@ Interfaces:
 interface Named {
     def label() Str
 }
+
+Methods that satisfy an interface must use `impl def`:
+
+```txt
+interface Named {
+    def label() Str
+}
+
+class Box with Named {
+    impl def label() Str = "box"
+}
+```
 ```
 
 Enums:
@@ -588,6 +602,7 @@ Other operators / constructs:
 - `->` for function types and lambdas
 - `=>` for match cases
 - `with` for interface implementation, generic bounds, and record update
+- `impl def` for interface method implementations
 
 Examples:
 

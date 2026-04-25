@@ -3,7 +3,7 @@ record IntRange with Iterable[Int] {
     end Int
     step Int
 
-    def iterator() Iterator[Int] = RangeIterator(start = start, end = end, step = step)
+    impl def iterator() Iterator[Int] = RangeIterator(start = start, end = end, step = step)
 }
 
 private class RangeIterator with Iterator[Int] {
@@ -17,14 +17,14 @@ private class RangeIterator with Iterator[Int] {
         this.step := step
     }
 
-    def hasNext() Bool {
+    impl def hasNext() Bool {
         if this.step > 0 {
             return this.current < this.end
         }
         return this.current > this.end
     }
 
-    def next() Int {
+    impl def next() Int {
         value Int = this.current
         this.current := this.current + this.step
         value

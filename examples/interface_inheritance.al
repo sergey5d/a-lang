@@ -17,9 +17,9 @@ interface Acrobat with Hopper, Jumper {
 }
 
 class Rabbit with Acrobat {
-    def hop() Str = "hop"
+    impl def hop() Str = "hop"
 
-    def jump(steps Int) Str = "jump " + steps
+    impl def jump(steps Int) Str = "jump " + steps
 }
 
 def main() Unit {

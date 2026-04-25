@@ -36,9 +36,9 @@ record Amount with Hopper, Jumper {
         Term.println("amount:", amount)
     }
 
-    def hop() Str = "Hop-hop"
+    impl def hop() Str = "Hop-hop"
 
-    def jump(steps Int) Str = "Jump " + steps + " steps"
+    impl def jump(steps Int) Str = "Jump " + steps + " steps"
 }
 
 a1 = Amount(10, "description", 5)

@@ -8,11 +8,11 @@ interface WorkerLike {
 }
 
 class Worker with WorkerLike {
-    def doWork() Int = 7
+    impl def doWork() Int = 7
 }
 
 class Other with WorkerLike {
-    def doWork() Int = 3
+    impl def doWork() Int = 3
 }
 
 def describe(value WorkerLike) {

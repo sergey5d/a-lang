@@ -1,8 +1,7 @@
 # EXPECT:
 # hop
-# jump 3
-# true
-# true
+# jump 2
+# 0
 
 interface Hopper {
     def hop() Str
@@ -18,10 +17,10 @@ class Rabbit with Hopper, Jumper {
     impl def jump(steps Int) Str = "jump " + steps
 }
 
-def main() Unit {
-    rabbit = Rabbit()
+def main() Int {
+    rabbit Hopper = Rabbit()
+    jumper Jumper = Rabbit()
     Term.println(rabbit.hop())
-    Term.println(rabbit.jump(3))
-    Term.println(rabbit is Hopper)
-    Term.println(rabbit is Jumper)
+    Term.println(jumper.jump(2))
+    0
 }

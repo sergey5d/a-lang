@@ -13,9 +13,9 @@ class ArrayListIterator[T] with Iterator[T] {
         this.limit := limit
     }
 
-    def hasNext() Bool = index < limit
+    impl def hasNext() Bool = index < limit
 
-    def next() T {
+    impl def next() T {
         value T = items[index]
         index := index + 1
         value
@@ -44,7 +44,7 @@ class ArrayList[T] with Iterable[T] {
 
     def size() Int = count
 
-    def iterator() Iterator[T] = ArrayListIterator[T](items = items, limit = count)
+    impl def iterator() Iterator[T] = ArrayListIterator[T](items = items, limit = count)
 }
 
 def main() Int {

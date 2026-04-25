@@ -760,11 +760,11 @@ interface Named {
 }
 
 class A with Named {
-	def label() Str = "A"
+	impl def label() Str = "A"
 }
 
 class B with Named {
-	def label() Str = "B"
+	impl def label() Str = "B"
 }
 
 object C {
@@ -810,7 +810,7 @@ class Good with Stringable {
 	def init() {
 	}
 
-	def show() Str {
+	impl def show() Str {
 		return "ok"
 	}
 }
@@ -830,6 +830,28 @@ class Bad with Stringable {
 	}
 }
 
+func TestAnalyzeInterfaceImplementationRequiresImplDef(t *testing.T) {
+	src := `
+interface Stringable {
+	def show() Str
+}
+
+class Bad with Stringable {
+	def show() Str {
+		return "ok"
+	}
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %#v", result.Diagnostics)
+	}
+	if result.Diagnostics[0].Code != "interface_method_requires_impl" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
 func TestAnalyzeInterfaceInheritance(t *testing.T) {
 	src := `
 interface Hopper {
@@ -844,8 +866,8 @@ interface Acrobat with Hopper, Jumper {
 }
 
 class Rabbit with Acrobat {
-	def hop() Str = "hop"
-	def jump(steps Int) Str = "jump " + steps
+	impl def hop() Str = "hop"
+	impl def jump(steps Int) Str = "jump " + steps
 }
 
 def run() Str {
@@ -1269,7 +1291,7 @@ class Counter with Eq[Counter] {
 		this.count = count
 	}
 
-	def equals(other Counter) Bool {
+	impl def equals(other Counter) Bool {
 		return this.count == other.count
 	}
 }
@@ -1316,7 +1338,7 @@ def run() Bool {
 func TestAnalyzeBuiltinCollectionAndTermInterfaces(t *testing.T) {
 	src := `
 object Ascending with Ordering[Int] {
-	def compare(left Int, right Int) Int = left - right
+	impl def compare(left Int, right Int) Int = left - right
 }
 
 def run() Int {
@@ -1345,7 +1367,7 @@ def run() Int {
 func TestAnalyzeListSortWithOrdering(t *testing.T) {
 	src := `
 object Descending with Ordering[Int] {
-	def compare(left Int, right Int) Int = right - left
+	impl def compare(left Int, right Int) Int = right - left
 }
 
 def run() Int {
@@ -1382,7 +1404,7 @@ def run() Int {
 func TestAnalyzeGenericBounds(t *testing.T) {
 	src := `
 object Ascending with Ordering[Int] {
-	def compare(left Int, right Int) Int = left - right
+	impl def compare(left Int, right Int) Int = left - right
 }
 
 class Box[T with Ordering[T]] {

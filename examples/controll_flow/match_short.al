@@ -14,7 +14,7 @@ interface WorkerLike {
 }
 
 class Worker with WorkerLike {
-    def doWork() Int = 7
+    impl def doWork() Int = 7
 }
 
 def main() Int {

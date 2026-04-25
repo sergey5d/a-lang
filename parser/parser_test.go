@@ -944,7 +944,7 @@ class Box[T] with Mapper[T, Stringable] {
 		this.value = value
 	}
 
-	def map(key T) Stringable {
+	impl def map(key T) Stringable {
 		return this
 	}
 }
@@ -958,7 +958,7 @@ class SolidWork with Stringable {
 		this.b = b
 	}
 
-	def show() Str {
+	impl def show() Str {
 	}
 
 	def addOne(one Int) Int {
@@ -1021,6 +1021,9 @@ solidWork = SolidWork(1, false)
 	}
 	if !cls.Methods[3].Private {
 		t.Fatalf("expected helper method to be private")
+	}
+	if !box.Methods[1].Impl || !cls.Methods[1].Impl {
+		t.Fatalf("expected implemented methods to be marked impl")
 	}
 	if !cls.Methods[0].Constructor {
 		t.Fatalf("expected init to be marked as constructor")

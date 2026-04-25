@@ -63,7 +63,7 @@ func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 				return nil, err
 			}
 			decl.Fields = append(decl.Fields, field)
-		case TokenDef:
+		case TokenDef, TokenImpl:
 			sawNonField = true
 			method, err := p.parseMethod(false, false)
 			if err != nil {
@@ -131,7 +131,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 				return nil, err
 			}
 			decl.Fields = append(decl.Fields, field)
-		case TokenDef:
+		case TokenDef, TokenImpl:
 			sawMethod = true
 			method, err := p.parseMethod(private, false)
 			if err != nil {
@@ -188,9 +188,18 @@ func (p *Parser) parseField(private bool) (FieldDecl, error) {
 }
 
 func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, error) {
-	start, err := p.consume(TokenDef, "expected 'def'")
-	if err != nil {
+	impl := p.match(TokenImpl)
+	start := p.peek()
+	if _, err := p.consume(TokenDef, "expected 'def'"); err != nil {
+		if impl {
+			return nil, err
+		}
 		return nil, err
+	}
+	if impl {
+		start = p.tokens[p.pos-2]
+	} else {
+		start = p.previous()
 	}
 	nameLexeme := ""
 	if allowShortApply && p.check(TokenLParen) {
@@ -232,6 +241,7 @@ func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, e
 		Parameters:     params,
 		ReturnType:     returnType,
 		Body:           body,
+		Impl:           impl,
 		Private:        private,
 		Constructor:    constructor,
 		Span:           mergeSpans(tokenSpan(start), body.Span),
