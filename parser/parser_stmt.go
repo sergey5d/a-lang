@@ -344,34 +344,51 @@ func (p *Parser) parseMatchStmt() (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := p.consume(TokenLBrace, "expected '{' after match value"); err != nil {
-		return nil, err
-	}
-	stmt := &MatchStmt{Value: value}
-	for !p.check(TokenRBrace) && !p.isAtEnd() {
-		pattern, err := p.parsePattern()
-		if err != nil {
-			return nil, err
-		}
-		if _, err := p.consume(TokenFatArrow, "expected '=>' after match pattern"); err != nil {
-			return nil, err
-		}
-		body, err := p.parseBlock()
-		if err != nil {
-			return nil, err
-		}
-		stmt.Cases = append(stmt.Cases, MatchCase{
-			Pattern: pattern,
-			Body:    body,
-			Span:    mergeSpans(patternSpan(pattern), body.Span),
-		})
-	}
-	end, err := p.consume(TokenRBrace, "expected '}' after match cases")
+	cases, end, err := p.parseMatchCases()
 	if err != nil {
 		return nil, err
 	}
+	stmt := &MatchStmt{Value: value, Cases: cases}
 	stmt.Span = mergeSpans(tokenSpan(start), tokenSpan(end))
 	return stmt, nil
+}
+
+func (p *Parser) parseMatchCases() ([]MatchCase, Token, error) {
+	if _, err := p.consume(TokenLBrace, "expected '{' after match value"); err != nil {
+		return nil, Token{}, err
+	}
+	var cases []MatchCase
+	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		pattern, err := p.parsePattern()
+		if err != nil {
+			return nil, Token{}, err
+		}
+		if _, err := p.consume(TokenFatArrow, "expected '=>' after match pattern"); err != nil {
+			return nil, Token{}, err
+		}
+		matchCase := MatchCase{Pattern: pattern}
+		if p.check(TokenLBrace) {
+			body, err := p.parseBlock()
+			if err != nil {
+				return nil, Token{}, err
+			}
+			matchCase.Body = body
+			matchCase.Span = mergeSpans(patternSpan(pattern), body.Span)
+		} else {
+			expr, err := p.parseExpressionWithOptions(0, false)
+			if err != nil {
+				return nil, Token{}, err
+			}
+			matchCase.Expr = expr
+			matchCase.Span = mergeSpans(patternSpan(pattern), exprSpan(expr))
+		}
+		cases = append(cases, matchCase)
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after match cases")
+	if err != nil {
+		return nil, Token{}, err
+	}
+	return cases, end, nil
 }
 
 func (p *Parser) parsePattern() (Pattern, error) {

@@ -1101,7 +1101,12 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		for _, matchCase := range s.Cases {
 			c.pushScope()
 			c.checkMatchPattern(matchCase.Pattern, valueType)
-			c.checkBlockStatements(matchCase.Body.Statements, false)
+			if matchCase.Body != nil {
+				c.checkBlockStatements(matchCase.Body.Statements, false)
+			}
+			if matchCase.Expr != nil {
+				c.checkExpr(matchCase.Expr)
+			}
 			c.popScope()
 		}
 	case *parser.LoopStmt:
@@ -1370,6 +1375,33 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			break
 		}
 		result = thenType
+	case *parser.MatchExpr:
+		valueType := c.checkExpr(e.Value)
+		var resultType *Type
+		for _, matchCase := range e.Cases {
+			c.pushScope()
+			c.checkMatchPattern(matchCase.Pattern, valueType)
+			caseType := unknownType
+			if matchCase.Body != nil {
+				caseType = c.checkBlockResult(matchCase.Body, "invalid_match_expression", "match case must end with an expression")
+			} else if matchCase.Expr != nil {
+				caseType = c.checkExpr(matchCase.Expr)
+			}
+			c.popScope()
+			if resultType == nil {
+				resultType = caseType
+				continue
+			}
+			if !sameType(resultType, caseType) {
+				c.addDiagnostic("type_mismatch", "match expression cases must have the same type", e.Span)
+				resultType = unknownType
+			}
+		}
+		if resultType == nil {
+			result = unknownType
+			break
+		}
+		result = resultType
 	case *parser.ForYieldExpr:
 		c.pushScope()
 		for _, binding := range e.Bindings {

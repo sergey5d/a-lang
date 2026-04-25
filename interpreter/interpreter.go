@@ -497,7 +497,14 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			for _, binding := range bindings {
 				caseEnv.define(binding.name, binding.value, false)
 			}
-			return in.execBlock(matchCase.Body, caseEnv, self)
+			if matchCase.Body != nil {
+				return in.execBlock(matchCase.Body, caseEnv, self)
+			}
+			if matchCase.Expr != nil {
+				value, err := in.evalExpr(matchCase.Expr, caseEnv)
+				return value, nil, err
+			}
+			return nil, nil, nil
 		}
 		return nil, nil, nil
 	case *parser.LoopStmt:
@@ -1025,6 +1032,36 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			return nil, RuntimeError{Message: "unexpected control flow in if expression", Span: e.Span}
 		}
 		return value, nil
+	case *parser.MatchExpr:
+		value, err := in.evalExpr(e.Value, local)
+		if err != nil {
+			return nil, err
+		}
+		for _, matchCase := range e.Cases {
+			bindings, ok, err := in.matchPattern(matchCase.Pattern, value, local)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				continue
+			}
+			caseEnv := newEnv(local)
+			for _, binding := range bindings {
+				caseEnv.define(binding.name, binding.value, false)
+			}
+			if matchCase.Body != nil {
+				value, signal, err := in.evalBlockValue(matchCase.Body, caseEnv, nil, "match case must end with an expression")
+				if err != nil {
+					return nil, err
+				}
+				if signal != nil {
+					return nil, RuntimeError{Message: "unexpected control flow in match expression", Span: e.Span}
+				}
+				return value, nil
+			}
+			return in.evalExpr(matchCase.Expr, caseEnv)
+		}
+		return nil, RuntimeError{Message: "non-exhaustive match expression", Span: e.Span}
 	case *parser.ForYieldExpr:
 		var yielded []Value
 		signal, err := in.execForBindings(e.Bindings, 0, local, nil, func(loopEnv *env) (any, error) {

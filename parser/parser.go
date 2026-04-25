@@ -89,6 +89,8 @@ func exprSpan(expr Expr) Span {
 		return e.Span
 	case *IfExpr:
 		return e.Span
+	case *MatchExpr:
+		return e.Span
 	case *ForYieldExpr:
 		return e.Span
 	case *LambdaExpr:

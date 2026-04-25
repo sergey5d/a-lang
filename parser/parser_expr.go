@@ -149,6 +149,8 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		return &ListLiteral{Elements: items, Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
 	case TokenIf:
 		return p.parseIfExprAfterStart(token)
+	case TokenMatch:
+		return p.parseMatchExprAfterStart(token)
 	case TokenFor:
 		return p.parseForYieldExprAfterStart(token)
 	default:
@@ -177,6 +179,22 @@ func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
 		Then:      thenBlock,
 		Else:      elseBlock,
 		Span:      mergeSpans(tokenSpan(start), elseBlock.Span),
+	}, nil
+}
+
+func (p *Parser) parseMatchExprAfterStart(start Token) (Expr, error) {
+	value, err := p.parseExpressionWithOptions(0, false)
+	if err != nil {
+		return nil, err
+	}
+	cases, end, err := p.parseMatchCases()
+	if err != nil {
+		return nil, err
+	}
+	return &MatchExpr{
+		Value: value,
+		Cases: cases,
+		Span:  mergeSpans(tokenSpan(start), tokenSpan(end)),
 	}, nil
 }
 

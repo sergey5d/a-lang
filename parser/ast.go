@@ -239,6 +239,7 @@ func (*MatchStmt) statementNode() {}
 type MatchCase struct {
 	Pattern Pattern    `json:"pattern"`
 	Body    *BlockStmt `json:"body"`
+	Expr    Expr       `json:"expr,omitempty"`
 	Span    Span       `json:"span"`
 }
 
@@ -455,6 +456,15 @@ type IfExpr struct {
 }
 
 func (*IfExpr) exprNode() {}
+
+// MatchExpr is a match expression whose value comes from the matched case.
+type MatchExpr struct {
+	Value Expr        `json:"value"`
+	Cases []MatchCase `json:"cases"`
+	Span  Span        `json:"span"`
+}
+
+func (*MatchExpr) exprNode() {}
 
 // ForYieldExpr is a yield-style for expression that evaluates to a list.
 type ForYieldExpr struct {

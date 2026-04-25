@@ -442,6 +442,22 @@ type IfExpr struct {
 
 func (*IfExpr) exprNode() {}
 
+// MatchCase is a typed case in a match statement or expression.
+type MatchCase struct {
+	Pattern parser.Pattern
+	Body    *BlockStmt
+	Expr    Expr
+}
+
+// MatchExpr is a typed match expression.
+type MatchExpr struct {
+	baseExpr
+	Value Expr
+	Cases []MatchCase
+}
+
+func (*MatchExpr) exprNode() {}
+
 // ForYieldExpr is a typed yield-style loop expression.
 type ForYieldExpr struct {
 	baseExpr

@@ -62,6 +62,8 @@ func (b *exprBuilder) Build(expr parser.Expr) (Expr, error) {
 		return b.buildRecordUpdateExpr(expr, e)
 	case *parser.IfExpr:
 		return b.buildIfExpr(expr, e)
+	case *parser.MatchExpr:
+		return b.buildMatchExpr(expr, e)
 	case *parser.ForYieldExpr:
 		return b.buildForYieldExpr(expr, e)
 	case *parser.CallExpr:
