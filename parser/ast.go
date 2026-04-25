@@ -157,6 +157,11 @@ type Statement interface {
 	statementNode()
 }
 
+// Pattern is implemented by all parser AST match-pattern nodes.
+type Pattern interface {
+	patternNode()
+}
+
 // LocalFunctionStmt declares a named local function inside a block.
 type LocalFunctionStmt struct {
 	Function *FunctionDecl `json:"function"`
@@ -221,6 +226,22 @@ type IfStmt struct {
 
 func (*IfStmt) statementNode() {}
 
+// MatchStmt represents a match statement with pattern cases.
+type MatchStmt struct {
+	Value Expr        `json:"value"`
+	Cases []MatchCase `json:"cases"`
+	Span  Span        `json:"span"`
+}
+
+func (*MatchStmt) statementNode() {}
+
+// MatchCase represents a single pattern/body case in a match statement.
+type MatchCase struct {
+	Pattern Pattern    `json:"pattern"`
+	Body    *BlockStmt `json:"body"`
+	Span    Span       `json:"span"`
+}
+
 // LoopStmt represents an infinite loop.
 type LoopStmt struct {
 	Body *BlockStmt `json:"body"`
@@ -270,6 +291,46 @@ type ExprStmt struct {
 }
 
 func (*ExprStmt) statementNode() {}
+
+// WildcardPattern matches any value and binds nothing.
+type WildcardPattern struct {
+	Span Span `json:"span"`
+}
+
+func (*WildcardPattern) patternNode() {}
+
+// BindingPattern binds the matched value to a local name.
+type BindingPattern struct {
+	Name string `json:"name"`
+	Span Span   `json:"span"`
+}
+
+func (*BindingPattern) patternNode() {}
+
+// LiteralPattern matches a literal value exactly.
+type LiteralPattern struct {
+	Value Expr `json:"value"`
+	Span  Span `json:"span"`
+}
+
+func (*LiteralPattern) patternNode() {}
+
+// TuplePattern matches a destructurable value by position.
+type TuplePattern struct {
+	Elements []Pattern `json:"elements"`
+	Span     Span      `json:"span"`
+}
+
+func (*TuplePattern) patternNode() {}
+
+// ConstructorPattern matches an enum case and its payload fields.
+type ConstructorPattern struct {
+	Path []string  `json:"path"`
+	Args []Pattern `json:"args,omitempty"`
+	Span Span      `json:"span"`
+}
+
+func (*ConstructorPattern) patternNode() {}
 
 // Identifier is a name reference expression.
 type Identifier struct {

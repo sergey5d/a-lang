@@ -27,6 +27,7 @@ const (
 	TokenWith       TokenType = "WITH"
 	TokenPrivate    TokenType = "PRIVATE"
 	TokenIf         TokenType = "IF"
+	TokenMatch      TokenType = "MATCH"
 	TokenIs         TokenType = "IS"
 	TokenElse       TokenType = "ELSE"
 	TokenLoop       TokenType = "LOOP"
@@ -48,6 +49,7 @@ const (
 	TokenQuestion TokenType = "?"
 	TokenEllipsis TokenType = "..."
 	TokenAssign TokenType = "="
+	TokenFatArrow TokenType = "=>"
 	TokenColonAssign TokenType = ":="
 
 	TokenPlus    TokenType = "+"
@@ -91,6 +93,7 @@ var keywords = map[string]TokenType{
 	"with":       TokenWith,
 	"private":    TokenPrivate,
 	"if":         TokenIf,
+	"match":      TokenMatch,
 	"is":         TokenIs,
 	"else":       TokenElse,
 	"loop":       TokenLoop,

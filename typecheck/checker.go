@@ -1096,6 +1096,14 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		if s.Else != nil {
 			c.checkBlockStatements(s.Else.Statements, false)
 		}
+	case *parser.MatchStmt:
+		valueType := c.checkExpr(s.Value)
+		for _, matchCase := range s.Cases {
+			c.pushScope()
+			c.checkMatchPattern(matchCase.Pattern, valueType)
+			c.checkBlockStatements(matchCase.Body.Statements, false)
+			c.popScope()
+		}
 	case *parser.LoopStmt:
 		c.pushScope()
 		if s.Body != nil {
@@ -1139,6 +1147,77 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		if len(c.diagnostics) == before && !c.exprHasEffect(s.Expr) {
 			c.addDiagnostic("useless_expression", "expression statement has no effect", s.Span)
 		}
+	}
+}
+
+func (c *Checker) checkMatchPattern(pattern parser.Pattern, valueType *Type) {
+	switch p := pattern.(type) {
+	case *parser.WildcardPattern:
+		return
+	case *parser.BindingPattern:
+		c.define(p.Name, valueType, false)
+	case *parser.LiteralPattern:
+		patternType := c.checkExpr(p.Value)
+		if !sameType(valueType, patternType) && !isUnknown(valueType) && !isUnknown(patternType) {
+			c.addDiagnostic("invalid_match_pattern", "pattern does not match value type", p.Span)
+		}
+	case *parser.TuplePattern:
+		partTypes := c.destructureValueTypes(len(p.Elements), valueType, p.Span, "invalid_match_pattern", "match pattern")
+		for i, elem := range p.Elements {
+			elemType := unknownType
+			if i < len(partTypes) && partTypes[i] != nil {
+				elemType = partTypes[i]
+			}
+			c.checkMatchPattern(elem, elemType)
+		}
+	case *parser.ConstructorPattern:
+		c.checkConstructorPattern(p, valueType)
+	}
+}
+
+func (c *Checker) checkConstructorPattern(pattern *parser.ConstructorPattern, valueType *Type) {
+	if valueType == nil || isUnknown(valueType) || valueType.Kind != TypeClass {
+		c.addDiagnostic("invalid_match_pattern", "constructor pattern requires enum value", pattern.Span)
+		return
+	}
+	info, ok := c.classes[valueType.Name]
+	if !ok || !info.decl.Enum {
+		c.addDiagnostic("invalid_match_pattern", "constructor pattern requires enum value", pattern.Span)
+		return
+	}
+	caseName := ""
+	switch len(pattern.Path) {
+	case 1:
+		caseName = pattern.Path[0]
+	case 2:
+		if pattern.Path[0] != valueType.Name {
+			c.addDiagnostic("invalid_match_pattern", "constructor pattern does not match value type", pattern.Span)
+			return
+		}
+		caseName = pattern.Path[1]
+	default:
+		c.addDiagnostic("invalid_match_pattern", "unsupported constructor pattern", pattern.Span)
+		return
+	}
+	var enumCase *parser.EnumCaseDecl
+	for i := range info.decl.Cases {
+		if info.decl.Cases[i].Name == caseName {
+			enumCase = &info.decl.Cases[i]
+			break
+		}
+	}
+	if enumCase == nil {
+		c.addDiagnostic("invalid_match_pattern", "unknown enum case '"+caseName+"'", pattern.Span)
+		return
+	}
+	if len(pattern.Args) != len(enumCase.Fields) {
+		c.addDiagnostic("invalid_match_pattern", fmt.Sprintf("enum case '%s' expects %d pattern arguments, got %d", caseName, len(enumCase.Fields), len(pattern.Args)), pattern.Span)
+		return
+	}
+	subst := c.substForDecl(info.decl.TypeParameters, valueType.Args)
+	for i, arg := range pattern.Args {
+		fieldType := c.instantiateTypeRef(enumCase.Fields[i].Type, subst)
+		c.checkMatchPattern(arg, fieldType)
 	}
 }
 

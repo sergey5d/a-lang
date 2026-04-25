@@ -131,6 +131,9 @@ func (l *Lexer) nextToken() (Token, error) {
 		if l.match('=') {
 			return l.token(TokenEqEq, "==", startLine, startColumn), nil
 		}
+		if l.match('>') {
+			return l.token(TokenFatArrow, "=>", startLine, startColumn), nil
+		}
 		return l.token(TokenAssign, "=", startLine, startColumn), nil
 	case '<':
 		l.advance()

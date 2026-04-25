@@ -257,6 +257,49 @@ def run() Int {
 	}
 }
 
+func TestMatchStmt(t *testing.T) {
+	src := `
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+def run() Int {
+	value OptionX[Int] = OptionX.SomeX(7)
+	total Int := 0
+
+	match value {
+		SomeX(item) => {
+			total += item
+		}
+		OptionX.NoneX => {
+			total += 100
+		}
+	}
+
+	pair = (1, 2)
+	match pair {
+		(left, right) => {
+			total += left + right
+		}
+	}
+
+	return total
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(10) {
+		t.Fatalf("expected 10, got %#v", value)
+	}
+}
+
 func TestFunctionImplicitReturn(t *testing.T) {
 	src := `
 def suffix(value Str) Str {

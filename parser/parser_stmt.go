@@ -29,6 +29,8 @@ func (p *Parser) parseStatement() (Statement, error) {
 	switch p.peek().Type {
 	case TokenIf:
 		return p.parseIfStmt()
+	case TokenMatch:
+		return p.parseMatchStmt()
 	case TokenLoop:
 		return p.parseLoopStmt()
 	case TokenFor:
@@ -331,6 +333,135 @@ func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
 	}
 	stmt.Span = mergeSpans(tokenSpan(start), thenBlock.Span)
 	return stmt, nil
+}
+
+func (p *Parser) parseMatchStmt() (Statement, error) {
+	start, err := p.consume(TokenMatch, "expected 'match'")
+	if err != nil {
+		return nil, err
+	}
+	value, err := p.parseExpressionWithOptions(0, false)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.consume(TokenLBrace, "expected '{' after match value"); err != nil {
+		return nil, err
+	}
+	stmt := &MatchStmt{Value: value}
+	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		pattern, err := p.parsePattern()
+		if err != nil {
+			return nil, err
+		}
+		if _, err := p.consume(TokenFatArrow, "expected '=>' after match pattern"); err != nil {
+			return nil, err
+		}
+		body, err := p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
+		stmt.Cases = append(stmt.Cases, MatchCase{
+			Pattern: pattern,
+			Body:    body,
+			Span:    mergeSpans(patternSpan(pattern), body.Span),
+		})
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after match cases")
+	if err != nil {
+		return nil, err
+	}
+	stmt.Span = mergeSpans(tokenSpan(start), tokenSpan(end))
+	return stmt, nil
+}
+
+func (p *Parser) parsePattern() (Pattern, error) {
+	token := p.advance()
+	switch token.Type {
+	case TokenUnder:
+		return &WildcardPattern{Span: tokenSpan(token)}, nil
+	case TokenInteger:
+		return &LiteralPattern{Value: &IntegerLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, Span: tokenSpan(token)}, nil
+	case TokenFloat:
+		return &LiteralPattern{Value: &FloatLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, Span: tokenSpan(token)}, nil
+	case TokenRune:
+		return &LiteralPattern{Value: &RuneLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, Span: tokenSpan(token)}, nil
+	case TokenBool:
+		return &LiteralPattern{Value: &BoolLiteral{Value: token.Lexeme == "true", Span: tokenSpan(token)}, Span: tokenSpan(token)}, nil
+	case TokenString:
+		return &LiteralPattern{Value: &StringLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, Span: tokenSpan(token)}, nil
+	case TokenLParen:
+		if p.check(TokenRParen) {
+			end, err := p.consume(TokenRParen, "expected ')'")
+			if err != nil {
+				return nil, err
+			}
+			span := mergeSpans(tokenSpan(token), tokenSpan(end))
+			return &LiteralPattern{Value: &UnitLiteral{Span: span}, Span: span}, nil
+		}
+		first, err := p.parsePattern()
+		if err != nil {
+			return nil, err
+		}
+		if !p.match(TokenComma) {
+			if _, err := p.consume(TokenRParen, "expected ')' after pattern"); err != nil {
+				return nil, err
+			}
+			return first, nil
+		}
+		elements := []Pattern{first}
+		for {
+			next, err := p.parsePattern()
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, next)
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+		end, err := p.consume(TokenRParen, "expected ')' after tuple pattern")
+		if err != nil {
+			return nil, err
+		}
+		return &TuplePattern{Elements: elements, Span: mergeSpans(tokenSpan(token), tokenSpan(end))}, nil
+	case TokenIdentifier:
+		path := []string{token.Lexeme}
+		endSpan := tokenSpan(token)
+		for p.match(TokenDot) {
+			next, err := p.consume(TokenIdentifier, "expected identifier after '.'")
+			if err != nil {
+				return nil, err
+			}
+			path = append(path, next.Lexeme)
+			endSpan = tokenSpan(next)
+		}
+		if p.match(TokenLParen) {
+			var args []Pattern
+			if !p.check(TokenRParen) {
+				for {
+					arg, err := p.parsePattern()
+					if err != nil {
+						return nil, err
+					}
+					args = append(args, arg)
+					if !p.match(TokenComma) {
+						break
+					}
+				}
+			}
+			end, err := p.consume(TokenRParen, "expected ')' after constructor pattern")
+			if err != nil {
+				return nil, err
+			}
+			return &ConstructorPattern{Path: path, Args: args, Span: mergeSpans(tokenSpan(token), tokenSpan(end))}, nil
+		}
+		if len(path) == 1 {
+			return &BindingPattern{Name: path[0], Span: tokenSpan(token)}, nil
+		}
+		return &ConstructorPattern{Path: path, Span: mergeSpans(tokenSpan(token), endSpan)}, nil
+	default:
+		return nil, fmt.Errorf("unexpected token in pattern %s", token.String())
+	}
 }
 
 func (p *Parser) bindingListFollowedByArrow(start int) bool {

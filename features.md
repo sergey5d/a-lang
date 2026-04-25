@@ -4,6 +4,8 @@ This file captures the main language gaps and near-term design directions.
 
 ## Highest Priority
 
+TBO: add value as Some(x)
+
 ### 1. Match / Pattern Matching
 
 This is the biggest missing expression feature.

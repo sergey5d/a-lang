@@ -119,6 +119,34 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeMatchStmt(t *testing.T) {
+	src := `
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+def run(value OptionX[Int]) Int {
+	match value {
+		SomeX(x) => {
+			return x
+		}
+		OptionX.NoneX => {
+			return 0
+		}
+	}
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeConstructorFieldAssignmentAllowsEquals(t *testing.T) {
 	src := `
 class Box {

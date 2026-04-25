@@ -84,6 +84,42 @@ func TestParseSampleProgram(t *testing.T) {
 	}
 }
 
+func TestParseMatchStmt(t *testing.T) {
+	program, err := Parse(`
+def run(value OptionX[Int]) Int {
+	match value {
+		SomeX(x) => {
+			return x
+		}
+		OptionX.NoneX => {
+			return 0
+		}
+	}
+}
+
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+`)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	fn := program.Functions[0]
+	matchStmt, ok := fn.Body.Statements[0].(*MatchStmt)
+	if !ok {
+		t.Fatalf("expected match statement, got %T", fn.Body.Statements[0])
+	}
+	if _, ok := matchStmt.Cases[0].Pattern.(*ConstructorPattern); !ok {
+		t.Fatalf("expected constructor pattern, got %T", matchStmt.Cases[0].Pattern)
+	}
+	if _, ok := matchStmt.Cases[1].Pattern.(*ConstructorPattern); !ok {
+		t.Fatalf("expected qualified constructor pattern, got %T", matchStmt.Cases[1].Pattern)
+	}
+}
+
 func TestParseHashComments(t *testing.T) {
 	src := `
 # top-level comment

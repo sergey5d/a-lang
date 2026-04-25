@@ -118,6 +118,8 @@ func stmtSpan(stmt Statement) Span {
 		return s.Span
 	case *IfStmt:
 		return s.Span
+	case *MatchStmt:
+		return s.Span
 	case *LoopStmt:
 		return s.Span
 	case *ForStmt:
@@ -128,6 +130,23 @@ func stmtSpan(stmt Statement) Span {
 		return s.Span
 	case *ExprStmt:
 		return s.Span
+	default:
+		return Span{}
+	}
+}
+
+func patternSpan(pattern Pattern) Span {
+	switch p := pattern.(type) {
+	case *WildcardPattern:
+		return p.Span
+	case *BindingPattern:
+		return p.Span
+	case *LiteralPattern:
+		return p.Span
+	case *TuplePattern:
+		return p.Span
+	case *ConstructorPattern:
+		return p.Span
 	default:
 		return Span{}
 	}

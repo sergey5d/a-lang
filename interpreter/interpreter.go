@@ -480,6 +480,26 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			return in.execBlock(s.Else, local, self)
 		}
 		return nil, nil, nil
+	case *parser.MatchStmt:
+		value, err := in.evalExpr(s.Value, local)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, matchCase := range s.Cases {
+			bindings, ok, err := in.matchPattern(matchCase.Pattern, value, local)
+			if err != nil {
+				return nil, nil, err
+			}
+			if !ok {
+				continue
+			}
+			caseEnv := newEnv(local)
+			for _, binding := range bindings {
+				caseEnv.define(binding.name, binding.value, false)
+			}
+			return in.execBlock(matchCase.Body, caseEnv, self)
+		}
+		return nil, nil, nil
 	case *parser.LoopStmt:
 		return in.execLoop(s, local, self)
 	case *parser.ForStmt:
@@ -497,6 +517,130 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 		return value, nil, err
 	default:
 		return nil, nil, RuntimeError{Message: "unsupported statement", Span: stmtSpan(stmt)}
+	}
+}
+
+type matchedBinding struct {
+	name  string
+	value Value
+}
+
+func (in *Interpreter) matchPattern(pattern parser.Pattern, value Value, local *env) ([]matchedBinding, bool, error) {
+	switch p := pattern.(type) {
+	case *parser.WildcardPattern:
+		return nil, true, nil
+	case *parser.BindingPattern:
+		return []matchedBinding{{name: p.Name, value: value}}, true, nil
+	case *parser.LiteralPattern:
+		patternValue, err := in.matchLiteralValue(p.Value)
+		if err != nil {
+			return nil, false, err
+		}
+		equal, err := in.valuesEqual(value, patternValue, p.Span, local)
+		if err != nil {
+			return nil, false, err
+		}
+		return nil, equal, nil
+	case *parser.TuplePattern:
+		items, _, ok := destructurableValues(value)
+		if !ok || len(items) != len(p.Elements) {
+			return nil, false, nil
+		}
+		var bindings []matchedBinding
+		for i, elem := range p.Elements {
+			next, ok, err := in.matchPattern(elem, items[i], local)
+			if err != nil || !ok {
+				return nil, ok, err
+			}
+			bindings = append(bindings, next...)
+		}
+		return bindings, true, nil
+	case *parser.ConstructorPattern:
+		instanceValue, ok := value.(*instance)
+		if !ok || !instanceValue.class.Enum {
+			return nil, false, nil
+		}
+		caseName := ""
+		switch len(p.Path) {
+		case 1:
+			caseName = p.Path[0]
+		case 2:
+			if p.Path[0] != instanceValue.class.Name {
+				return nil, false, nil
+			}
+			caseName = p.Path[1]
+		default:
+			return nil, false, nil
+		}
+		if instanceValue.caseName != caseName {
+			return nil, false, nil
+		}
+		var enumCase *parser.EnumCaseDecl
+		for i := range instanceValue.class.Cases {
+			if instanceValue.class.Cases[i].Name == caseName {
+				enumCase = &instanceValue.class.Cases[i]
+				break
+			}
+		}
+		if enumCase == nil || len(p.Args) != len(enumCase.Fields) {
+			return nil, false, nil
+		}
+		var bindings []matchedBinding
+		for i, arg := range p.Args {
+			fieldValue, ok := instanceValue.fields[enumCase.Fields[i].Name]
+			if !ok {
+				return nil, false, nil
+			}
+			next, ok, err := in.matchPattern(arg, fieldValue, local)
+			if err != nil || !ok {
+				return nil, ok, err
+			}
+			bindings = append(bindings, next...)
+		}
+		return bindings, true, nil
+	default:
+		return nil, false, RuntimeError{Message: "unsupported match pattern", Span: parser.Span{}}
+	}
+}
+
+func (in *Interpreter) matchLiteralValue(expr parser.Expr) (Value, error) {
+	switch e := expr.(type) {
+	case *parser.IntegerLiteral:
+		return strconv.ParseInt(e.Value, 10, 64)
+	case *parser.FloatLiteral:
+		return strconv.ParseFloat(e.Value, 64)
+	case *parser.RuneLiteral:
+		return decodeRuneLiteral(e.Value)
+	case *parser.BoolLiteral:
+		return e.Value, nil
+	case *parser.StringLiteral:
+		return e.Value, nil
+	case *parser.UnitLiteral:
+		return nil, nil
+	default:
+		return nil, RuntimeError{Message: "unsupported literal pattern", Span: exprSpan(expr)}
+	}
+}
+
+func decodeRuneLiteral(raw string) (rune, error) {
+	if len(raw) == 1 {
+		return []rune(raw)[0], nil
+	}
+	switch raw {
+	case `\n`:
+		return '\n', nil
+	case `\t`:
+		return '\t', nil
+	case `\r`:
+		return '\r', nil
+	case `\\`:
+		return '\\', nil
+	case `\'`:
+		return '\'', nil
+	case `\"`:
+		return '"', nil
+	default:
+		return 0, fmt.Errorf("unsupported rune literal %q", raw)
 	}
 }
 
