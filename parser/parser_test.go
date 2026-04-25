@@ -317,14 +317,14 @@ def run(value Any) Bool {
 
 func TestParsePackageAndImports(t *testing.T) {
 	src := `
-package app
-import util
-import model/user
-
-def main() Unit {
-	()
-}
-`
+	package app
+	import util
+	import model/user
+	
+	def main() Unit {
+		()
+	}
+	`
 
 	program, err := Parse(src)
 	if err != nil {
@@ -338,6 +338,39 @@ def main() Unit {
 	}
 	if program.Imports[0].Path != "util" || program.Imports[1].Path != "model/user" {
 		t.Fatalf("unexpected imports %#v", program.Imports)
+	}
+}
+
+func TestParseExtendedImportForms(t *testing.T) {
+	src := `
+	import model/things
+	import model/things/*
+	import model/things/A
+	import model/things/A as B
+	import model/things/{A, B as D, C}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Imports) != 5 {
+		t.Fatalf("expected 5 imports, got %d", len(program.Imports))
+	}
+	if program.Imports[0].Path != "model/things" || program.Imports[0].Wildcard || len(program.Imports[0].Symbols) != 0 {
+		t.Fatalf("unexpected package import %#v", program.Imports[0])
+	}
+	if !program.Imports[1].Wildcard || program.Imports[1].Path != "model/things" {
+		t.Fatalf("unexpected wildcard import %#v", program.Imports[1])
+	}
+	if got := program.Imports[2].Symbols; len(got) != 1 || got[0].Name != "A" || got[0].Alias != "" {
+		t.Fatalf("unexpected single import %#v", program.Imports[2])
+	}
+	if got := program.Imports[3].Symbols; len(got) != 1 || got[0].Name != "A" || got[0].Alias != "B" {
+		t.Fatalf("unexpected aliased import %#v", program.Imports[3])
+	}
+	if got := program.Imports[4].Symbols; len(got) != 3 || got[0].Name != "A" || got[1].Name != "B" || got[1].Alias != "D" || got[2].Name != "C" {
+		t.Fatalf("unexpected grouped import %#v", program.Imports[4])
 	}
 }
 

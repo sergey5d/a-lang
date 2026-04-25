@@ -750,6 +750,56 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeModuleExtendedImports(t *testing.T) {
+	dir := t.TempDir()
+	writeModuleFile(t, filepath.Join(dir, "model", "things.al"), `
+package things
+
+interface Named {
+	def label() Str
+}
+
+class A with Named {
+	def label() Str = "A"
+}
+
+class B with Named {
+	def label() Str = "B"
+}
+
+object C {
+	def apply(value Int) Int = value + 1
+}
+`)
+	writeModuleFile(t, filepath.Join(dir, "main.al"), `
+package app
+
+import model/things
+import model/things/A
+import model/things/A as AliasA
+import model/things/{B as AliasB, Named}
+import model/things/*
+
+def run() Int {
+	value A = A()
+	aliasA AliasA = AliasA()
+	valueB AliasB = AliasB()
+	named Named = value
+	total Int = C(4)
+	return total + things.C(5)
+}
+`)
+
+	mod, err := module.Load(filepath.Join(dir, "main.al"))
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	result := AnalyzeModule(mod)
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeInterfaceImplementation(t *testing.T) {
 	src := `
 interface Stringable {

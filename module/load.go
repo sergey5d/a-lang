@@ -10,10 +10,20 @@ import (
 )
 
 type LoadedModule struct {
-	Path        string
-	Program     *parser.Program
-	Imports     map[string]*LoadedModule
-	ImportPaths map[string]string
+	Path          string
+	SourceProgram *parser.Program
+	Program       *parser.Program
+	Imports       map[string]*LoadedModule
+	ImportPaths   map[string]string
+	SymbolImports map[string]ImportedSymbol
+	Dependencies  map[string]*LoadedModule
+}
+
+type ImportedSymbol struct {
+	LocalName    string
+	OriginalName string
+	IsInterface  bool
+	Module       *LoadedModule
 }
 
 func Load(path string) (*LoadedModule, error) {
@@ -40,10 +50,11 @@ func load(path string, cache map[string]*LoadedModule, loading map[string]bool) 
 	if err != nil {
 		return nil, err
 	}
-	program, err := parser.Parse(string(src))
+	sourceProgram, err := parser.Parse(string(src))
 	if err != nil {
 		return nil, err
 	}
+	program := sourceProgram
 	stdlibDir, _ := findStdlibDir(filepath.Dir(abs))
 	if stdlibDir != "" {
 		preludePrograms, err := loadPreludePrograms(stdlibDir, abs)
@@ -54,32 +65,105 @@ func load(path string, cache map[string]*LoadedModule, loading map[string]bool) 
 	}
 
 	mod := &LoadedModule{
-		Path:        abs,
-		Program:     program,
-		Imports:     map[string]*LoadedModule{},
-		ImportPaths: map[string]string{},
+		Path:          abs,
+		SourceProgram: sourceProgram,
+		Program:       program,
+		Imports:       map[string]*LoadedModule{},
+		ImportPaths:   map[string]string{},
+		SymbolImports: map[string]ImportedSymbol{},
+		Dependencies:  map[string]*LoadedModule{},
 	}
 	cache[abs] = mod
 
 	baseDir := filepath.Dir(abs)
 	for _, imp := range program.Imports {
-		alias := filepath.Base(imp.Path)
-		if existing, ok := mod.ImportPaths[alias]; ok && existing != imp.Path {
-			return nil, fmt.Errorf("duplicate import alias '%s' for paths '%s' and '%s'", alias, existing, imp.Path)
-		}
 		childPath := filepath.Join(baseDir, filepath.FromSlash(imp.Path)+".al")
 		child, err := load(childPath, cache, loading)
 		if err != nil {
 			return nil, fmt.Errorf("load import %q: %w", imp.Path, err)
 		}
-		if child.Program.PackageName != "" && child.Program.PackageName != alias {
-			return nil, fmt.Errorf("import %q expected package '%s', got '%s'", imp.Path, alias, child.Program.PackageName)
+		mod.Dependencies[child.Path] = child
+		if len(imp.Symbols) == 0 && !imp.Wildcard {
+			alias := filepath.Base(imp.Path)
+			if existing, ok := mod.ImportPaths[alias]; ok && existing != imp.Path {
+				return nil, fmt.Errorf("duplicate import alias '%s' for paths '%s' and '%s'", alias, existing, imp.Path)
+			}
+			if _, ok := mod.SymbolImports[alias]; ok {
+				return nil, fmt.Errorf("module import alias '%s' conflicts with imported symbol", alias)
+			}
+			if child.Program.PackageName != "" && child.Program.PackageName != alias {
+				return nil, fmt.Errorf("import %q expected package '%s', got '%s'", imp.Path, alias, child.Program.PackageName)
+			}
+			mod.Imports[alias] = child
+			mod.ImportPaths[alias] = imp.Path
+			continue
 		}
-		mod.Imports[alias] = child
-		mod.ImportPaths[alias] = imp.Path
+		symbols := imp.Symbols
+		if imp.Wildcard {
+			symbols = exportedSymbols(child, program.PackageName)
+		}
+		samePackage := program.PackageName != "" && child.Program.PackageName == program.PackageName
+		for _, symbol := range symbols {
+			resolved, ok := resolveImportedSymbol(child, symbol.Name, samePackage)
+			if !ok {
+				return nil, fmt.Errorf("import %q has no public symbol '%s'", imp.Path, symbol.Name)
+			}
+			localName := symbol.Name
+			if symbol.Alias != "" {
+				localName = symbol.Alias
+			}
+			if _, ok := mod.Imports[localName]; ok {
+				return nil, fmt.Errorf("imported symbol '%s' conflicts with module import alias", localName)
+			}
+			if existing, ok := mod.SymbolImports[localName]; ok && (existing.Module.Path != child.Path || existing.OriginalName != resolved.OriginalName) {
+				return nil, fmt.Errorf("duplicate imported symbol '%s'", localName)
+			}
+			resolved.LocalName = localName
+			mod.SymbolImports[localName] = resolved
+		}
 	}
 
 	return mod, nil
+}
+
+func exportedSymbols(mod *LoadedModule, currentPackage string) []parser.ImportSymbol {
+	samePackage := currentPackage != "" && mod.SourceProgram.PackageName == currentPackage
+	out := []parser.ImportSymbol{}
+	for _, decl := range mod.SourceProgram.Classes {
+		if decl.Private && !samePackage {
+			continue
+		}
+		out = append(out, parser.ImportSymbol{Name: decl.Name})
+	}
+	for _, decl := range mod.SourceProgram.Interfaces {
+		if decl.Private && !samePackage {
+			continue
+		}
+		out = append(out, parser.ImportSymbol{Name: decl.Name})
+	}
+	return out
+}
+
+func resolveImportedSymbol(mod *LoadedModule, name string, samePackage bool) (ImportedSymbol, bool) {
+	for _, decl := range mod.SourceProgram.Classes {
+		if decl.Name != name {
+			continue
+		}
+		if decl.Private && !samePackage {
+			return ImportedSymbol{}, false
+		}
+		return ImportedSymbol{OriginalName: name, Module: mod}, true
+	}
+	for _, decl := range mod.SourceProgram.Interfaces {
+		if decl.Name != name {
+			continue
+		}
+		if decl.Private && !samePackage {
+			return ImportedSymbol{}, false
+		}
+		return ImportedSymbol{OriginalName: name, Module: mod, IsInterface: true}, true
+	}
+	return ImportedSymbol{}, false
 }
 
 func findStdlibDir(start string) (string, error) {

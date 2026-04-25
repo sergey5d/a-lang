@@ -26,8 +26,17 @@ type Program struct {
 
 // ImportDecl describes a single imported module path.
 type ImportDecl struct {
-	Path string `json:"path"`
-	Span Span   `json:"span"`
+	Path     string         `json:"path"`
+	Wildcard bool           `json:"wildcard,omitempty"`
+	Symbols  []ImportSymbol `json:"symbols,omitempty"`
+	Span     Span           `json:"span"`
+}
+
+// ImportSymbol describes a directly imported symbol and its optional alias.
+type ImportSymbol struct {
+	Name  string `json:"name"`
+	Alias string `json:"alias,omitempty"`
+	Span  Span   `json:"span"`
 }
 
 // TypeRef represents a named, generic, or function type in source.

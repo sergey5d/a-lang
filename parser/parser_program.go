@@ -15,14 +15,11 @@ func (p *Parser) parseProgram() (*Program, error) {
 	}
 	for p.match(TokenImport) {
 		keyword := p.previous()
-		path, span, err := p.parseModulePath("expected import path")
+		imp, err := p.parseImportDecl(keyword)
 		if err != nil {
 			return nil, err
 		}
-		program.Imports = append(program.Imports, ImportDecl{
-			Path: path,
-			Span: mergeSpans(tokenSpan(keyword), span),
-		})
+		program.Imports = append(program.Imports, *imp)
 	}
 	for !p.isAtEnd() {
 		switch p.peek().Type {
@@ -164,4 +161,117 @@ func (p *Parser) parseModulePath(message string) (string, Span, error) {
 		span = mergeSpans(span, tokenSpan(next))
 	}
 	return path, span, nil
+}
+
+func (p *Parser) parseImportDecl(keyword Token) (*ImportDecl, error) {
+	segments, span, err := p.parseImportSegments("expected import path")
+	if err != nil {
+		return nil, err
+	}
+	if len(segments) == 0 {
+		return nil, fmt.Errorf("expected import path")
+	}
+	imp := &ImportDecl{}
+	switch {
+	case p.match(TokenSlash):
+		switch {
+		case p.match(TokenStar):
+			imp.Path = joinImportSegments(segments)
+			imp.Wildcard = true
+			span = mergeSpans(span, tokenSpan(p.previous()))
+		case p.match(TokenLBrace):
+			imp.Path = joinImportSegments(segments)
+			symbols, symbolsSpan, err := p.parseImportSymbolList()
+			if err != nil {
+				return nil, err
+			}
+			imp.Symbols = symbols
+			span = mergeSpans(span, symbolsSpan)
+		default:
+			next, err := p.consume(TokenIdentifier, "expected import symbol, '*', or '{' after '/'")
+			if err != nil {
+				return nil, err
+			}
+			imp.Path = joinImportSegments(segments)
+			symbol := ImportSymbol{Name: next.Lexeme, Span: tokenSpan(next)}
+			if p.match(TokenAs) {
+				alias, err := p.consume(TokenIdentifier, "expected alias after 'as'")
+				if err != nil {
+					return nil, err
+				}
+				symbol.Alias = alias.Lexeme
+				symbol.Span = mergeSpans(symbol.Span, tokenSpan(alias))
+			}
+			imp.Symbols = []ImportSymbol{symbol}
+			span = mergeSpans(span, symbol.Span)
+		}
+	default:
+		imp.Path = joinImportSegments(segments)
+	}
+	imp.Span = mergeSpans(tokenSpan(keyword), span)
+	return imp, nil
+}
+
+func (p *Parser) parseImportSegments(message string) ([]string, Span, error) {
+	start, err := p.consume(TokenIdentifier, message)
+	if err != nil {
+		return nil, Span{}, err
+	}
+	segments := []string{start.Lexeme}
+	span := tokenSpan(start)
+	for p.check(TokenSlash) && p.checkNth(1, TokenIdentifier) && startsLower(p.tokens[p.pos+1].Lexeme) {
+		p.advance()
+		next := p.advance()
+		segments = append(segments, next.Lexeme)
+		span = mergeSpans(span, tokenSpan(next))
+	}
+	return segments, span, nil
+}
+
+func startsLower(s string) bool {
+	if s == "" {
+		return false
+	}
+	r := rune(s[0])
+	return r >= 'a' && r <= 'z'
+}
+
+func joinImportSegments(parts []string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	out := parts[0]
+	for _, part := range parts[1:] {
+		out += "/" + part
+	}
+	return out
+}
+
+func (p *Parser) parseImportSymbolList() ([]ImportSymbol, Span, error) {
+	open := p.previous()
+	var symbols []ImportSymbol
+	for {
+		name, err := p.consume(TokenIdentifier, "expected import symbol")
+		if err != nil {
+			return nil, Span{}, err
+		}
+		symbol := ImportSymbol{Name: name.Lexeme, Span: tokenSpan(name)}
+		if p.match(TokenAs) {
+			alias, err := p.consume(TokenIdentifier, "expected alias after 'as'")
+			if err != nil {
+				return nil, Span{}, err
+			}
+			symbol.Alias = alias.Lexeme
+			symbol.Span = mergeSpans(symbol.Span, tokenSpan(alias))
+		}
+		symbols = append(symbols, symbol)
+		if !p.match(TokenComma) {
+			break
+		}
+	}
+	close, err := p.consume(TokenRBrace, "expected '}' after import symbol list")
+	if err != nil {
+		return nil, Span{}, err
+	}
+	return symbols, mergeSpans(tokenSpan(open), tokenSpan(close)), nil
 }

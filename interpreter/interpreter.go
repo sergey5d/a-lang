@@ -40,8 +40,15 @@ type Interpreter struct {
 	classes   map[string]*parser.ClassDecl
 	interfaces map[string]*parser.InterfaceDecl
 	imports   map[string]*Interpreter
+	directImports map[string]runtimeImportedSymbol
 	globals   *env
 	ready     bool
+}
+
+type runtimeImportedSymbol struct {
+	module     *Interpreter
+	original   string
+	isInterface bool
 }
 
 type instance struct {
@@ -111,6 +118,7 @@ func New(program *parser.Program) *Interpreter {
 		classes:    map[string]*parser.ClassDecl{},
 		interfaces: map[string]*parser.InterfaceDecl{},
 		imports:    map[string]*Interpreter{},
+		directImports: map[string]runtimeImportedSymbol{},
 	}
 	for _, fn := range program.Functions {
 		in.functions[fn.Name] = fn
@@ -128,6 +136,13 @@ func NewModule(mod *module.LoadedModule) *Interpreter {
 	in := New(mod.Program)
 	for alias, imported := range mod.Imports {
 		in.imports[alias] = NewModule(imported)
+	}
+	for localName, symbol := range mod.SymbolImports {
+		in.directImports[localName] = runtimeImportedSymbol{
+			module:     NewModule(symbol.Module),
+			original:   symbol.OriginalName,
+			isInterface: symbol.IsInterface,
+		}
 	}
 	return in
 }
@@ -159,6 +174,21 @@ func (in *Interpreter) execTopLevel(global *env) error {
 		if _, err := imported.ensureGlobals(); err != nil {
 			return err
 		}
+	}
+	for localName, symbol := range in.directImports {
+		if _, err := symbol.module.ensureGlobals(); err != nil {
+			return err
+		}
+		if symbol.isInterface {
+			continue
+		}
+		if class, ok := symbol.module.classes[symbol.original]; ok && class.Object {
+			if value, ok := symbol.module.globals.get(symbol.original); ok {
+				global.define(localName, value.value, false)
+				continue
+			}
+		}
+		global.define(localName, classRef{module: symbol.module, name: symbol.original}, false)
 	}
 	for _, class := range in.program.Classes {
 		if !class.Object {
@@ -1312,14 +1342,25 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 		if !ok {
 			return nil, RuntimeError{Message: "undefined class '" + fn.name + "'", Span: call.Span}
 		}
-			ordered := namedArgValues(args)
-			if hasNamedParserArgs(call.Args) {
-				reordered, err := reorderConstructorValueArgs(class, args, call.Span)
-				if err != nil {
-					return nil, err
-				}
-				ordered = reordered
+		ordered := namedArgValues(args)
+		if class.Object {
+			value, ok := fn.module.globals.get(fn.name)
+			if !ok {
+				return nil, RuntimeError{Message: "undefined object '" + fn.name + "'", Span: call.Span}
 			}
+				argsOnly := make([]Value, len(ordered))
+				for i, arg := range ordered {
+					argsOnly[i] = arg
+				}
+			return fn.module.invokeCallableValue(value.value, argsOnly, local, call.Span)
+		}
+		if hasNamedParserArgs(call.Args) {
+			reordered, err := reorderConstructorValueArgs(class, args, call.Span)
+			if err != nil {
+				return nil, err
+			}
+			ordered = reordered
+		}
 		return fn.module.construct(class, ordered, local)
 	case enumCaseRef:
 		class, ok := fn.module.classes[fn.enumName]
@@ -1459,15 +1500,23 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 				ordered = reordered
 			}
 		}
-		if _, ok := mod.functions[member.Name]; ok {
-			return mod.callFunctionByName(member.Name, ordered, mod.globals)
-		}
-		if class, ok := mod.classes[member.Name]; ok {
-			if class.Object {
-				return nil, RuntimeError{Message: "object '" + member.Name + "' is a singleton and cannot be called", Span: member.Span}
+			if _, ok := mod.functions[member.Name]; ok {
+				return mod.callFunctionByName(member.Name, ordered, mod.globals)
 			}
-			if hasNamedParserArgs(argExprs) {
-				reordered, err := reorderConstructorValueArgs(class, args, member.Span)
+			if class, ok := mod.classes[member.Name]; ok {
+				if class.Object {
+					value, ok := mod.globals.get(member.Name)
+					if !ok {
+						return nil, RuntimeError{Message: "undefined object '" + member.Name + "'", Span: member.Span}
+					}
+					argsOnly := make([]Value, len(ordered))
+					for i, arg := range ordered {
+						argsOnly[i] = arg
+					}
+					return mod.invokeCallableValue(value.value, argsOnly, mod.globals, member.Span)
+				}
+				if hasNamedParserArgs(argExprs) {
+					reordered, err := reorderConstructorValueArgs(class, args, member.Span)
 				if err != nil {
 					return nil, err
 				}
@@ -2176,9 +2225,6 @@ func (in *Interpreter) invokeCallableValue(callee Value, args []Value, local *en
 	case builtinRef:
 		return in.callBuiltin(fn.name, nil, args, local, span)
 	case *instance:
-		if fn.class.Object {
-			return nil, RuntimeError{Message: "object '" + fn.class.Name + "' is a singleton and cannot be called", Span: span}
-		}
 		named := make([]namedValueArg, len(args))
 		for i, arg := range args {
 			named[i] = namedValueArg{Value: arg, Span: span}

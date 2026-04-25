@@ -79,6 +79,7 @@ def syntax2(rows List[(Int, Int, Str)]) Unit {
 
 def syntax3(rows List[(Int, Int, Str)]) Unit {
     lastX := 0
+
     if first <- rows.get(0) {
         _, initialY Int, _ = first
         lastY := initialY

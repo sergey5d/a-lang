@@ -70,6 +70,9 @@ type Checker struct {
 	classes       map[string]classInfo
 	interfaces    map[string]interfaceInfo
 	imports       map[string]moduleInfo
+	importedClasses    map[string]classInfo
+	importedInterfaces map[string]interfaceInfo
+	importedInterfaceNames map[string]string
 	returnTypes   []*Type
 	exprTypes     map[parser.Expr]*Type
 	currentClass  *parser.ClassDecl
@@ -89,6 +92,9 @@ func Analyze(program *parser.Program) Result {
 		classes:       map[string]classInfo{},
 		interfaces:    map[string]interfaceInfo{},
 		imports:       map[string]moduleInfo{},
+		importedClasses:    map[string]classInfo{},
+		importedInterfaces: map[string]interfaceInfo{},
+		importedInterfaceNames: map[string]string{},
 		exprTypes:     map[parser.Expr]*Type{},
 	}
 	c.installBuiltinInterfaces()
@@ -110,19 +116,22 @@ func AnalyzeModule(mod *module.LoadedModule) Result {
 			functionDecls: map[string]*parser.FunctionDecl{},
 			classes:       map[string]classInfo{},
 			interfaces:    map[string]interfaceInfo{},
-			imports:       map[string]moduleInfo{},
-			exprTypes:     map[parser.Expr]*Type{},
-		}
+				imports:       map[string]moduleInfo{},
+				importedClasses:    map[string]classInfo{},
+				importedInterfaces: map[string]interfaceInfo{},
+				importedInterfaceNames: map[string]string{},
+				exprTypes:     map[parser.Expr]*Type{},
+			}
 		c.installBuiltinInterfaces()
 		c.installModuleImports(current)
 		c.collectDecls(current.Program)
 		c.checkProgram(current.Program)
 		result := Result{Diagnostics: append([]semantic.Diagnostic(nil), c.diagnostics...), ExprTypes: c.exprTypes}
 		seen[current.Path] = result
-		for _, imported := range current.Imports {
-			child := analyzeOne(imported)
-			result.Diagnostics = append(result.Diagnostics, child.Diagnostics...)
-		}
+			for _, imported := range current.Dependencies {
+				child := analyzeOne(imported)
+				result.Diagnostics = append(result.Diagnostics, child.Diagnostics...)
+			}
 		seen[current.Path] = result
 		return result
 	}
@@ -202,7 +211,63 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 			info.classes[decl.Name] = class
 			c.classes[qualified] = class
 		}
-		c.imports[alias] = info
+			c.imports[alias] = info
+		}
+	for localName, symbol := range current.SymbolImports {
+		samePackage := currentPackage != "" && symbol.Module.SourceProgram.PackageName == currentPackage
+		if symbol.IsInterface {
+			for _, decl := range symbol.Module.SourceProgram.Interfaces {
+				if decl.Name != symbol.OriginalName {
+					continue
+				}
+				if decl.Private && !samePackage {
+					break
+				}
+				info := interfaceInfo{
+					decl:    decl,
+					methods: map[string]interfaceMethodInfo{},
+				}
+				for _, method := range decl.Methods {
+					info.methods[method.Name] = interfaceMethodInfo{decl: method}
+				}
+				qualified := symbol.Module.Path + "::" + decl.Name
+				c.importedInterfaces[localName] = info
+				c.importedInterfaceNames[localName] = qualified
+				c.interfaces[qualified] = info
+				break
+			}
+			continue
+		}
+		for _, decl := range symbol.Module.SourceProgram.Classes {
+			if decl.Name != symbol.OriginalName {
+				continue
+			}
+			if decl.Private && !samePackage {
+				break
+			}
+			class := classInfo{
+				name:      symbol.Module.Path + "::" + decl.Name,
+				decl:      decl,
+				fields:    map[string]fieldInfo{},
+				methods:   map[string][]methodInfo{},
+				enumCases: map[string]parser.EnumCaseDecl{},
+			}
+			for _, field := range decl.Fields {
+				class.fields[field.Name] = fieldInfo{decl: field}
+			}
+			for _, method := range decl.Methods {
+				class.methods[method.Name] = append(class.methods[method.Name], methodInfo{decl: method})
+				if method.Constructor {
+					class.constructors = append(class.constructors, method)
+				}
+			}
+			for _, enumCase := range decl.Cases {
+				class.enumCases[enumCase.Name] = enumCase
+			}
+			c.importedClasses[localName] = class
+			c.classes[class.name] = class
+			break
+		}
 	}
 }
 
@@ -1403,11 +1468,19 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			result = fieldType
 			break
 		}
-		if _, ok := c.imports[e.Name]; ok {
-			result = &Type{Kind: TypeModule, Name: e.Name}
-			break
-		}
-		if sig, ok := c.functions[e.Name]; ok {
+			if _, ok := c.imports[e.Name]; ok {
+				result = &Type{Kind: TypeModule, Name: e.Name}
+				break
+			}
+			if class, ok := c.importedClasses[e.Name]; ok {
+				result = &Type{Kind: TypeClass, Name: class.name}
+				break
+			}
+			if _, ok := c.importedInterfaces[e.Name]; ok {
+				result = &Type{Kind: TypeInterface, Name: c.importedInterfaceNames[e.Name]}
+				break
+			}
+			if sig, ok := c.functions[e.Name]; ok {
 			result = functionType(e.Name, sig)
 			break
 		}
@@ -1586,13 +1659,19 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 		if isBuiltinValue(ident.Name) {
 			return c.checkBuiltinConstructorCall(ident.Name, call)
 		}
-		if class, ok := c.classes[ident.Name]; ok {
-			if class.decl.Object {
-				return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, call.Args, call.Span, "object '"+class.decl.Name+"' is not callable")
+			if class, ok := c.classes[ident.Name]; ok {
+				if class.decl.Object {
+					return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, call.Args, call.Span, "object '"+class.decl.Name+"' is not callable")
+				}
+				return c.checkConstructorCall(class, call)
 			}
-			return c.checkConstructorCall(class, call)
-		}
-		if fnDecl, ok := c.functionDecls[ident.Name]; ok {
+			if class, ok := c.importedClasses[ident.Name]; ok {
+				if class.decl.Object {
+					return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, call.Args, call.Span, "object '"+ident.Name+"' is not callable")
+				}
+				return c.checkConstructorCall(class, call)
+			}
+			if fnDecl, ok := c.functionDecls[ident.Name]; ok {
 			orderedArgs := callArgValues(call.Args)
 			if hasNamedCallArgs(call.Args) {
 				reordered, ok := c.reorderCallArgs(fnDecl.Parameters, call.Args, call.Span, "function '"+ident.Name+"'")
@@ -2167,15 +2246,13 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			}
 			return sig.ReturnType
 		}
-		if class, ok := info.classes[member.Name]; ok {
-			if class.decl.Object {
-				c.checkArgTypes(callArgValues(args))
-				c.addDiagnostic("invalid_call_target", "object '"+class.decl.Name+"' is a singleton and cannot be called", member.Span)
-				return unknownType
+			if class, ok := info.classes[member.Name]; ok {
+				if class.decl.Object {
+					return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, args, member.Span, "object '"+class.decl.Name+"' is not callable")
+				}
+				call := &parser.CallExpr{Callee: member, Args: args, Span: member.Span}
+				return c.checkConstructorCall(class, call)
 			}
-			call := &parser.CallExpr{Callee: member, Args: args, Span: member.Span}
-			return c.checkConstructorCall(class, call)
-		}
 		c.checkArgTypes(callArgValues(args))
 		c.addDiagnostic("unknown_member", "unknown imported member '"+member.Name+"' on module '"+receiverType.Name+"'", member.Span)
 		return unknownType
@@ -2692,7 +2769,14 @@ func (c *Checker) instantiateTypeRef(ref *parser.TypeRef, subst map[string]*Type
 	if kind == "" {
 		kind = TypeUnknown
 	}
-	return &Type{Kind: kind, Name: ref.Name, Args: args}
+	name := ref.Name
+	if class, ok := c.importedClasses[ref.Name]; ok {
+		name = class.name
+	}
+	if qualified, ok := c.importedInterfaceNames[ref.Name]; ok {
+		name = qualified
+	}
+	return &Type{Kind: kind, Name: name, Args: args}
 }
 
 func (c *Checker) validateTypeParameterBounds(params []parser.TypeParameter) {
@@ -3323,8 +3407,14 @@ func (c *Checker) lookupTypeInstance(name string) (*Type, bool) {
 	if _, ok := c.classes[name]; ok {
 		return &Type{Kind: TypeClass, Name: name}, true
 	}
+	if class, ok := c.importedClasses[name]; ok {
+		return &Type{Kind: TypeClass, Name: class.name}, true
+	}
 	if _, ok := c.interfaces[name]; ok {
 		return &Type{Kind: TypeInterface, Name: name}, true
+	}
+	if _, ok := c.importedInterfaces[name]; ok {
+		return &Type{Kind: TypeInterface, Name: c.importedInterfaceNames[name]}, true
 	}
 	return nil, false
 }
@@ -3493,7 +3583,13 @@ func (c *Checker) typeParametersForName(name string) ([]parser.TypeParameter, bo
 	if info, ok := c.classes[name]; ok {
 		return info.decl.TypeParameters, true
 	}
+	if info, ok := c.importedClasses[name]; ok {
+		return info.decl.TypeParameters, true
+	}
 	if info, ok := c.interfaces[name]; ok {
+		return info.decl.TypeParameters, true
+	}
+	if info, ok := c.importedInterfaces[name]; ok {
 		return info.decl.TypeParameters, true
 	}
 	return nil, false
@@ -3620,7 +3716,13 @@ func (c *Checker) kindOf(name string) TypeKind {
 	if _, ok := c.classes[name]; ok {
 		return TypeClass
 	}
+	if _, ok := c.importedClasses[name]; ok {
+		return TypeClass
+	}
 	if _, ok := c.interfaces[name]; ok {
+		return TypeInterface
+	}
+	if _, ok := c.importedInterfaces[name]; ok {
 		return TypeInterface
 	}
 	if isBuiltinInterfaceType(name) {
