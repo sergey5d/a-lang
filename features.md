@@ -8,35 +8,29 @@ TBO: add value as Some(x)
 
 ### 1. Match / Pattern Matching
 
-This is the biggest missing expression feature.
-
-Why it matters:
-- enums become much more useful
-- `Option` becomes more natural
-- tuples, records, and destructuring become more complete
-- future `Result` / `Either` style APIs get much nicer
-
-Good first scope:
-- enum case matching
+`match` exists now, including:
+- enum case patterns
 - tuple patterns
-- wildcard `_`
-- literal patterns
+- literal/value patterns
+- class/record extractor patterns
+- simple type patterns
 
-Good later scope:
+Still missing:
+- generic type-aware matching / extraction
 - guards
 - nested patterns
-- record/class destructuring by field
-- exhaustiveness checking
+- exhaustiveness analysis
+- unreachable-case detection
+- a final decision on statement-vs-expression totality semantics
 
 ## Important Next Tier
 
 ### 2. Enum Ergonomics
 
 Enums exist, but they still want:
-- pattern matching support
 - eventual exhaustiveness checking
 
-Once `match` exists, enums become much more complete.
+Now that `match` exists, the biggest remaining enum improvement is compile-time exhaustiveness.
 
 ### 3. Derived Protocols
 
@@ -94,7 +88,7 @@ Current package/import support is usable, but possible future additions include:
 
 `Option` exists, but a richer success/error enum would likely be useful later.
 
-This becomes much more attractive once `match` exists.
+This is much more attractive now that `match` exists.
 
 ### 9. Smarter Type Narrowing
 
@@ -104,6 +98,54 @@ Later improvements could include:
 - unreachable branch detection
 
 ## TBD
+
+### Match Totality / Partial Match Behavior
+
+`match` now exists, but the language still needs a clear rule for what happens when no case matches.
+
+Open options under discussion:
+
+1. Require exhaustive `match` expressions
+   Shape:
+   - `match value { ... }` returns `T`
+   - missing cases are a compile error
+   Good fit:
+   - safest long-term design
+   - strongest enum / `Option` ergonomics
+   - needs exhaustiveness checking
+
+2. Split total and partial forms
+   Possible shapes:
+   - `match value { ... }` returns `T`
+   - `match? value { ... }` returns `Option[T]`
+   or some similar exact-vs-partial distinction
+   Good fit:
+   - explicit
+   - lets users choose strict vs partial matching
+   Cost:
+   - more syntax to teach
+
+3. Make all `match` expressions return `Option[T]`
+   Shape:
+   - `match value { ... }` returns `Option[T]`
+   Good fit:
+   - never throws
+   Cost:
+   - makes ordinary exhaustive matches noisier
+   - weakens `match` as a primary expression form
+
+4. Differentiate statements and expressions
+   Shape:
+   - statement `match` may be partial
+   - expression `match` must be exhaustive and return `T`
+   Good fit:
+   - practical
+   - keeps expression form safe without forcing `Option` everywhere
+
+Current leaning:
+- avoid runtime "no match" exceptions as a normal language outcome
+- keep expression `match` total if possible
+- if partial matching is needed, prefer a separate explicit form over silently returning `Option[T]` everywhere
 
 ### Constructor / Companion Design
 
