@@ -198,6 +198,10 @@ def loops(input Int, value Int) Bool {
 		break
 	}
 
+	for value < 3 {
+		break
+	}
+
 	for left Int, right Str <- [(1, "x")] {
 		if left == value {
 			break
@@ -233,16 +237,21 @@ def loops(input Int, value Int) Bool {
 	}
 
 	fourth := fn.Body.Statements[3].(*ForStmt)
-	if len(fourth.Bindings) != 1 || len(fourth.Bindings[0].Bindings) != 2 || fourth.Body == nil {
-		t.Fatalf("expected destructuring for loop, got %#v", fourth)
+	if fourth.Condition == nil || fourth.Body == nil {
+		t.Fatalf("expected conditional for loop, got %#v", fourth)
 	}
 
 	fifth := fn.Body.Statements[4].(*ForStmt)
-	if len(fifth.Bindings) != 3 || fifth.YieldBody == nil {
-		t.Fatalf("expected yield-style for loop, got %#v", fifth)
+	if len(fifth.Bindings) != 1 || len(fifth.Bindings[0].Bindings) != 2 || fifth.Body == nil {
+		t.Fatalf("expected destructuring for loop, got %#v", fifth)
 	}
-	if len(fifth.Bindings[2].Values) != 1 {
-		t.Fatalf("expected third yield clause to be immutable local binding, got %#v", fifth.Bindings[2])
+
+	sixth := fn.Body.Statements[5].(*ForStmt)
+	if len(sixth.Bindings) != 3 || sixth.YieldBody == nil {
+		t.Fatalf("expected yield-style for loop, got %#v", sixth)
+	}
+	if len(sixth.Bindings[2].Values) != 1 {
+		t.Fatalf("expected third yield clause to be immutable local binding, got %#v", sixth.Bindings[2])
 	}
 }
 

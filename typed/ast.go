@@ -239,6 +239,7 @@ type ForBinding struct {
 
 // ForStmt is a typed loop including optional yield-body form.
 type ForStmt struct {
+	Condition Expr
 	Bindings  []ForBinding
 	Body      *BlockStmt
 	YieldBody *BlockStmt

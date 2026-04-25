@@ -1183,6 +1183,10 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		c.popScope()
 	case *parser.ForStmt:
 		c.pushScope()
+		if s.Condition != nil {
+			condType := c.checkExpr(s.Condition)
+			c.requireAssignable(condType, builtin("Bool"), exprSpan(s.Condition), "invalid_condition_type", "for condition must be Bool")
+		}
 		for _, binding := range s.Bindings {
 			c.checkForClause(binding)
 		}

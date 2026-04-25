@@ -129,6 +129,19 @@ func (l *Lowerer) lowerForStmt(stmt *typed.ForStmt) ([]Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
+	if stmt.Condition != nil {
+		cond, err := l.lowerExpr(stmt.Condition)
+		if err != nil {
+			return nil, err
+		}
+		return []Stmt{&Loop{Body: []Stmt{
+			&If{
+				Condition: cond,
+				Then:      body,
+				Else:      []Stmt{&Break{}},
+			},
+		}}}, nil
+	}
 	if stmt.YieldBody == nil {
 		return l.lowerForBindings(stmt.Bindings, body)
 	}

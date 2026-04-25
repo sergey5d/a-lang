@@ -775,6 +775,32 @@ func (in *Interpreter) execFor(stmt *parser.ForStmt, local *env, self *instance)
 			return nil, signal, nil
 		}
 	}
+	if stmt.Condition != nil {
+		for {
+			condValue, err := in.evalExpr(stmt.Condition, local)
+			if err != nil {
+				return nil, nil, err
+			}
+			cond, ok := condValue.(bool)
+			if !ok {
+				return nil, nil, RuntimeError{Message: "for condition must be Bool", Span: exprSpan(stmt.Condition)}
+			}
+			if !cond {
+				return nil, nil, nil
+			}
+			_, signal, err := in.execBlock(stmt.Body, local, self)
+			if err != nil {
+				return nil, nil, err
+			}
+			switch signal.(type) {
+			case nil:
+			case breakSignal:
+				return nil, nil, nil
+			default:
+				return nil, signal, nil
+			}
+		}
+	}
 	signal, err := in.execForBindings(stmt.Bindings, 0, local, self, func(loopEnv *env) (any, error) {
 		_, signal, err := in.execBlock(stmt.Body, loopEnv, self)
 		return signal, err

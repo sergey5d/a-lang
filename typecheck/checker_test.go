@@ -1546,6 +1546,23 @@ def run(rows List[(Int, Str)]) Int {
 	}
 }
 
+func TestAnalyzeConditionalForLoop(t *testing.T) {
+	src := `
+def run(limit Int) Int {
+	total Int := 0
+	for total < limit {
+		total += 1
+	}
+	return total
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeForYieldImmutableBindings(t *testing.T) {
 	src := `
 def run(values List[Int]) List[Int] {

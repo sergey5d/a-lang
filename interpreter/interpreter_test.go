@@ -1273,6 +1273,27 @@ def run() Int {
 	}
 }
 
+func TestConditionalForLoop(t *testing.T) {
+	src := `
+def run() Int {
+	total Int := 0
+	for total < 3 {
+		total += 1
+	}
+	return total
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(3) {
+		t.Fatalf("expected 3, got %#v", value)
+	}
+}
+
 func TestYieldLoopsWithMutableBindings(t *testing.T) {
 	src := `
 def run() Int {

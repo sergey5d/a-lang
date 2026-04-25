@@ -578,7 +578,7 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 			Bindings: []ForBinding{binding},
 			Body:     body,
 			Span:     mergeSpans(tokenSpan(start), body.Span),
-		}, nil
+			}, nil
 	}
 	if p.check(TokenLBrace) && p.isForYieldStart() {
 		bindings, err := p.parseForBindingsBlock()
@@ -596,9 +596,21 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 			Bindings:  bindings,
 			YieldBody: yieldBody,
 			Span:      mergeSpans(tokenSpan(start), yieldBody.Span),
-		}, nil
+			}, nil
 	}
-	return nil, fmt.Errorf("for loop requires bindings like 'for item <- items { ... }' or a yield form")
+	condition, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
+	if err != nil {
+		return nil, err
+	}
+	body, err := p.parseStmtBodyBlock("for")
+	if err != nil {
+		return nil, err
+	}
+	return &ForStmt{
+		Condition: condition,
+		Body:      body,
+		Span:      mergeSpans(tokenSpan(start), body.Span),
+	}, nil
 }
 
 func (p *Parser) parseStmtBodyBlock(owner string, stopTypes ...TokenType) (*BlockStmt, error) {

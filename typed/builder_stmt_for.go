@@ -15,6 +15,14 @@ type forStmtBuilder struct {
 
 // Build converts a parser for statement into a typed for statement.
 func (b *forStmtBuilder) Build(stmt *parser.ForStmt) (Stmt, error) {
+	var condition Expr
+	var err error
+	if stmt.Condition != nil {
+		condition, err = b.exprs.Build(stmt.Condition)
+		if err != nil {
+			return nil, err
+		}
+	}
 	bindings := make([]ForBinding, len(stmt.Bindings))
 	b.ctx.pushScope()
 	for i, binding := range stmt.Bindings {
@@ -94,5 +102,5 @@ func (b *forStmtBuilder) Build(stmt *parser.ForStmt) (Stmt, error) {
 		return nil, err
 	}
 
-	return &ForStmt{Bindings: bindings, Body: body, YieldBody: yieldBody, Span: stmt.Span}, nil
+	return &ForStmt{Condition: condition, Bindings: bindings, Body: body, YieldBody: yieldBody, Span: stmt.Span}, nil
 }

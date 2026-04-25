@@ -262,6 +262,7 @@ func (*LoopStmt) statementNode() {}
 
 // ForStmt represents foreach and yield-style loops.
 type ForStmt struct {
+	Condition Expr         `json:"condition,omitempty"`
 	Bindings  []ForBinding `json:"bindings,omitempty"`
 	Body      *BlockStmt   `json:"body,omitempty"`
 	YieldBody *BlockStmt   `json:"yieldBody,omitempty"`

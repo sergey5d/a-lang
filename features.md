@@ -77,6 +77,17 @@ Still useful for:
 
 There is already an example reminder for this idea.
 
+### 7. Module / Visibility Polish
+
+Current package/import support is usable.
+
+Still open:
+- decide what to do with package variables and package-scoped methods
+- private by default vs public by default
+- whether package variables should ever be exposed through imports
+- whether package-scoped methods should be exposed by default or require an explicit rule
+- if both a wide package import and a renamed selective import target the same package, the wide import should come first and the `as` import should come after it
+
 ## Longer-Term Ideas
 
 ### 9. Result / Either Style Error Values
