@@ -1,21 +1,19 @@
 # EXPECT:
-# some 5
-# 5
+# pair 5-9
+# 14
 # 0
 
-enum MaybeInt {
-    case NoneX
-    case SomeX {
-        value Int
-    }
+class PairBox {
+    left Int
+    right Int
 }
 
 def main() Int {
-    maybe MaybeInt = MaybeInt.SomeX(5)
+    pair PairBox = PairBox(5, 9)
 
-    match maybe: SomeX(x) => Term.println("some " + x), MaybeInt.NoneX => Term.println("none")
+    match pair: PairBox(left, right) => Term.println("pair " + left + "-" + right)
 
-    picked = match maybe: SomeX(x) => x, MaybeInt.NoneX => 100
+    picked = match pair: PairBox(left, right) => left + right
     Term.println(picked)
 
     0

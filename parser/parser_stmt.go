@@ -654,52 +654,39 @@ func (p *Parser) parseInlineMatchCases(statementMode bool) ([]MatchCase, Token, 
 	if p.isAtEnd() || !sameLine(colon, p.peek()) {
 		return nil, Token{}, fmt.Errorf("expected same-line match case after ':'")
 	}
-	var cases []MatchCase
-	end := colon
-	for {
-		pattern, err := p.parsePattern()
-		if err != nil {
-			return nil, Token{}, err
-		}
-		arrow, err := p.consume(TokenFatArrow, "expected '=>' after match pattern")
-		if err != nil {
-			return nil, Token{}, err
-		}
-		if !sameLine(arrow, p.peek()) {
-			return nil, Token{}, fmt.Errorf("expected same-line match case body after '=>'")
-		}
-		matchCase := MatchCase{Pattern: pattern}
-		if statementMode {
-			p.beginScope()
-			stmt, err := p.parseInlineStatement(TokenComma)
-			p.endScope()
-			if err != nil {
-				return nil, Token{}, err
-			}
-			matchCase.Body = &BlockStmt{
-				Statements: []Statement{stmt},
-				Span:       stmtSpan(stmt),
-			}
-			matchCase.Span = mergeSpans(patternSpan(pattern), stmtSpan(stmt))
-		} else {
-			expr, err := p.parseInlineExpression(TokenComma)
-			if err != nil {
-				return nil, Token{}, err
-			}
-			matchCase.Expr = expr
-			matchCase.Span = mergeSpans(patternSpan(pattern), exprSpan(expr))
-		}
-		cases = append(cases, matchCase)
-		end = p.previous()
-		if !p.match(TokenComma) {
-			break
-		}
-		end = p.previous()
-		if p.isAtEnd() || !sameLine(colon, p.peek()) {
-			return nil, Token{}, fmt.Errorf("expected same-line match case after ','")
-		}
+	pattern, err := p.parsePattern()
+	if err != nil {
+		return nil, Token{}, err
 	}
-	return cases, end, nil
+	arrow, err := p.consume(TokenFatArrow, "expected '=>' after match pattern")
+	if err != nil {
+		return nil, Token{}, err
+	}
+	if !sameLine(arrow, p.peek()) {
+		return nil, Token{}, fmt.Errorf("expected same-line match case body after '=>'")
+	}
+	matchCase := MatchCase{Pattern: pattern}
+	if statementMode {
+		p.beginScope()
+		stmt, err := p.parseInlineStatement()
+		p.endScope()
+		if err != nil {
+			return nil, Token{}, err
+		}
+		matchCase.Body = &BlockStmt{
+			Statements: []Statement{stmt},
+			Span:       stmtSpan(stmt),
+		}
+		matchCase.Span = mergeSpans(patternSpan(pattern), stmtSpan(stmt))
+	} else {
+		expr, err := p.parseInlineExpression()
+		if err != nil {
+			return nil, Token{}, err
+		}
+		matchCase.Expr = expr
+		matchCase.Span = mergeSpans(patternSpan(pattern), exprSpan(expr))
+	}
+	return []MatchCase{matchCase}, p.previous(), nil
 }
 
 func (p *Parser) parseInlineStatement(stopTypes ...TokenType) (Statement, error) {
