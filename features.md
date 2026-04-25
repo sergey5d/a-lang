@@ -79,7 +79,25 @@ There is already an example reminder for this idea.
 Current package/import support is usable, but possible future additions include:
 - import aliases
 - selective imports
+- importing by package as the default form
+- importing specific class / object / record / interface names from a package
+- importing selected methods from an object when a package-level utility style is desired
+- import renaming with `as`, for example `import package1/sub/sub2/ClassA as ClassB`
+- possible import shapes under discussion:
+  - `import package/sub` with qualified access like `sub.A`
+  - `import package/sub/*` for importing all public symbols unqualified
+  - `import package/sub/A` for importing one symbol unqualified
+  - `import package/sub/{A, B, C}` as the possible grouped selective-import form
 - explicit exports later if needed
+
+Open design question:
+- how much import granularity should the language allow before it starts feeling too heavy
+
+Current leaning:
+- package import should remain the primary / simplest form
+- selective symbol imports are reasonable for class, object, record, and interface names
+- importing individual object methods is possible, but should probably stay explicit and selective rather than becoming the default style
+- if both a wide package import and a renamed selective import target the same package, the wide import should come first and the `as` import should come after it
 
 ## Longer-Term Ideas
 
