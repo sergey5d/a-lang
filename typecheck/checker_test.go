@@ -147,6 +147,58 @@ def run(value OptionX[Int]) Int {
 	}
 }
 
+func TestAnalyzeMatchStmtRequiresEnumExhaustiveness(t *testing.T) {
+	src := `
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+def run(value OptionX[Int]) Int {
+	match value {
+		SomeX(x) => {
+			return x
+		}
+	}
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if result.Diagnostics[0].Code != "non_exhaustive_match" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
+func TestAnalyzeMatchExprRequiresEnumExhaustiveness(t *testing.T) {
+	src := `
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+def run(value OptionX[Int]) Int =
+	match value {
+		SomeX(x) => x
+	}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if result.Diagnostics[0].Code != "non_exhaustive_match" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
 func TestAnalyzeMatchClassExtractor(t *testing.T) {
 	src := `
 class PairBox {

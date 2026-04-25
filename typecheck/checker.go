@@ -83,13 +83,13 @@ type typeLookup interface {
 
 func Analyze(program *parser.Program) Result {
 	c := &Checker{
-		globals:    map[string]binding{},
-		functions:  map[string]Signature{},
+		globals:       map[string]binding{},
+		functions:     map[string]Signature{},
 		functionDecls: map[string]*parser.FunctionDecl{},
-		classes:    map[string]classInfo{},
-		interfaces: map[string]interfaceInfo{},
-		imports:    map[string]moduleInfo{},
-		exprTypes:  map[parser.Expr]*Type{},
+		classes:       map[string]classInfo{},
+		interfaces:    map[string]interfaceInfo{},
+		imports:       map[string]moduleInfo{},
+		exprTypes:     map[parser.Expr]*Type{},
 	}
 	c.installBuiltinInterfaces()
 	c.collectDecls(program)
@@ -181,10 +181,10 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 			}
 			qualified := imported.Path + "::" + decl.Name
 			class := classInfo{
-				name:    qualified,
-				decl:    decl,
-				fields:  map[string]fieldInfo{},
-				methods: map[string][]methodInfo{},
+				name:      qualified,
+				decl:      decl,
+				fields:    map[string]fieldInfo{},
+				methods:   map[string][]methodInfo{},
 				enumCases: map[string]parser.EnumCaseDecl{},
 			}
 			for _, field := range decl.Fields {
@@ -344,10 +344,10 @@ func (c *Checker) collectDecls(program *parser.Program) {
 	}
 	for _, decl := range program.Classes {
 		info := classInfo{
-			name:    decl.Name,
-			decl:    decl,
-			fields:  map[string]fieldInfo{},
-			methods: map[string][]methodInfo{},
+			name:      decl.Name,
+			decl:      decl,
+			fields:    map[string]fieldInfo{},
+			methods:   map[string][]methodInfo{},
 			enumCases: map[string]parser.EnumCaseDecl{},
 		}
 		for _, field := range decl.Fields {
@@ -1109,6 +1109,7 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			}
 			c.popScope()
 		}
+		c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
 	case *parser.LoopStmt:
 		c.pushScope()
 		if s.Body != nil {
@@ -1186,6 +1187,77 @@ func (c *Checker) checkMatchPattern(pattern parser.Pattern, valueType *Type) {
 	case *parser.ConstructorPattern:
 		c.checkConstructorPattern(p, valueType)
 	}
+}
+
+func (c *Checker) checkMatchExhaustiveness(valueType *Type, cases []parser.MatchCase, span parser.Span) {
+	if valueType == nil || isUnknown(valueType) || valueType.Kind != TypeClass {
+		return
+	}
+	info, ok := c.classes[valueType.Name]
+	if !ok || !info.decl.Enum {
+		return
+	}
+	if len(info.decl.Cases) == 0 {
+		return
+	}
+	covered := map[string]bool{}
+	for _, matchCase := range cases {
+		if c.patternIsCatchAll(matchCase.Pattern, valueType) {
+			return
+		}
+		if caseName, ok := c.enumCaseNameForPattern(matchCase.Pattern, valueType); ok {
+			covered[caseName] = true
+		}
+	}
+	missing := make([]string, 0, len(info.decl.Cases))
+	for _, enumCase := range info.decl.Cases {
+		if !covered[enumCase.Name] {
+			missing = append(missing, enumCase.Name)
+		}
+	}
+	if len(missing) == 0 {
+		return
+	}
+	c.addDiagnostic("non_exhaustive_match", "match does not cover enum cases: "+joinNames(missing), span)
+}
+
+func (c *Checker) patternIsCatchAll(pattern parser.Pattern, valueType *Type) bool {
+	switch p := pattern.(type) {
+	case *parser.WildcardPattern:
+		return true
+	case *parser.BindingPattern:
+		return true
+	case *parser.TypePattern:
+		targetType := c.resolveDeclaredType(p.Target)
+		return c.isAssignable(valueType, targetType)
+	default:
+		return false
+	}
+}
+
+func (c *Checker) enumCaseNameForPattern(pattern parser.Pattern, valueType *Type) (string, bool) {
+	constructor, ok := pattern.(*parser.ConstructorPattern)
+	if !ok {
+		return "", false
+	}
+	info, ok := c.classes[valueType.Name]
+	if !ok || !info.decl.Enum {
+		return "", false
+	}
+	switch len(constructor.Path) {
+	case 1:
+		if _, ok := info.enumCases[constructor.Path[0]]; ok {
+			return constructor.Path[0], true
+		}
+	case 2:
+		if constructor.Path[0] != valueType.Name {
+			return "", false
+		}
+		if _, ok := info.enumCases[constructor.Path[1]]; ok {
+			return constructor.Path[1], true
+		}
+	}
+	return "", false
 }
 
 func (c *Checker) patternTypeCouldMatch(valueType, targetType *Type) bool {
@@ -1449,6 +1521,7 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 				resultType = unknownType
 			}
 		}
+		c.checkMatchExhaustiveness(valueType, e.Cases, e.Span)
 		if resultType == nil {
 			result = unknownType
 			break

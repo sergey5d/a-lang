@@ -19,7 +19,6 @@ Still missing:
 - generic type-aware matching / extraction
 - guards
 - nested patterns
-- exhaustiveness analysis
 - unreachable-case detection
 - a final decision on statement-vs-expression totality semantics
 
@@ -28,9 +27,9 @@ Still missing:
 ### 2. Enum Ergonomics
 
 Enums exist, but they still want:
-- eventual exhaustiveness checking
+- better generic pattern ergonomics
 
-Now that `match` exists, the biggest remaining enum improvement is compile-time exhaustiveness.
+Now that `match` exists and enum exhaustiveness is checked, the biggest remaining enum work is more expressive generic-pattern support.
 
 ### 3. Derived Protocols
 
