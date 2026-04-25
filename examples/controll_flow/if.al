@@ -1,5 +1,6 @@
 # EXPECT:
 # then
+# else-if
 # picked 5
 # binding 7
 # 0
@@ -9,6 +10,14 @@ def main() Int {
         Term.println("then")
     } else {
         Term.println("else")
+    }
+
+    if false {
+        Term.println("nope")
+    } else if true {
+        Term.println("else-if")
+    } else {
+        Term.println("also nope")
     }
 
     picked = if false {
