@@ -614,6 +614,19 @@ SomeX(x) => x
 class Box[T] with Named
 ```
 
+Planned operator overloading constraints:
+
+- Allowed to overload:
+  - arithmetic: `+`, `-`, `*`, `/`, `%`
+  - unary: unary `-`
+  - collection-oriented: `[]`, `:+`, `++`
+  - symbolic custom forms with no built-in language meaning: `|`, `&`, `>>`, `<<`, `~`, `::`
+- Not allowed to overload:
+  - logical operators: `&&`, `||`, `!`
+  - equality operators: `==`, `!=`
+- Comparison operators are intended to work through `Ordering[T]` rather than custom operator declarations.
+- Equality is intended to work through `Eq[T]` rather than custom operator declarations.
+
 ## Visibility
 
 Supported today:
