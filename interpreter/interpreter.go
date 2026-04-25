@@ -572,41 +572,59 @@ func (in *Interpreter) matchPattern(pattern parser.Pattern, value Value, local *
 		return bindings, true, nil
 	case *parser.ConstructorPattern:
 		instanceValue, ok := value.(*instance)
-		if !ok || !instanceValue.class.Enum {
+		if !ok {
 			return nil, false, nil
 		}
-		caseName := ""
-		switch len(p.Path) {
-		case 1:
-			caseName = p.Path[0]
-		case 2:
-			if p.Path[0] != instanceValue.class.Name {
+		if instanceValue.class.Enum {
+			caseName := ""
+			switch len(p.Path) {
+			case 1:
+				caseName = p.Path[0]
+			case 2:
+				if p.Path[0] != instanceValue.class.Name {
+					return nil, false, nil
+				}
+				caseName = p.Path[1]
+			default:
 				return nil, false, nil
 			}
-			caseName = p.Path[1]
-		default:
-			return nil, false, nil
-		}
-		if instanceValue.caseName != caseName {
-			return nil, false, nil
-		}
-		var enumCase *parser.EnumCaseDecl
-		for i := range instanceValue.class.Cases {
-			if instanceValue.class.Cases[i].Name == caseName {
-				enumCase = &instanceValue.class.Cases[i]
-				break
+			if instanceValue.caseName != caseName {
+				return nil, false, nil
 			}
+			var enumCase *parser.EnumCaseDecl
+			for i := range instanceValue.class.Cases {
+				if instanceValue.class.Cases[i].Name == caseName {
+					enumCase = &instanceValue.class.Cases[i]
+					break
+				}
+			}
+			if enumCase == nil || len(p.Args) != len(enumCase.Fields) {
+				return nil, false, nil
+			}
+			var bindings []matchedBinding
+			for i, arg := range p.Args {
+				fieldValue, ok := instanceValue.fields[enumCase.Fields[i].Name]
+				if !ok {
+					return nil, false, nil
+				}
+				next, ok, err := in.matchPattern(arg, fieldValue, local)
+				if err != nil || !ok {
+					return nil, ok, err
+				}
+				bindings = append(bindings, next...)
+			}
+			return bindings, true, nil
 		}
-		if enumCase == nil || len(p.Args) != len(enumCase.Fields) {
+		if len(p.Path) != 1 || p.Path[0] != instanceValue.class.Name {
+			return nil, false, nil
+		}
+		items, _, ok := destructurableValues(value)
+		if !ok || len(items) != len(p.Args) {
 			return nil, false, nil
 		}
 		var bindings []matchedBinding
 		for i, arg := range p.Args {
-			fieldValue, ok := instanceValue.fields[enumCase.Fields[i].Name]
-			if !ok {
-				return nil, false, nil
-			}
-			next, ok, err := in.matchPattern(arg, fieldValue, local)
+			next, ok, err := in.matchPattern(arg, items[i], local)
 			if err != nil || !ok {
 				return nil, ok, err
 			}

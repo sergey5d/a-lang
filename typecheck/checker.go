@@ -1215,47 +1215,66 @@ func (c *Checker) patternTypeCouldMatch(valueType, targetType *Type) bool {
 
 func (c *Checker) checkConstructorPattern(pattern *parser.ConstructorPattern, valueType *Type) {
 	if valueType == nil || isUnknown(valueType) || valueType.Kind != TypeClass {
-		c.addDiagnostic("invalid_match_pattern", "constructor pattern requires enum value", pattern.Span)
+		c.addDiagnostic("invalid_match_pattern", "constructor pattern requires class, record, or enum value", pattern.Span)
 		return
 	}
 	info, ok := c.classes[valueType.Name]
-	if !ok || !info.decl.Enum {
-		c.addDiagnostic("invalid_match_pattern", "constructor pattern requires enum value", pattern.Span)
+	if !ok {
+		c.addDiagnostic("invalid_match_pattern", "constructor pattern requires class, record, or enum value", pattern.Span)
 		return
 	}
-	caseName := ""
-	switch len(pattern.Path) {
-	case 1:
-		caseName = pattern.Path[0]
-	case 2:
-		if pattern.Path[0] != valueType.Name {
-			c.addDiagnostic("invalid_match_pattern", "constructor pattern does not match value type", pattern.Span)
+	if info.decl.Enum {
+		caseName := ""
+		switch len(pattern.Path) {
+		case 1:
+			caseName = pattern.Path[0]
+		case 2:
+			if pattern.Path[0] != valueType.Name {
+				c.addDiagnostic("invalid_match_pattern", "constructor pattern does not match value type", pattern.Span)
+				return
+			}
+			caseName = pattern.Path[1]
+		default:
+			c.addDiagnostic("invalid_match_pattern", "unsupported constructor pattern", pattern.Span)
 			return
 		}
-		caseName = pattern.Path[1]
-	default:
-		c.addDiagnostic("invalid_match_pattern", "unsupported constructor pattern", pattern.Span)
-		return
-	}
-	var enumCase *parser.EnumCaseDecl
-	for i := range info.decl.Cases {
-		if info.decl.Cases[i].Name == caseName {
-			enumCase = &info.decl.Cases[i]
-			break
+		var enumCase *parser.EnumCaseDecl
+		for i := range info.decl.Cases {
+			if info.decl.Cases[i].Name == caseName {
+				enumCase = &info.decl.Cases[i]
+				break
+			}
 		}
-	}
-	if enumCase == nil {
-		c.addDiagnostic("invalid_match_pattern", "unknown enum case '"+caseName+"'", pattern.Span)
+		if enumCase == nil {
+			c.addDiagnostic("invalid_match_pattern", "unknown enum case '"+caseName+"'", pattern.Span)
+			return
+		}
+		if len(pattern.Args) != len(enumCase.Fields) {
+			c.addDiagnostic("invalid_match_pattern", fmt.Sprintf("enum case '%s' expects %d pattern arguments, got %d", caseName, len(enumCase.Fields), len(pattern.Args)), pattern.Span)
+			return
+		}
+		subst := c.substForDecl(info.decl.TypeParameters, valueType.Args)
+		for i, arg := range pattern.Args {
+			fieldType := c.instantiateTypeRef(enumCase.Fields[i].Type, subst)
+			c.checkMatchPattern(arg, fieldType)
+		}
 		return
 	}
-	if len(pattern.Args) != len(enumCase.Fields) {
-		c.addDiagnostic("invalid_match_pattern", fmt.Sprintf("enum case '%s' expects %d pattern arguments, got %d", caseName, len(enumCase.Fields), len(pattern.Args)), pattern.Span)
+	if len(pattern.Path) != 1 || pattern.Path[0] != valueType.Name {
+		c.addDiagnostic("invalid_match_pattern", "constructor pattern does not match value type", pattern.Span)
 		return
 	}
-	subst := c.substForDecl(info.decl.TypeParameters, valueType.Args)
+	fieldTypes, _, ok := c.destructurableValueTypes(valueType)
+	if !ok {
+		c.addDiagnostic("invalid_match_pattern", "constructor pattern requires destructurable class or record", pattern.Span)
+		return
+	}
+	if len(pattern.Args) != len(fieldTypes) {
+		c.addDiagnostic("invalid_match_pattern", fmt.Sprintf("pattern '%s' expects %d arguments, got %d", valueType.Name, len(fieldTypes), len(pattern.Args)), pattern.Span)
+		return
+	}
 	for i, arg := range pattern.Args {
-		fieldType := c.instantiateTypeRef(enumCase.Fields[i].Type, subst)
-		c.checkMatchPattern(arg, fieldType)
+		c.checkMatchPattern(arg, fieldTypes[i])
 	}
 }
 

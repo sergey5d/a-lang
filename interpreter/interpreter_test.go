@@ -335,6 +335,56 @@ def run() Int {
 	}
 }
 
+func TestMatchClassExtractor(t *testing.T) {
+	src := `
+class PairBox {
+	left Int
+	right Int
+}
+
+def run() Int {
+	value PairBox = PairBox(4, 9)
+	return match value {
+		PairBox(left, right) => left + right
+	}
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(13) {
+		t.Fatalf("expected 13, got %#v", value)
+	}
+}
+
+func TestMatchRecordExtractor(t *testing.T) {
+	src := `
+record Amount {
+	count Int
+	label Str
+}
+
+def run() Int {
+	value Amount = Amount(42, "hello")
+	return match value {
+		Amount(count, label) => count
+	}
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(42) {
+		t.Fatalf("expected 42, got %#v", value)
+	}
+}
+
 func TestFunctionImplicitReturn(t *testing.T) {
 	src := `
 def suffix(value Str) Str {

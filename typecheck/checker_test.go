@@ -147,6 +147,52 @@ def run(value OptionX[Int]) Int {
 	}
 }
 
+func TestAnalyzeMatchClassExtractor(t *testing.T) {
+	src := `
+class PairBox {
+	left Int
+	right Int
+}
+
+def run(value PairBox) Int {
+	match value {
+		PairBox(left, right) => {
+			return left + right
+		}
+	}
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeMatchRecordExtractor(t *testing.T) {
+	src := `
+record Amount {
+	count Int
+	label Str
+}
+
+def run(value Amount) Int {
+	match value {
+		Amount(count, label) => {
+			return count
+		}
+	}
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeMatchTypePattern(t *testing.T) {
 	src := `
 interface WorkerLike {
