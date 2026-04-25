@@ -143,6 +143,8 @@ func patternSpan(pattern Pattern) Span {
 		return p.Span
 	case *BindingPattern:
 		return p.Span
+	case *TypePattern:
+		return p.Span
 	case *LiteralPattern:
 		return p.Span
 	case *TuplePattern:

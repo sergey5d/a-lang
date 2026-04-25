@@ -308,6 +308,15 @@ type BindingPattern struct {
 
 func (*BindingPattern) patternNode() {}
 
+// TypePattern matches by runtime type and optionally binds the matched value.
+type TypePattern struct {
+	Name   string   `json:"name,omitempty"`
+	Target *TypeRef `json:"target"`
+	Span   Span     `json:"span"`
+}
+
+func (*TypePattern) patternNode() {}
+
 // LiteralPattern matches a literal value exactly.
 type LiteralPattern struct {
 	Value Expr `json:"value"`

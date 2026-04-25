@@ -538,6 +538,14 @@ func (in *Interpreter) matchPattern(pattern parser.Pattern, value Value, local *
 		return nil, true, nil
 	case *parser.BindingPattern:
 		return []matchedBinding{{name: p.Name, value: value}}, true, nil
+	case *parser.TypePattern:
+		if !in.runtimeValueMatchesType(value, p.Target) {
+			return nil, false, nil
+		}
+		if p.Name == "" || p.Name == "_" {
+			return nil, true, nil
+		}
+		return []matchedBinding{{name: p.Name, value: value}}, true, nil
 	case *parser.LiteralPattern:
 		patternValue, err := in.matchLiteralValue(p.Value)
 		if err != nil {

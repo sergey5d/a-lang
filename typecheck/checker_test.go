@@ -147,6 +147,39 @@ def run(value OptionX[Int]) Int {
 	}
 }
 
+func TestAnalyzeMatchTypePattern(t *testing.T) {
+	src := `
+interface WorkerLike {
+}
+
+class Worker with WorkerLike {
+}
+
+class Other with WorkerLike {
+}
+
+def run(value WorkerLike) Int {
+	match value {
+		worker Worker => {
+			return 1
+		}
+		_ Other => {
+			return 2
+		}
+		_ => {
+			return 3
+		}
+	}
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeConstructorFieldAssignmentAllowsEquals(t *testing.T) {
 	src := `
 class Box {

@@ -1161,6 +1161,14 @@ func (c *Checker) checkMatchPattern(pattern parser.Pattern, valueType *Type) {
 		return
 	case *parser.BindingPattern:
 		c.define(p.Name, valueType, false)
+	case *parser.TypePattern:
+		targetType := c.resolveDeclaredType(p.Target)
+		if !isUnknown(valueType) && !c.patternTypeCouldMatch(valueType, targetType) {
+			c.addDiagnostic("invalid_match_pattern", "type pattern does not match value type", p.Span)
+		}
+		if p.Name != "" && p.Name != "_" {
+			c.define(p.Name, targetType, false)
+		}
 	case *parser.LiteralPattern:
 		patternType := c.checkExpr(p.Value)
 		if !sameType(valueType, patternType) && !isUnknown(valueType) && !isUnknown(patternType) {
@@ -1178,6 +1186,31 @@ func (c *Checker) checkMatchPattern(pattern parser.Pattern, valueType *Type) {
 	case *parser.ConstructorPattern:
 		c.checkConstructorPattern(p, valueType)
 	}
+}
+
+func (c *Checker) patternTypeCouldMatch(valueType, targetType *Type) bool {
+	if isUnknown(valueType) || isUnknown(targetType) {
+		return true
+	}
+	if sameType(valueType, targetType) {
+		return true
+	}
+	if valueType.Kind == TypeClass && targetType.Kind == TypeClass {
+		if c.isAssignable(valueType, targetType) || c.isAssignable(targetType, valueType) {
+			return true
+		}
+	}
+	if valueType.Kind == TypeClass && targetType.Kind == TypeInterface {
+		if c.isAssignable(valueType, targetType) {
+			return true
+		}
+	}
+	if valueType.Kind == TypeInterface && targetType.Kind == TypeClass {
+		if c.isAssignable(targetType, valueType) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Checker) checkConstructorPattern(pattern *parser.ConstructorPattern, valueType *Type) {

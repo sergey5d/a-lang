@@ -300,6 +300,41 @@ def run() Int {
 	}
 }
 
+func TestMatchTypePattern(t *testing.T) {
+	src := `
+interface WorkerLike {
+	def doWork() Int
+}
+
+class Worker with WorkerLike {
+	def doWork() Int = 7
+}
+
+class Other with WorkerLike {
+	def doWork() Int = 3
+}
+
+def run() Int {
+	value WorkerLike = Worker()
+
+	return match value {
+		worker Worker => worker.doWork()
+		_ Other => 100
+		_ => 0
+	}
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(7) {
+		t.Fatalf("expected 7, got %#v", value)
+	}
+}
+
 func TestFunctionImplicitReturn(t *testing.T) {
 	src := `
 def suffix(value Str) Str {

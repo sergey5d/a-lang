@@ -120,6 +120,35 @@ enum OptionX[T] {
 	}
 }
 
+func TestParseMatchTypePattern(t *testing.T) {
+	program, err := Parse(`
+class Worker {
+}
+
+def run(value Worker) Int {
+	match value {
+		item Worker => {
+			return 1
+		}
+		_ Worker => {
+			return 2
+		}
+	}
+}
+`)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	fn := program.Functions[0]
+	matchStmt := fn.Body.Statements[0].(*MatchStmt)
+	if _, ok := matchStmt.Cases[0].Pattern.(*TypePattern); !ok {
+		t.Fatalf("expected type pattern, got %T", matchStmt.Cases[0].Pattern)
+	}
+	if _, ok := matchStmt.Cases[1].Pattern.(*TypePattern); !ok {
+		t.Fatalf("expected wildcard type pattern, got %T", matchStmt.Cases[1].Pattern)
+	}
+}
+
 func TestParseHashComments(t *testing.T) {
 	src := `
 # top-level comment

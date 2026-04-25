@@ -395,6 +395,13 @@ func (p *Parser) parsePattern() (Pattern, error) {
 	token := p.advance()
 	switch token.Type {
 	case TokenUnder:
+		if p.bindingTypeStartsOnSameLine(token) && p.check(TokenIdentifier) {
+			target, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			return &TypePattern{Name: "_", Target: target, Span: mergeSpans(tokenSpan(token), typeSpan(target))}, nil
+		}
 		return &WildcardPattern{Span: tokenSpan(token)}, nil
 	case TokenInteger:
 		return &LiteralPattern{Value: &IntegerLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, Span: tokenSpan(token)}, nil
@@ -442,6 +449,13 @@ func (p *Parser) parsePattern() (Pattern, error) {
 		}
 		return &TuplePattern{Elements: elements, Span: mergeSpans(tokenSpan(token), tokenSpan(end))}, nil
 	case TokenIdentifier:
+		if p.bindingTypeStartsOnSameLine(token) && p.check(TokenIdentifier) {
+			target, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			return &TypePattern{Name: token.Lexeme, Target: target, Span: mergeSpans(tokenSpan(token), typeSpan(target))}, nil
+		}
 		path := []string{token.Lexeme}
 		endSpan := tokenSpan(token)
 		for p.match(TokenDot) {
