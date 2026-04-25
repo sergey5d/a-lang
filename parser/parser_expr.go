@@ -106,7 +106,7 @@ func (p *Parser) parsePrefix() (Expr, error) {
 
 	token := p.advance()
 	switch token.Type {
-	case TokenBang, TokenMinus:
+	case TokenBang, TokenMinus, TokenTilde:
 		right, err := p.parseExpression(unaryPrecedence())
 		if err != nil {
 			return nil, err
@@ -336,16 +336,24 @@ func precedence(t TokenType) int {
 		return 1
 	case TokenAndAnd:
 		return 2
-	case TokenEqEq, TokenBangEq, TokenIs:
+	case TokenPipe:
 		return 3
-	case TokenLT, TokenLTE, TokenGT, TokenGTE:
+	case TokenAmp:
 		return 4
-	case TokenPlus, TokenMinus:
+	case TokenEqEq, TokenBangEq, TokenIs:
 		return 5
-	case TokenStar, TokenSlash, TokenPercent:
+	case TokenLT, TokenLTE, TokenGT, TokenGTE:
 		return 6
-	case TokenColon:
+	case TokenLTLT, TokenGTGT:
 		return 7
+	case TokenPlus, TokenMinus, TokenPlusPlus, TokenColonPlus:
+		return 8
+	case TokenStar, TokenSlash, TokenPercent:
+		return 9
+	case TokenColonColon:
+		return 10
+	case TokenColon:
+		return 11
 	default:
 		return -1
 	}

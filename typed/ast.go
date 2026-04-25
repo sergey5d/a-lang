@@ -127,6 +127,7 @@ type MethodDecl struct {
 	ReturnType     *typecheck.Type
 	Body           *BlockStmt
 	Impl           bool
+	Operator       bool
 	Private        bool
 	Constructor    bool
 	Symbol         SymbolRef

@@ -410,9 +410,6 @@ func (in *Interpreter) constructEnumCase(class *parser.ClassDecl, enumCase parse
 
 func (in *Interpreter) execBlock(block *parser.BlockStmt, parent *env, self *instance) (Value, any, error) {
 	local := newEnv(parent)
-	if self != nil {
-		local.define("this", self, false)
-	}
 	var lastValue Value
 	for _, stmt := range block.Statements {
 		value, signal, err := in.execStmt(stmt, local, self)
@@ -1010,21 +1007,32 @@ func (in *Interpreter) assign(target parser.Expr, operator string, value Value, 
 func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 	switch e := expr.(type) {
 	case *parser.Identifier:
-		if binding, ok := local.get(e.Name); ok {
+		if thisScope, thisObj, ok := local.findThisScope(); ok && thisObj != nil {
+			if binding, ok := local.getUntil(thisScope, e.Name); ok {
+				if _, deferred := binding.value.(deferredValue); deferred {
+					return nil, RuntimeError{Message: "binding '" + e.Name + "' is deferred and has not been assigned", Span: e.Span}
+				}
+				return binding.value, nil
+			}
+			if value, exists := thisObj.fields[e.Name]; exists {
+				if _, deferred := value.(deferredValue); deferred {
+					return nil, RuntimeError{Message: "field '" + e.Name + "' is deferred and has not been assigned", Span: e.Span}
+				}
+				return value, nil
+			}
+			if thisScope.parent != nil {
+				if binding, ok := thisScope.parent.get(e.Name); ok {
+					if _, deferred := binding.value.(deferredValue); deferred {
+						return nil, RuntimeError{Message: "binding '" + e.Name + "' is deferred and has not been assigned", Span: e.Span}
+					}
+					return binding.value, nil
+				}
+			}
+		} else if binding, ok := local.get(e.Name); ok {
 			if _, deferred := binding.value.(deferredValue); deferred {
 				return nil, RuntimeError{Message: "binding '" + e.Name + "' is deferred and has not been assigned", Span: e.Span}
 			}
 			return binding.value, nil
-		}
-		if thisSlot, ok := local.get("this"); ok {
-			if obj, ok := thisSlot.value.(*instance); ok {
-				if value, exists := obj.fields[e.Name]; exists {
-					if _, deferred := value.(deferredValue); deferred {
-						return nil, RuntimeError{Message: "field '" + e.Name + "' is deferred and has not been assigned", Span: e.Span}
-					}
-					return value, nil
-				}
-			}
 		}
 		if _, ok := in.functions[e.Name]; ok {
 			return functionRef{module: in, name: e.Name}, nil
@@ -1180,6 +1188,9 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			}
 			return !b, nil
 		case "-":
+			if obj, ok := right.(*instance); ok {
+				return in.invokeMethod(obj, "-", nil, local, e.Span)
+			}
 			switch n := right.(type) {
 			case int64:
 				return -n, nil
@@ -1188,6 +1199,11 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			default:
 				return nil, RuntimeError{Message: "operator - requires numeric operand", Span: e.Span}
 			}
+		case "~":
+			if obj, ok := right.(*instance); ok {
+				return in.invokeMethod(obj, "~", nil, local, e.Span)
+			}
+			return nil, RuntimeError{Message: "operator ~ requires an overloaded operand", Span: e.Span}
 		default:
 			return nil, RuntimeError{Message: "unsupported unary operator", Span: e.Span}
 		}
@@ -1228,6 +1244,9 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			}
 			return equal, nil
 		}
+		if overloaded, ok, err := in.evalOverloadedBinary(e.Operator, left, e.Right, right, local, e.Span); ok {
+			return overloaded, err
+		}
 		return applyBinary(e.Operator, left, right, e.Span)
 	case *parser.IsExpr:
 		left, err := in.evalExpr(e.Left, local)
@@ -1248,13 +1267,27 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		items, ok := indexedItems(receiver)
-		if !ok {
-			return nil, RuntimeError{Message: "indexing requires array-like value", Span: e.Span}
-		}
 		indexValue, err := in.evalExpr(e.Index, local)
 		if err != nil {
 			return nil, err
+		}
+		if obj, ok := receiver.(*instance); ok {
+			return in.invokeMethod(obj, "[]", []Value{indexValue}, local, e.Span)
+		}
+		items, ok := indexedItems(receiver)
+		if !ok {
+			if m, ok := receiver.(*nativeMap); ok {
+				key, err := nativeKey(indexValue, e.Span, local, in)
+				if err != nil {
+					return nil, err
+				}
+				value, exists := m.items[key]
+				if !exists {
+					return nil, RuntimeError{Message: "map key not found", Span: e.Span}
+				}
+				return value, nil
+			}
+			return nil, RuntimeError{Message: "indexing requires Array, List, Map, or operator []", Span: e.Span}
 		}
 		index, ok := indexValue.(int64)
 		if !ok {
@@ -2307,6 +2340,38 @@ func (e *env) define(name string, value Value, mutable bool) {
 	e.values[name] = slot{value: value, mutable: mutable}
 }
 
+func (e *env) getLocal(name string) (slot, bool) {
+	value, ok := e.values[name]
+	return value, ok
+}
+
+func (e *env) getUntil(stop *env, name string) (slot, bool) {
+	for current := e; current != nil; current = current.parent {
+		if value, ok := current.values[name]; ok {
+			return value, true
+		}
+		if current == stop {
+			break
+		}
+	}
+	return slot{}, false
+}
+
+func (e *env) findThisScope() (*env, *instance, bool) {
+	for current := e; current != nil; current = current.parent {
+		value, ok := current.values["this"]
+		if !ok {
+			continue
+		}
+		obj, ok := value.value.(*instance)
+		if !ok {
+			return current, nil, false
+		}
+		return current, obj, true
+	}
+	return nil, nil, false
+}
+
 func (e *env) get(name string) (slot, bool) {
 	if value, ok := e.values[name]; ok {
 		return value, true
@@ -2536,6 +2601,80 @@ func applyBinary(op string, left, right Value, span parser.Span) (Value, error) 
 	}
 	return nil, RuntimeError{Message: "unsupported operator '" + op + "'", Span: span}
 }
+
+func (in *Interpreter) evalOverloadedBinary(op string, left Value, rightExpr parser.Expr, right Value, local *env, span parser.Span) (Value, bool, error) {
+	switch op {
+	case ":+":
+		switch l := left.(type) {
+		case *nativeList:
+			return &nativeList{items: append(append([]Value(nil), l.items...), right)}, true, nil
+		case *nativeSet:
+			out := &nativeSet{keys: map[string]Value{}, order: []string{}}
+			for _, key := range l.order {
+				out.keys[key] = l.keys[key]
+				out.order = append(out.order, key)
+			}
+			key, err := nativeKey(right, span, local, in)
+			if err != nil {
+				return nil, true, err
+			}
+			if _, exists := out.keys[key]; !exists {
+				out.order = append(out.order, key)
+			}
+			out.keys[key] = right
+			return out, true, nil
+		}
+	case "++":
+		switch l := left.(type) {
+		case *nativeList:
+			if r, ok := right.(*nativeList); ok {
+				out := append(append([]Value(nil), l.items...), r.items...)
+				return &nativeList{items: out}, true, nil
+			}
+		case *nativeSet:
+			if r, ok := right.(*nativeSet); ok {
+				out := &nativeSet{keys: map[string]Value{}, order: []string{}}
+				for _, key := range l.order {
+					out.keys[key] = l.keys[key]
+					out.order = append(out.order, key)
+				}
+				for _, key := range r.order {
+					if _, exists := out.keys[key]; !exists {
+						out.order = append(out.order, key)
+					}
+					out.keys[key] = r.keys[key]
+				}
+				return out, true, nil
+			}
+		case *nativeMap:
+			if r, ok := right.(*nativeMap); ok {
+				out := &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: []string{}}
+				for _, key := range l.order {
+					out.items[key] = l.items[key]
+					out.keys[key] = l.keys[key]
+					out.order = append(out.order, key)
+				}
+				for _, key := range r.order {
+					if _, exists := out.items[key]; !exists {
+						out.order = append(out.order, key)
+					}
+					out.items[key] = r.items[key]
+					out.keys[key] = r.keys[key]
+				}
+				return out, true, nil
+			}
+		}
+	case "+", "-", "*", "/", "%", "|", "&", ">>", "<<", "::":
+		if obj, ok := left.(*instance); ok {
+			value, err := in.invokeMethod(obj, op, []Value{right}, local, span)
+			return value, true, err
+		}
+	case "~":
+		return nil, false, nil
+	}
+	return nil, false, nil
+}
+
 
 func applyArithmetic(op string, left, right Value, span parser.Span) (Value, error) {
 	if ls, ok := left.(string); ok && op == "+" {

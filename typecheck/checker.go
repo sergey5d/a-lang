@@ -580,6 +580,7 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 	for _, method := range decl.Methods {
 		c.checkMethod(method, decl)
 	}
+	c.checkOperatorMethods(info)
 	c.checkImplMethodMarkers(info)
 	if decl.Enum {
 		c.checkEnumCases(info)
@@ -717,6 +718,47 @@ func (c *Checker) checkImplMethodMarkers(class classInfo) {
 				c.addDiagnostic("invalid_impl_method", "method '"+class.decl.Name+"."+method.decl.Name+"' uses 'impl def' but does not match any declared interface method", method.decl.Span)
 			}
 		}
+	}
+}
+
+func (c *Checker) checkOperatorMethods(class classInfo) {
+	for _, methods := range class.methods {
+		for _, method := range methods {
+			if !method.decl.Operator {
+				continue
+			}
+			if method.decl.Impl {
+				c.addDiagnostic("invalid_operator_method", "operator declaration '"+class.decl.Name+"."+method.decl.Name+"' cannot use 'impl'", method.decl.Span)
+				continue
+			}
+			if !isAllowedOperatorName(method.decl.Name) {
+				c.addDiagnostic("invalid_operator_method", "operator '"+method.decl.Name+"' cannot be overloaded", method.decl.Span)
+				continue
+			}
+			switch method.decl.Name {
+			case "[]", ":+", "++", "+", "*", "/", "%", "|", "&", ">>", "<<", "::":
+				if len(method.decl.Parameters) != 1 {
+					c.addDiagnostic("invalid_operator_method", "operator '"+method.decl.Name+"' must declare exactly 1 parameter", method.decl.Span)
+				}
+			case "~":
+				if len(method.decl.Parameters) != 0 {
+					c.addDiagnostic("invalid_operator_method", "operator '~' must declare 0 parameters", method.decl.Span)
+				}
+			case "-":
+				if len(method.decl.Parameters) != 0 && len(method.decl.Parameters) != 1 {
+					c.addDiagnostic("invalid_operator_method", "operator '-' must declare 0 or 1 parameters", method.decl.Span)
+				}
+			}
+		}
+	}
+}
+
+func isAllowedOperatorName(name string) bool {
+	switch name {
+	case "+", "-", "*", "/", "%", "[]", ":+", "++", "|", "&", ">>", "<<", "~", "::":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -1642,10 +1684,21 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			c.requireAssignable(right, builtin("Bool"), e.Span, "invalid_unary_operand", "operator ! requires Bool")
 			result = builtin("Bool")
 		case "-":
+			if overloaded, ok := c.resolveOperatorExprType(right, "-", nil, e.Span); ok {
+				result = overloaded
+				break
+			}
 			if !isNumeric(right) {
 				c.addDiagnostic("invalid_unary_operand", "operator - requires numeric operand", e.Span)
 			}
 			result = right
+		case "~":
+			if overloaded, ok := c.resolveOperatorExprType(right, "~", nil, e.Span); ok {
+				result = overloaded
+				break
+			}
+			c.addDiagnostic("invalid_unary_operand", "operator ~ requires an overloaded operand", e.Span)
+			result = unknownType
 		default:
 			result = unknownType
 		}
@@ -2191,7 +2244,20 @@ func (c *Checker) checkIndexExpr(expr *parser.IndexExpr) *Type {
 	if receiverType.Kind == TypeBuiltin && receiverType.Name == "Array" && len(receiverType.Args) == 1 {
 		return receiverType.Args[0]
 	}
-	c.addDiagnostic("invalid_index_target", "indexing requires Array[T]", expr.Span)
+	if receiverType.Kind == TypeInterface && receiverType.Name == "List" && len(receiverType.Args) == 1 {
+		return receiverType.Args[0]
+	}
+	if receiverType.Kind == TypeInterface && receiverType.Name == "Map" && len(receiverType.Args) == 2 {
+		expectedKey := receiverType.Args[0]
+		if !sameType(indexType, expectedKey) {
+			c.addDiagnostic("type_mismatch", "map index must have key type "+expectedKey.String(), expr.Span)
+		}
+		return receiverType.Args[1]
+	}
+	if result, ok := c.resolveOperatorExprType(receiverType, "[]", []*Type{indexType}, expr.Span); ok {
+		return result
+	}
+	c.addDiagnostic("invalid_index_target", "indexing requires Array[T], List[T], Map[K, V], or operator []", expr.Span)
 	return unknownType
 }
 
@@ -2685,6 +2751,9 @@ func (c *Checker) checkBinaryOperation(left, right *Type, op string, span parser
 		if sameType(left, builtin("Str")) || sameType(right, builtin("Str")) {
 			return builtin("Str")
 		}
+		if result, ok := c.resolveOperatorExprType(left, op, []*Type{right}, span); ok {
+			return result
+		}
 		if !isNumeric(left) || !isNumeric(right) {
 			c.addDiagnostic("invalid_binary_operand", "operator + requires numeric operands unless one side is Str", span)
 			return unknownType
@@ -2694,6 +2763,9 @@ func (c *Checker) checkBinaryOperation(left, right *Type, op string, span parser
 		}
 		return left
 	case "-", "*", "/", "%":
+		if result, ok := c.resolveOperatorExprType(left, op, []*Type{right}, span); ok {
+			return result
+		}
 		if !isNumeric(left) || !isNumeric(right) {
 			c.addDiagnostic("invalid_binary_operand", "arithmetic operators require numeric operands", span)
 			return unknownType
@@ -2725,9 +2797,112 @@ func (c *Checker) checkBinaryOperation(left, right *Type, op string, span parser
 		return builtin("Bool")
 	case ":":
 		return unknownType
+	case ":+":
+		if result, ok := c.checkCollectionAppendType(left, right, span); ok {
+			return result
+		}
+		if result, ok := c.resolveOperatorExprType(left, op, []*Type{right}, span); ok {
+			return result
+		}
+		c.addDiagnostic("invalid_binary_operand", "operator :+ requires a collection receiver or matching operator overload", span)
+		return unknownType
+	case "++":
+		if result, ok := c.checkCollectionConcatType(left, right, span); ok {
+			return result
+		}
+		if result, ok := c.resolveOperatorExprType(left, op, []*Type{right}, span); ok {
+			return result
+		}
+		c.addDiagnostic("invalid_binary_operand", "operator ++ requires matching collections or a matching operator overload", span)
+		return unknownType
+	case "|", "&", ">>", "<<", "::":
+		if result, ok := c.resolveOperatorExprType(left, op, []*Type{right}, span); ok {
+			return result
+		}
+		c.addDiagnostic("invalid_binary_operand", "operator "+op+" requires a matching operator overload", span)
+		return unknownType
 	default:
 		return unknownType
 	}
+}
+
+func (c *Checker) resolveOperatorExprType(receiver *Type, name string, argTypes []*Type, span parser.Span) (*Type, bool) {
+	if isUnknown(receiver) || receiver.Kind != TypeClass {
+		return unknownType, false
+	}
+	class, ok := c.classes[receiver.Name]
+	if !ok {
+		return unknownType, false
+	}
+	method, ok := c.findOperatorOverload(class, receiver, name, argTypes, span)
+	if !ok {
+		return unknownType, false
+	}
+	subst := c.substForDecl(class.decl.TypeParameters, receiver.Args)
+	sig := c.instantiateMethodSignature(method.decl, class.decl, subst)
+	return sig.ReturnType, true
+}
+
+func (c *Checker) findOperatorOverload(class classInfo, receiver *Type, name string, argTypes []*Type, span parser.Span) (methodInfo, bool) {
+	methods, ok := class.methods[name]
+	if !ok || len(methods) == 0 {
+		return methodInfo{}, false
+	}
+	subst := c.substForDecl(class.decl.TypeParameters, receiver.Args)
+	var matches []methodInfo
+	for _, method := range methods {
+		if !method.decl.Operator {
+			continue
+		}
+		if method.decl.Private && !c.canAccessPrivate(class.decl) {
+			continue
+		}
+		sig := c.instantiateMethodSignature(method.decl, class.decl, subst)
+		if signatureMatches(sig, argTypes) {
+			matches = append(matches, method)
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0], true
+	}
+	if len(matches) > 1 {
+		c.addDiagnostic("ambiguous_overload", "operator '"+name+"' is ambiguous", span)
+	}
+	return methodInfo{}, false
+}
+
+func (c *Checker) checkCollectionAppendType(left, right *Type, span parser.Span) (*Type, bool) {
+	if isUnknown(left) || isUnknown(right) {
+		return unknownType, false
+	}
+	if left.Kind == TypeInterface && left.Name == "List" && len(left.Args) == 1 {
+		c.requireAssignable(right, left.Args[0], span, "type_mismatch", "cannot append "+right.String()+" to List["+left.Args[0].String()+"]")
+		return left, true
+	}
+	if left.Kind == TypeInterface && left.Name == "Set" && len(left.Args) == 1 {
+		c.requireAssignable(right, left.Args[0], span, "type_mismatch", "cannot add "+right.String()+" to Set["+left.Args[0].String()+"]")
+		return left, true
+	}
+	return unknownType, false
+}
+
+func (c *Checker) checkCollectionConcatType(left, right *Type, span parser.Span) (*Type, bool) {
+	if isUnknown(left) || isUnknown(right) {
+		return unknownType, false
+	}
+	if left.Kind == TypeInterface && right.Kind == TypeInterface && left.Name == right.Name && len(left.Args) == len(right.Args) {
+		switch left.Name {
+		case "List", "Set", "Map":
+			for i := range left.Args {
+				if !sameType(left.Args[i], right.Args[i]) {
+					c.addDiagnostic("type_mismatch", "operator ++ requires matching collection element types", span)
+					return unknownType, true
+				}
+			}
+			return left, true
+		}
+	}
+	return unknownType, false
 }
 
 func (c *Checker) checkAssignmentTarget(target parser.Expr, span parser.Span) (*Type, bool) {

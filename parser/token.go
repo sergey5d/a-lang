@@ -17,6 +17,7 @@ const (
 
 	TokenDef        TokenType = "DEF"
 	TokenImpl       TokenType = "IMPL"
+	TokenOperator   TokenType = "OPERATOR"
 	TokenPackage    TokenType = "PACKAGE"
 	TokenImport     TokenType = "IMPORT"
 	TokenAs         TokenType = "AS"
@@ -47,6 +48,8 @@ const (
 
 	TokenComma  TokenType = ","
 	TokenColon  TokenType = ":"
+	TokenColonPlus TokenType = ":+"
+	TokenColonColon TokenType = "::"
 	TokenDot    TokenType = "."
 	TokenQuestion TokenType = "?"
 	TokenEllipsis TokenType = "..."
@@ -55,6 +58,7 @@ const (
 	TokenColonAssign TokenType = ":="
 
 	TokenPlus    TokenType = "+"
+	TokenPlusPlus TokenType = "++"
 	TokenMinus   TokenType = "-"
 	TokenStar    TokenType = "*"
 	TokenSlash   TokenType = "/"
@@ -72,12 +76,17 @@ const (
 	TokenBang      TokenType = "!"
 	TokenBangEq    TokenType = "!="
 	TokenLT        TokenType = "<"
+	TokenLTLT      TokenType = "<<"
 	TokenLTE       TokenType = "<="
 	TokenGT        TokenType = ">"
+	TokenGTGT      TokenType = ">>"
 	TokenGTE       TokenType = ">="
 
+	TokenAmp   TokenType = "&"
 	TokenAndAnd TokenType = "&&"
+	TokenPipe  TokenType = "|"
 	TokenOrOr   TokenType = "||"
+	TokenTilde TokenType = "~"
 
 	TokenUnder TokenType = "_"
 )
@@ -85,6 +94,7 @@ const (
 var keywords = map[string]TokenType{
 	"def":        TokenDef,
 	"impl":       TokenImpl,
+	"operator":   TokenOperator,
 	"package":    TokenPackage,
 	"import":     TokenImport,
 	"as":         TokenAs,

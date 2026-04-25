@@ -71,6 +71,12 @@ func (l *Lexer) nextToken() (Token, error) {
 		if l.match('=') {
 			return l.token(TokenColonAssign, ":=", startLine, startColumn), nil
 		}
+		if l.match('+') {
+			return l.token(TokenColonPlus, ":+", startLine, startColumn), nil
+		}
+		if l.match(':') {
+			return l.token(TokenColonColon, "::", startLine, startColumn), nil
+		}
 		return l.token(TokenColon, ":", startLine, startColumn), nil
 	case '.':
 		l.advance()
@@ -88,6 +94,9 @@ func (l *Lexer) nextToken() (Token, error) {
 		l.advance()
 		if l.match('=') {
 			return l.token(TokenPlusEq, "+=", startLine, startColumn), nil
+		}
+		if l.match('+') {
+			return l.token(TokenPlusPlus, "++", startLine, startColumn), nil
 		}
 		return l.token(TokenPlus, "+", startLine, startColumn), nil
 	case '-':
@@ -140,12 +149,18 @@ func (l *Lexer) nextToken() (Token, error) {
 		if l.match('-') {
 			return l.token(TokenLeftArrow, "<-", startLine, startColumn), nil
 		}
+		if l.match('<') {
+			return l.token(TokenLTLT, "<<", startLine, startColumn), nil
+		}
 		if l.match('=') {
 			return l.token(TokenLTE, "<=", startLine, startColumn), nil
 		}
 		return l.token(TokenLT, "<", startLine, startColumn), nil
 	case '>':
 		l.advance()
+		if l.match('>') {
+			return l.token(TokenGTGT, ">>", startLine, startColumn), nil
+		}
 		if l.match('=') {
 			return l.token(TokenGTE, ">=", startLine, startColumn), nil
 		}
@@ -155,13 +170,16 @@ func (l *Lexer) nextToken() (Token, error) {
 		if l.match('&') {
 			return l.token(TokenAndAnd, "&&", startLine, startColumn), nil
 		}
-		return Token{}, fmt.Errorf("unexpected '&' at %d:%d", startLine, startColumn)
+		return l.token(TokenAmp, "&", startLine, startColumn), nil
 	case '|':
 		l.advance()
 		if l.match('|') {
 			return l.token(TokenOrOr, "||", startLine, startColumn), nil
 		}
-		return Token{}, fmt.Errorf("unexpected '|' at %d:%d", startLine, startColumn)
+		return l.token(TokenPipe, "|", startLine, startColumn), nil
+	case '~':
+		l.advance()
+		return l.token(TokenTilde, "~", startLine, startColumn), nil
 	case '\'':
 		return l.lexRune(startLine, startColumn)
 	case '"':

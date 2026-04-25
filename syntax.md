@@ -614,7 +614,17 @@ SomeX(x) => x
 class Box[T] with Named
 ```
 
-Planned operator overloading constraints:
+Operator declarations use the `operator` keyword rather than `def`:
+
+```txt
+operator +(other Vec) Vec = Vec(this[0] + other[0], this[1] + other[1])
+operator -() Vec = Vec(-this[0], -this[1])
+operator [](index Int) Int = items[index]
+operator :+(value Int) Vec = ...
+operator ++(other Vec) Vec = ...
+```
+
+Current operator overloading constraints:
 
 - Allowed to overload:
   - arithmetic: `+`, `-`, `*`, `/`, `%`

@@ -341,7 +341,7 @@ def run(values Array[Int]) Int {
 
 func TestAnalyzeInvalidIndexing(t *testing.T) {
 	src := `
-def fromList(values List[Int]) Int {
+def fromSet(values Set[Int]) Int {
 	return values[0]
 }
 
@@ -1415,6 +1415,45 @@ def run() Int {
 	expanded List[Int] = items.flatMap((item Int) -> List(item, item + 10))
 	doubled.forEach((item Int) -> Term.println(item))
 	return doubled.get(2).getOr(0) + doubled2.get(1).getOr(0) + expanded.get(5).getOr(0)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeCustomAndCollectionOperators(t *testing.T) {
+	src := `
+class Vec {
+	private items Array[Int] := ?
+
+	def this(left Int, right Int) {
+		this.items := Array(2)
+		this.items[0] := left
+		this.items[1] := right
+	}
+
+	operator [](index Int) Int = items[index]
+	operator +(other Vec) Vec = Vec(this[0] + other[0], this[1] + other[1])
+	operator -() Vec = Vec(-this[0], -this[1])
+}
+
+def run() Int {
+	left Vec = Vec(1, 2)
+	right Vec = Vec(3, 4)
+	total Vec = left + right
+	neg Vec = -total
+
+	items List[Int] = List(1, 2)
+	items2 List[Int] = items :+ 3
+	merged List[Int] = items2 ++ List(4, 5)
+
+	seen Set[Int] = Set(1, 2)
+	all Set[Int] = seen ++ Set(3)
+
+	return neg[0] + merged[4] + all.size()
 }
 `
 

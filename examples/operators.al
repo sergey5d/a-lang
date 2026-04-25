@@ -1,0 +1,38 @@
+# EXPECT:
+# 4 6
+# -4
+# 5
+# 3
+
+class Vec {
+    private items Array[Int] := ?
+
+    def this(left Int, right Int) {
+        this.items := Array(2)
+        this.items[0] := left
+        this.items[1] := right
+    }
+
+    operator [](index Int) Int = items[index]
+    operator +(other Vec) Vec = Vec(this[0] + other[0], this[1] + other[1])
+    operator -() Vec = Vec(-this[0], -this[1])
+}
+
+def main() Unit {
+    left Vec = Vec(1, 2)
+    right Vec = Vec(3, 4)
+    total Vec = left + right
+    neg Vec = -total
+
+    Term.println(total[0], total[1])
+    Term.println(neg[0])
+
+    items = List(1, 2)
+    items2 = items :+ 3
+    merged = items2 ++ List(4, 5)
+    Term.println(merged[4])
+
+    seen = Set(1, 2)
+    all = seen ++ Set(3)
+    Term.println(all.size())
+}

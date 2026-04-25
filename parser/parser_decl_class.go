@@ -63,9 +63,9 @@ func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 				return nil, err
 			}
 			decl.Fields = append(decl.Fields, field)
-		case TokenDef, TokenImpl:
+		case TokenDef, TokenImpl, TokenOperator:
 			sawNonField = true
-			method, err := p.parseMethod(false, false)
+			method, err := p.parseMethodLike(false, false)
 			if err != nil {
 				return nil, err
 			}
@@ -131,9 +131,9 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 				return nil, err
 			}
 			decl.Fields = append(decl.Fields, field)
-		case TokenDef, TokenImpl:
+		case TokenDef, TokenImpl, TokenOperator:
 			sawMethod = true
-			method, err := p.parseMethod(private, false)
+			method, err := p.parseMethodLike(private, false)
 			if err != nil {
 				return nil, err
 			}
@@ -185,6 +185,13 @@ func (p *Parser) parseField(private bool) (FieldDecl, error) {
 		field.Span = mergeSpans(field.Span, exprSpan(expr))
 	}
 	return field, nil
+}
+
+func (p *Parser) parseMethodLike(private bool, allowShortApply bool) (*MethodDecl, error) {
+	if p.check(TokenOperator) {
+		return p.parseOperatorMethod(private)
+	}
+	return p.parseMethod(private, allowShortApply)
 }
 
 func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, error) {
@@ -242,10 +249,87 @@ func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, e
 		ReturnType:     returnType,
 		Body:           body,
 		Impl:           impl,
+		Operator:       false,
 		Private:        private,
 		Constructor:    constructor,
 		Span:           mergeSpans(tokenSpan(start), body.Span),
 	}, nil
+}
+
+func (p *Parser) parseOperatorMethod(private bool) (*MethodDecl, error) {
+	start, err := p.consume(TokenOperator, "expected 'operator'")
+	if err != nil {
+		return nil, err
+	}
+	nameLexeme, endSpan, err := p.parseOperatorName()
+	if err != nil {
+		return nil, err
+	}
+	typeParams, err := p.parseTypeParameters()
+	if err != nil {
+		return nil, err
+	}
+	params, err := p.parseParameters()
+	if err != nil {
+		return nil, err
+	}
+	var returnType *TypeRef
+	if !p.check(TokenLBrace) && !p.check(TokenAssign) {
+		typ, err := p.parseTypeRef()
+		if err != nil {
+			return nil, err
+		}
+		returnType = typ
+	}
+	body, err := p.parseCallableBody()
+	if err != nil {
+		return nil, err
+	}
+	if returnType == nil {
+		returnType = implicitUnitType(body.Span)
+	}
+	return &MethodDecl{
+		Name:           nameLexeme,
+		TypeParameters: typeParams,
+		Parameters:     params,
+		ReturnType:     returnType,
+		Body:           body,
+		Operator:       true,
+		Private:        private,
+		Span:           mergeSpans(tokenSpan(start), mergeSpans(endSpan, body.Span)),
+	}, nil
+}
+
+func (p *Parser) parseOperatorName() (string, Span, error) {
+	token := p.advance()
+	switch token.Type {
+	case TokenPlus, TokenMinus, TokenStar, TokenSlash, TokenPercent:
+		return token.Lexeme, tokenSpan(token), nil
+	case TokenColonPlus:
+		return ":+", tokenSpan(token), nil
+	case TokenPlusPlus:
+		return "++", tokenSpan(token), nil
+	case TokenPipe:
+		return "|", tokenSpan(token), nil
+	case TokenAmp:
+		return "&", tokenSpan(token), nil
+	case TokenGTGT:
+		return ">>", tokenSpan(token), nil
+	case TokenLTLT:
+		return "<<", tokenSpan(token), nil
+	case TokenTilde:
+		return "~", tokenSpan(token), nil
+	case TokenColonColon:
+		return "::", tokenSpan(token), nil
+	case TokenLBracket:
+		end, err := p.consume(TokenRBracket, "expected ']' after operator '['")
+		if err != nil {
+			return "", Span{}, err
+		}
+		return "[]", mergeSpans(tokenSpan(token), tokenSpan(end)), nil
+	default:
+		return "", Span{}, fmt.Errorf("expected operator symbol, got %s", token.String())
+	}
 }
 
 func (p *Parser) parseEnumCase() (EnumCaseDecl, error) {

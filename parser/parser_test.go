@@ -1150,6 +1150,38 @@ object Range {
 	}
 }
 
+func TestParseOperatorDecls(t *testing.T) {
+	src := `
+class Vec {
+	operator [](index Int) Int = 0
+	operator +(other Vec) Vec = this
+	operator -() Vec = this
+	operator :+(value Int) Vec = this
+	operator ++(other Vec) Vec = this
+	operator |(other Vec) Vec = this
+	operator &(other Vec) Vec = this
+	operator >>(bits Int) Vec = this
+	operator <<(bits Int) Vec = this
+	operator ~() Vec = this
+	operator ::(other Vec) Vec = this
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Classes) != 1 || len(program.Classes[0].Methods) != 11 {
+		t.Fatalf("unexpected operator declarations %#v", program.Classes)
+	}
+	if !program.Classes[0].Methods[0].Operator || program.Classes[0].Methods[0].Name != "[]" {
+		t.Fatalf("expected [] operator method, got %#v", program.Classes[0].Methods[0])
+	}
+	if !program.Classes[0].Methods[2].Operator || program.Classes[0].Methods[2].Name != "-" {
+		t.Fatalf("expected unary - operator method, got %#v", program.Classes[0].Methods[2])
+	}
+}
+
 func TestParsePrivateClassDecl(t *testing.T) {
 	src := `
 private class Hidden {
