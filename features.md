@@ -64,18 +64,10 @@ This is not a core blocker, but it would help:
 - vector-like records
 - domain-specific types
 
-### 6. One-Line `:` Shorthand
-
-Possible shorthand under discussion:
-- `if cond: stmt`
-- `if cond: stmt else: stmt`
-- `for item <- items: stmt`
-- `loop: stmt`
-
 Constraint:
 - keep it same-line only; no newline-based implicit body after `:`
 
-### 7. Anonymous Objects / Object Literals
+### 6. Anonymous Objects / Object Literals
 
 Still useful for:
 - one-off adapters
@@ -84,30 +76,6 @@ Still useful for:
 - temporary helper instances
 
 There is already an example reminder for this idea.
-
-### 8. Module / Visibility Polish
-
-Current package/import support is usable, but possible future additions include:
-- import aliases
-- selective imports
-- importing by package as the default form
-- importing specific class / object / record / interface names from a package
-- import renaming with `as`, for example `import package1/sub/sub2/ClassA as ClassB`
-- possible import shapes under discussion:
-  - `import package/sub` with qualified access like `sub.A`
-  - `import package/sub/*` for importing all public symbols unqualified
-  - `import package/sub/A` for importing one symbol unqualified
-  - `import package/sub/{A, B, C}` as the possible grouped selective-import form
-- explicit exports later if needed
-
-Open design question:
-- how much import granularity should the language allow before it starts feeling too heavy
-
-Current leaning:
-- package import should remain the primary / simplest form
-- selective symbol imports are reasonable for class, object, record, and interface names
-- keep method-level imports out of scope for now
-- if both a wide package import and a renamed selective import target the same package, the wide import should come first and the `as` import should come after it
 
 ## Longer-Term Ideas
 
