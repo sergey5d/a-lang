@@ -466,6 +466,11 @@ func (c *Checker) checkInterface(decl *parser.InterfaceDecl) {
 		c.currentTypeScope()[param.Name] = TypeParam
 	}
 	c.validateTypeParameterBounds(decl.TypeParameters)
+	for _, method := range decl.Methods {
+		if method.Name == "this" {
+			c.addDiagnostic("invalid_interface_method", "interface '"+decl.Name+"': interfaces cannot declare constructors", method.Span)
+		}
+	}
 	for _, parent := range decl.Extends {
 		parentType := c.resolveDeclaredType(parent)
 		if parentType.Kind != TypeInterface {
@@ -647,6 +652,9 @@ func (c *Checker) checkMethod(method *parser.MethodDecl, owner *parser.ClassDecl
 	}
 	if owner.Object && method.Constructor {
 		c.addDiagnostic("invalid_object_method", "object '"+owner.Name+"' cannot declare constructors", method.Span)
+	}
+	if owner.Record && method.Constructor {
+		c.addDiagnostic("invalid_record_method", "record '"+owner.Name+"': records cannot declare constructors", method.Span)
 	}
 	implicitReturn := c.checkBlock(method.Body)
 	if !method.Constructor && method.ReturnType != nil && !isUnknown(implicitReturn) && !isUnitType(expectedReturn) {
