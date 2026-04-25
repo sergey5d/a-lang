@@ -295,20 +295,20 @@ func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
 		if _, err := p.consume(TokenLeftArrow, "expected '<-' after if binding"); err != nil {
 			return nil, err
 		}
-		value, err := p.parseExpressionWithOptions(0, false)
+		value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
 		if err != nil {
 			return nil, err
 		}
 		stmt.Bindings = bindings
 		stmt.BindingValue = value
 	} else {
-		condition, err := p.parseExpressionWithOptions(0, false)
+		condition, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
 		if err != nil {
 			return nil, err
 		}
 		stmt.Condition = condition
 	}
-	thenBlock, err := p.parseBlock()
+	thenBlock, err := p.parseStmtBodyBlock("if", TokenElse)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +323,7 @@ func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
 			stmt.Span = mergeSpans(tokenSpan(start), stmt.ElseIf.Span)
 			return stmt, nil
 		}
-		elseBlock, err := p.parseBlock()
+		elseBlock, err := p.parseStmtBodyBlock("else")
 		if err != nil {
 			return nil, err
 		}
@@ -340,11 +340,17 @@ func (p *Parser) parseMatchStmt() (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	value, err := p.parseExpressionWithOptions(0, false)
+	value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
 	if err != nil {
 		return nil, err
 	}
-	cases, end, err := p.parseMatchCases()
+	var cases []MatchCase
+	var end Token
+	if p.check(TokenLBrace) {
+		cases, end, err = p.parseMatchCases()
+	} else {
+		cases, end, err = p.parseInlineMatchCases(true)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -548,7 +554,7 @@ func (p *Parser) parseForStmt() (Statement, error) {
 
 func (p *Parser) parseLoopStmt() (Statement, error) {
 	start := p.advance()
-	body, err := p.parseBlock()
+	body, err := p.parseStmtBodyBlock("loop")
 	if err != nil {
 		return nil, err
 	}
@@ -564,7 +570,7 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 			return nil, err
 		}
 		p.declareBindings(binding.Bindings)
-		body, err := p.parseBlock()
+		body, err := p.parseStmtBodyBlock("for")
 		if err != nil {
 			return nil, err
 		}
@@ -582,7 +588,7 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 		if _, err := p.consume(TokenYield, "expected 'yield' after for bindings"); err != nil {
 			return nil, err
 		}
-		yieldBody, err := p.parseBlock()
+		yieldBody, err := p.parseYieldBodyBlock("yield")
 		if err != nil {
 			return nil, err
 		}
@@ -593,6 +599,275 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 		}, nil
 	}
 	return nil, fmt.Errorf("for loop requires bindings like 'for item <- items { ... }' or a yield form")
+}
+
+func (p *Parser) parseStmtBodyBlock(owner string, stopTypes ...TokenType) (*BlockStmt, error) {
+	if p.check(TokenLBrace) {
+		return p.parseBlock()
+	}
+	colon, err := p.consume(TokenColon, "expected '{' or ':' after "+owner)
+	if err != nil {
+		return nil, err
+	}
+	if p.isAtEnd() || !sameLine(colon, p.peek()) {
+		return nil, fmt.Errorf("expected same-line statement after ':'")
+	}
+	p.beginScope()
+	defer p.endScope()
+	stmt, err := p.parseInlineStatement(stopTypes...)
+	if err != nil {
+		return nil, err
+	}
+	return &BlockStmt{
+		Statements: []Statement{stmt},
+		Span:       mergeSpans(tokenSpan(colon), stmtSpan(stmt)),
+	}, nil
+}
+
+func (p *Parser) parseYieldBodyBlock(owner string, stopTypes ...TokenType) (*BlockStmt, error) {
+	if p.check(TokenLBrace) {
+		return p.parseBlock()
+	}
+	colon, err := p.consume(TokenColon, "expected '{' or ':' after "+owner)
+	if err != nil {
+		return nil, err
+	}
+	if p.isAtEnd() || !sameLine(colon, p.peek()) {
+		return nil, fmt.Errorf("expected same-line expression after ':'")
+	}
+	expr, err := p.parseInlineExpression(stopTypes...)
+	if err != nil {
+		return nil, err
+	}
+	stmt := &ExprStmt{Expr: expr, Span: exprSpan(expr)}
+	return &BlockStmt{
+		Statements: []Statement{stmt},
+		Span:       mergeSpans(tokenSpan(colon), exprSpan(expr)),
+	}, nil
+}
+
+func (p *Parser) parseInlineMatchCases(statementMode bool) ([]MatchCase, Token, error) {
+	colon, err := p.consume(TokenColon, "expected '{' or ':' after match value")
+	if err != nil {
+		return nil, Token{}, err
+	}
+	if p.isAtEnd() || !sameLine(colon, p.peek()) {
+		return nil, Token{}, fmt.Errorf("expected same-line match case after ':'")
+	}
+	var cases []MatchCase
+	end := colon
+	for {
+		pattern, err := p.parsePattern()
+		if err != nil {
+			return nil, Token{}, err
+		}
+		arrow, err := p.consume(TokenFatArrow, "expected '=>' after match pattern")
+		if err != nil {
+			return nil, Token{}, err
+		}
+		if !sameLine(arrow, p.peek()) {
+			return nil, Token{}, fmt.Errorf("expected same-line match case body after '=>'")
+		}
+		matchCase := MatchCase{Pattern: pattern}
+		if statementMode {
+			p.beginScope()
+			stmt, err := p.parseInlineStatement(TokenComma)
+			p.endScope()
+			if err != nil {
+				return nil, Token{}, err
+			}
+			matchCase.Body = &BlockStmt{
+				Statements: []Statement{stmt},
+				Span:       stmtSpan(stmt),
+			}
+			matchCase.Span = mergeSpans(patternSpan(pattern), stmtSpan(stmt))
+		} else {
+			expr, err := p.parseInlineExpression(TokenComma)
+			if err != nil {
+				return nil, Token{}, err
+			}
+			matchCase.Expr = expr
+			matchCase.Span = mergeSpans(patternSpan(pattern), exprSpan(expr))
+		}
+		cases = append(cases, matchCase)
+		end = p.previous()
+		if !p.match(TokenComma) {
+			break
+		}
+		end = p.previous()
+		if p.isAtEnd() || !sameLine(colon, p.peek()) {
+			return nil, Token{}, fmt.Errorf("expected same-line match case after ','")
+		}
+	}
+	return cases, end, nil
+}
+
+func (p *Parser) parseInlineStatement(stopTypes ...TokenType) (Statement, error) {
+	sub, nextPos, err := p.inlineBodyParser(stopTypes...)
+	if err != nil {
+		return nil, err
+	}
+	stmt, err := sub.parseStatement()
+	if err != nil {
+		return nil, err
+	}
+	if !sub.isAtEnd() {
+		return nil, fmt.Errorf("expected end of inline statement, got %s", sub.peek().String())
+	}
+	p.pos = nextPos
+	return stmt, nil
+}
+
+func (p *Parser) parseInlineExpression(stopTypes ...TokenType) (Expr, error) {
+	sub, nextPos, err := p.inlineBodyParser(stopTypes...)
+	if err != nil {
+		return nil, err
+	}
+	expr, err := sub.parseExpressionWithOptions(0, false)
+	if err != nil {
+		return nil, err
+	}
+	if !sub.isAtEnd() {
+		return nil, fmt.Errorf("expected end of inline expression, got %s", sub.peek().String())
+	}
+	p.pos = nextPos
+	return expr, nil
+}
+
+func (p *Parser) parseExpressionUntil(stopTypes ...TokenType) (Expr, error) {
+	sub, nextPos, err := p.subparserUntil(stopTypes...)
+	if err != nil {
+		return nil, err
+	}
+	expr, err := sub.parseExpressionWithOptions(0, false)
+	if err != nil {
+		return nil, err
+	}
+	if !sub.isAtEnd() {
+		return nil, fmt.Errorf("expected end of expression, got %s", sub.peek().String())
+	}
+	p.pos = nextPos
+	return expr, nil
+}
+
+func (p *Parser) inlineBodyParser(stopTypes ...TokenType) (*Parser, int, error) {
+	if p.isAtEnd() {
+		return nil, 0, fmt.Errorf("expected inline body")
+	}
+	line := p.peek().Line
+	stopSet := map[TokenType]struct{}{}
+	for _, stop := range stopTypes {
+		stopSet[stop] = struct{}{}
+	}
+	depthParen := 0
+	depthBracket := 0
+	depthBrace := 0
+	end := p.pos
+	for end < len(p.tokens) {
+		token := p.tokens[end]
+		if token.Line != line {
+			break
+		}
+		if depthParen == 0 && depthBracket == 0 && depthBrace == 0 {
+			if _, ok := stopSet[token.Type]; ok {
+				break
+			}
+		}
+		switch token.Type {
+		case TokenLParen:
+			depthParen++
+		case TokenRParen:
+			if depthParen > 0 {
+				depthParen--
+			}
+		case TokenLBracket:
+			depthBracket++
+		case TokenRBracket:
+			if depthBracket > 0 {
+				depthBracket--
+			}
+		case TokenLBrace:
+			depthBrace++
+		case TokenRBrace:
+			if depthBrace > 0 {
+				depthBrace--
+			}
+		}
+		end++
+	}
+	if end == p.pos {
+		return nil, 0, fmt.Errorf("expected inline body")
+	}
+	inlineTokens := append([]Token(nil), p.tokens[p.pos:end]...)
+	last := inlineTokens[len(inlineTokens)-1]
+	inlineTokens = append(inlineTokens, Token{
+		Type:      TokenEOF,
+		Line:      last.EndLine,
+		Column:    last.EndColumn,
+		EndLine:   last.EndLine,
+		EndColumn: last.EndColumn,
+	})
+	scopes := make([]map[string]struct{}, len(p.scopes))
+	copy(scopes, p.scopes)
+	return &Parser{tokens: inlineTokens, scopes: scopes}, end, nil
+}
+
+func (p *Parser) subparserUntil(stopTypes ...TokenType) (*Parser, int, error) {
+	if p.isAtEnd() {
+		return nil, 0, fmt.Errorf("expected expression")
+	}
+	stopSet := map[TokenType]struct{}{}
+	for _, stop := range stopTypes {
+		stopSet[stop] = struct{}{}
+	}
+	depthParen := 0
+	depthBracket := 0
+	depthBrace := 0
+	end := p.pos
+	for end < len(p.tokens) {
+		token := p.tokens[end]
+		if depthParen == 0 && depthBracket == 0 && depthBrace == 0 {
+			if _, ok := stopSet[token.Type]; ok {
+				break
+			}
+		}
+		switch token.Type {
+		case TokenLParen:
+			depthParen++
+		case TokenRParen:
+			if depthParen > 0 {
+				depthParen--
+			}
+		case TokenLBracket:
+			depthBracket++
+		case TokenRBracket:
+			if depthBracket > 0 {
+				depthBracket--
+			}
+		case TokenLBrace:
+			depthBrace++
+		case TokenRBrace:
+			if depthBrace > 0 {
+				depthBrace--
+			}
+		}
+		end++
+	}
+	if end == p.pos {
+		return nil, 0, fmt.Errorf("expected expression")
+	}
+	inlineTokens := append([]Token(nil), p.tokens[p.pos:end]...)
+	last := inlineTokens[len(inlineTokens)-1]
+	inlineTokens = append(inlineTokens, Token{
+		Type:      TokenEOF,
+		Line:      last.EndLine,
+		Column:    last.EndColumn,
+		EndLine:   last.EndLine,
+		EndColumn: last.EndColumn,
+	})
+	scopes := make([]map[string]struct{}, len(p.scopes))
+	copy(scopes, p.scopes)
+	return &Parser{tokens: inlineTokens, scopes: scopes}, end, nil
 }
 
 func (p *Parser) parseForClause() (ForBinding, error) {
@@ -613,7 +888,7 @@ func (p *Parser) parseForClause() (ForBinding, error) {
 	switch p.peek().Type {
 	case TokenLeftArrow:
 		p.advance()
-		iterable, err := p.parseExpressionWithOptions(0, false)
+		iterable, err := p.parseInlineExpression(TokenComma, TokenRBrace, TokenYield, TokenLBrace, TokenColon)
 		if err != nil {
 			return ForBinding{}, err
 		}

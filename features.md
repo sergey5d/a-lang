@@ -64,7 +64,18 @@ This is not a core blocker, but it would help:
 - vector-like records
 - domain-specific types
 
-### 6. Anonymous Objects / Object Literals
+### 6. One-Line `:` Shorthand
+
+Possible shorthand under discussion:
+- `if cond: stmt`
+- `if cond: stmt else: stmt`
+- `for item <- items: stmt`
+- `loop: stmt`
+
+Constraint:
+- keep it same-line only; no newline-based implicit body after `:`
+
+### 7. Anonymous Objects / Object Literals
 
 Still useful for:
 - one-off adapters
@@ -74,7 +85,7 @@ Still useful for:
 
 There is already an example reminder for this idea.
 
-### 7. Module / Visibility Polish
+### 8. Module / Visibility Polish
 
 Current package/import support is usable, but possible future additions include:
 - import aliases
@@ -100,13 +111,13 @@ Current leaning:
 
 ## Longer-Term Ideas
 
-### 8. Result / Either Style Error Values
+### 9. Result / Either Style Error Values
 
 `Option` exists, but a richer success/error enum would likely be useful later.
 
 This is much more attractive now that `match` exists.
 
-### 9. Smarter Type Narrowing
+### 10. Smarter Type Narrowing
 
 Later improvements could include:
 - better narrowing after `is`

@@ -292,6 +292,133 @@ def run(values List[Int], flag Bool) Int {
 	}
 }
 
+func TestParseColonShorthandStatements(t *testing.T) {
+	src := `
+def run(values List[Int], flag Bool, maybe MaybeInt) Int {
+	if flag: return 1 else: return 2
+	for value <- values: Term.println(value)
+	loop: break
+	match maybe: SomeX(x) => return x, MaybeInt.NoneX => return 0
+}
+
+enum MaybeInt {
+	case NoneX
+	case SomeX {
+		value Int
+	}
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	ifStmt, ok := fn.Body.Statements[0].(*IfStmt)
+	if !ok {
+		t.Fatalf("expected first statement to be if, got %T", fn.Body.Statements[0])
+	}
+	if len(ifStmt.Then.Statements) != 1 || len(ifStmt.Else.Statements) != 1 {
+		t.Fatalf("expected shorthand if to wrap single statements, got %#v", ifStmt)
+	}
+
+	forStmt, ok := fn.Body.Statements[1].(*ForStmt)
+	if !ok {
+		t.Fatalf("expected second statement to be for, got %T", fn.Body.Statements[1])
+	}
+	if len(forStmt.Body.Statements) != 1 {
+		t.Fatalf("expected shorthand for body to wrap one statement, got %#v", forStmt.Body)
+	}
+
+	loopStmt, ok := fn.Body.Statements[2].(*LoopStmt)
+	if !ok {
+		t.Fatalf("expected third statement to be loop, got %T", fn.Body.Statements[2])
+	}
+	if len(loopStmt.Body.Statements) != 1 {
+		t.Fatalf("expected shorthand loop body to wrap one statement, got %#v", loopStmt.Body)
+	}
+
+	matchStmt, ok := fn.Body.Statements[3].(*MatchStmt)
+	if !ok {
+		t.Fatalf("expected fourth statement to be match, got %T", fn.Body.Statements[3])
+	}
+	if len(matchStmt.Cases) != 2 {
+		t.Fatalf("expected 2 inline match cases, got %d", len(matchStmt.Cases))
+	}
+	if matchStmt.Cases[0].Body == nil || matchStmt.Cases[1].Body == nil {
+		t.Fatalf("expected shorthand match statement cases to have bodies, got %#v", matchStmt.Cases)
+	}
+}
+
+func TestParseColonShorthandExpressions(t *testing.T) {
+	src := `
+def run(values List[Int], flag Bool, maybe MaybeInt) Int {
+	label = if flag: 1 else: 2
+	items = for value <- values yield: value + 1
+	picked = match maybe: SomeX(x) => x, MaybeInt.NoneX => 0
+	return label + picked
+}
+
+enum MaybeInt {
+	case NoneX
+	case SomeX {
+		value Int
+	}
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	first := fn.Body.Statements[0].(*ValStmt)
+	ifExpr, ok := first.Values[0].(*IfExpr)
+	if !ok {
+		t.Fatalf("expected first binding value to be if expression, got %T", first.Values[0])
+	}
+	if len(ifExpr.Then.Statements) != 1 || len(ifExpr.Else.Statements) != 1 {
+		t.Fatalf("expected shorthand if expression blocks to wrap single expressions, got %#v", ifExpr)
+	}
+
+	second := fn.Body.Statements[1].(*ValStmt)
+	forYield, ok := second.Values[0].(*ForYieldExpr)
+	if !ok {
+		t.Fatalf("expected second binding value to be for-yield expression, got %T", second.Values[0])
+	}
+	if len(forYield.YieldBody.Statements) != 1 {
+		t.Fatalf("expected shorthand yield body to wrap one expression, got %#v", forYield.YieldBody)
+	}
+
+	third := fn.Body.Statements[2].(*ValStmt)
+	matchExpr, ok := third.Values[0].(*MatchExpr)
+	if !ok {
+		t.Fatalf("expected third binding value to be match expression, got %T", third.Values[0])
+	}
+	if len(matchExpr.Cases) != 2 {
+		t.Fatalf("expected 2 inline match expression cases, got %d", len(matchExpr.Cases))
+	}
+	if matchExpr.Cases[0].Expr == nil || matchExpr.Cases[1].Expr == nil {
+		t.Fatalf("expected shorthand match expression cases to have expressions, got %#v", matchExpr.Cases)
+	}
+}
+
+func TestParseColonShorthandRejectsNewlineBody(t *testing.T) {
+	src := `
+def run(flag Bool) Int {
+	if flag:
+		return 1
+	return 0
+}
+`
+
+	if _, err := Parse(src); err == nil {
+		t.Fatalf("expected parse error for newline body after ':'")
+	}
+}
+
 func TestParseIsExpression(t *testing.T) {
 	src := `
 def run(value Any) Bool {

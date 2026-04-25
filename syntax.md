@@ -1,0 +1,618 @@
+# Syntax Reference
+
+This file describes the language syntax that is available now.
+
+## Built-In Data Types
+
+Primitive types:
+
+- `Int`
+- `Int64`
+- `Float`
+- `Float64`
+- `Bool`
+- `Str`
+- `Rune`
+- `Unit`
+
+Built-in generic/container types:
+
+- `Array[T]`
+- `Map[K, V]`
+- `Set[T]`
+- `List[T]`
+- `Unit`
+
+Common stdlib/prelude types:
+- `Option[T]`
+- `Iterable[T]`
+- `Iterator[T]`
+- `Ordering[T]`
+
+Tuple types:
+
+- unnamed tuples: `(Int, Str)`
+- named tuples: `(value Int, label Str)`
+
+Function types:
+
+- `(Int) -> Str`
+- `(Int, Bool) -> Unit`
+
+## Imports
+
+Supported import forms:
+
+```txt
+import package/sub
+import package/sub/*
+import package/sub/A
+import package/sub/A as B
+import package/sub/{A, B as D, C}
+```
+
+Meaning:
+
+- `import package/sub`
+  qualified access through the package name, for example `sub.A`
+- `import package/sub/*`
+  import all public symbols unqualified
+- `import package/sub/A`
+  import one symbol unqualified
+- `import package/sub/A as B`
+  import one symbol with a local alias
+- `import package/sub/{A, B as D, C}`
+  import a selected symbol set
+
+Method-level imports are currently out of scope.
+
+## Top-Level Declarations
+
+Package declaration:
+
+```txt
+package app
+```
+
+Top-level forms:
+
+- `def`
+- `interface`
+- `class`
+- `object`
+- `record`
+- `enum`
+- `private def`
+- `private interface`
+- `private class`
+- `private object`
+- `private record`
+- `private enum`
+
+Examples:
+
+```txt
+def greet(name Str) Str = "hello, " + name
+
+interface Named {
+    def label() Str
+}
+
+class Box[T] {
+    value T
+}
+
+object Counter {
+    count Int := 0
+}
+
+record Amount {
+    value Int
+    label Str
+}
+
+enum OptionX[T] {
+    case NoneX
+    case SomeX {
+        value T
+    }
+}
+```
+
+## Variable Declarations
+
+Immutable local binding:
+
+```txt
+value = 1
+name Str = "Ada"
+```
+
+Mutable local binding:
+
+```txt
+count := 0
+total Int := 10
+```
+
+Top-level bindings are also supported:
+
+```txt
+seed Int = 1
+counter Int := 0
+```
+
+Deferred / uninitialized fields are only valid in class-like field declarations:
+
+```txt
+class Box {
+    private cached Int := ?
+    private label Str = ?
+}
+```
+
+## Assignment and Update
+
+Reassignment:
+
+```txt
+count := count + 1
+```
+
+Compound assignment:
+
+```txt
+count += 1
+count -= 1
+count *= 2
+count /= 2
+count %= 2
+```
+
+Member assignment:
+
+```txt
+this.value = value
+this.count := this.count + 1
+```
+
+Index assignment:
+
+```txt
+values[0] := 1
+values[1] := values[0] + 4
+```
+
+Record update:
+
+```txt
+updated = value with {
+    age = 42
+    name = "Bob"
+}
+```
+
+## Functions and Methods
+
+Expression-bodied function:
+
+```txt
+def greet(name Str) Str = "hello, " + name
+```
+
+Block-bodied function:
+
+```txt
+def add(left Int, right Int) Int {
+    return left + right
+}
+```
+
+Generic function:
+
+```txt
+def id[T](value T) T = value
+```
+
+Generic bounds:
+
+```txt
+def sort[T with Ordering[T]](value T) T = value
+```
+
+Methods look the same inside classes, records, objects, and enums:
+
+```txt
+class Counter {
+    value Int
+
+    def inc() Int = value + 1
+}
+```
+
+Constructors currently use `def this(...)`:
+
+```txt
+class Person {
+    age Int
+    name Str
+
+    def this(age Int, name Str) {
+        this.age = age
+        this.name = name
+    }
+}
+```
+
+## Lambdas
+
+Single-parameter lambda:
+
+```txt
+x -> x + 1
+```
+
+Explicitly typed lambda:
+
+```txt
+(x Int) -> x + 1
+```
+
+Multi-parameter lambda:
+
+```txt
+(left Int, right Int) -> left + right
+```
+
+Block lambda:
+
+```txt
+(x Int) -> {
+    value := x + 1
+    value
+}
+```
+
+## Classes, Objects, Records, Interfaces, Enums
+
+Class:
+
+```txt
+class Box[T] with Named {
+    value T
+
+    def label() Str = "box"
+}
+```
+
+Object:
+
+```txt
+object Range {
+    def apply(end Int) IntRange = IntRange(0, end, 1)
+}
+```
+
+Records:
+
+```txt
+record Amount with Named {
+    value Int
+    label Str
+}
+```
+
+Interfaces:
+
+```txt
+interface Named {
+    def label() Str
+}
+```
+
+Enums:
+
+```txt
+enum Color {
+    code Str
+
+    case Red {
+        code = "red"
+    }
+}
+```
+
+```txt
+enum OptionX[T] {
+    case NoneX
+    case SomeX {
+        value T
+    }
+}
+```
+
+## Calls and `apply`
+
+Normal call:
+
+```txt
+add(1, 2)
+```
+
+Named arguments:
+
+```txt
+format(prefix = "item", value = 5)
+```
+
+Instances with `apply` can be called like functions:
+
+```txt
+adder Adder = Adder(5)
+adder(7)
+```
+
+Objects with `apply` can also be called:
+
+```txt
+Range(10)
+Range.apply(10, 0, -1)
+```
+
+## Lists, Arrays, Tuples
+
+List literal:
+
+```txt
+[1, 2, 3]
+["a", "b"]
+```
+
+Array construction:
+
+```txt
+values Array[Int] = Array(3)
+values[0] := 1
+```
+
+Tuple literal:
+
+```txt
+(1, "x")
+(value = 1, label = "x")
+```
+
+## Statements
+
+Main statement forms:
+
+- value binding
+- assignment / reassignment
+- local function
+- `if`
+- `match`
+- `for`
+- `loop`
+- `return`
+- `break`
+- expression statement
+
+Pure expression statements with no effect are rejected.
+
+## `if`
+
+Statement form:
+
+```txt
+if value > 0 {
+    Term.println("positive")
+} else {
+    Term.println("non-positive")
+}
+```
+
+Option binding form:
+
+```txt
+if item <- maybeValue {
+    Term.println(item)
+}
+```
+
+Destructuring also works in `if <-`:
+
+```txt
+if x, y <- maybePair {
+    Term.println(x)
+    Term.println(y)
+}
+```
+
+Expression form:
+
+```txt
+result = if value > 0 {
+    1
+} else {
+    0
+}
+```
+
+## `for`
+
+Simple loop:
+
+```txt
+for item <- [1, 2, 3] {
+    Term.println(item)
+}
+```
+
+Destructuring loop:
+
+```txt
+for x, y, char <- rows {
+    Term.println(char)
+}
+```
+
+Yield form:
+
+```txt
+items = for item <- [1, 2, 3] yield {
+    item * 2
+}
+```
+
+Multi-clause yield form:
+
+```txt
+items = for {
+    x <- [1, 2]
+    y <- [10, 20]
+} yield {
+    x + y
+}
+```
+
+`for` clauses in the block form may also include local `=` and `:=` bindings.
+
+## `loop`
+
+Infinite loop:
+
+```txt
+loop {
+    if done {
+        break
+    }
+}
+```
+
+## `match`
+
+Statement form:
+
+```txt
+match value {
+    SomeX(x) => {
+        Term.println(x)
+    }
+    OptionX.NoneX => {
+        Term.println("none")
+    }
+}
+```
+
+Expression form:
+
+```txt
+result = match value {
+    SomeX(x) => x
+    OptionX.NoneX => 0
+}
+```
+
+Supported pattern families:
+
+- wildcard: `_`
+- binding pattern: `x`
+- literal/value patterns: `1`, `"hello"`, `true`
+- tuple patterns: `(x, y)`
+- enum constructor patterns: `SomeX(x)`
+- class/record extractor patterns: `PairBox(left, right)`
+- type patterns: `item Worker`, `_ Other`
+
+Current notes:
+
+- enum exhaustiveness is checked
+- bare singleton enum cases should still be written in qualified form when needed, for example `MaybeInt.NoneX`
+
+## Destructuring
+
+Tuple destructuring:
+
+```txt
+left Int, right Str = (5, "hello")
+```
+
+Record destructuring:
+
+```txt
+value Int, label Str = Amount(7, "world")
+```
+
+Class destructuring:
+
+```txt
+left Int, right Str = Box(9, "boxed")
+```
+
+Skip pattern:
+
+```txt
+left Int, _, right Str = (1, "drop", "keep")
+```
+
+Classes with private fields are not destructurable.
+
+## Operators
+
+Arithmetic:
+
+- `+`
+- `-`
+- `*`
+- `/`
+- `%`
+
+Comparison:
+
+- `==`
+- `!=`
+- `<`
+- `<=`
+- `>`
+- `>=`
+
+Boolean:
+
+- `!`
+- `&&`
+- `||`
+
+Other operators / constructs:
+
+- `is` for runtime type checks
+- `<-` for `for` iteration and `if` option binding
+- `->` for function types and lambdas
+- `=>` for match cases
+- `with` for interface implementation, generic bounds, and record update
+
+Examples:
+
+```txt
+counter is Counter
+value <- maybe
+(Int) -> Str
+SomeX(x) => x
+class Box[T] with Named
+```
+
+## Visibility
+
+Supported today:
+
+- `private` on top-level `def`
+- `private` on top-level `interface`
+- `private` on top-level `class` / `object` / `record` / `enum`
+- `private` on fields
+- `private` on methods
+
+Package-private visibility applies across imported modules in the same package.
+
+## Notes
+
+This file is meant to describe the current surface syntax.
+
+Ideas that are still under discussion, such as one-line `:` shorthand or future partial-match syntax (`match?` / `try match`), belong in `features.md`, not here.

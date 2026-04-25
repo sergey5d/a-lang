@@ -159,18 +159,18 @@ func (p *Parser) parsePrefix() (Expr, error) {
 }
 
 func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
-	condition, err := p.parseExpressionWithOptions(0, false)
+	condition, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
 	if err != nil {
 		return nil, err
 	}
-	thenBlock, err := p.parseBlock()
+	thenBlock, err := p.parseYieldBodyBlock("if", TokenElse)
 	if err != nil {
 		return nil, err
 	}
 	if _, err := p.consume(TokenElse, "expected 'else' in if expression"); err != nil {
 		return nil, err
 	}
-	elseBlock, err := p.parseBlock()
+	elseBlock, err := p.parseYieldBodyBlock("else")
 	if err != nil {
 		return nil, err
 	}
@@ -183,13 +183,24 @@ func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
 }
 
 func (p *Parser) parseMatchExprAfterStart(start Token) (Expr, error) {
-	value, err := p.parseExpressionWithOptions(0, false)
+	value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
 	if err != nil {
 		return nil, err
 	}
-	cases, end, err := p.parseMatchCases()
-	if err != nil {
-		return nil, err
+	var (
+		cases []MatchCase
+		end   Token
+	)
+	if p.check(TokenLBrace) {
+		cases, end, err = p.parseMatchCases()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		cases, end, err = p.parseInlineMatchCases(false)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &MatchExpr{
 		Value: value,
@@ -210,7 +221,7 @@ func (p *Parser) parseForYieldExprAfterStart(start Token) (Expr, error) {
 		if _, err := p.consume(TokenYield, "expected 'yield' after for binding"); err != nil {
 			return nil, err
 		}
-		yieldBody, err := p.parseBlock()
+		yieldBody, err := p.parseYieldBodyBlock("yield")
 		if err != nil {
 			return nil, err
 		}
@@ -230,7 +241,7 @@ func (p *Parser) parseForYieldExprAfterStart(start Token) (Expr, error) {
 	if _, err := p.consume(TokenYield, "expected 'yield' after for bindings"); err != nil {
 		return nil, err
 	}
-	yieldBody, err := p.parseBlock()
+	yieldBody, err := p.parseYieldBodyBlock("yield")
 	if err != nil {
 		return nil, err
 	}
