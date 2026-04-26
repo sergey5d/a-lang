@@ -5,6 +5,7 @@ import (
 
 	"a-lang/module"
 	"a-lang/parser"
+	"a-lang/predef"
 	"a-lang/semantic"
 )
 
@@ -139,8 +140,41 @@ func AnalyzeModule(mod *module.LoadedModule) Result {
 }
 
 func (c *Checker) installBuiltinInterfaces() {
-	for name, info := range builtinInterfaceInfos() {
-		c.interfaces[name] = info
+	registry, err := predef.Load()
+	if err != nil {
+		panic(err)
+	}
+	for _, decl := range registry.Program.Interfaces {
+		info := interfaceInfo{
+			decl:    decl,
+			methods: map[string]interfaceMethodInfo{},
+		}
+		for _, method := range decl.Methods {
+			info.methods[method.Name] = interfaceMethodInfo{decl: method}
+		}
+		c.interfaces[decl.Name] = info
+	}
+	for _, decl := range registry.Program.Classes {
+		info := classInfo{
+			name:      decl.Name,
+			decl:      decl,
+			fields:    map[string]fieldInfo{},
+			methods:   map[string][]methodInfo{},
+			enumCases: map[string]parser.EnumCaseDecl{},
+		}
+		for _, field := range decl.Fields {
+			info.fields[field.Name] = fieldInfo{decl: field}
+		}
+		for _, method := range decl.Methods {
+			info.methods[method.Name] = append(info.methods[method.Name], methodInfo{decl: method})
+			if method.Constructor {
+				info.constructors = append(info.constructors, method)
+			}
+		}
+		for _, enumCase := range decl.Cases {
+			info.enumCases[enumCase.Name] = enumCase
+		}
+		c.classes[decl.Name] = info
 	}
 }
 
@@ -268,131 +302,6 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 			c.classes[class.name] = class
 			break
 		}
-	}
-}
-
-func builtinInterfaceInfos() map[string]interfaceInfo {
-	out := map[string]interfaceInfo{}
-
-	orderingDecl := &parser.InterfaceDecl{
-		Name:           "Ordering",
-		TypeParameters: []parser.TypeParameter{{Name: "T"}},
-		Methods: []parser.InterfaceMethod{
-			{Name: "compare", Parameters: []parser.Parameter{{Name: "left", Type: namedType("T")}, {Name: "right", Type: namedType("T")}}, ReturnType: namedType("Int")},
-		},
-	}
-	out["Ordering"] = interfaceInfo{decl: orderingDecl, methods: map[string]interfaceMethodInfo{
-		"compare": {decl: orderingDecl.Methods[0]},
-	}}
-
-	listDecl := &parser.InterfaceDecl{
-		Name:           "List",
-		TypeParameters: []parser.TypeParameter{{Name: "T"}},
-		Extends:        []*parser.TypeRef{genericType("Iterable", "T")},
-		Methods: []parser.InterfaceMethod{
-			{Name: "append", Parameters: []parser.Parameter{{Name: "value", Type: namedType("T")}}, ReturnType: genericType("List", "T")},
-			{Name: "map", TypeParameters: []parser.TypeParameter{{Name: "X"}}, Parameters: []parser.Parameter{{Name: "f", Type: functionTypeRef(namedType("T"), namedType("X"))}}, ReturnType: genericType("List", "X")},
-			{Name: "flatMap", TypeParameters: []parser.TypeParameter{{Name: "X"}}, Parameters: []parser.Parameter{{Name: "f", Type: functionTypeRef(namedType("T"), genericType("List", "X"))}}, ReturnType: genericType("List", "X")},
-			{Name: "forEach", Parameters: []parser.Parameter{{Name: "f", Type: functionTypeRef(namedType("T"), namedType("Unit"))}}, ReturnType: namedType("Unit")},
-			{Name: "sort", Parameters: []parser.Parameter{{Name: "ordering", Type: genericType("Ordering", "T")}}, ReturnType: genericType("List", "T")},
-			{Name: "get", Parameters: []parser.Parameter{{Name: "index", Type: namedType("Int")}}, ReturnType: genericType("Option", "T")},
-			{Name: "size", Parameters: nil, ReturnType: namedType("Int")},
-			{Name: "iterator", Parameters: nil, ReturnType: genericType("Iterator", "T")},
-		},
-	}
-	out["List"] = interfaceInfo{decl: listDecl, methods: map[string]interfaceMethodInfo{
-		"append":   {decl: listDecl.Methods[0]},
-		"map":      {decl: listDecl.Methods[1]},
-		"flatMap":  {decl: listDecl.Methods[2]},
-		"forEach":  {decl: listDecl.Methods[3]},
-		"sort":     {decl: listDecl.Methods[4]},
-		"get":      {decl: listDecl.Methods[5]},
-		"size":     {decl: listDecl.Methods[6]},
-		"iterator": {decl: listDecl.Methods[7]},
-	}}
-
-	setDecl := &parser.InterfaceDecl{
-		Name:           "Set",
-		TypeParameters: []parser.TypeParameter{{Name: "T"}},
-		Methods: []parser.InterfaceMethod{
-			{Name: "add", Parameters: []parser.Parameter{{Name: "value", Type: namedType("T")}}, ReturnType: genericType("Set", "T")},
-			{Name: "contains", Parameters: []parser.Parameter{{Name: "value", Type: namedType("T")}}, ReturnType: namedType("Bool")},
-			{Name: "size", Parameters: nil, ReturnType: namedType("Int")},
-		},
-	}
-	out["Set"] = interfaceInfo{decl: setDecl, methods: map[string]interfaceMethodInfo{
-		"add":      {decl: setDecl.Methods[0]},
-		"contains": {decl: setDecl.Methods[1]},
-		"size":     {decl: setDecl.Methods[2]},
-	}}
-
-	mapDecl := &parser.InterfaceDecl{
-		Name:           "Map",
-		TypeParameters: []parser.TypeParameter{{Name: "K"}, {Name: "V"}},
-		Methods: []parser.InterfaceMethod{
-			{Name: "set", Parameters: []parser.Parameter{{Name: "key", Type: namedType("K")}, {Name: "value", Type: namedType("V")}}, ReturnType: genericType("Map", "K", "V")},
-			{Name: "get", Parameters: []parser.Parameter{{Name: "key", Type: namedType("K")}}, ReturnType: genericType("Option", "V")},
-			{Name: "contains", Parameters: []parser.Parameter{{Name: "key", Type: namedType("K")}}, ReturnType: namedType("Bool")},
-			{Name: "size", Parameters: nil, ReturnType: namedType("Int")},
-		},
-	}
-	out["Map"] = interfaceInfo{decl: mapDecl, methods: map[string]interfaceMethodInfo{
-		"set":      {decl: mapDecl.Methods[0]},
-		"get":      {decl: mapDecl.Methods[1]},
-		"contains": {decl: mapDecl.Methods[2]},
-		"size":     {decl: mapDecl.Methods[3]},
-	}}
-
-	termDecl := &parser.InterfaceDecl{
-		Name: "Term",
-		Methods: []parser.InterfaceMethod{
-			{Name: "print", Parameters: []parser.Parameter{{Name: "value", Type: namedType("Str")}}, ReturnType: namedType("Term")},
-			{Name: "println", Parameters: []parser.Parameter{{Name: "value", Type: namedType("Str"), Variadic: true}}, ReturnType: namedType("Term")},
-		},
-	}
-	out["Term"] = interfaceInfo{decl: termDecl, methods: map[string]interfaceMethodInfo{
-		"print":   {decl: termDecl.Methods[0]},
-		"println": {decl: termDecl.Methods[1]},
-	}}
-
-	optionDecl := &parser.InterfaceDecl{
-		Name:           "Option",
-		TypeParameters: []parser.TypeParameter{{Name: "T"}},
-		Methods: []parser.InterfaceMethod{
-			{Name: "isSet", Parameters: nil, ReturnType: namedType("Bool")},
-			{Name: "get", Parameters: nil, ReturnType: namedType("T")},
-			{Name: "getOr", Parameters: []parser.Parameter{{Name: "defaultValue", Type: namedType("T")}}, ReturnType: namedType("T")},
-		},
-	}
-	out["Option"] = interfaceInfo{decl: optionDecl, methods: map[string]interfaceMethodInfo{
-		"isSet": {decl: optionDecl.Methods[0]},
-		"get":   {decl: optionDecl.Methods[1]},
-		"getOr": {decl: optionDecl.Methods[2]},
-	}}
-
-	return out
-}
-
-func namedType(name string) *parser.TypeRef {
-	return &parser.TypeRef{Name: name}
-}
-
-func genericType(name string, args ...string) *parser.TypeRef {
-	ref := &parser.TypeRef{Name: name}
-	for _, arg := range args {
-		ref.Arguments = append(ref.Arguments, namedType(arg))
-	}
-	return ref
-}
-
-func functionTypeRef(params ...*parser.TypeRef) *parser.TypeRef {
-	if len(params) == 0 {
-		return &parser.TypeRef{Name: "func"}
-	}
-	return &parser.TypeRef{
-		Name:           "func",
-		ParameterTypes: params[:len(params)-1],
-		ReturnType:     params[len(params)-1],
 	}
 }
 
