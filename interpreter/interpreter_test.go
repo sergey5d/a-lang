@@ -1032,6 +1032,27 @@ def run() Str {
 	}
 }
 
+func TestMultilineString(t *testing.T) {
+	src := `
+def run() Str {
+	return """
+hello
+$name
+\n
+"""
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "hello\n$name\n\n\n" {
+		t.Fatalf("expected %q, got %#v", "hello\n$name\n\n\n", value)
+	}
+}
+
 func TestIfAndForYieldExpressions(t *testing.T) {
 	src := `
 def run() Int {

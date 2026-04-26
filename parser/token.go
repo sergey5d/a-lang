@@ -13,6 +13,7 @@ const (
 	TokenFloat      TokenType = "FLOAT"
 	TokenRune       TokenType = "RUNE"
 	TokenString     TokenType = "STRING"
+	TokenMultilineString TokenType = "MULTILINE_STRING"
 	TokenBool       TokenType = "BOOL"
 
 	TokenDef        TokenType = "DEF"

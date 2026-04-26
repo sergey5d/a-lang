@@ -419,6 +419,8 @@ func (p *Parser) parsePattern() (Pattern, error) {
 		return &LiteralPattern{Value: &BoolLiteral{Value: token.Lexeme == "true", Span: tokenSpan(token)}, Span: tokenSpan(token)}, nil
 	case TokenString:
 		return &LiteralPattern{Value: &StringLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, Span: tokenSpan(token)}, nil
+	case TokenMultilineString:
+		return &LiteralPattern{Value: &StringLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, Span: tokenSpan(token)}, nil
 	case TokenLParen:
 		if p.check(TokenRParen) {
 			end, err := p.consume(TokenRParen, "expected ')'")

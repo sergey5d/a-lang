@@ -168,6 +168,42 @@ def run(name Str, count Int) Str {
 	}
 }
 
+func TestParseMultilineString(t *testing.T) {
+	program, err := Parse(`
+def run() Str {
+	return """
+hello
+$name
+\n
+"""
+}
+`)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	fn := program.Functions[0]
+	ret := fn.Body.Statements[0].(*ReturnStmt)
+	literal, ok := ret.Value.(*StringLiteral)
+	if !ok {
+		t.Fatalf("expected multiline string to stay a StringLiteral, got %T", ret.Value)
+	}
+	if literal.Value != "hello\n$name\n\n\n" {
+		t.Fatalf("unexpected multiline string value %q", literal.Value)
+	}
+}
+
+func TestParseRejectsEmptyMultilineString(t *testing.T) {
+	_, err := Parse(`
+def run() Str {
+	return """
+"""
+}
+`)
+	if err == nil {
+		t.Fatalf("expected parse error for empty multiline string")
+	}
+}
+
 func TestParseHashComments(t *testing.T) {
 	src := `
 # top-level comment

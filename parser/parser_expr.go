@@ -140,6 +140,12 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		return &BoolLiteral{Value: token.Lexeme == "true", Span: tokenSpan(token)}, nil
 	case TokenString:
 		return p.parseStringLiteralExpr(token)
+	case TokenMultilineString:
+		value, err := decodeStringEscapes(token.Lexeme)
+		if err != nil {
+			return nil, fmt.Errorf("invalid multiline string at %d:%d: %w", token.Line, token.Column, err)
+		}
+		return &StringLiteral{Value: value, Span: tokenSpan(token)}, nil
 	case TokenUnder:
 		return &PlaceholderExpr{Span: tokenSpan(token)}, nil
 	case TokenLParen:
@@ -178,7 +184,11 @@ func (p *Parser) parseStringLiteralExpr(token Token) (Expr, error) {
 	raw := token.Lexeme
 	span := tokenSpan(token)
 	if !stringHasInterpolation(raw) {
-		return &StringLiteral{Value: unescapeInterpolatedString(raw), Span: span}, nil
+		value, err := decodeStringEscapes(unescapeInterpolatedString(raw))
+		if err != nil {
+			return nil, fmt.Errorf("invalid string literal at %d:%d: %w", token.Line, token.Column, err)
+		}
+		return &StringLiteral{Value: value, Span: span}, nil
 	}
 
 	parts, err := parseInterpolatedStringParts(raw)
@@ -192,7 +202,11 @@ func (p *Parser) parseStringLiteralExpr(token Token) (Expr, error) {
 	}
 	for _, part := range parts {
 		if part.isLiteral {
-			exprs = append(exprs, &StringLiteral{Value: part.text, Span: span})
+			value, err := decodeStringEscapes(part.text)
+			if err != nil {
+				return nil, fmt.Errorf("invalid string literal at %d:%d: %w", token.Line, token.Column, err)
+			}
+			exprs = append(exprs, &StringLiteral{Value: value, Span: span})
 			continue
 		}
 		expr, err := ParseExpr(part.text)
@@ -247,6 +261,38 @@ func unescapeInterpolatedString(raw string) string {
 		out = append(out, runes[i])
 	}
 	return string(out)
+}
+
+func decodeStringEscapes(raw string) (string, error) {
+	runes := []rune(raw)
+	out := make([]rune, 0, len(runes))
+	for i := 0; i < len(runes); i++ {
+		if runes[i] != '\\' {
+			out = append(out, runes[i])
+			continue
+		}
+		if i+1 >= len(runes) {
+			return "", fmt.Errorf("dangling escape")
+		}
+		i++
+		switch runes[i] {
+		case 'n':
+			out = append(out, '\n')
+		case 't':
+			out = append(out, '\t')
+		case 'r':
+			out = append(out, '\r')
+		case '\\':
+			out = append(out, '\\')
+		case '"':
+			out = append(out, '"')
+		case '$':
+			out = append(out, '$')
+		default:
+			return "", fmt.Errorf("unsupported escape \\%c", runes[i])
+		}
+	}
+	return string(out), nil
 }
 
 func parseInterpolatedStringParts(raw string) ([]interpolatedStringPart, error) {
