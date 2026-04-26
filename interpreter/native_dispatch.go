@@ -13,6 +13,11 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"append":   nativeListAppend,
 			"map":      nativeListMap,
 			"flatMap":  nativeListFlatMap,
+			"filter":   nativeListFilter,
+			"fold":     nativeListFold,
+			"reduce":   nativeListReduce,
+			"exists":   nativeListExists,
+			"forAll":   nativeListForAll,
 			"forEach":  nativeListForEach,
 			"sort":     nativeListSort,
 			"get":      nativeListGet,
@@ -37,6 +42,11 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"iterator": nativeSetIterator,
 			"map":      nativeSetMap,
 			"flatMap":  nativeSetFlatMap,
+			"filter":   nativeSetFilter,
+			"fold":     nativeSetFold,
+			"reduce":   nativeSetReduce,
+			"exists":   nativeSetExists,
+			"forAll":   nativeSetForAll,
 			"forEach":  nativeSetForEach,
 			"contains": nativeSetContains,
 			"size":     nativeSetSize,
@@ -46,6 +56,11 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"iterator": nativeMapIterator,
 			"map":      nativeMapMap,
 			"flatMap":  nativeMapFlatMap,
+			"filter":   nativeMapFilter,
+			"fold":     nativeMapFold,
+			"reduce":   nativeMapReduce,
+			"exists":   nativeMapExists,
+			"forAll":   nativeMapForAll,
 			"forEach":  nativeMapForEach,
 			"get":      nativeMapGet,
 			"contains": nativeMapContains,
@@ -113,4 +128,16 @@ func asNativeMap(receiver Value) (*nativeMap, bool) {
 func asNativeTerm(receiver Value) (*nativeTerm, bool) {
 	value, ok := receiver.(*nativeTerm)
 	return value, ok
+}
+
+func boolResult(value Value, methodName string, span parser.Span) (bool, error) {
+	result, ok := value.(bool)
+	if !ok {
+		return false, RuntimeError{Message: methodName + " function must return Bool", Span: span}
+	}
+	return result, nil
+}
+
+func tupleEntry(key Value, value Value) *nativeTuple {
+	return &nativeTuple{items: []Value{key, value}}
 }

@@ -879,11 +879,21 @@ def run() Int {
 	seen = Set(1, 2, 3)
 	doubled = seen.map((item Int) -> item * 2)
 	expanded = seen.flatMap((item Int) -> Set(item, item + 10))
+	filtered = seen.filter((item Int) -> item > 1)
+	setTotal = seen.fold(0, (acc Int, item Int) -> acc + item)
+	setReduced = seen.reduce((left Int, right Int) -> left + right)
+	setHasBig = seen.exists((item Int) -> item > 2)
+	setAllPositive = seen.forAll((item Int) -> item > 0)
 	seen.forEach((item Int) -> Term.println("set " + item))
 
 	values = Map("a" : 1, "b" : 2)
 	mapped = values.map((key Str, value Int) -> value * 10)
 	expandedValues = values.flatMap((key Str, value Int) -> List(value, value + 10))
+	filteredMap = values.filter((key Str, value Int) -> value > 1)
+	mapTotal = values.fold(0, (acc Int, key Str, value Int) -> acc + value)
+	mapReduced = values.reduce((leftKey Str, leftValue Int, rightKey Str, rightValue Int) -> (rightKey, rightValue))
+	mapHasB = values.exists((key Str, value Int) -> key == "b")
+	mapAllSmall = values.forAll((key Str, value Int) -> value < 3)
 	values.forEach((key Str, value Int) -> Term.println("pair " + key + " " + value))
 
 	total := 0
@@ -894,12 +904,15 @@ def run() Int {
 		total += value
 	}
 
-	if expanded.contains(12) {
-		return total * 1000 + mapped.get(0).getOr(0) * 100 + expandedValues.get(3).getOr(0) * 10 + doubled.size()
+	reducedKey, reducedValue = mapReduced.get()
+	if expanded.contains(12) && setHasBig && setAllPositive && mapHasB && mapAllSmall {
+		if reducedKey == "b" {
+			return total * 1000000 + mapped.get(0).getOr(0) * 100000 + expandedValues.get(3).getOr(0) * 10000 + doubled.size() * 1000 + filtered.size() * 100 + setTotal * 10 + setReduced.getOr(0) + filteredMap.size() + mapTotal + reducedValue
+		}
 	}
 	return 0
 }
-`
+	`
 
 	in := New(parseProgram(t, src))
 
@@ -920,8 +933,8 @@ def run() Int {
 	if callErr != nil {
 		t.Fatalf("Call returned error: %v", callErr)
 	}
-	if value != int64(10123) {
-		t.Fatalf("expected 10123, got %#v", value)
+	if value != int64(10123272) {
+		t.Fatalf("expected 10123272, got %#v", value)
 	}
 	if strings.TrimSpace(string(output)) != "set 1\nset 2\nset 3\npair a 1\npair b 2" {
 		t.Fatalf("unexpected output %q", string(output))

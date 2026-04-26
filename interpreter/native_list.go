@@ -60,6 +60,120 @@ func nativeListFlatMap(in *Interpreter, receiver Value, args []Value, local *env
 	return out, nil
 }
 
+func nativeListFilter(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeList(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native List.filter receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "filter expects 1 argument", Span: span}
+	}
+	out := &nativeList{items: make([]Value, 0, len(value.items))}
+	for _, item := range value.items {
+		matched, err := in.invokeCallableValue(args[0], []Value{item}, local, span)
+		if err != nil {
+			return nil, err
+		}
+		keep, err := boolResult(matched, "filter", span)
+		if err != nil {
+			return nil, err
+		}
+		if keep {
+			out.items = append(out.items, item)
+		}
+	}
+	return out, nil
+}
+
+func nativeListFold(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeList(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native List.fold receiver mismatch", Span: span}
+	}
+	if len(args) != 2 {
+		return nil, RuntimeError{Message: "fold expects 2 arguments", Span: span}
+	}
+	acc := args[0]
+	for _, item := range value.items {
+		next, err := in.invokeCallableValue(args[1], []Value{acc, item}, local, span)
+		if err != nil {
+			return nil, err
+		}
+		acc = next
+	}
+	return acc, nil
+}
+
+func nativeListReduce(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeList(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native List.reduce receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "reduce expects 1 argument", Span: span}
+	}
+	if len(value.items) == 0 {
+		return in.constructStdlibOption(nil, false, local, span)
+	}
+	acc := value.items[0]
+	for _, item := range value.items[1:] {
+		next, err := in.invokeCallableValue(args[0], []Value{acc, item}, local, span)
+		if err != nil {
+			return nil, err
+		}
+		acc = next
+	}
+	return in.constructStdlibOption(acc, true, local, span)
+}
+
+func nativeListExists(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeList(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native List.exists receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "exists expects 1 argument", Span: span}
+	}
+	for _, item := range value.items {
+		matched, err := in.invokeCallableValue(args[0], []Value{item}, local, span)
+		if err != nil {
+			return nil, err
+		}
+		keep, err := boolResult(matched, "exists", span)
+		if err != nil {
+			return nil, err
+		}
+		if keep {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func nativeListForAll(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeList(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native List.forAll receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "forAll expects 1 argument", Span: span}
+	}
+	for _, item := range value.items {
+		matched, err := in.invokeCallableValue(args[0], []Value{item}, local, span)
+		if err != nil {
+			return nil, err
+		}
+		keep, err := boolResult(matched, "forAll", span)
+		if err != nil {
+			return nil, err
+		}
+		if !keep {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 func nativeListForEach(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
 	value, ok := asNativeList(receiver)
 	if !ok {

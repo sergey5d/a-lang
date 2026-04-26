@@ -3,8 +3,8 @@
 ## Builtin Descriptor Follow-Ups
 
 - Revisit `Set[T]` / `Map[K, V]` collection API breadth.
-  - `iterator`, `map`, `flatMap`, and `forEach` now exist in `stdlib/predef` and are wired through the runtime.
-  - Remaining question is whether to go further with helpers like `filter`, plus whether `Map` should eventually grow richer transforms such as:
+  - `iterator`, `map`, `flatMap`, `filter`, `fold`, `reduce`, `exists`, `forAll`, and `forEach` now exist in `stdlib/predef` and are wired through the runtime.
+  - Remaining question is whether `Map` should eventually grow richer transforms such as:
     - `mapValues(value -> X) Map[K, X]`
     - `mapEntries((key, value) -> (K2, V2)) Map[K2, V2]`
 

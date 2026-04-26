@@ -1413,10 +1413,18 @@ def run() Int {
 	doubled List[Int] = items.map((item Int) -> item * 2)
 	doubled2 List[Int] = items.map(item -> item * 2)
 	expanded List[Int] = items.flatMap((item Int) -> List(item, item + 10))
+	filtered List[Int] = items.filter((item Int) -> item > 1)
+	total Int = items.fold(0, (acc Int, item Int) -> acc + item)
+	reduced Option[Int] = items.reduce((left Int, right Int) -> left + right)
+	hasBig Bool = items.exists((item Int) -> item > 2)
+	allPositive Bool = items.forAll((item Int) -> item > 0)
 	doubled.forEach((item Int) -> Term.println(item))
-	return doubled.get(2).getOr(0) + doubled2.get(1).getOr(0) + expanded.get(5).getOr(0)
+	if hasBig && allPositive {
+		return doubled.get(2).getOr(0) + doubled2.get(1).getOr(0) + expanded.get(5).getOr(0) + filtered.size() + total + reduced.getOr(0)
+	}
+	return 0
 }
-`
+	`
 
 	result := Analyze(parseProgram(t, src))
 	if len(result.Diagnostics) != 0 {
@@ -1430,11 +1438,21 @@ def run() Int {
 	seen Set[Int] = Set(1, 2, 3)
 	doubled Set[Int] = seen.map((item Int) -> item * 2)
 	expanded Set[Int] = seen.flatMap((item Int) -> Set(item, item + 10))
+	filtered Set[Int] = seen.filter((item Int) -> item > 1)
+	setTotal Int = seen.fold(0, (acc Int, item Int) -> acc + item)
+	setReduced Option[Int] = seen.reduce((left Int, right Int) -> left + right)
+	setHasBig Bool = seen.exists((item Int) -> item > 2)
+	setAllPositive Bool = seen.forAll((item Int) -> item > 0)
 	seen.forEach((item Int) -> Term.println(item))
 
 	values Map[Str, Int] = Map("a" : 1, "b" : 2)
 	mapped List[Int] = values.map((key Str, value Int) -> value * 10)
 	expandedValues List[Int] = values.flatMap((key Str, value Int) -> List(value, value + 10))
+	filteredMap Map[Str, Int] = values.filter((key Str, value Int) -> value > 1)
+	mapTotal Int = values.fold(0, (acc Int, key Str, value Int) -> acc + value)
+	mapReduced Option[(Str, Int)] = values.reduce((leftKey Str, leftValue Int, rightKey Str, rightValue Int) -> (rightKey, rightValue))
+	mapHasB Bool = values.exists((key Str, value Int) -> key == "b")
+	mapAllSmall Bool = values.forAll((key Str, value Int) -> value < 3)
 	values.forEach((key Str, value Int) -> Term.println(key))
 
 	total Int := 0
@@ -1445,12 +1463,15 @@ def run() Int {
 		total += value
 	}
 
-	if expanded.contains(12) {
-		return total + mapped.get(0).getOr(0) + expandedValues.get(3).getOr(0) + doubled.size()
+	reducedKey Str, reducedValue Int = mapReduced.get()
+	if expanded.contains(12) && setHasBig && setAllPositive && mapHasB && mapAllSmall {
+		if reducedKey == "b" {
+			return total + mapped.get(0).getOr(0) + expandedValues.get(3).getOr(0) + doubled.size() + filtered.size() + setTotal + setReduced.getOr(0) + filteredMap.size() + mapTotal + reducedValue
+		}
 	}
 	return 0
 }
-`
+	`
 
 	result := Analyze(parseProgram(t, src))
 	if len(result.Diagnostics) != 0 {

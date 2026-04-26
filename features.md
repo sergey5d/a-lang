@@ -44,13 +44,16 @@ This reduces boilerplate and helps stdlib types feel native.
 
 ### 4. Collection / Query APIs
 
-The language now has `for ... yield`, `map`, `flatMap`, and `forEach`, but stdlib collection ergonomics still need growth.
+The language now has `for ... yield`, `map`, `flatMap`, `filter`, `fold`, `reduce`, `exists`, `forAll`, and `forEach`, but stdlib collection ergonomics still need growth.
 
 Likely missing methods:
-- `filter`
-- `fold` / `reduce`
-- `any`
-- `all`
+- richer `Map` transforms like `mapValues` / `mapEntries`
+- clearer `Map` indexing ergonomics:
+  - `map[key]` should likely act as lookup and return `Option[V]`
+  - `map[key] := value` should likely act as set/update
+  - this is intentionally different from list/array indexing, where `[]` may still return the element directly
+- maybe collection partitioning helpers
+- maybe zip / unzip style helpers later
 
 These can mostly live in the stdlib, but may still need runtime support in places.
 

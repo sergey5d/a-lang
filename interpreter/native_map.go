@@ -79,6 +79,126 @@ func nativeMapFlatMap(in *Interpreter, receiver Value, args []Value, local *env,
 	return out, nil
 }
 
+func nativeMapFilter(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeMap(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Map.filter receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "filter expects 1 argument", Span: span}
+	}
+	out := &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: []string{}}
+	for _, key := range value.order {
+		matched, err := in.invokeCallableValue(args[0], []Value{value.keys[key], value.items[key]}, local, span)
+		if err != nil {
+			return nil, err
+		}
+		keep, err := boolResult(matched, "filter", span)
+		if err != nil {
+			return nil, err
+		}
+		if keep {
+			out.order = append(out.order, key)
+			out.keys[key] = value.keys[key]
+			out.items[key] = value.items[key]
+		}
+	}
+	return out, nil
+}
+
+func nativeMapFold(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeMap(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Map.fold receiver mismatch", Span: span}
+	}
+	if len(args) != 2 {
+		return nil, RuntimeError{Message: "fold expects 2 arguments", Span: span}
+	}
+	acc := args[0]
+	for _, key := range value.order {
+		next, err := in.invokeCallableValue(args[1], []Value{acc, value.keys[key], value.items[key]}, local, span)
+		if err != nil {
+			return nil, err
+		}
+		acc = next
+	}
+	return acc, nil
+}
+
+func nativeMapReduce(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeMap(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Map.reduce receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "reduce expects 1 argument", Span: span}
+	}
+	if len(value.order) == 0 {
+		return in.constructStdlibOption(nil, false, local, span)
+	}
+	acc := tupleEntry(value.keys[value.order[0]], value.items[value.order[0]])
+	for _, key := range value.order[1:] {
+		next, err := in.invokeCallableValue(args[0], []Value{acc.items[0], acc.items[1], value.keys[key], value.items[key]}, local, span)
+		if err != nil {
+			return nil, err
+		}
+		tuple, ok := next.(*nativeTuple)
+		if !ok || len(tuple.items) != 2 {
+			return nil, RuntimeError{Message: "reduce function must return a (K, V) tuple", Span: span}
+		}
+		acc = tuple
+	}
+	return in.constructStdlibOption(acc, true, local, span)
+}
+
+func nativeMapExists(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeMap(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Map.exists receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "exists expects 1 argument", Span: span}
+	}
+	for _, key := range value.order {
+		matched, err := in.invokeCallableValue(args[0], []Value{value.keys[key], value.items[key]}, local, span)
+		if err != nil {
+			return nil, err
+		}
+		keep, err := boolResult(matched, "exists", span)
+		if err != nil {
+			return nil, err
+		}
+		if keep {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func nativeMapForAll(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeMap(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Map.forAll receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "forAll expects 1 argument", Span: span}
+	}
+	for _, key := range value.order {
+		matched, err := in.invokeCallableValue(args[0], []Value{value.keys[key], value.items[key]}, local, span)
+		if err != nil {
+			return nil, err
+		}
+		keep, err := boolResult(matched, "forAll", span)
+		if err != nil {
+			return nil, err
+		}
+		if !keep {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 func nativeMapForEach(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
 	value, ok := asNativeMap(receiver)
 	if !ok {
