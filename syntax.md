@@ -614,14 +614,14 @@ SomeX(x) => x
 class Box[T] with Named
 ```
 
-Operator declarations use the `operator` keyword rather than `def`:
+Operator declarations use symbolic `def` / `impl def` forms on interfaces, classes, records, and enums:
 
 ```txt
-operator +(other Vec) Vec = Vec(this[0] + other[0], this[1] + other[1])
-operator -() Vec = Vec(-this[0], -this[1])
-operator [](index Int) Int = items[index]
-operator :+(value Int) Vec = ...
-operator ++(other Vec) Vec = ...
+def +(other Vec) Vec = Vec(this[0] + other[0], this[1] + other[1])
+def -() Vec = Vec(-this[0], -this[1])
+def [](index Int) Int = items[index]
+def :+(value Int) Vec = ...
+def ++(other Vec) Vec = ...
 ```
 
 Current operator overloading constraints:

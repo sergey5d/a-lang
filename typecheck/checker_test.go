@@ -1435,9 +1435,9 @@ class Vec {
 		this.items[1] := right
 	}
 
-	operator [](index Int) Int = items[index]
-	operator +(other Vec) Vec = Vec(this[0] + other[0], this[1] + other[1])
-	operator -() Vec = Vec(-this[0], -this[1])
+	def [](index Int) Int = items[index]
+	def +(other Vec) Vec = Vec(this[0] + other[0], this[1] + other[1])
+	def -() Vec = Vec(-this[0], -this[1])
 }
 
 def run() Int {

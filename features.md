@@ -67,6 +67,11 @@ This is not a core blocker, but it would help:
 Constraint:
 - keep it same-line only; no newline-based implicit body after `:`
 
+Still open:
+- decide whether operator overloading should be limited to classes / records / enums / interfaces
+- decide what to do with operator overloading for objects
+- decide whether top-level functions should ever be allowed to participate in operator overloading
+
 ### 6. Anonymous Objects / Object Literals
 
 Still useful for:

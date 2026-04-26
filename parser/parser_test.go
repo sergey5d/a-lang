@@ -1152,24 +1152,31 @@ object Range {
 
 func TestParseOperatorDecls(t *testing.T) {
 	src := `
+interface Addable[T] {
+	def +(other T) T
+}
+
 class Vec {
-	operator [](index Int) Int = 0
-	operator +(other Vec) Vec = this
-	operator -() Vec = this
-	operator :+(value Int) Vec = this
-	operator ++(other Vec) Vec = this
-	operator |(other Vec) Vec = this
-	operator &(other Vec) Vec = this
-	operator >>(bits Int) Vec = this
-	operator <<(bits Int) Vec = this
-	operator ~() Vec = this
-	operator ::(other Vec) Vec = this
+	def [](index Int) Int = 0
+	impl def +(other Vec) Vec = this
+	def -() Vec = this
+	def :+(value Int) Vec = this
+	def ++(other Vec) Vec = this
+	def |(other Vec) Vec = this
+	def &(other Vec) Vec = this
+	def >>(bits Int) Vec = this
+	def <<(bits Int) Vec = this
+	def ~() Vec = this
+	def ::(other Vec) Vec = this
 }
 `
 
 	program, err := Parse(src)
 	if err != nil {
 		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Interfaces) != 1 || program.Interfaces[0].Methods[0].Name != "+" {
+		t.Fatalf("expected interface operator method, got %#v", program.Interfaces)
 	}
 	if len(program.Classes) != 1 || len(program.Classes[0].Methods) != 11 {
 		t.Fatalf("unexpected operator declarations %#v", program.Classes)

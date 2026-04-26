@@ -636,8 +636,8 @@ func (c *Checker) checkOperatorMethods(class classInfo) {
 			if !method.decl.Operator {
 				continue
 			}
-			if method.decl.Impl {
-				c.addDiagnostic("invalid_operator_method", "operator declaration '"+class.decl.Name+"."+method.decl.Name+"' cannot use 'impl'", method.decl.Span)
+			if class.decl.Object {
+				c.addDiagnostic("invalid_operator_method", "objects cannot declare operators", method.decl.Span)
 				continue
 			}
 			if !isAllowedOperatorName(method.decl.Name) {

@@ -1,5 +1,7 @@
 package parser
 
+import "fmt"
+
 func (p *Parser) parseInterface() (*InterfaceDecl, error) {
 	return p.parseInterfaceWithPrivate(false)
 }
@@ -38,6 +40,9 @@ func (p *Parser) parseInterfaceWithPrivate(private bool) (*InterfaceDecl, error)
 		return nil, err
 	}
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		if p.check(TokenOperator) {
+			return nil, fmt.Errorf("use symbolic 'def' declarations instead of the 'operator' keyword")
+		}
 		method, err := p.parseInterfaceMethod()
 		if err != nil {
 			return nil, err
@@ -57,7 +62,7 @@ func (p *Parser) parseInterfaceMethod() (InterfaceMethod, error) {
 	if err != nil {
 		return InterfaceMethod{}, err
 	}
-	name, err := p.consume(TokenIdentifier, "expected method name")
+	nameLexeme, _, err := p.parseDeclaredMethodName(false, "expected method name")
 	if err != nil {
 		return InterfaceMethod{}, err
 	}
@@ -79,7 +84,7 @@ func (p *Parser) parseInterfaceMethod() (InterfaceMethod, error) {
 		}
 	}
 	return InterfaceMethod{
-		Name:           name.Lexeme,
+		Name:           nameLexeme,
 		TypeParameters: typeParams,
 		Parameters:     params,
 		ReturnType:     returnType,
