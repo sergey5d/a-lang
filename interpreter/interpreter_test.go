@@ -1013,6 +1013,25 @@ def run() Str {
 	}
 }
 
+func TestStringInterpolation(t *testing.T) {
+	src := `
+def run() Str {
+	name Str = "world"
+	count Int = 2
+	return "hello $name ${count + 1} \$done"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "hello world 3 $done" {
+		t.Fatalf("expected %q, got %#v", "hello world 3 $done", value)
+	}
+}
+
 func TestIfAndForYieldExpressions(t *testing.T) {
 	src := `
 def run() Int {

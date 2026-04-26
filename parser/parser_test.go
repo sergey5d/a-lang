@@ -149,6 +149,25 @@ def run(value Worker) Int {
 	}
 }
 
+func TestParseStringInterpolation(t *testing.T) {
+	program, err := Parse(`
+def run(name Str, count Int) Str {
+	return "hello $name ${count + 1} \\$done"
+}
+`)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	fn := program.Functions[0]
+	ret, ok := fn.Body.Statements[0].(*ReturnStmt)
+	if !ok {
+		t.Fatalf("expected return statement, got %T", fn.Body.Statements[0])
+	}
+	if _, ok := ret.Value.(*BinaryExpr); !ok {
+		t.Fatalf("expected interpolated string to lower to BinaryExpr, got %T", ret.Value)
+	}
+}
+
 func TestParseHashComments(t *testing.T) {
 	src := `
 # top-level comment

@@ -39,6 +39,28 @@ Function types:
 - `(Int) -> Str`
 - `(Int, Bool) -> Unit`
 
+## Strings
+
+Ordinary string literals use double quotes:
+
+```txt
+"hello"
+```
+
+String interpolation is supported in any string:
+
+```txt
+"hello $name"
+"next ${count + 1}"
+"money \$5"
+```
+
+Rules:
+
+- `$name` interpolates a simple identifier expression
+- `${...}` interpolates a full expression
+- `\$` inserts a literal dollar sign
+
 ## Imports
 
 Supported import forms:

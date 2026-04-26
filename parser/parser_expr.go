@@ -2,6 +2,22 @@ package parser
 
 import "fmt"
 
+func ParseExpr(input string) (Expr, error) {
+	tokens, err := Lex(input)
+	if err != nil {
+		return nil, err
+	}
+	parser := &Parser{tokens: tokens}
+	expr, err := parser.parseExpressionWithOptions(0, true)
+	if err != nil {
+		return nil, err
+	}
+	if !parser.check(TokenEOF) {
+		return nil, fmt.Errorf("unexpected token %s", parser.peek().String())
+	}
+	return expr, nil
+}
+
 func (p *Parser) parseExpression(minPrec int) (Expr, error) {
 	return p.parseExpressionWithOptions(minPrec, true)
 }
@@ -123,7 +139,7 @@ func (p *Parser) parsePrefix() (Expr, error) {
 	case TokenBool:
 		return &BoolLiteral{Value: token.Lexeme == "true", Span: tokenSpan(token)}, nil
 	case TokenString:
-		return &StringLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, nil
+		return p.parseStringLiteralExpr(token)
 	case TokenUnder:
 		return &PlaceholderExpr{Span: tokenSpan(token)}, nil
 	case TokenLParen:
@@ -156,6 +172,187 @@ func (p *Parser) parsePrefix() (Expr, error) {
 	default:
 		return nil, fmt.Errorf("unexpected token %s", token.String())
 	}
+}
+
+func (p *Parser) parseStringLiteralExpr(token Token) (Expr, error) {
+	raw := token.Lexeme
+	span := tokenSpan(token)
+	if !stringHasInterpolation(raw) {
+		return &StringLiteral{Value: unescapeInterpolatedString(raw), Span: span}, nil
+	}
+
+	parts, err := parseInterpolatedStringParts(raw)
+	if err != nil {
+		return nil, fmt.Errorf("invalid string interpolation at %d:%d: %w", token.Line, token.Column, err)
+	}
+
+	exprs := make([]Expr, 0, len(parts)*2+1)
+	if len(parts) == 0 || !parts[0].isLiteral {
+		exprs = append(exprs, &StringLiteral{Value: "", Span: span})
+	}
+	for _, part := range parts {
+		if part.isLiteral {
+			exprs = append(exprs, &StringLiteral{Value: part.text, Span: span})
+			continue
+		}
+		expr, err := ParseExpr(part.text)
+		if err != nil {
+			return nil, err
+		}
+		exprs = append(exprs, expr)
+	}
+	if len(exprs) == 1 {
+		return exprs[0], nil
+	}
+	left := exprs[0]
+	for _, right := range exprs[1:] {
+		left = &BinaryExpr{
+			Left:     left,
+			Operator: "+",
+			Right:    right,
+			Span:     span,
+		}
+	}
+	return left, nil
+}
+
+type interpolatedStringPart struct {
+	isLiteral bool
+	text      string
+}
+
+func stringHasInterpolation(raw string) bool {
+	runes := []rune(raw)
+	for i := 0; i < len(runes); i++ {
+		if runes[i] != '$' {
+			continue
+		}
+		if i > 0 && runes[i-1] == '\\' {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func unescapeInterpolatedString(raw string) string {
+	runes := []rune(raw)
+	var out []rune
+	for i := 0; i < len(runes); i++ {
+		if runes[i] == '\\' && i+1 < len(runes) && runes[i+1] == '$' {
+			out = append(out, '$')
+			i++
+			continue
+		}
+		out = append(out, runes[i])
+	}
+	return string(out)
+}
+
+func parseInterpolatedStringParts(raw string) ([]interpolatedStringPart, error) {
+	runes := []rune(raw)
+	var (
+		parts   []interpolatedStringPart
+		literal []rune
+	)
+	flushLiteral := func() {
+		if len(literal) == 0 {
+			return
+		}
+		parts = append(parts, interpolatedStringPart{isLiteral: true, text: string(literal)})
+		literal = nil
+	}
+
+	for i := 0; i < len(runes); i++ {
+		switch runes[i] {
+		case '\\':
+			if i+1 < len(runes) && runes[i+1] == '$' {
+				literal = append(literal, '$')
+				i++
+				continue
+			}
+			literal = append(literal, runes[i])
+		case '$':
+			if i+1 >= len(runes) {
+				return nil, fmt.Errorf("dangling '$'")
+			}
+			flushLiteral()
+			if runes[i+1] == '{' {
+				start := i + 2
+				end, err := findInterpolatedExprEnd(runes, start)
+				if err != nil {
+					return nil, err
+				}
+				expr := string(runes[start:end])
+				if expr == "" {
+					return nil, fmt.Errorf("empty interpolation")
+				}
+				parts = append(parts, interpolatedStringPart{text: expr})
+				i = end
+				continue
+			}
+			if !isAlpha(runes[i+1]) {
+				return nil, fmt.Errorf("expected identifier or '{' after '$'")
+			}
+			start := i + 1
+			end := start + 1
+			for end < len(runes) && isAlphaNumeric(runes[end]) {
+				end++
+			}
+			parts = append(parts, interpolatedStringPart{text: string(runes[start:end])})
+			i = end - 1
+		default:
+			literal = append(literal, runes[i])
+		}
+	}
+	flushLiteral()
+	return parts, nil
+}
+
+func findInterpolatedExprEnd(runes []rune, start int) (int, error) {
+	depth := 1
+	for i := start; i < len(runes); i++ {
+		switch runes[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return i, nil
+			}
+		case '"':
+			j := i + 1
+			for ; j < len(runes); j++ {
+				if runes[j] == '\\' {
+					j++
+					continue
+				}
+				if runes[j] == '"' {
+					break
+				}
+			}
+			if j >= len(runes) {
+				return 0, fmt.Errorf("unterminated string inside interpolation")
+			}
+			i = j
+		case '\'':
+			j := i + 1
+			for ; j < len(runes); j++ {
+				if runes[j] == '\\' {
+					j++
+					continue
+				}
+				if runes[j] == '\'' {
+					break
+				}
+			}
+			if j >= len(runes) {
+				return 0, fmt.Errorf("unterminated rune inside interpolation")
+			}
+			i = j
+		}
+	}
+	return 0, fmt.Errorf("unterminated '${...}'")
 }
 
 func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
