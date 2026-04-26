@@ -69,9 +69,14 @@ func (p *Parser) parseInterfaceMethod() (InterfaceMethod, error) {
 	if err != nil {
 		return InterfaceMethod{}, err
 	}
-	returnType, err := p.parseTypeRef()
-	if err != nil {
-		return InterfaceMethod{}, err
+	var returnType *TypeRef
+	if p.check(TokenDef) || p.check(TokenRBrace) {
+		returnType = implicitUnitType(tokenSpan(p.previous()))
+	} else {
+		returnType, err = p.parseTypeRef()
+		if err != nil {
+			return InterfaceMethod{}, err
+		}
 	}
 	return InterfaceMethod{
 		Name:           name.Lexeme,
