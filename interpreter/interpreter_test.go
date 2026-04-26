@@ -895,6 +895,51 @@ def run() Int {
 	}
 }
 
+func TestBuiltinRuntimeUsesPredefMethodSurface(t *testing.T) {
+	src := `
+def run() Int {
+	items = List(10, 20, 30)
+	head = items.head().getOr(0)
+	rest = items.tail()
+	removed = items.remove(1)
+	empty = None()
+
+	Term.print("left", "-", "right")
+
+	if empty.isEmpty() {
+		return head * 1000 + rest.size() * 100 + removed.getOr(0)
+	}
+	return 0
+}
+`
+
+	in := New(parseProgram(t, src))
+
+	oldStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe returned error: %v", err)
+	}
+	os.Stdout = writer
+
+	value, callErr := in.Call("run")
+
+	_ = writer.Close()
+	os.Stdout = oldStdout
+	output, _ := io.ReadAll(reader)
+	_ = reader.Close()
+
+	if callErr != nil {
+		t.Fatalf("Call returned error: %v", callErr)
+	}
+	if value != int64(10220) {
+		t.Fatalf("expected 10220, got %#v", value)
+	}
+	if string(output) != "left-right" {
+		t.Fatalf("unexpected output %q", string(output))
+	}
+}
+
 func TestStringConcatenation(t *testing.T) {
 	src := `
 def run() Str {

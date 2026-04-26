@@ -9,6 +9,7 @@ import (
 
 	"a-lang/module"
 	"a-lang/parser"
+	"a-lang/predef"
 )
 
 type Value any
@@ -1936,82 +1937,21 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 }
 
 func (in *Interpreter) nativeHasMethod(receiver Value, name string) bool {
-	switch receiver.(type) {
-	case *nativeList:
-		return name == "append" || name == "map" || name == "flatMap" || name == "forEach" || name == "sort" || name == "get" || name == "size" || name == "iterator"
-	case *nativeListIterator:
-		return name == "hasNext" || name == "next"
-	case *nativeArray:
-		return name == "size"
-	case *nativeOption:
-		return name == "isSet" || name == "get" || name == "getOr"
-	case *nativeSet:
-		return name == "add" || name == "contains" || name == "size"
-	case *nativeMap:
-		return name == "set" || name == "get" || name == "contains" || name == "size"
-	case *nativeTerm:
-		return name == "print" || name == "println"
-	default:
-		return false
+	if _, ok := in.nativeMethodDescriptor(receiver, name); ok {
+		return true
 	}
+	if _, ok := receiver.(*nativeArray); ok {
+		return name == "size"
+	}
+	return false
 }
 
-func nativeMethodParams(receiver Value, name string) ([]parser.Parameter, bool) {
-	switch receiver.(type) {
-	case *nativeList:
-		switch name {
-		case "append":
-			return []parser.Parameter{{Name: "value"}}, true
-		case "map", "flatMap", "forEach":
-			return []parser.Parameter{{Name: "f"}}, true
-		case "sort":
-			return []parser.Parameter{{Name: "ordering"}}, true
-		case "get":
-			return []parser.Parameter{{Name: "index"}}, true
-		case "size":
-			return nil, true
-		case "iterator":
-			return nil, true
-		}
-	case *nativeListIterator:
-		switch name {
-		case "hasNext", "next":
-			return nil, true
-		}
-	case *nativeArray:
-		if name == "size" {
-			return nil, true
-		}
-	case *nativeOption:
-		switch name {
-		case "isSet", "get":
-			return nil, true
-		case "getOr":
-			return []parser.Parameter{{Name: "defaultValue"}}, true
-		}
-	case *nativeSet:
-		switch name {
-		case "add", "contains":
-			return []parser.Parameter{{Name: "value"}}, true
-		case "size":
-			return nil, true
-		}
-	case *nativeMap:
-		switch name {
-		case "set":
-			return []parser.Parameter{{Name: "key"}, {Name: "value"}}, true
-		case "get", "contains":
-			return []parser.Parameter{{Name: "key"}}, true
-		case "size":
-			return nil, true
-		}
-	case *nativeTerm:
-		switch name {
-		case "print":
-			return []parser.Parameter{{Name: "value"}}, true
-		case "println":
-			return []parser.Parameter{{Name: "value", Variadic: true}}, true
-		}
+func (in *Interpreter) nativeMethodParams(receiver Value, name string) ([]parser.Parameter, bool) {
+	if descriptor, ok := in.nativeMethodDescriptor(receiver, name); ok {
+		return append([]parser.Parameter(nil), descriptor.Parameters...), true
+	}
+	if _, ok := receiver.(*nativeArray); ok && name == "size" {
+		return nil, true
 	}
 	return nil, false
 }
@@ -2019,7 +1959,7 @@ func nativeMethodParams(receiver Value, name string) ([]parser.Parameter, bool) 
 func (in *Interpreter) callNativeMethod(receiver Value, name string, args []namedValueArg, local *env, span parser.Span) (nativeCallResult, bool) {
 	ordered := namedArgValues(args)
 	if hasNamedValueArgs(args) {
-		params, ok := nativeMethodParams(receiver, name)
+		params, ok := in.nativeMethodParams(receiver, name)
 		if !ok {
 			return nativeCallResult{}, false
 		}
@@ -2118,6 +2058,40 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []name
 			}
 			result, err := in.constructStdlibOption(value.items[index], true, local, span)
 			return nativeCallResult{value: result, err: err}, true
+		case "head":
+			if len(ordered) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "head expects 0 arguments", Span: span}}, true
+			}
+			if len(value.items) == 0 {
+				result, err := in.constructStdlibOption(nil, false, local, span)
+				return nativeCallResult{value: result, err: err}, true
+			}
+			result, err := in.constructStdlibOption(value.items[0], true, local, span)
+			return nativeCallResult{value: result, err: err}, true
+		case "tail":
+			if len(ordered) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "tail expects 0 arguments", Span: span}}, true
+			}
+			if len(value.items) <= 1 {
+				return nativeCallResult{value: &nativeList{items: []Value{}}}, true
+			}
+			return nativeCallResult{value: &nativeList{items: append([]Value(nil), value.items[1:]...)}}, true
+		case "remove":
+			if len(ordered) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "remove expects 1 argument", Span: span}}, true
+			}
+			index, ok := ordered[0].(int64)
+			if !ok {
+				return nativeCallResult{err: RuntimeError{Message: "remove index must be Int", Span: span}}, true
+			}
+			if index < 0 || index >= int64(len(value.items)) {
+				result, err := in.constructStdlibOption(nil, false, local, span)
+				return nativeCallResult{value: result, err: err}, true
+			}
+			removed := value.items[index]
+			value.items = append(value.items[:index], value.items[index+1:]...)
+			result, err := in.constructStdlibOption(removed, true, local, span)
+			return nativeCallResult{value: result, err: err}, true
 		case "size":
 			if len(ordered) != 0 {
 				return nativeCallResult{err: RuntimeError{Message: "size expects 0 arguments", Span: span}}, true
@@ -2162,6 +2136,11 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []name
 				return nativeCallResult{err: RuntimeError{Message: "isSet expects 0 arguments", Span: span}}, true
 			}
 			return nativeCallResult{value: value.set}, true
+		case "isEmpty":
+			if len(ordered) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "isEmpty expects 0 arguments", Span: span}}, true
+			}
+			return nativeCallResult{value: !value.set}, true
 		case "get":
 			if len(ordered) != 0 {
 				return nativeCallResult{err: RuntimeError{Message: "get expects 0 arguments", Span: span}}, true
@@ -2260,10 +2239,9 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []name
 	case *nativeTerm:
 		switch name {
 		case "print":
-			if len(ordered) != 1 {
-				return nativeCallResult{err: RuntimeError{Message: "print expects 1 argument", Span: span}}, true
+			for _, arg := range ordered {
+				fmt.Print(fmt.Sprint(arg))
 			}
-			fmt.Print(fmt.Sprint(ordered[0]))
 			return nativeCallResult{value: value}, true
 		case "println":
 			parts := make([]any, len(ordered))
@@ -2275,6 +2253,97 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []name
 		}
 	}
 	return nativeCallResult{}, false
+}
+
+func builtinRegistry() *predef.Registry {
+	registry, err := predef.Load()
+	if err != nil {
+		panic(err)
+	}
+	return registry
+}
+
+func nativeBuiltinTypeName(value Value) (string, bool) {
+	switch value.(type) {
+	case *nativeList:
+		return "List", true
+	case *nativeListIterator:
+		return "Iterator", true
+	case *nativeOption:
+		return "Option", true
+	case *nativeSet:
+		return "Set", true
+	case *nativeMap:
+		return "Map", true
+	case *nativeTerm:
+		return "Term", true
+	default:
+		return "", false
+	}
+}
+
+func lookupBuiltinMethodDescriptor(typeName, methodName string) (predef.MethodDescriptor, bool) {
+	return lookupBuiltinMethodDescriptorInRegistry(builtinRegistry(), typeName, methodName, map[string]bool{})
+}
+
+func lookupBuiltinMethodDescriptorInRegistry(registry *predef.Registry, typeName, methodName string, seen map[string]bool) (predef.MethodDescriptor, bool) {
+	if seen[typeName] {
+		return predef.MethodDescriptor{}, false
+	}
+	seen[typeName] = true
+	descriptor, ok := registry.Types[typeName]
+	if !ok {
+		return predef.MethodDescriptor{}, false
+	}
+	for _, method := range descriptor.Methods {
+		if method.Name == methodName && !method.Private && !method.Constructor {
+			return method, true
+		}
+	}
+	for _, iface := range descriptor.ImplementedInterfaces {
+		if iface == nil || iface.Name == "" {
+			continue
+		}
+		if method, ok := lookupBuiltinMethodDescriptorInRegistry(registry, iface.Name, methodName, seen); ok {
+			return method, true
+		}
+	}
+	return predef.MethodDescriptor{}, false
+}
+
+func builtinTypeImplements(typeName, target string) bool {
+	return builtinTypeImplementsInRegistry(builtinRegistry(), typeName, target, map[string]bool{})
+}
+
+func builtinTypeImplementsInRegistry(registry *predef.Registry, typeName, target string, seen map[string]bool) bool {
+	if typeName == target {
+		return true
+	}
+	if seen[typeName] {
+		return false
+	}
+	seen[typeName] = true
+	descriptor, ok := registry.Types[typeName]
+	if !ok {
+		return false
+	}
+	for _, iface := range descriptor.ImplementedInterfaces {
+		if iface == nil || iface.Name == "" {
+			continue
+		}
+		if iface.Name == target || builtinTypeImplementsInRegistry(registry, iface.Name, target, seen) {
+			return true
+		}
+	}
+	return false
+}
+
+func (in *Interpreter) nativeMethodDescriptor(receiver Value, name string) (predef.MethodDescriptor, bool) {
+	typeName, ok := nativeBuiltinTypeName(receiver)
+	if !ok {
+		return predef.MethodDescriptor{}, false
+	}
+	return lookupBuiltinMethodDescriptor(typeName, name)
 }
 
 func (in *Interpreter) invokeCallableValue(callee Value, args []Value, local *env, span parser.Span) (Value, error) {
@@ -2509,32 +2578,44 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 		_, ok := value.(*nativeList)
 		return ok
 	case "Iterable":
-		switch value.(type) {
-		case *nativeList, *nativeArray, *nativeSet, *nativeListIterator:
+		if _, ok := value.(*nativeArray); ok {
 			return true
+		}
+		if typeName, ok := nativeBuiltinTypeName(value); ok {
+			return builtinTypeImplements(typeName, "Iterable")
 		}
 		return false
 	case "Iterator":
-		_, ok := value.(*nativeListIterator)
-		return ok
+		if typeName, ok := nativeBuiltinTypeName(value); ok {
+			return builtinTypeImplements(typeName, "Iterator")
+		}
+		return false
 	case "Set":
-		_, ok := value.(*nativeSet)
-		return ok
+		if typeName, ok := nativeBuiltinTypeName(value); ok {
+			return builtinTypeImplements(typeName, "Set")
+		}
+		return false
 	case "Map":
-		_, ok := value.(*nativeMap)
-		return ok
+		if typeName, ok := nativeBuiltinTypeName(value); ok {
+			return builtinTypeImplements(typeName, "Map")
+		}
+		return false
 	case "Option":
+		if typeName, ok := nativeBuiltinTypeName(value); ok {
+			return builtinTypeImplements(typeName, "Option")
+		}
 		if instanceValue, ok := value.(*instance); ok && instanceValue.class.Name == "Option" {
 			return true
 		}
-		_, ok := value.(*nativeOption)
-		return ok
+		return false
 	case "Array":
 		_, ok := value.(*nativeArray)
 		return ok
 	case "Term":
-		_, ok := value.(*nativeTerm)
-		return ok
+		if typeName, ok := nativeBuiltinTypeName(value); ok {
+			return builtinTypeImplements(typeName, "Term")
+		}
+		return false
 	default:
 		if instanceValue, ok := value.(*instance); ok {
 			if instanceValue.class.Name == ref.Name {
