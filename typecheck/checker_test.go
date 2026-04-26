@@ -1424,6 +1424,40 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeSetAndMapHigherOrderMethods(t *testing.T) {
+	src := `
+def run() Int {
+	seen Set[Int] = Set(1, 2, 3)
+	doubled Set[Int] = seen.map((item Int) -> item * 2)
+	expanded Set[Int] = seen.flatMap((item Int) -> Set(item, item + 10))
+	seen.forEach((item Int) -> Term.println(item))
+
+	values Map[Str, Int] = Map("a" : 1, "b" : 2)
+	mapped List[Int] = values.map((key Str, value Int) -> value * 10)
+	expandedValues List[Int] = values.flatMap((key Str, value Int) -> List(value, value + 10))
+	values.forEach((key Str, value Int) -> Term.println(key))
+
+	total Int := 0
+	for item Int <- seen {
+		total += item
+	}
+	for key Str, value Int <- values {
+		total += value
+	}
+
+	if expanded.contains(12) {
+		return total + mapped.get(0).getOr(0) + expandedValues.get(3).getOr(0) + doubled.size()
+	}
+	return 0
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeCustomAndCollectionOperators(t *testing.T) {
 	src := `
 class Vec {

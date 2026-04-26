@@ -873,6 +873,61 @@ def run() Int {
 	}
 }
 
+func TestSetAndMapHigherOrderMethods(t *testing.T) {
+	src := `
+def run() Int {
+	seen = Set(1, 2, 3)
+	doubled = seen.map((item Int) -> item * 2)
+	expanded = seen.flatMap((item Int) -> Set(item, item + 10))
+	seen.forEach((item Int) -> Term.println("set " + item))
+
+	values = Map("a" : 1, "b" : 2)
+	mapped = values.map((key Str, value Int) -> value * 10)
+	expandedValues = values.flatMap((key Str, value Int) -> List(value, value + 10))
+	values.forEach((key Str, value Int) -> Term.println("pair " + key + " " + value))
+
+	total := 0
+	for item Int <- seen {
+		total += item
+	}
+	for key Str, value Int <- values {
+		total += value
+	}
+
+	if expanded.contains(12) {
+		return total * 1000 + mapped.get(0).getOr(0) * 100 + expandedValues.get(3).getOr(0) * 10 + doubled.size()
+	}
+	return 0
+}
+`
+
+	in := New(parseProgram(t, src))
+
+	oldStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe returned error: %v", err)
+	}
+	os.Stdout = writer
+
+	value, callErr := in.Call("run")
+
+	_ = writer.Close()
+	os.Stdout = oldStdout
+	output, _ := io.ReadAll(reader)
+	_ = reader.Close()
+
+	if callErr != nil {
+		t.Fatalf("Call returned error: %v", callErr)
+	}
+	if value != int64(10123) {
+		t.Fatalf("expected 10123, got %#v", value)
+	}
+	if strings.TrimSpace(string(output)) != "set 1\nset 2\nset 3\npair a 1\npair b 2" {
+		t.Fatalf("unexpected output %q", string(output))
+	}
+}
+
 func TestOptionRuntime(t *testing.T) {
 	src := `
 def run() Int {

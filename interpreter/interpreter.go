@@ -2173,6 +2173,72 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []name
 			}
 			value.keys[key] = ordered[0]
 			return nativeCallResult{value: value}, true
+		case "iterator":
+			if len(ordered) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "iterator expects 0 arguments", Span: span}}, true
+			}
+			items := make([]Value, 0, len(value.order))
+			for _, key := range value.order {
+				items = append(items, value.keys[key])
+			}
+			return nativeCallResult{value: &nativeListIterator{items: items}}, true
+		case "map":
+			if len(ordered) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "map expects 1 argument", Span: span}}, true
+			}
+			out := &nativeSet{keys: map[string]Value{}, order: []string{}}
+			for _, key := range value.order {
+				mapped, err := in.invokeCallableValue(ordered[0], []Value{value.keys[key]}, local, span)
+				if err != nil {
+					return nativeCallResult{err: err}, true
+				}
+				mappedKey, err := nativeKey(mapped, span, local, in)
+				if err != nil {
+					return nativeCallResult{err: err}, true
+				}
+				if _, exists := out.keys[mappedKey]; !exists {
+					out.order = append(out.order, mappedKey)
+				}
+				out.keys[mappedKey] = mapped
+			}
+			return nativeCallResult{value: out}, true
+		case "flatMap":
+			if len(ordered) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "flatMap expects 1 argument", Span: span}}, true
+			}
+			out := &nativeSet{keys: map[string]Value{}, order: []string{}}
+			for _, key := range value.order {
+				mapped, err := in.invokeCallableValue(ordered[0], []Value{value.keys[key]}, local, span)
+				if err != nil {
+					return nativeCallResult{err: err}, true
+				}
+				setValue, ok := mapped.(*nativeSet)
+				if !ok {
+					return nativeCallResult{err: RuntimeError{Message: "flatMap function must return Set", Span: span}}, true
+				}
+				for _, nestedKey := range setValue.order {
+					nestedValue := setValue.keys[nestedKey]
+					outKey, err := nativeKey(nestedValue, span, local, in)
+					if err != nil {
+						return nativeCallResult{err: err}, true
+					}
+					if _, exists := out.keys[outKey]; !exists {
+						out.order = append(out.order, outKey)
+					}
+					out.keys[outKey] = nestedValue
+				}
+			}
+			return nativeCallResult{value: out}, true
+		case "forEach":
+			if len(ordered) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "forEach expects 1 argument", Span: span}}, true
+			}
+			for _, key := range value.order {
+				if _, err := in.invokeCallableValue(ordered[0], []Value{value.keys[key]}, local, span); err != nil {
+					return nativeCallResult{err: err}, true
+				}
+			}
+			return nativeCallResult{value: nil}, true
 		case "contains":
 			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "contains expects 1 argument", Span: span}}, true
@@ -2205,6 +2271,55 @@ func (in *Interpreter) callNativeMethod(receiver Value, name string, args []name
 			}
 			value.items[key] = ordered[1]
 			return nativeCallResult{value: value}, true
+		case "iterator":
+			if len(ordered) != 0 {
+				return nativeCallResult{err: RuntimeError{Message: "iterator expects 0 arguments", Span: span}}, true
+			}
+			items := make([]Value, 0, len(value.order))
+			for _, key := range value.order {
+				items = append(items, &nativeTuple{items: []Value{value.keys[key], value.items[key]}})
+			}
+			return nativeCallResult{value: &nativeListIterator{items: items}}, true
+		case "map":
+			if len(ordered) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "map expects 1 argument", Span: span}}, true
+			}
+			out := &nativeList{items: make([]Value, 0, len(value.order))}
+			for _, key := range value.order {
+				mapped, err := in.invokeCallableValue(ordered[0], []Value{value.keys[key], value.items[key]}, local, span)
+				if err != nil {
+					return nativeCallResult{err: err}, true
+				}
+				out.items = append(out.items, mapped)
+			}
+			return nativeCallResult{value: out}, true
+		case "flatMap":
+			if len(ordered) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "flatMap expects 1 argument", Span: span}}, true
+			}
+			out := &nativeList{items: []Value{}}
+			for _, key := range value.order {
+				mapped, err := in.invokeCallableValue(ordered[0], []Value{value.keys[key], value.items[key]}, local, span)
+				if err != nil {
+					return nativeCallResult{err: err}, true
+				}
+				listValue, ok := mapped.(*nativeList)
+				if !ok {
+					return nativeCallResult{err: RuntimeError{Message: "flatMap function must return List", Span: span}}, true
+				}
+				out.items = append(out.items, listValue.items...)
+			}
+			return nativeCallResult{value: out}, true
+		case "forEach":
+			if len(ordered) != 1 {
+				return nativeCallResult{err: RuntimeError{Message: "forEach expects 1 argument", Span: span}}, true
+			}
+			for _, key := range value.order {
+				if _, err := in.invokeCallableValue(ordered[0], []Value{value.keys[key], value.items[key]}, local, span); err != nil {
+					return nativeCallResult{err: err}, true
+				}
+			}
+			return nativeCallResult{value: nil}, true
 		case "get":
 			if len(ordered) != 1 {
 				return nativeCallResult{err: RuntimeError{Message: "get expects 1 argument", Span: span}}, true

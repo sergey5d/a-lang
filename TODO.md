@@ -2,13 +2,11 @@
 
 ## Builtin Descriptor Follow-Ups
 
-- Expand `stdlib/predef` collection APIs so `Set` and `Map` are not lagging behind `List`.
-  - Decide whether `Set[T]` should expose `map`, `flatMap`, `forEach`, `filter`, and related higher-order helpers.
-  - Decide what `Map[K, V]` transformation APIs should look like.
-    - Possible directions:
-      - `map((key, value) -> X) List[X]`
-      - `mapValues(value -> X) Map[K, X]`
-      - `mapEntries((key, value) -> (K2, V2)) Map[K2, V2]`
+- Revisit `Set[T]` / `Map[K, V]` collection API breadth.
+  - `iterator`, `map`, `flatMap`, and `forEach` now exist in `stdlib/predef` and are wired through the runtime.
+  - Remaining question is whether to go further with helpers like `filter`, plus whether `Map` should eventually grow richer transforms such as:
+    - `mapValues(value -> X) Map[K, X]`
+    - `mapEntries((key, value) -> (K2, V2)) Map[K2, V2]`
 
 - Revisit `Option[T]` representation.
   - Current implementation still models `Option` as a class-like builtin for historical/runtime convenience.
@@ -21,5 +19,3 @@ enum Option[T] {
     case Some { value T }
 }
 ```
-
-- After the above API decisions, finish wiring runtime/native builtin behavior to the same `predef` descriptor source so checker and interpreter share one builtin API definition path.
