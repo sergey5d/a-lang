@@ -186,6 +186,16 @@ type BindingStmt struct {
 func (*BindingStmt) stmtNode()              {}
 func (s *BindingStmt) GetSpan() parser.Span { return s.Span }
 
+// UnwrapStmt is a typed short-circuit extraction statement.
+type UnwrapStmt struct {
+	Bindings []BindingDecl
+	Value    Expr
+	Span     parser.Span
+}
+
+func (*UnwrapStmt) stmtNode()              {}
+func (s *UnwrapStmt) GetSpan() parser.Span { return s.Span }
+
 // AssignmentStmt is a typed write to an assignment target.
 type AssignmentStmt struct {
 	Target   Expr

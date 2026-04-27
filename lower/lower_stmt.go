@@ -19,6 +19,8 @@ func (l *Lowerer) lowerStmt(stmt typed.Stmt) ([]Stmt, error) {
 	switch s := stmt.(type) {
 	case *typed.BindingStmt:
 		return l.lowerBindingStmt(s)
+	case *typed.UnwrapStmt:
+		return nil, unsupportedStmtErr(stmt)
 	case *typed.AssignmentStmt:
 		return l.lowerAssignmentStmt(s)
 	case *typed.IfStmt:

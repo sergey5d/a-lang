@@ -2009,3 +2009,61 @@ def run(value Option[(Int, Str, Bool)]) Str {
 		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
 	}
 }
+
+func TestAnalyzeUnwrapStmtOptionResultEither(t *testing.T) {
+	src := `
+def plusOneOption(value Option[Int]) Option[Int] {
+	item <- value
+	return Some(item + 1)
+}
+
+def plusOneResult(value Result[Int, Str]) Result[Int, Str] {
+	item <- value
+	return Ok(item + 1)
+}
+
+def plusOneEither(value Either[Str, Int]) Either[Str, Int] {
+	item <- value
+	return Right(item + 1)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeUnwrapStmtRejectsIncompatibleReturn(t *testing.T) {
+	src := `
+def run(value Result[Int, Str]) Option[Int] {
+	item <- value
+	return Some(item)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if result.Diagnostics[0].Code != "invalid_unwrap" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
+func TestAnalyzeUnwrapStmtRejectsNonUnwrappable(t *testing.T) {
+	src := `
+def run(value Int) Option[Int] {
+	item <- value
+	return Some(item)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if result.Diagnostics[0].Code != "invalid_unwrap" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}

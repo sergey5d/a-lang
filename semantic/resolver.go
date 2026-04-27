@@ -376,6 +376,15 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		for _, value := range s.Values {
 			r.resolveExpr(value)
 		}
+	case *parser.UnwrapStmt:
+		r.resolveExpr(s.Value)
+		for _, binding := range s.Bindings {
+			r.resolveTypeRef(binding.Type)
+			if binding.Name == "_" {
+				continue
+			}
+			r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
+		}
 	case *parser.IfStmt:
 		if s.BindingValue != nil {
 			r.resolveExpr(s.BindingValue)
@@ -669,9 +678,9 @@ func builtinTypeArity(name string) (int, bool) {
 		return 0, true
 	case "List", "Set", "Array", "Option":
 		return 1, true
-	case "Map":
+	case "Map", "Result", "Either":
 		return 2, true
-	case "Eq", "Ordering":
+	case "Eq", "Ordering", "Unwrappable":
 		return 1, true
 	default:
 		return 0, false
@@ -748,7 +757,7 @@ func (r *Resolver) currentTypeScope() typeScope {
 
 func isBuiltin(name string) bool {
 	switch name {
-	case "List", "Map", "Set", "Array", "Some", "None", "Term":
+	case "List", "Map", "Set", "Array", "Some", "None", "Ok", "Err", "Left", "Right", "Term":
 		return true
 	default:
 		return false

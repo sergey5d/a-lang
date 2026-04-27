@@ -9,6 +9,7 @@ import (
 // stmtBuilder dispatches parser statements to their dedicated typed builders.
 type stmtBuilder struct {
 	bindings    Builder[*parser.ValStmt, Stmt]
+	unwraps     Builder[*parser.UnwrapStmt, Stmt]
 	assignments Builder[*parser.AssignmentStmt, Stmt]
 	multiAssignments Builder[*parser.MultiAssignmentStmt, Stmt]
 	ifs         Builder[*parser.IfStmt, Stmt]
@@ -24,6 +25,8 @@ func (b *stmtBuilder) Build(stmt parser.Statement) (Stmt, error) {
 	switch s := stmt.(type) {
 	case *parser.ValStmt:
 		return b.bindings.Build(s)
+	case *parser.UnwrapStmt:
+		return b.unwraps.Build(s)
 	case *parser.AssignmentStmt:
 		return b.assignments.Build(s)
 	case *parser.MultiAssignmentStmt:

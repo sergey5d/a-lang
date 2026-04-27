@@ -1,0 +1,29 @@
+class Result[T, E] with Unwrappable[T] {
+    private ok Bool := ?
+    private value T := ?
+    private error E := ?
+
+    def isOk() Bool = ok
+
+    def isErr() Bool = !ok
+
+    impl def isFailure() Bool = !ok
+
+    impl def unwrap() T = value
+
+    def getError() E = error
+
+    def getOr(defaultValue T) T =
+        if ok {
+            value
+        } else {
+            defaultValue
+        }
+
+    def map[X](f T -> X) Result[X, E] =
+        if ok {
+            Ok(f(value))
+        } else {
+            Err(error)
+        }
+}

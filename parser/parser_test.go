@@ -1879,6 +1879,32 @@ def run(value Option[(Int, Str, Bool)]) Unit {
 	}
 }
 
+func TestParseUnwrapStmt(t *testing.T) {
+	src := `
+def run(value Result[Int, Str]) Result[Int, Str] {
+	item <- value
+	return Ok(item + 1)
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	stmt, ok := fn.Body.Statements[0].(*UnwrapStmt)
+	if !ok {
+		t.Fatalf("expected first statement to be unwrap, got %T", fn.Body.Statements[0])
+	}
+	if len(stmt.Bindings) != 1 || stmt.Bindings[0].Name != "item" {
+		t.Fatalf("unexpected bindings %#v", stmt.Bindings)
+	}
+	if _, ok := stmt.Value.(*Identifier); !ok {
+		t.Fatalf("expected identifier unwrap source, got %T", stmt.Value)
+	}
+}
+
 func TestAttachSourceSpans(t *testing.T) {
 	src := `
 def sample(a Int) Bool {

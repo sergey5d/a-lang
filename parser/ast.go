@@ -204,6 +204,15 @@ type Binding struct {
 
 func (*ValStmt) statementNode() {}
 
+// UnwrapStmt extracts a success value from an unwrappable value or returns early on failure.
+type UnwrapStmt struct {
+	Bindings []Binding `json:"bindings"`
+	Value    Expr      `json:"value"`
+	Span     Span      `json:"span"`
+}
+
+func (*UnwrapStmt) statementNode() {}
+
 // AssignmentStmt writes a value to an existing assignment target.
 type AssignmentStmt struct {
 	Target   Expr   `json:"target"`

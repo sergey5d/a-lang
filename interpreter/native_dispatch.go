@@ -37,6 +37,24 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"get":     nativeOptionGet,
 			"getOr":   nativeOptionGetOr,
 		},
+		"Result": {
+			"isOk":      nativeResultIsOk,
+			"isErr":     nativeResultIsErr,
+			"isFailure": nativeResultIsFailure,
+			"unwrap":    nativeResultUnwrap,
+			"getError":  nativeResultGetError,
+			"getOr":     nativeResultGetOr,
+			"map":       nativeResultMap,
+		},
+		"Either": {
+			"isLeft":    nativeEitherIsLeft,
+			"isRight":   nativeEitherIsRight,
+			"isFailure": nativeEitherIsFailure,
+			"unwrap":    nativeEitherUnwrap,
+			"getLeft":   nativeEitherGetLeft,
+			"getOr":     nativeEitherGetOr,
+			"map":       nativeEitherMap,
+		},
 		"Set": {
 			"add":      nativeSetAdd,
 			"iterator": nativeSetIterator,
@@ -112,6 +130,16 @@ func asNativeArray(receiver Value) (*nativeArray, bool) {
 
 func asNativeOption(receiver Value) (*nativeOption, bool) {
 	value, ok := receiver.(*nativeOption)
+	return value, ok
+}
+
+func asNativeResult(receiver Value) (*nativeResult, bool) {
+	value, ok := receiver.(*nativeResult)
+	return value, ok
+}
+
+func asNativeEither(receiver Value) (*nativeEither, bool) {
+	value, ok := receiver.(*nativeEither)
 	return value, ok
 }
 

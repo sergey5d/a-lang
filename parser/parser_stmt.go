@@ -79,10 +79,19 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 	}
 
 	operator := p.peek().Type
-	if operator != TokenAssign && operator != TokenColonAssign {
-		return nil, fmt.Errorf("expected '=' or ':=' after bindings, got %s", p.peek().String())
+	if operator != TokenAssign && operator != TokenColonAssign && operator != TokenLeftArrow {
+		return nil, fmt.Errorf("expected '=', ':=', or '<-' after bindings, got %s", p.peek().String())
 	}
 	p.advance()
+	if operator == TokenLeftArrow {
+		value, err := p.parseExpression(0)
+		if err != nil {
+			return nil, err
+		}
+		stmt := &UnwrapStmt{Bindings: bindings, Value: value}
+		stmt.Span = mergeSpans(tokenSpan(start), exprSpan(value))
+		return stmt, nil
+	}
 	mutable := operator == TokenColonAssign
 	for i := range bindings {
 		bindings[i].Mutable = mutable
@@ -169,6 +178,10 @@ func (p *Parser) isBareBindingStart() bool {
 		return true
 	}
 
+	if p.checkNext(TokenLeftArrow) {
+		return true
+	}
+
 	if p.checkNext(TokenColonAssign) {
 		return !p.isDeclared(p.peek().Lexeme)
 	}
@@ -203,9 +216,9 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 		if i >= len(p.tokens) {
 			return false
 		}
-		if p.tokens[i].Type == TokenAssign {
-			return true
-		}
+			if p.tokens[i].Type == TokenAssign || p.tokens[i].Type == TokenLeftArrow {
+				return true
+			}
 		if p.tokens[i].Type == TokenColonAssign {
 			return sawType || sawUndeclared
 		}

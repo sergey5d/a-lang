@@ -104,12 +104,56 @@ Still open:
 
 This is much more attractive now that `match` exists.
 
+If `Result[T, E]` is added, one likely follow-up is Rust-style unwrap / propagation sugar, for example a `?`-like form that:
+- extracts the success value from `Ok`
+- returns early on `Err`
+- possibly allows error conversion through a protocol or conversion rule
+
+This is not required for an initial `Result` type, but it is one of the main ergonomics questions to decide if error values become a first-class pattern in the language.
+
+Another related idea is `<-` short-circuit extraction, for example:
+
+```txt
+value <- maybeValue
+```
+
+Possible meaning:
+- works for `Option`, `Result`, `Either`, or similar types
+- unwraps the success value into `value`
+- if the rhs is a failure / empty case, returns early from the current function with the corresponding failure branch
+
+This likely wants:
+- a marker interface such as `Unwrappable[T]` or similar
+- compiler-known propagation rules for each supported type family
+
+Important design constraint:
+- expressing "same container family, different success type" is hard without higher-kinded types
+- so the surface may use an interface, but the actual failure rewrap step will likely still need compiler help at first
+
 ### 10. Smarter Type Narrowing
 
 Later improvements could include:
 - better narrowing after `is`
 - exhaustiveness analysis
 - unreachable branch detection
+
+### 11. Deferred Cleanup
+
+A Go-like `defer` construct is still a possible future feature.
+
+Potential shape:
+- `defer close()`
+- `defer { cleanup() }`
+
+Main use cases:
+- resource cleanup
+- structured teardown
+- keeping setup and cleanup close together in imperative code
+
+Open questions:
+- whether it should run at function exit only
+- whether it should support block scope
+- how it should interact with `return`, `break`, and runtime errors
 
 ## TBD
 

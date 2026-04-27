@@ -1561,3 +1561,44 @@ def run() Str {
 		t.Fatalf("expected %q, got %#v", "ok", value)
 	}
 }
+
+func TestUnwrapStmtOptionResultEither(t *testing.T) {
+	src := `
+def plusOneOption(value Option[Int]) Option[Int] {
+	item <- value
+	return Some(item + 1)
+}
+
+def plusOneResult(value Result[Int, Str]) Result[Int, Str] {
+	item <- value
+	return Ok(item + 1)
+}
+
+def plusOneEither(value Either[Str, Int]) Either[Str, Int] {
+	item <- value
+	return Right(item + 1)
+}
+
+def run() Str {
+	optionValue = plusOneOption(Some(4)).getOr(0)
+	resultValue = plusOneResult(Ok(5)).getOr(0)
+	eitherValue = plusOneEither(Right(6)).getOr(0)
+
+	if plusOneOption(None()).isEmpty() &&
+	   plusOneResult(Err("bad")).isErr() &&
+	   plusOneEither(Left("nope")).isLeft() {
+		return "${optionValue}-${resultValue}-${eitherValue}"
+	}
+	return "broken"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "5-6-7" {
+		t.Fatalf("expected %q, got %#v", "5-6-7", value)
+	}
+}

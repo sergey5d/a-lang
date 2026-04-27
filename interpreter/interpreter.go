@@ -82,6 +82,16 @@ type nativeOption struct {
 	value Value
 	set   bool
 }
+type nativeResult struct {
+	value Value
+	err   Value
+	ok    bool
+}
+type nativeEither struct {
+	left     Value
+	right    Value
+	rightSet bool
+}
 type nativeSet struct {
 	keys  map[string]Value
 	order []string
@@ -463,6 +473,33 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			}
 		}
 		return nil, nil, nil
+	case *parser.UnwrapStmt:
+		sourceValue, err := in.evalExpr(s.Value, local)
+		if err != nil {
+			return nil, nil, err
+		}
+		ok, unwrapped, err := in.unwrappableBindingValue(sourceValue, local, exprSpan(s.Value))
+		if err != nil {
+			return nil, nil, err
+		}
+		if !ok {
+			return nil, returnSignal{value: sourceValue}, nil
+		}
+		values, err := in.destructureBoundValue(s.Bindings, unwrapped, s.Span)
+		if err != nil {
+			return nil, nil, err
+		}
+		for i, binding := range s.Bindings {
+			if binding.Name == "_" {
+				continue
+			}
+			var value Value
+			if i < len(values) {
+				value = in.coerceValueForBinding(binding.Type, values[i])
+			}
+			local.define(binding.Name, value, false)
+		}
+		return nil, nil, nil
 	case *parser.IfStmt:
 		if s.BindingValue != nil {
 			optionValue, err := in.evalExpr(s.BindingValue, local)
@@ -730,6 +767,48 @@ func (in *Interpreter) optionBindingValue(optionValue Value, local *env, span pa
 		return true, unwrapped, nil
 	default:
 		return false, nil, RuntimeError{Message: "if binding requires Option[T]", Span: span}
+	}
+}
+
+func (in *Interpreter) unwrappableBindingValue(sourceValue Value, local *env, span parser.Span) (bool, Value, error) {
+	switch value := sourceValue.(type) {
+	case *nativeOption:
+		if !value.set {
+			return false, nil, nil
+		}
+		return true, value.value, nil
+	case *nativeResult:
+		if !value.ok {
+			return false, nil, nil
+		}
+		return true, value.value, nil
+	case *nativeEither:
+		if !value.rightSet {
+			return false, nil, nil
+		}
+		return true, value.right, nil
+	case *instance:
+		if !in.instanceImplements(value, "Unwrappable") {
+			return false, nil, RuntimeError{Message: "unwrap binding requires Unwrappable[T]", Span: span}
+		}
+		isFailureValue, err := in.invokeMethod(value, "isFailure", nil, local, span)
+		if err != nil {
+			return false, nil, err
+		}
+		isFailure, ok := isFailureValue.(bool)
+		if !ok {
+			return false, nil, RuntimeError{Message: "Unwrappable.isFailure must return Bool", Span: span}
+		}
+		if isFailure {
+			return false, nil, nil
+		}
+		unwrapped, err := in.invokeMethod(value, "unwrap", nil, local, span)
+		if err != nil {
+			return false, nil, err
+		}
+		return true, unwrapped, nil
+	default:
+		return false, nil, RuntimeError{Message: "unwrap binding requires Unwrappable[T]", Span: span}
 	}
 }
 
@@ -1038,7 +1117,7 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			return functionRef{module: in, name: e.Name}, nil
 		}
 		switch e.Name {
-		case "List", "Set", "Map", "Array", "Some", "None":
+		case "List", "Set", "Map", "Array", "Some", "None", "Ok", "Err", "Left", "Right":
 			return builtinRef{name: e.Name}, nil
 		case "Term":
 			return &nativeTerm{}, nil
@@ -1904,6 +1983,66 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 			return nil, RuntimeError{Message: fmt.Sprintf("None constructor expects 0 arguments, got %d", len(argExprs)), Span: span}
 		}
 		return in.constructStdlibOption(nil, false, local, span)
+	case "Ok":
+		if len(argExprs) != 1 {
+			return nil, RuntimeError{Message: fmt.Sprintf("Ok constructor expects 1 argument, got %d", len(argExprs)), Span: span}
+		}
+		if args == nil {
+			args = make([]Value, len(argExprs))
+			for i, arg := range argExprs {
+				value, err := in.evalExpr(arg.Value, local)
+				if err != nil {
+					return nil, err
+				}
+				args[i] = value
+			}
+		}
+		return in.constructStdlibResult(args[0], nil, true, local)
+	case "Err":
+		if len(argExprs) != 1 {
+			return nil, RuntimeError{Message: fmt.Sprintf("Err constructor expects 1 argument, got %d", len(argExprs)), Span: span}
+		}
+		if args == nil {
+			args = make([]Value, len(argExprs))
+			for i, arg := range argExprs {
+				value, err := in.evalExpr(arg.Value, local)
+				if err != nil {
+					return nil, err
+				}
+				args[i] = value
+			}
+		}
+		return in.constructStdlibResult(nil, args[0], false, local)
+	case "Left":
+		if len(argExprs) != 1 {
+			return nil, RuntimeError{Message: fmt.Sprintf("Left constructor expects 1 argument, got %d", len(argExprs)), Span: span}
+		}
+		if args == nil {
+			args = make([]Value, len(argExprs))
+			for i, arg := range argExprs {
+				value, err := in.evalExpr(arg.Value, local)
+				if err != nil {
+					return nil, err
+				}
+				args[i] = value
+			}
+		}
+		return in.constructStdlibEither(args[0], nil, false, local)
+	case "Right":
+		if len(argExprs) != 1 {
+			return nil, RuntimeError{Message: fmt.Sprintf("Right constructor expects 1 argument, got %d", len(argExprs)), Span: span}
+		}
+		if args == nil {
+			args = make([]Value, len(argExprs))
+			for i, arg := range argExprs {
+				value, err := in.evalExpr(arg.Value, local)
+				if err != nil {
+					return nil, err
+				}
+				args[i] = value
+			}
+		}
+		return in.constructStdlibEither(nil, args[0], true, local)
 	case "Map":
 		m := &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: []string{}}
 		for _, argExpr := range argExprs {
@@ -1992,6 +2131,10 @@ func nativeBuiltinTypeName(value Value) (string, bool) {
 		return "Iterator", true
 	case *nativeOption:
 		return "Option", true
+	case *nativeResult:
+		return "Result", true
+	case *nativeEither:
+		return "Either", true
 	case *nativeSet:
 		return "Set", true
 	case *nativeMap:
@@ -2269,7 +2412,7 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 		return ok && len(ref.TupleElements) == len(tuple.items)
 	}
 	switch ref.Name {
-	case "", "Unit", "Int", "Float", "Bool", "Str", "Rune", "List", "Iterable", "Iterator", "Set", "Map", "Option", "Array", "Term":
+	case "", "Unit", "Int", "Float", "Bool", "Str", "Rune", "List", "Iterable", "Iterator", "Set", "Map", "Option", "Result", "Either", "Unwrappable", "Array", "Term":
 	default:
 		if _, ok := in.classes[ref.Name]; !ok {
 			if _, ok := in.interfaces[ref.Name]; !ok {
@@ -2326,6 +2469,30 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 			return builtinTypeImplements(typeName, "Option")
 		}
 		if instanceValue, ok := value.(*instance); ok && instanceValue.class.Name == "Option" {
+			return true
+		}
+		return false
+	case "Result":
+		if typeName, ok := nativeBuiltinTypeName(value); ok {
+			return builtinTypeImplements(typeName, "Result")
+		}
+		if instanceValue, ok := value.(*instance); ok && instanceValue.class.Name == "Result" {
+			return true
+		}
+		return false
+	case "Either":
+		if typeName, ok := nativeBuiltinTypeName(value); ok {
+			return builtinTypeImplements(typeName, "Either")
+		}
+		if instanceValue, ok := value.(*instance); ok && instanceValue.class.Name == "Either" {
+			return true
+		}
+		return false
+	case "Unwrappable":
+		if typeName, ok := nativeBuiltinTypeName(value); ok {
+			return builtinTypeImplements(typeName, "Unwrappable")
+		}
+		if instanceValue, ok := value.(*instance); ok && in.instanceImplements(instanceValue, "Unwrappable") {
 			return true
 		}
 		return false
@@ -2742,6 +2909,88 @@ func (in *Interpreter) constructStdlibOption(value Value, set bool, local *env, 
 		return in.construct(class, []Value{value}, local)
 	}
 	return in.construct(class, nil, local)
+}
+
+func (in *Interpreter) constructStdlibResult(value Value, errValue Value, ok bool, local *env) (Value, error) {
+	class, found := in.classes["Result"]
+	if !found {
+		return &nativeResult{value: value, err: errValue, ok: ok}, nil
+	}
+	obj, err := in.constructBuiltinInstance(class, local)
+	if err != nil {
+		return nil, err
+	}
+	obj.fields["ok"] = ok
+	if ok {
+		obj.fields["value"] = value
+		obj.fields["error"] = zeroValue(fieldTypeByName(class, "error"))
+	} else {
+		obj.fields["value"] = zeroValue(fieldTypeByName(class, "value"))
+		obj.fields["error"] = errValue
+	}
+	return obj, nil
+}
+
+func (in *Interpreter) constructStdlibEither(left Value, right Value, rightSet bool, local *env) (Value, error) {
+	class, found := in.classes["Either"]
+	if !found {
+		return &nativeEither{left: left, right: right, rightSet: rightSet}, nil
+	}
+	obj, err := in.constructBuiltinInstance(class, local)
+	if err != nil {
+		return nil, err
+	}
+	obj.fields["rightSet"] = rightSet
+	if rightSet {
+		obj.fields["left"] = zeroValue(fieldTypeByName(class, "left"))
+		obj.fields["right"] = right
+	} else {
+		obj.fields["left"] = left
+		obj.fields["right"] = zeroValue(fieldTypeByName(class, "right"))
+	}
+	return obj, nil
+}
+
+func (in *Interpreter) constructBuiltinInstance(class *parser.ClassDecl, parent *env) (*instance, error) {
+	obj := &instance{class: class, fields: map[string]Value{}}
+	fieldEnv := newEnv(parent)
+	fieldEnv.define("this", obj, false)
+	for _, field := range class.Fields {
+		switch {
+		case field.Initializer != nil:
+			value, err := in.evalExpr(field.Initializer, fieldEnv)
+			if err != nil {
+				return nil, err
+			}
+			obj.fields[field.Name] = value
+		case field.Deferred:
+			obj.fields[field.Name] = deferredValue{}
+		default:
+			obj.fields[field.Name] = zeroValue(field.Type)
+		}
+	}
+	return obj, nil
+}
+
+func fieldTypeByName(class *parser.ClassDecl, name string) *parser.TypeRef {
+	for i := range class.Fields {
+		if class.Fields[i].Name == name {
+			return class.Fields[i].Type
+		}
+	}
+	return nil
+}
+
+func (in *Interpreter) instanceImplements(value *instance, target string) bool {
+	if value.class.Name == target {
+		return true
+	}
+	for _, impl := range value.class.Implements {
+		if impl.Name == target || in.interfaceExtends(impl.Name, target, map[string]bool{}) {
+			return true
+		}
+	}
+	return false
 }
 
 func (in *Interpreter) bindingValues(bindings []parser.Binding, values []parser.Expr, local *env, span parser.Span) ([]Value, error) {
