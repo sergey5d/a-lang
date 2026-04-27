@@ -169,6 +169,12 @@ func (p *Parser) parsePrefix() (Expr, error) {
 			return nil, err
 		}
 		return &ListLiteral{Elements: items, Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
+	case TokenLBrace:
+		block, err := p.parseBlockAfterStart(token)
+		if err != nil {
+			return nil, err
+		}
+		return &BlockExpr{Body: block, Span: block.Span}, nil
 	case TokenIf:
 		return p.parseIfExprAfterStart(token)
 	case TokenMatch:

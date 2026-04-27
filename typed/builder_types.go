@@ -366,6 +366,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 		return e.Span
 	case *parser.GroupExpr:
 		return e.Span
+	case *parser.BlockExpr:
+		return e.Span
 	default:
 		return parser.Span{}
 	}

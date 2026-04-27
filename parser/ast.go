@@ -487,6 +487,14 @@ type IfExpr struct {
 
 func (*IfExpr) exprNode() {}
 
+// BlockExpr evaluates a braced block and yields the value of its final statement.
+type BlockExpr struct {
+	Body *BlockStmt `json:"body"`
+	Span Span       `json:"span"`
+}
+
+func (*BlockExpr) exprNode() {}
+
 // MatchExpr is a match expression whose value comes from the matched case.
 type MatchExpr struct {
 	Value Expr        `json:"value"`

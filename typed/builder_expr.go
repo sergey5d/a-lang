@@ -48,6 +48,12 @@ func (b *exprBuilder) Build(expr parser.Expr) (Expr, error) {
 			return nil, err
 		}
 		return &GroupExpr{baseExpr: b.base(expr), Inner: inner}, nil
+	case *parser.BlockExpr:
+		body, err := b.blocks.Build(e.Body)
+		if err != nil {
+			return nil, err
+		}
+		return &BlockExpr{baseExpr: b.base(expr), Body: body}, nil
 	case *parser.UnaryExpr:
 		return b.buildUnaryExpr(expr, e)
 	case *parser.BinaryExpr:

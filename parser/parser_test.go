@@ -204,6 +204,62 @@ def run() Str {
 	}
 }
 
+func TestParseNestedBlockExpressions(t *testing.T) {
+	program, err := Parse(`
+def run() Int {
+	a1 = {
+		1 + 7
+	}
+	{
+		Term.println("xxx")
+	}
+	v := {
+		a = 5
+		{
+			a + 1
+		}
+	}
+	return a1 + v
+}
+`)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	fn := program.Functions[0]
+	first, ok := fn.Body.Statements[0].(*ValStmt)
+	if !ok {
+		t.Fatalf("expected first statement to be ValStmt, got %T", fn.Body.Statements[0])
+	}
+	if _, ok := first.Values[0].(*BlockExpr); !ok {
+		t.Fatalf("expected first binding value to be BlockExpr, got %T", first.Values[0])
+	}
+	second, ok := fn.Body.Statements[1].(*ExprStmt)
+	if !ok {
+		t.Fatalf("expected second statement to be ExprStmt, got %T", fn.Body.Statements[1])
+	}
+	if _, ok := second.Expr.(*BlockExpr); !ok {
+		t.Fatalf("expected standalone block statement to be BlockExpr, got %T", second.Expr)
+	}
+	third, ok := fn.Body.Statements[2].(*ValStmt)
+	if !ok {
+		t.Fatalf("expected third statement to be ValStmt, got %T", fn.Body.Statements[2])
+	}
+	if !third.Bindings[0].Mutable {
+		t.Fatalf("expected third binding to be mutable")
+	}
+	outer, ok := third.Values[0].(*BlockExpr)
+	if !ok {
+		t.Fatalf("expected mutable binding value to be BlockExpr, got %T", third.Values[0])
+	}
+	last, ok := outer.Body.Statements[len(outer.Body.Statements)-1].(*ExprStmt)
+	if !ok {
+		t.Fatalf("expected nested block to be final ExprStmt, got %T", outer.Body.Statements[len(outer.Body.Statements)-1])
+	}
+	if _, ok := last.Expr.(*BlockExpr); !ok {
+		t.Fatalf("expected nested block expr, got %T", last.Expr)
+	}
+}
+
 func TestParseHashComments(t *testing.T) {
 	src := `
 # top-level comment

@@ -455,6 +455,14 @@ type IfExpr struct {
 
 func (*IfExpr) exprNode() {}
 
+// BlockExpr is a typed braced block expression.
+type BlockExpr struct {
+	baseExpr
+	Body *BlockStmt
+}
+
+func (*BlockExpr) exprNode() {}
+
 // MatchCase is a typed case in a match statement or expression.
 type MatchCase struct {
 	Pattern parser.Pattern

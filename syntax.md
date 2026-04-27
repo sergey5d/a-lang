@@ -312,6 +312,28 @@ Block lambda:
 }
 ```
 
+Nested blocks are also valid expressions:
+
+```txt
+a1 = {
+    1 + 7
+}
+
+v := {
+    a = 5
+    {
+        a + 1
+    }
+}
+```
+
+Rules:
+
+- braced blocks may appear as standalone statements or as expressions
+- block expressions evaluate to the value of their last statement
+- if you want a block value, the last statement must be an expression
+- blocks can nest arbitrarily
+
 ## Classes, Objects, Records, Interfaces, Enums
 
 Class:
@@ -451,6 +473,14 @@ Main statement forms:
 - expression statement
 
 Pure expression statements with no effect are rejected.
+
+Standalone nested blocks are valid expression statements:
+
+```txt
+{
+    Term.println("xxx")
+}
+```
 
 ## `if`
 

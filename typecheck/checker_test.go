@@ -2086,3 +2086,28 @@ def run(text Str) Int {
 		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
 	}
 }
+
+func TestAnalyzeNestedBlockExpressions(t *testing.T) {
+	src := `
+def run() Int {
+	a1 Int = {
+		1 + 7
+	}
+	{
+		Term.println("xxx")
+	}
+	v Int := {
+		a Int = 5
+		{
+			a + 1
+		}
+	}
+	return a1 + v
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}

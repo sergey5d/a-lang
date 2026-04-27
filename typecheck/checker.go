@@ -1025,6 +1025,8 @@ func (c *Checker) exprHasEffect(expr parser.Expr) bool {
 		return true
 	case *parser.GroupExpr:
 		return c.exprHasEffect(e.Inner)
+	case *parser.BlockExpr:
+		return c.blockHasEffect(e.Body)
 	case *parser.IfExpr:
 		return c.blockHasEffect(e.Then) || c.blockHasEffect(e.Else)
 	case *parser.ForYieldExpr:
@@ -1625,6 +1627,8 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		result = &Type{Kind: TypeTuple, Name: "Tuple", Args: elements}
 	case *parser.GroupExpr:
 		result = c.checkExpr(e.Inner)
+	case *parser.BlockExpr:
+		result = c.checkBlockResult(e.Body, "invalid_block_expression", "block expression must end with an expression")
 	case *parser.UnaryExpr:
 		right := c.checkExpr(e.Right)
 		switch e.Operator {
@@ -4223,6 +4227,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.UnaryExpr:
 		return e.Span
 	case *parser.GroupExpr:
+		return e.Span
+	case *parser.BlockExpr:
 		return e.Span
 	default:
 		return parser.Span{}

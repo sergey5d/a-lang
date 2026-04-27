@@ -7,6 +7,10 @@ func (p *Parser) parseBlock() (*BlockStmt, error) {
 	if err != nil {
 		return nil, err
 	}
+	return p.parseBlockAfterStart(start)
+}
+
+func (p *Parser) parseBlockAfterStart(start Token) (*BlockStmt, error) {
 	p.beginScope()
 	defer p.endScope()
 	block := &BlockStmt{}

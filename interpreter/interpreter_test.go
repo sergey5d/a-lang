@@ -1627,3 +1627,32 @@ def run() Int {
 		t.Fatalf("expected 8, got %#v", value)
 	}
 }
+
+func TestNestedBlockExpressions(t *testing.T) {
+	src := `
+def run() Int {
+	a1 = {
+		1 + 7
+	}
+	{
+		Term.println("xxx")
+	}
+	v := {
+		a = 5
+		{
+			a + 1
+		}
+	}
+	return a1 + v
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(14) {
+		t.Fatalf("expected 14, got %#v", value)
+	}
+}

@@ -1201,6 +1201,15 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			return nil, RuntimeError{Message: "unexpected control flow in if expression", Span: e.Span}
 		}
 		return value, nil
+	case *parser.BlockExpr:
+		value, signal, err := in.evalBlockValue(e.Body, local, nil, "block expression must end with an expression")
+		if err != nil {
+			return nil, err
+		}
+		if signal != nil {
+			return nil, RuntimeError{Message: "unexpected control flow in block expression", Span: e.Span}
+		}
+		return value, nil
 	case *parser.MatchExpr:
 		value, err := in.evalExpr(e.Value, local)
 		if err != nil {
@@ -3245,6 +3254,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.UnaryExpr:
 		return e.Span
 	case *parser.GroupExpr:
+		return e.Span
+	case *parser.BlockExpr:
 		return e.Span
 	default:
 		return parser.Span{}
