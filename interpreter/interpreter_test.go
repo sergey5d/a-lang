@@ -1689,3 +1689,25 @@ def run() Int {
 		t.Fatalf("expected 40, got %#v", value)
 	}
 }
+
+func TestPlaceholderLambdaShorthand(t *testing.T) {
+	src := `
+def applyTwice(f (Int) -> Int, value Int) Int = f(f(value))
+
+def run() Int {
+	inc (Int) -> Int = _ + 1
+	items = List(1, 2, 3)
+	mapped = items.map(_ + 1)
+	return applyTwice(inc, mapped.get(0).getOr(0))
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(4) {
+		t.Fatalf("expected 4, got %#v", value)
+	}
+}

@@ -1545,6 +1545,17 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 	if fn, ok := callee.(builtinRef); ok {
 		return in.callBuiltin(fn.name, call.Args, nil, local, call.Span)
 	}
+	if fn, ok := callee.(functionRef); ok {
+		decl, ok := fn.module.functions[fn.name]
+		if !ok {
+			return nil, RuntimeError{Message: "undefined function '" + fn.name + "'", Span: call.Span}
+		}
+		ordered, err := in.evalArgsWithParams(decl.Parameters, call.Args, local, call.Span, "function '"+fn.name+"'")
+		if err != nil {
+			return nil, err
+		}
+		return fn.module.callFunctionByName(fn.name, ordered, local)
+	}
 	args := make([]namedValueArg, len(call.Args))
 	for i, arg := range call.Args {
 		value, err := in.evalExpr(arg.Value, local)
@@ -1554,20 +1565,6 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 		args[i] = namedValueArg{Name: arg.Name, Value: value, Span: arg.Span}
 	}
 	switch fn := callee.(type) {
-	case functionRef:
-		ordered := namedArgValues(args)
-		if hasNamedParserArgs(call.Args) {
-			decl, ok := fn.module.functions[fn.name]
-			if !ok {
-				return nil, RuntimeError{Message: "undefined function '" + fn.name + "'", Span: call.Span}
-			}
-			reordered, err := reorderNamedValueArgs(decl.Parameters, args, call.Span, "function '"+fn.name+"'")
-			if err != nil {
-				return nil, err
-			}
-			ordered = reordered
-		}
-		return fn.module.callFunctionByName(fn.name, ordered, local)
 	case classRef:
 		class, ok := fn.module.classes[fn.name]
 		if !ok {
@@ -1708,32 +1705,27 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 	if err != nil {
 		return nil, err
 	}
-	args := make([]namedValueArg, len(argExprs))
-	for i, arg := range argExprs {
-		value, err := in.evalExpr(arg.Value, local)
-		if err != nil {
-			return nil, err
-		}
-		args[i] = namedValueArg{Name: arg.Name, Value: value, Span: arg.Span}
-	}
 	if modRef, ok := receiver.(moduleRef); ok {
 		mod, ok := in.imports[modRef.name]
 		if !ok {
 			return nil, RuntimeError{Message: "unknown module '" + modRef.name + "'", Span: member.Span}
 		}
-		ordered := namedArgValues(args)
-		if hasNamedParserArgs(argExprs) {
-			if decl, ok := mod.functions[member.Name]; ok {
-				reordered, err := reorderNamedValueArgs(decl.Parameters, args, member.Span, "function '"+member.Name+"'")
-				if err != nil {
-					return nil, err
-				}
-				ordered = reordered
+		if decl, ok := mod.functions[member.Name]; ok {
+			ordered, err := in.evalArgsWithParams(decl.Parameters, argExprs, local, member.Span, "function '"+member.Name+"'")
+			if err != nil {
+				return nil, err
 			}
+			return mod.callFunctionByName(member.Name, ordered, mod.globals)
 		}
-			if _, ok := mod.functions[member.Name]; ok {
-				return mod.callFunctionByName(member.Name, ordered, mod.globals)
+		args := make([]namedValueArg, len(argExprs))
+		for i, arg := range argExprs {
+			value, err := in.evalExpr(arg.Value, local)
+			if err != nil {
+				return nil, err
 			}
+			args[i] = namedValueArg{Name: arg.Name, Value: value, Span: arg.Span}
+		}
+		ordered := namedArgValues(args)
 			if class, ok := mod.classes[member.Name]; ok {
 				if class.Object {
 					value, ok := mod.globals.get(member.Name)
@@ -1767,21 +1759,42 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 				if enumCase.Name != member.Name {
 					continue
 				}
-				ordered := namedArgValues(args)
-				if hasNamedParserArgs(argExprs) {
-					params := make([]parser.Parameter, len(enumCase.Fields))
-					for i, field := range enumCase.Fields {
-						params[i] = parser.Parameter{Name: field.Name, Type: field.Type, Span: field.Span}
-					}
-					reordered, err := reorderNamedValueArgs(params, args, member.Span, "enum case '"+member.Name+"'")
-					if err != nil {
-						return nil, err
-					}
-					ordered = reordered
+				params := make([]parser.Parameter, len(enumCase.Fields))
+				for i, field := range enumCase.Fields {
+					params[i] = parser.Parameter{Name: field.Name, Type: field.Type, Span: field.Span}
+				}
+				ordered, err := in.evalArgsWithParams(params, argExprs, local, member.Span, "enum case '"+member.Name+"'")
+				if err != nil {
+					return nil, err
 				}
 				return class.module.constructEnumCase(decl, enumCase, ordered, local, member.Span)
 			}
 		}
+	}
+	if method, ok := in.nativeMethodDescriptor(receiver, member.Name); ok {
+		ordered, err := in.evalArgsWithParams(method.Parameters, argExprs, local, member.Span, "method '"+member.Name+"'")
+		if err != nil {
+			return nil, err
+		}
+		named := make([]namedValueArg, len(ordered))
+		for i, value := range ordered {
+			span := member.Span
+			if i < len(argExprs) {
+				span = argExprs[i].Span
+			}
+			named[i] = namedValueArg{Value: value, Span: span}
+		}
+		if native, ok := in.callNativeMethod(receiver, member.Name, named, local, member.Span); ok {
+			return native.value, native.err
+		}
+	}
+	args := make([]namedValueArg, len(argExprs))
+	for i, arg := range argExprs {
+		value, err := in.evalExpr(arg.Value, local)
+		if err != nil {
+			return nil, err
+		}
+		args[i] = namedValueArg{Name: arg.Name, Value: value, Span: arg.Span}
 	}
 	if native, ok := in.callNativeMethod(receiver, member.Name, args, local, member.Span); ok {
 		return native.value, native.err
@@ -1789,6 +1802,21 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 	obj, ok := receiver.(*instance)
 	if !ok {
 		return nil, RuntimeError{Message: "member call requires class instance", Span: member.Span}
+	}
+	if len(obj.class.Methods) > 0 {
+		var candidates []*parser.MethodDecl
+		for _, method := range obj.class.Methods {
+			if method.Name == member.Name {
+				candidates = append(candidates, method)
+			}
+		}
+		if len(candidates) == 1 {
+			ordered, err := in.evalArgsWithParams(candidates[0].Parameters, argExprs, local, member.Span, "method '"+member.Name+"'")
+			if err != nil {
+				return nil, err
+			}
+			return in.callMethod(obj, candidates[0], ordered, local)
+		}
 	}
 	if hasNamedParserArgs(argExprs) {
 		var candidates []*parser.MethodDecl
@@ -3099,7 +3127,7 @@ func (in *Interpreter) bindingValues(bindings []parser.Binding, values []parser.
 				out[i] = deferredValue{}
 				continue
 			}
-			value, err := in.evalExpr(expr, local)
+			value, err := in.evalExprWithTypeRef(expr, bindingTypeRef(bindings, i), local)
 			if err != nil {
 				return nil, err
 			}
@@ -3126,6 +3154,81 @@ func (in *Interpreter) bindingValues(bindings []parser.Binding, values []parser.
 		return append([]Value(nil), items...), nil
 	}
 	return nil, RuntimeError{Message: fmt.Sprintf("binding expects %d values, got %d", len(bindings), len(values)), Span: span}
+}
+
+func (in *Interpreter) evalExprWithTypeRef(expr parser.Expr, expected *parser.TypeRef, local *env) (Value, error) {
+	return in.evalExpr(parser.WrapContextualFunctionExpr(expected, expr), local)
+}
+
+func (in *Interpreter) evalArgsWithParams(params []parser.Parameter, argExprs []parser.CallArg, local *env, span parser.Span, callable string) ([]Value, error) {
+	orderedExprs := make([]parser.Expr, len(argExprs))
+	if hasNamedParserArgs(argExprs) {
+		reordered, err := reorderNamedParserArgs(params, argExprs, span, callable)
+		if err != nil {
+			return nil, err
+		}
+		orderedExprs = reordered
+	} else {
+		for i, arg := range argExprs {
+			orderedExprs[i] = arg.Value
+		}
+	}
+	values := make([]Value, len(orderedExprs))
+	for i, expr := range orderedExprs {
+		var expected *parser.TypeRef
+		if i < len(params) {
+			expected = params[i].Type
+		}
+		value, err := in.evalExprWithTypeRef(expr, expected, local)
+		if err != nil {
+			return nil, err
+		}
+		values[i] = value
+	}
+	return values, nil
+}
+
+func reorderNamedParserArgs(params []parser.Parameter, args []parser.CallArg, span parser.Span, callable string) ([]parser.Expr, error) {
+	ordered := make([]parser.Expr, len(params))
+	filled := make([]bool, len(params))
+	positional := 0
+	seenNamed := false
+	for _, arg := range args {
+		if arg.Name == "" {
+			if seenNamed {
+				return nil, RuntimeError{Message: "positional arguments cannot follow named arguments in " + callable, Span: arg.Span}
+			}
+			if positional >= len(params) {
+				return nil, RuntimeError{Message: "too many arguments in " + callable, Span: arg.Span}
+			}
+			ordered[positional] = arg.Value
+			filled[positional] = true
+			positional++
+			continue
+		}
+		seenNamed = true
+		paramIndex := -1
+		for i, param := range params {
+			if param.Name == arg.Name {
+				paramIndex = i
+				break
+			}
+		}
+		if paramIndex < 0 {
+			return nil, RuntimeError{Message: "unknown named argument '" + arg.Name + "'", Span: arg.Span}
+		}
+		if filled[paramIndex] {
+			return nil, RuntimeError{Message: "argument '" + arg.Name + "' was provided more than once", Span: arg.Span}
+		}
+		ordered[paramIndex] = arg.Value
+		filled[paramIndex] = true
+	}
+	for i, ok := range filled {
+		if !ok {
+			return nil, RuntimeError{Message: "missing argument '" + params[i].Name + "' in " + callable, Span: span}
+		}
+	}
+	return ordered, nil
 }
 
 func bindingTypeRef(bindings []parser.Binding, index int) *parser.TypeRef {

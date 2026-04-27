@@ -46,17 +46,7 @@ func isZeroArgFunctionType(ref *TypeRef) bool {
 }
 
 func wrapThunkExpr(ref *TypeRef, expr Expr) Expr {
-	if !isZeroArgFunctionType(ref) {
-		return expr
-	}
-	if _, ok := expr.(*LambdaExpr); ok {
-		return expr
-	}
-	return &LambdaExpr{
-		Parameters: []LambdaParameter{},
-		Body:       expr,
-		Span:       exprSpan(expr),
-	}
+	return WrapContextualFunctionExpr(ref, expr)
 }
 
 func exprSpan(expr Expr) Span {

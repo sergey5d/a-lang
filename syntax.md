@@ -291,6 +291,19 @@ Single-parameter lambda:
 x -> x + 1
 ```
 
+Underscore shorthand in a lambda-expected context:
+
+```txt
+inc (Int) -> Int = _ + 1
+items.map(_ + 1)
+```
+
+Rules:
+
+- if an expression containing `_` appears where a one-argument function is expected, it expands to a lambda
+- `_ + 1` becomes `x -> x + 1`
+- the shorthand is contextual; outside a lambda-expected position, `_` is not a normal value
+
 Explicitly typed lambda:
 
 ```txt

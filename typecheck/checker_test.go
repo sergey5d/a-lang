@@ -2140,3 +2140,21 @@ def run() Int {
 		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
 	}
 }
+
+func TestAnalyzePlaceholderLambdaShorthand(t *testing.T) {
+	src := `
+def applyTwice(f (Int) -> Int, value Int) Int = f(f(value))
+
+def run() Int {
+	inc (Int) -> Int = _ + 1
+	items List[Int] = List(1, 2, 3)
+	mapped List[Int] = items.map(_ + 1)
+	return applyTwice(inc, mapped.get(0).getOr(0))
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}

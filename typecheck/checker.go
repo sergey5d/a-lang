@@ -1664,6 +1664,11 @@ func (c *Checker) checkExpr(expr parser.Expr) *Type {
 }
 
 func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type {
+	originalExpr := expr
+	if expected != nil && expected.Kind == TypeFunction && expected.Signature != nil &&
+		len(expected.Signature.Parameters) == 1 && parser.HasPlaceholderExpr(expr) {
+		expr = parser.WrapPlaceholderLambdaExpr(expr)
+	}
 	var result *Type
 	switch e := expr.(type) {
 	case *parser.Identifier:
@@ -1838,7 +1843,10 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 	default:
 		result = unknownType
 	}
-	if expr != nil {
+	if originalExpr != nil {
+		c.exprTypes[originalExpr] = result
+	}
+	if expr != nil && expr != originalExpr {
 		c.exprTypes[expr] = result
 	}
 	return result
