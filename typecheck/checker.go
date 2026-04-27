@@ -1516,10 +1516,8 @@ func (c *Checker) checkBlockStatements(statements []parser.Statement, allowTailE
 	defer c.popScope()
 	for i, stmt := range statements {
 		if allowTailExpr && i == len(statements)-1 {
-			if exprStmt, ok := stmt.(*parser.ExprStmt); ok {
-				c.checkExpr(exprStmt.Expr)
-				return
-			}
+			_ = c.checkStmtResult(stmt, "invalid_tail_expression", "block must end with a value-producing statement")
+			return
 		}
 		c.checkStmt(stmt)
 	}
@@ -1536,13 +1534,129 @@ func (c *Checker) checkBlockResult(block *parser.BlockStmt, code, message string
 		c.checkStmt(block.Statements[i])
 	}
 	last := block.Statements[len(block.Statements)-1]
-	exprStmt, ok := last.(*parser.ExprStmt)
-	if !ok {
-		c.checkStmt(last)
-		c.addDiagnostic(code, message, stmtSpan(last))
+	return c.checkStmtResult(last, code, message)
+}
+
+func (c *Checker) checkStmtResult(stmt parser.Statement, code, message string) *Type {
+	switch s := stmt.(type) {
+	case *parser.ExprStmt:
+		return c.checkExpr(s.Expr)
+	case *parser.IfStmt:
+		return c.checkIfStmtResult(s, code, message)
+	case *parser.MatchStmt:
+		return c.checkMatchStmtResult(s, code, message)
+	case *parser.ForStmt:
+		if s.YieldBody != nil {
+			return c.checkForStmtResult(s, code, message)
+		}
+		c.checkStmt(stmt)
+		c.addDiagnostic(code, message, stmtSpan(stmt))
+		return unknownType
+	default:
+		c.checkStmt(stmt)
+		c.addDiagnostic(code, message, stmtSpan(stmt))
 		return unknownType
 	}
-	return c.checkExpr(exprStmt.Expr)
+}
+
+func (c *Checker) checkIfStmtResult(s *parser.IfStmt, code, message string) *Type {
+	var thenType *Type
+	if s.BindingValue != nil {
+		optionType := c.checkExpr(s.BindingValue)
+		elemType := c.optionElementType(optionType)
+		if isUnknown(elemType) {
+			c.addDiagnostic("invalid_condition_type", "if binding requires Option[T]", exprSpan(s.BindingValue))
+			elemType = unknownType
+		}
+		bindingTypes := []*Type{elemType}
+		if len(s.Bindings) > 1 {
+			bindingTypes = c.destructureValueTypes(len(s.Bindings), elemType, s.Span, "invalid_binding_count", "if binding")
+		}
+		c.pushScope()
+		for i, binding := range s.Bindings {
+			if binding.Name == "_" {
+				continue
+			}
+			bindingType := unknownType
+			if i < len(bindingTypes) && bindingTypes[i] != nil {
+				bindingType = bindingTypes[i]
+			}
+			if binding.Type != nil {
+				declType := c.resolveDeclaredType(binding.Type)
+				c.requireAssignable(bindingType, declType, binding.Span, "type_mismatch", "cannot assign "+bindingType.String()+" to "+declType.String())
+				bindingType = declType
+			}
+			c.define(binding.Name, bindingType, false)
+		}
+		thenType = c.checkBlockResult(s.Then, code, message)
+		c.popScope()
+	} else {
+		condType := c.checkExpr(s.Condition)
+		c.requireAssignable(condType, builtin("Bool"), exprSpan(s.Condition), "invalid_condition_type", "if condition must be Bool")
+		thenType = c.checkBlockResult(s.Then, code, message)
+	}
+
+	var elseType *Type
+	switch {
+	case s.ElseIf != nil:
+		elseType = c.checkIfStmtResult(s.ElseIf, code, message)
+	case s.Else != nil:
+		elseType = c.checkBlockResult(s.Else, code, message)
+	default:
+		c.addDiagnostic(code, message, s.Span)
+		return unknownType
+	}
+	if !sameType(thenType, elseType) {
+		c.addDiagnostic("type_mismatch", "if branches must have the same type", s.Span)
+		return unknownType
+	}
+	return thenType
+}
+
+func (c *Checker) checkMatchStmtResult(s *parser.MatchStmt, code, message string) *Type {
+	valueType := c.checkExpr(s.Value)
+	var resultType *Type
+	for _, matchCase := range s.Cases {
+		c.pushScope()
+		c.checkMatchPattern(matchCase.Pattern, valueType)
+		caseType := unknownType
+		if matchCase.Body != nil {
+			caseType = c.checkBlockResult(matchCase.Body, code, message)
+		} else if matchCase.Expr != nil {
+			caseType = c.checkExpr(matchCase.Expr)
+		} else {
+			c.addDiagnostic(code, message, matchCase.Span)
+		}
+		c.popScope()
+		if resultType == nil {
+			resultType = caseType
+			continue
+		}
+		if !sameType(resultType, caseType) {
+			c.addDiagnostic("type_mismatch", "match cases must have the same type", s.Span)
+			resultType = unknownType
+		}
+	}
+	c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
+	if resultType == nil {
+		c.addDiagnostic(code, message, s.Span)
+		return unknownType
+	}
+	return resultType
+}
+
+func (c *Checker) checkForStmtResult(s *parser.ForStmt, code, message string) *Type {
+	if s.YieldBody == nil {
+		c.addDiagnostic(code, message, s.Span)
+		return unknownType
+	}
+	c.pushScope()
+	for _, binding := range s.Bindings {
+		c.checkForClause(binding)
+	}
+	yieldType := c.checkBlockResult(s.YieldBody, code, message)
+	c.popScope()
+	return &Type{Kind: TypeInterface, Name: "List", Args: []*Type{yieldType}}
 }
 
 func (c *Checker) checkExpr(expr parser.Expr) *Type {

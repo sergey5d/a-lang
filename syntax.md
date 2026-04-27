@@ -331,7 +331,8 @@ Rules:
 
 - braced blocks may appear as standalone statements or as expressions
 - block expressions evaluate to the value of their last statement
-- if you want a block value, the last statement must be an expression
+- if you want a block value, the last statement must be value-producing
+- value-producing tail forms currently include ordinary expressions, `if / else`, `match`, and `for ... yield`
 - blocks can nest arbitrarily
 
 ## Classes, Objects, Records, Interfaces, Enums

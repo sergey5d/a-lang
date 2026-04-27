@@ -589,6 +589,20 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 			return nil, err
 		}
 		p.declareBindings(binding.Bindings)
+		if p.check(TokenYield) {
+			if _, err := p.consume(TokenYield, "expected 'yield' after for binding"); err != nil {
+				return nil, err
+			}
+			yieldBody, err := p.parseYieldBodyBlock("yield")
+			if err != nil {
+				return nil, err
+			}
+			return &ForStmt{
+				Bindings:  []ForBinding{binding},
+				YieldBody: yieldBody,
+				Span:      mergeSpans(tokenSpan(start), yieldBody.Span),
+			}, nil
+		}
 		body, err := p.parseStmtBodyBlock("for")
 		if err != nil {
 			return nil, err

@@ -2111,3 +2111,32 @@ def run() Int {
 		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
 	}
 }
+
+func TestAnalyzeNestedBlockValueStatements(t *testing.T) {
+	src := `
+def run() Int {
+	fromIf Int = {
+		if false {
+			10
+		} else {
+			20
+		}
+	}
+	fromYield List[Int] = {
+		for item <- [1, 2, 3] yield {
+			if item % 2 == 0 {
+				item * 10
+			} else {
+				item
+			}
+		}
+	}
+	return fromIf + fromYield.get(1).getOr(0)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}

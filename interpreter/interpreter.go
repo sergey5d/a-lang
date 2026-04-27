@@ -844,9 +844,9 @@ func (in *Interpreter) execFor(stmt *parser.ForStmt, local *env, self *instance)
 		}
 		switch signal.(type) {
 		case nil:
-			return yielded, nil, nil
+			return &nativeList{items: yielded}, nil, nil
 		case breakSignal:
-			return yielded, nil, nil
+			return &nativeList{items: yielded}, nil, nil
 		default:
 			return nil, signal, nil
 		}
@@ -968,7 +968,7 @@ func (in *Interpreter) execForBindings(bindings []parser.ForBinding, index int, 
 
 func (in *Interpreter) evalYieldBody(block *parser.BlockStmt, local *env, self *instance) (Value, any, error) {
 	if block == nil || len(block.Statements) == 0 {
-		return nil, nil, RuntimeError{Message: "yield body must end with an expression", Span: parser.Span{}}
+		return nil, nil, RuntimeError{Message: "yield body must end with a value-producing statement", Span: parser.Span{}}
 	}
 	for i := 0; i < len(block.Statements)-1; i++ {
 		_, signal, err := in.execStmt(block.Statements[i], local, self)
@@ -977,12 +977,7 @@ func (in *Interpreter) evalYieldBody(block *parser.BlockStmt, local *env, self *
 		}
 	}
 	last := block.Statements[len(block.Statements)-1]
-	exprStmt, ok := last.(*parser.ExprStmt)
-	if !ok {
-		return nil, nil, RuntimeError{Message: "yield body must end with an expression", Span: stmtSpan(last)}
-	}
-	value, err := in.evalExpr(exprStmt.Expr, local)
-	return value, nil, err
+	return in.evalStmtValue(last, local, self, "yield body must end with a value-producing statement")
 }
 
 func (in *Interpreter) evalBlockValue(block *parser.BlockStmt, local *env, self *instance, message string) (Value, any, error) {
@@ -997,12 +992,101 @@ func (in *Interpreter) evalBlockValue(block *parser.BlockStmt, local *env, self 
 		}
 	}
 	last := block.Statements[len(block.Statements)-1]
-	exprStmt, ok := last.(*parser.ExprStmt)
-	if !ok {
-		return nil, nil, RuntimeError{Message: message, Span: stmtSpan(last)}
+	return in.evalStmtValue(last, blockEnv, self, message)
+}
+
+func (in *Interpreter) evalStmtValue(stmt parser.Statement, local *env, self *instance, message string) (Value, any, error) {
+	switch s := stmt.(type) {
+	case *parser.ExprStmt:
+		value, err := in.evalExpr(s.Expr, local)
+		return value, nil, err
+	case *parser.IfStmt:
+		return in.evalIfStmtValue(s, local, self, message)
+	case *parser.MatchStmt:
+		return in.evalMatchStmtValue(s, local, self, message)
+	case *parser.ForStmt:
+		if s.YieldBody != nil {
+			return in.execFor(s, local, self)
+		}
+		return nil, nil, RuntimeError{Message: message, Span: stmtSpan(stmt)}
+	default:
+		return nil, nil, RuntimeError{Message: message, Span: stmtSpan(stmt)}
 	}
-	value, err := in.evalExpr(exprStmt.Expr, blockEnv)
-	return value, nil, err
+}
+
+func (in *Interpreter) evalIfStmtValue(s *parser.IfStmt, local *env, self *instance, message string) (Value, any, error) {
+	if s.BindingValue != nil {
+		optionValue, err := in.evalExpr(s.BindingValue, local)
+		if err != nil {
+			return nil, nil, err
+		}
+		set, value, err := in.optionBindingValue(optionValue, local, exprSpan(s.BindingValue))
+		if err != nil {
+			return nil, nil, err
+		}
+		if set {
+			thenEnv := newEnv(local)
+			boundValues, err := in.destructureBoundValue(s.Bindings, value, s.Span)
+			if err != nil {
+				return nil, nil, err
+			}
+			for i, binding := range s.Bindings {
+				if binding.Name == "_" {
+					continue
+				}
+				thenEnv.define(binding.Name, in.coerceValueForBinding(binding.Type, boundValues[i]), false)
+			}
+			return in.evalBlockValue(s.Then, thenEnv, self, message)
+		}
+	} else {
+		cond, err := in.evalExpr(s.Condition, local)
+		if err != nil {
+			return nil, nil, err
+		}
+		truthy, err := asBool(cond, exprSpan(s.Condition))
+		if err != nil {
+			return nil, nil, err
+		}
+		if truthy {
+			return in.evalBlockValue(s.Then, local, self, message)
+		}
+	}
+	if s.ElseIf != nil {
+		return in.evalIfStmtValue(s.ElseIf, local, self, message)
+	}
+	if s.Else != nil {
+		return in.evalBlockValue(s.Else, local, self, message)
+	}
+	return nil, nil, RuntimeError{Message: message, Span: s.Span}
+}
+
+func (in *Interpreter) evalMatchStmtValue(s *parser.MatchStmt, local *env, self *instance, message string) (Value, any, error) {
+	value, err := in.evalExpr(s.Value, local)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, matchCase := range s.Cases {
+		bindings, ok, err := in.matchPattern(matchCase.Pattern, value, local)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !ok {
+			continue
+		}
+		caseEnv := newEnv(local)
+		for _, binding := range bindings {
+			caseEnv.define(binding.name, binding.value, false)
+		}
+		if matchCase.Body != nil {
+			return in.evalBlockValue(matchCase.Body, caseEnv, self, message)
+		}
+		if matchCase.Expr != nil {
+			value, err := in.evalExpr(matchCase.Expr, caseEnv)
+			return value, nil, err
+		}
+		return nil, nil, RuntimeError{Message: message, Span: matchCase.Span}
+	}
+	return nil, nil, RuntimeError{Message: "non-exhaustive match statement used as value", Span: s.Span}
 }
 
 func (in *Interpreter) assign(target parser.Expr, operator string, value Value, local *env) error {

@@ -1656,3 +1656,36 @@ def run() Int {
 		t.Fatalf("expected 14, got %#v", value)
 	}
 }
+
+func TestNestedBlockValueStatements(t *testing.T) {
+	src := `
+def run() Int {
+	fromIf = {
+		if false {
+			10
+		} else {
+			20
+		}
+	}
+	fromYield = {
+		for item <- [1, 2, 3] yield {
+			if item % 2 == 0 {
+				item * 10
+			} else {
+				item
+			}
+		}
+	}
+	return fromIf + fromYield.get(1).getOr(0)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(40) {
+		t.Fatalf("expected 40, got %#v", value)
+	}
+}
