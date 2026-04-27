@@ -145,6 +145,9 @@ func (c *Checker) installBuiltinInterfaces() {
 		panic(err)
 	}
 	for _, decl := range registry.Program.Interfaces {
+		if isBuiltinType(decl.Name) {
+			continue
+		}
 		info := interfaceInfo{
 			decl:    decl,
 			methods: map[string]interfaceMethodInfo{},
@@ -155,6 +158,9 @@ func (c *Checker) installBuiltinInterfaces() {
 		c.interfaces[decl.Name] = info
 	}
 	for _, decl := range registry.Program.Classes {
+		if isBuiltinType(decl.Name) {
+			continue
+		}
 		info := classInfo{
 			name:      decl.Name,
 			decl:      decl,
@@ -2433,6 +2439,24 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 		if hasNamedCallArgs(args) {
 			c.checkArgTypes(callArgValues(args))
 			c.addDiagnostic("invalid_named_argument", "named arguments are not supported for Array methods", member.Span)
+			return unknownType
+		}
+		argTypes := c.checkArgTypes(callArgValues(args))
+		switch member.Name {
+		case "size":
+			if len(argTypes) != 0 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 0, len(argTypes)), member.Span)
+			}
+			return builtin("Int")
+		default:
+			c.addDiagnostic("unknown_member", "unknown member '"+member.Name+"'", member.Span)
+			return unknownType
+		}
+	}
+	if receiverType.Kind == TypeBuiltin && receiverType.Name == "Str" {
+		if hasNamedCallArgs(args) {
+			c.checkArgTypes(callArgValues(args))
+			c.addDiagnostic("invalid_named_argument", "named arguments are not supported for Str methods", member.Span)
 			return unknownType
 		}
 		argTypes := c.checkArgTypes(callArgValues(args))

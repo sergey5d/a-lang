@@ -2026,6 +2026,12 @@ def plusOneEither(value Either[Str, Int]) Either[Str, Int] {
 	item <- value
 	return Right(item + 1)
 }
+
+def twoEithers(value Either[Str, Int], value2 Either[Str, Str]) Either[Str, Int] {
+	item <- value
+	size <- value2.map((s Str) -> s.size())
+	return Right(item + size)
+}
 `
 
 	result := Analyze(parseProgram(t, src))
@@ -2065,5 +2071,18 @@ def run(value Int) Option[Int] {
 	}
 	if result.Diagnostics[0].Code != "invalid_unwrap" {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
+func TestAnalyzeStrSize(t *testing.T) {
+	src := `
+def run(text Str) Int {
+	return text.size()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
 	}
 }

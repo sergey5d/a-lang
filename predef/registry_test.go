@@ -34,4 +34,15 @@ func TestLoadRegistry(t *testing.T) {
 	if len(term.Methods) != 2 {
 		t.Fatalf("expected Term to expose 2 methods, got %d", len(term.Methods))
 	}
+
+	str, ok := registry.Types["Str"]
+	if !ok {
+		t.Fatalf("expected Str descriptor to be loaded")
+	}
+	if str.Kind != KindInterface {
+		t.Fatalf("expected Str to be an interface, got %s", str.Kind)
+	}
+	if len(str.Methods) != 1 || str.Methods[0].Name != "size" {
+		t.Fatalf("expected Str to expose size(), got %#v", str.Methods)
+	}
 }

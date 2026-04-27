@@ -1798,7 +1798,7 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 			}
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
-	case *nativeList, *nativeArray, *nativeOption, *nativeSet, *nativeMap, *nativeTerm:
+	case string, *nativeList, *nativeArray, *nativeOption, *nativeResult, *nativeEither, *nativeSet, *nativeMap, *nativeTerm:
 		if in.nativeHasMethod(receiver, expr.Name) {
 			return nil, RuntimeError{Message: "method '" + expr.Name + "' must be called with ()", Span: expr.Span}
 		}
@@ -2123,6 +2123,8 @@ func builtinRegistry() *predef.Registry {
 
 func nativeBuiltinTypeName(value Value) (string, bool) {
 	switch value.(type) {
+	case string:
+		return "Str", true
 	case *nativeArray:
 		return "Array", true
 	case *nativeList:

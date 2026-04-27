@@ -5,7 +5,10 @@ import "a-lang/parser"
 type nativeMethodHandler func(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error)
 
 func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
-	return map[string]map[string]nativeMethodHandler{
+		return map[string]map[string]nativeMethodHandler{
+		"Str": {
+			"size": nativeStrSize,
+		},
 		"Array": {
 			"size": nativeArraySize,
 		},
@@ -104,7 +107,7 @@ func lookupNativeMethodHandler(receiver Value, name string) (nativeMethodHandler
 	if !ok {
 		return nil, false
 	}
-	if typeName == "Array" {
+	if typeName == "Array" || typeName == "Str" {
 		return handler, true
 	}
 	if _, ok := lookupBuiltinMethodDescriptor(typeName, name); !ok {

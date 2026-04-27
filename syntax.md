@@ -60,6 +60,7 @@ Rules:
 - `$name` interpolates a simple identifier expression
 - `${...}` interpolates a full expression
 - `\$` inserts a literal dollar sign
+- `Str.size()` returns the string length as `Int`
 
 Multiline strings use triple quotes:
 

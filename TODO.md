@@ -11,6 +11,7 @@
 - Revisit `Option[T]` representation.
   - Current implementation still models `Option` as a class-like builtin for historical/runtime convenience.
   - Long-term direction should likely be an enum-based shape now that `match` exists and enum support is much better.
+  - Clean up duplicated builtin declarations such as `Option` that currently exist in both `stdlib/` and `stdlib/predef/`, and settle on one source of truth.
   - Candidate surface shape:
 
 ```txt

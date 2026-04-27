@@ -1579,15 +1579,23 @@ def plusOneEither(value Either[Str, Int]) Either[Str, Int] {
 	return Right(item + 1)
 }
 
+def twoEithers(value Either[Str, Int], value2 Either[Str, Str]) Either[Str, Int] {
+	item <- value
+	size <- value2.map((s Str) -> s.size())
+	return Right(item + size)
+}
+
 def run() Str {
 	optionValue = plusOneOption(Some(4)).getOr(0)
 	resultValue = plusOneResult(Ok(5)).getOr(0)
 	eitherValue = plusOneEither(Right(6)).getOr(0)
+	comboValue = twoEithers(Right(7), Right("abc")).getOr(0)
 
 	if plusOneOption(None()).isEmpty() &&
 	   plusOneResult(Err("bad")).isErr() &&
-	   plusOneEither(Left("nope")).isLeft() {
-		return "${optionValue}-${resultValue}-${eitherValue}"
+	   plusOneEither(Left("nope")).isLeft() &&
+	   twoEithers(Right(7), Left("size bad")).isLeft() {
+		return "${optionValue}-${resultValue}-${eitherValue}-${comboValue}"
 	}
 	return "broken"
 }
@@ -1598,7 +1606,24 @@ def run() Str {
 	if err != nil {
 		t.Fatalf("Call returned error: %v", err)
 	}
-	if value != "5-6-7" {
-		t.Fatalf("expected %q, got %#v", "5-6-7", value)
+	if value != "5-6-7-10" {
+		t.Fatalf("expected %q, got %#v", "5-6-7-10", value)
+	}
+}
+
+func TestStrSize(t *testing.T) {
+	src := `
+def run() Int {
+	return "hello".size() + "мир".size()
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(8) {
+		t.Fatalf("expected 8, got %#v", value)
 	}
 }
