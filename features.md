@@ -100,35 +100,21 @@ Still open:
 
 ### 9. Result / Either Style Error Values
 
-`Option` exists, but a richer success/error enum would likely be useful later.
+`Option`, `Result`, `Either`, and `<-` short-circuit extraction now exist.
 
-This is much more attractive now that `match` exists.
+Still open:
+- whether there should also be a Rust-style `?`-like propagation form
+- whether failure conversion between result families should ever be supported
+- whether the current `Unwrappable[T]` surface is enough, or needs a richer protocol later
 
-If `Result[T, E]` is added, one likely follow-up is Rust-style unwrap / propagation sugar, for example a `?`-like form that:
+One possible follow-up is a Rust-style propagation form that:
 - extracts the success value from `Ok`
 - returns early on `Err`
 - possibly allows error conversion through a protocol or conversion rule
 
-This is not required for an initial `Result` type, but it is one of the main ergonomics questions to decide if error values become a first-class pattern in the language.
-
-Another related idea is `<-` short-circuit extraction, for example:
-
-```txt
-value <- maybeValue
-```
-
-Possible meaning:
-- works for `Option`, `Result`, `Either`, or similar types
-- unwraps the success value into `value`
-- if the rhs is a failure / empty case, returns early from the current function with the corresponding failure branch
-
-This likely wants:
-- a marker interface such as `Unwrappable[T]` or similar
-- compiler-known propagation rules for each supported type family
-
 Important design constraint:
 - expressing "same container family, different success type" is hard without higher-kinded types
-- so the surface may use an interface, but the actual failure rewrap step will likely still need compiler help at first
+- so the current propagation model still relies on compiler help for failure rewrapping
 
 ### 10. Smarter Type Narrowing
 
