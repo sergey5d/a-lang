@@ -524,7 +524,7 @@ enum MaybeInt {
 	}
 }
 
-func TestParseColonShorthandRejectsNewlineBody(t *testing.T) {
+func TestParseColonShorthandAllowsNewlineBody(t *testing.T) {
 	src := `
 def run(flag Bool) Int {
 	if flag:
@@ -533,8 +533,47 @@ def run(flag Bool) Int {
 }
 `
 
+	if _, err := Parse(src); err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+}
+
+func TestParseNewlineContinuationAfterOperatorsAndDelimiters(t *testing.T) {
+	src := `
+def run() Int {
+	sum Int = 1 +
+		2
+	grouped Int = (
+		3
+		+ 4
+	)
+	items List[Int] = [
+		1,
+		2,
+		3
+	]
+	size Int = "haha".
+		size()
+	return sum + grouped + items.size() + size
+}
+`
+
+	if _, err := Parse(src); err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+}
+
+func TestParseAssignmentRejectsNextLineRHS(t *testing.T) {
+	src := `
+def run() Int {
+	value =
+		1 + 2
+	return value
+}
+`
+
 	if _, err := Parse(src); err == nil {
-		t.Fatalf("expected parse error for newline body after ':'")
+		t.Fatalf("expected parse error for newline rhs after '='")
 	}
 }
 

@@ -60,10 +60,10 @@ func (p *Parser) parseFunctionWithPrivate(private bool) (*FunctionDecl, error) {
 
 func (p *Parser) parseCallableBody() (*BlockStmt, error) {
 	if p.match(TokenAssign) {
+		assign := p.previous()
 		if p.check(TokenLBrace) {
 			return p.parseBlock()
 		}
-		assign := p.previous()
 		expr, err := p.parseExpression(0)
 		if err != nil {
 			return nil, err

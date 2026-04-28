@@ -29,6 +29,9 @@ func (p *Parser) parseExpressionWithOptions(minPrec int, allowRecordUpdate bool)
 	}
 
 	for {
+		if p.shouldStopExpressionAtLineBreak() {
+			break
+		}
 		if allowRecordUpdate && p.match(TokenWith) {
 			updates, end, err := p.parseRecordUpdateArgs()
 			if err != nil {
@@ -155,6 +158,8 @@ func (p *Parser) parsePrefix() (Expr, error) {
 			return &ListLiteral{Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
 		}
 		var items []Expr
+		p.multilineExprDepth++
+		defer func() { p.multilineExprDepth-- }()
 		for {
 			expr, err := p.parseExpressionWithOptions(0, true)
 			if err != nil {
@@ -506,6 +511,8 @@ func (p *Parser) parseCallArgs() ([]CallArg, error) {
 		return nil, err
 	}
 	var args []CallArg
+	p.multilineExprDepth++
+	defer func() { p.multilineExprDepth-- }()
 	seenNamed := false
 	if !p.check(TokenRParen) {
 		for {
@@ -551,6 +558,8 @@ func (p *Parser) parseRecordUpdateArgs() ([]CallArg, Token, error) {
 		return nil, Token{}, err
 	}
 	var updates []CallArg
+	p.multilineExprDepth++
+	defer func() { p.multilineExprDepth-- }()
 	for {
 		nameToken, err := p.consume(TokenIdentifier, "expected record field name")
 		if err != nil {
@@ -608,6 +617,32 @@ func precedence(t TokenType) int {
 	}
 }
 
+func (p *Parser) shouldStopExpressionAtLineBreak() bool {
+	if p.multilineExprDepth > 0 || p.pos == 0 || p.isAtEnd() {
+		return false
+	}
+	prev := p.tokens[p.pos-1]
+	next := p.peek()
+	if prev.EndLine == next.Line {
+		return false
+	}
+	return !isExpressionContinuationToken(prev.Type)
+}
+
+func isExpressionContinuationToken(tokenType TokenType) bool {
+	switch tokenType {
+	case TokenPlus, TokenMinus, TokenStar, TokenSlash, TokenPercent,
+		TokenAndAnd, TokenOrOr,
+		TokenEqEq, TokenBangEq, TokenLT, TokenLTE, TokenGT, TokenGTE,
+		TokenPlusPlus, TokenMinusMinus, TokenColonPlus, TokenColonMinus,
+		TokenPipe, TokenAmp, TokenLTLT, TokenGTGT, TokenColonColon,
+		TokenFatArrow, TokenComma, TokenDot:
+		return true
+	default:
+		return false
+	}
+}
+
 func (p *Parser) parseParenExpr(start Token) (Expr, error) {
 	if p.check(TokenRParen) {
 		end, err := p.consume(TokenRParen, "expected ')'")
@@ -616,6 +651,8 @@ func (p *Parser) parseParenExpr(start Token) (Expr, error) {
 		}
 		return &UnitLiteral{Span: mergeSpans(tokenSpan(start), tokenSpan(end))}, nil
 	}
+	p.multilineExprDepth++
+	defer func() { p.multilineExprDepth-- }()
 	first, err := p.parseExpression(0)
 	if err != nil {
 		return nil, err

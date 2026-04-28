@@ -88,6 +88,9 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 	}
 	p.advance()
 	if operator == TokenLeftArrow {
+		if err := p.requireSameLineExpressionStart(p.previous()); err != nil {
+			return nil, err
+		}
 		value, err := p.parseExpression(0)
 		if err != nil {
 			return nil, err
@@ -101,7 +104,7 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 		bindings[i].Mutable = mutable
 	}
 
-	values, err := p.parseBindingInitializers(len(bindings))
+	values, err := p.parseBindingInitializers(len(bindings), p.previous())
 	if err != nil {
 		return nil, err
 	}
@@ -233,9 +236,12 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 	}
 }
 
-func (p *Parser) parseBindingInitializers(count int) ([]Expr, error) {
+func (p *Parser) parseBindingInitializers(count int, operator Token) ([]Expr, error) {
 	if count <= 0 {
 		return nil, nil
+	}
+	if err := p.requireSameLineExpressionStart(operator); err != nil {
+		return nil, err
 	}
 	if p.match(TokenQuestion) {
 		values := []Expr{nil}
@@ -310,6 +316,9 @@ func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
 			return nil, err
 		}
 		if _, err := p.consume(TokenLeftArrow, "expected '<-' after if binding"); err != nil {
+			return nil, err
+		}
+		if err := p.requireSameLineExpressionStart(p.previous()); err != nil {
 			return nil, err
 		}
 		value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
@@ -654,12 +663,17 @@ func (p *Parser) parseStmtBodyBlock(owner string, stopTypes ...TokenType) (*Bloc
 	if err != nil {
 		return nil, err
 	}
-	if p.isAtEnd() || !sameLine(colon, p.peek()) {
-		return nil, fmt.Errorf("expected same-line statement after ':'")
+	if p.isAtEnd() {
+		return nil, fmt.Errorf("expected statement after ':'")
 	}
 	p.beginScope()
 	defer p.endScope()
-	stmt, err := p.parseInlineStatement(stopTypes...)
+	var stmt Statement
+	if sameLine(colon, p.peek()) {
+		stmt, err = p.parseInlineStatement(stopTypes...)
+	} else {
+		stmt, err = p.parseStatement()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -677,10 +691,15 @@ func (p *Parser) parseYieldBodyBlock(owner string, stopTypes ...TokenType) (*Blo
 	if err != nil {
 		return nil, err
 	}
-	if p.isAtEnd() || !sameLine(colon, p.peek()) {
-		return nil, fmt.Errorf("expected same-line expression after ':'")
+	if p.isAtEnd() {
+		return nil, fmt.Errorf("expected expression after ':'")
 	}
-	expr, err := p.parseInlineExpression(stopTypes...)
+	var expr Expr
+	if sameLine(colon, p.peek()) {
+		expr, err = p.parseInlineExpression(stopTypes...)
+	} else {
+		expr, err = p.parseExpression(0)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -692,12 +711,11 @@ func (p *Parser) parseYieldBodyBlock(owner string, stopTypes ...TokenType) (*Blo
 }
 
 func (p *Parser) parseInlineMatchCases(statementMode bool) ([]MatchCase, Token, error) {
-	colon, err := p.consume(TokenColon, "expected '{' or ':' after match value")
-	if err != nil {
+	if _, err := p.consume(TokenColon, "expected '{' or ':' after match value"); err != nil {
 		return nil, Token{}, err
 	}
-	if p.isAtEnd() || !sameLine(colon, p.peek()) {
-		return nil, Token{}, fmt.Errorf("expected same-line match case after ':'")
+	if p.isAtEnd() {
+		return nil, Token{}, fmt.Errorf("expected match case after ':'")
 	}
 	pattern, err := p.parsePattern()
 	if err != nil {
@@ -707,13 +725,18 @@ func (p *Parser) parseInlineMatchCases(statementMode bool) ([]MatchCase, Token, 
 	if err != nil {
 		return nil, Token{}, err
 	}
-	if !sameLine(arrow, p.peek()) {
-		return nil, Token{}, fmt.Errorf("expected same-line match case body after '=>'")
+	if p.isAtEnd() {
+		return nil, Token{}, fmt.Errorf("expected match case body after '=>'")
 	}
 	matchCase := MatchCase{Pattern: pattern}
 	if statementMode {
 		p.beginScope()
-		stmt, err := p.parseInlineStatement()
+		var stmt Statement
+		if sameLine(arrow, p.peek()) {
+			stmt, err = p.parseInlineStatement()
+		} else {
+			stmt, err = p.parseStatement()
+		}
 		p.endScope()
 		if err != nil {
 			return nil, Token{}, err
@@ -724,7 +747,12 @@ func (p *Parser) parseInlineMatchCases(statementMode bool) ([]MatchCase, Token, 
 		}
 		matchCase.Span = mergeSpans(patternSpan(pattern), stmtSpan(stmt))
 	} else {
-		expr, err := p.parseInlineExpression()
+		var expr Expr
+		if sameLine(arrow, p.peek()) {
+			expr, err = p.parseInlineExpression()
+		} else {
+			expr, err = p.parseExpression(0)
+		}
 		if err != nil {
 			return nil, Token{}, err
 		}
@@ -841,7 +869,7 @@ func (p *Parser) inlineBodyParser(stopTypes ...TokenType) (*Parser, int, error) 
 	})
 	scopes := make([]map[string]struct{}, len(p.scopes))
 	copy(scopes, p.scopes)
-	return &Parser{tokens: inlineTokens, scopes: scopes}, end, nil
+	return &Parser{tokens: inlineTokens, scopes: scopes, multilineExprDepth: p.multilineExprDepth}, end, nil
 }
 
 func (p *Parser) subparserUntil(stopTypes ...TokenType) (*Parser, int, error) {
@@ -899,7 +927,7 @@ func (p *Parser) subparserUntil(stopTypes ...TokenType) (*Parser, int, error) {
 	})
 	scopes := make([]map[string]struct{}, len(p.scopes))
 	copy(scopes, p.scopes)
-	return &Parser{tokens: inlineTokens, scopes: scopes}, end, nil
+	return &Parser{tokens: inlineTokens, scopes: scopes, multilineExprDepth: p.multilineExprDepth}, end, nil
 }
 
 func (p *Parser) parseForClause() (ForBinding, error) {
@@ -920,6 +948,9 @@ func (p *Parser) parseForClause() (ForBinding, error) {
 	switch p.peek().Type {
 	case TokenLeftArrow:
 		p.advance()
+		if err := p.requireSameLineExpressionStart(p.previous()); err != nil {
+			return ForBinding{}, err
+		}
 		iterable, err := p.parseInlineExpression(TokenComma, TokenRBrace, TokenYield, TokenLBrace, TokenColon)
 		if err != nil {
 			return ForBinding{}, err
@@ -930,12 +961,12 @@ func (p *Parser) parseForClause() (ForBinding, error) {
 			Span:     mergeSpans(tokenSpan(name), exprSpan(iterable)),
 		}, nil
 	case TokenAssign, TokenColonAssign:
-		operator := p.advance().Type
-		mutable := operator == TokenColonAssign
+		operator := p.advance()
+		mutable := operator.Type == TokenColonAssign
 		for i := range bindings {
 			bindings[i].Mutable = mutable
 		}
-		values, err := p.parseBindingInitializers(len(bindings))
+		values, err := p.parseBindingInitializers(len(bindings), operator)
 		if err != nil {
 			return ForBinding{}, err
 		}
@@ -1050,7 +1081,7 @@ func (p *Parser) parseExprStmt() (Statement, error) {
 			return nil, fmt.Errorf("expected assignment operator after assignment targets at %d:%d", p.peek().Line, p.peek().Column)
 		}
 		operator := p.advance()
-		values, err := p.parseAssignmentValues()
+		values, err := p.parseAssignmentValues(operator)
 		if err != nil {
 			return nil, err
 		}
@@ -1063,6 +1094,9 @@ func (p *Parser) parseExprStmt() (Statement, error) {
 	}
 	if isAssignmentOperator(p.peek().Type) {
 		operator := p.advance()
+		if err := p.requireSameLineExpressionStart(operator); err != nil {
+			return nil, err
+		}
 		value, err := p.parseExpression(0)
 		if err != nil {
 			return nil, err
@@ -1077,8 +1111,11 @@ func (p *Parser) parseExprStmt() (Statement, error) {
 	return &ExprStmt{Expr: target, Span: exprSpan(target)}, nil
 }
 
-func (p *Parser) parseAssignmentValues() ([]Expr, error) {
+func (p *Parser) parseAssignmentValues(operator Token) ([]Expr, error) {
 	values := []Expr{}
+	if err := p.requireSameLineExpressionStart(operator); err != nil {
+		return nil, err
+	}
 	for {
 		value, err := p.parseExpression(0)
 		if err != nil {

@@ -17,11 +17,11 @@ class Option[T] with Unwrappable[T] {
     def get() T = value
     impl def unwrap() T = value
     def getOr(defaultValue T) T =
-        if set {
+        if set:
             value
-        } else {
+        else:
             defaultValue
-        }
+
     def map[X](f T -> X) Option[X] =
         if set {
             Some(f(value))

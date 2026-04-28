@@ -174,6 +174,9 @@ func (p *Parser) parseField(private bool) (FieldDecl, error) {
 	switch p.peek().Type {
 	case TokenAssign, TokenColonAssign:
 		operator := p.advance()
+		if err := p.requireSameLineExpressionStart(operator); err != nil {
+			return FieldDecl{}, err
+		}
 		field.Mutable = operator.Type == TokenColonAssign
 		if p.match(TokenQuestion) {
 			field.Deferred = true
@@ -354,6 +357,9 @@ func (p *Parser) parseEnumCase() (EnumCaseDecl, error) {
 			op := p.advance()
 			if op.Type != TokenAssign {
 				return EnumCaseDecl{}, fmt.Errorf("enum case field assignments must use '='")
+			}
+			if err := p.requireSameLineExpressionStart(op); err != nil {
+				return EnumCaseDecl{}, err
 			}
 			value, err := p.parseExpression(0)
 			if err != nil {

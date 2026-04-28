@@ -1,5 +1,7 @@
 package parser
 
+import "fmt"
+
 func Parse(input string) (*Program, error) {
 	tokens, err := Lex(input)
 	if err != nil {
@@ -17,6 +19,7 @@ type Parser struct {
 	tokens []Token
 	pos    int
 	scopes []map[string]struct{}
+	multilineExprDepth int
 }
 
 func tokenSpan(token Token) Span {
@@ -28,6 +31,16 @@ func tokenSpan(token Token) Span {
 
 func mergeSpans(start, end Span) Span {
 	return Span{Start: start.Start, End: end.End}
+}
+
+func (p *Parser) requireSameLineExpressionStart(after Token) error {
+	if p.isAtEnd() {
+		return fmt.Errorf("expected expression after %q", after.Lexeme)
+	}
+	if after.EndLine != p.peek().Line {
+		return fmt.Errorf("expected expression on same line after %q", after.Lexeme)
+	}
+	return nil
 }
 
 func typeSpan(ref *TypeRef) Span {

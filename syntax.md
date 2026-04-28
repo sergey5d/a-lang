@@ -719,39 +719,52 @@ Current operator overloading constraints:
 - Comparison operators are intended to work through `Ordering[T]` rather than custom operator declarations.
 - Equality is intended to work through `Eq[T]` rather than custom operator declarations.
 
-Planned newline-continuation rule:
+Newline continuation:
 
-- The intended direction is to stop treating ordinary expressions as broadly newline-insensitive.
-- A newline should continue the current expression only when the previous line clearly ends in a continuation form.
-- Planned continuation tokens:
+- Ordinary expressions are no longer broadly newline-insensitive.
+- A newline continues the current expression only when the previous line clearly ends in a continuation form.
+- Continuation tokens:
   - binary operators: `+`, `-`, `*`, `/`, `%`, `&&`, `||`, `==`, `!=`, `<`, `<=`, `>`, `>=`
-  - symbolic/custom infix operators: `<<`, `>>`, `|`, `&`, `::`
+  - symbolic/custom infix operators: `<<`, `>>`, `|`, `&`, `::`, `:+`, `:-`, `++`, `--`
   - match arrow: `=>`
   - separators / chaining markers: `,`, `.`
-- Continuation is also intended to stay allowed inside unmatched delimiters:
+- Continuation is also allowed inside unmatched delimiters:
   - `(...)`
   - `{...}`
   - `[...]`
-- Assignment-style operators are intended to require a right-hand side on the same line:
+- Assignment-style operators require a right-hand side on the same line:
   - `=`
   - `:=`
   - `+=`, `-=`, `*=`, `/=`, `%=`
   - `<-`
-- So this is intended to be invalid:
+- Body-introducing forms are intentionally looser:
+  - `def ... =` may start its body on the next line
+  - `if:`, `else:`, `for:`, `yield:`, and `match:` may also start their single statement / expression body on the next line
+- So this is invalid:
 
 ```txt
 a =
     1 + 2
 ```
 
-- while this is intended to stay valid:
+- while this stays valid:
 
 ```txt
 a = 1 +
     2
 ```
 
-- For dot chaining, the intended direction is stricter than Scala:
+- and this also stays valid:
+
+```txt
+def value() Int =
+    1 + 2
+
+if flag:
+    return 1
+```
+
+- For dot chaining, the rule is stricter than Scala:
   - allow newline after `.`
   - do not rely on newline before `.`
 
