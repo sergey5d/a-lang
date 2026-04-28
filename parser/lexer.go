@@ -221,15 +221,12 @@ func (l *Lexer) lexMultilineString(line, column int) (Token, error) {
 	l.advance()
 	l.advance()
 	l.advance()
-	if !l.isAtEnd() && l.peek() == '\n' {
-		l.advance()
-	}
 	start := l.pos
 	for !l.isAtEnd() {
 		if l.peek() == '"' && l.pos+2 < len(l.input) && l.input[l.pos+1] == '"' && l.input[l.pos+2] == '"' {
 			value := string(l.input[start:l.pos])
 			if value == "" {
-				return Token{}, fmt.Errorf("empty multiline string at %d:%d; use \\n if you need an explicit leading newline", line, column)
+				return Token{}, fmt.Errorf("empty multiline string at %d:%d", line, column)
 			}
 			l.advance()
 			l.advance()

@@ -1061,8 +1061,8 @@ $name
 	if err != nil {
 		t.Fatalf("Call returned error: %v", err)
 	}
-	if value != "hello\n$name\n\n\n" {
-		t.Fatalf("expected %q, got %#v", "hello\n$name\n\n\n", value)
+	if value != "\nhello\n$name\n\n\n" {
+		t.Fatalf("expected %q, got %#v", "\nhello\n$name\n\n\n", value)
 	}
 }
 

@@ -1,4 +1,5 @@
 # EXPECT:
+#
 # hello
 # world
 # $name
@@ -16,4 +17,9 @@ done
 """
 
     Term.println(text)
+
+    text2 = """Another
+multi-line
+text"""
+
 }

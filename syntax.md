@@ -73,10 +73,9 @@ world
 
 Rules:
 
-- if the first character after `"""` is a newline, that first newline is discarded
+- multiline strings preserve their contents exactly, including a leading newline
 - multiline strings do not interpolate
-- `"""` strings must not be empty after that discard step
-- use `\n` inside the string if you need an explicit leading newline
+- `"""` strings must not be empty
 
 ## Imports
 

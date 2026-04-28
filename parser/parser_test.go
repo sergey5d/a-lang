@@ -187,7 +187,7 @@ $name
 	if !ok {
 		t.Fatalf("expected multiline string to stay a StringLiteral, got %T", ret.Value)
 	}
-	if literal.Value != "hello\n$name\n\n\n" {
+	if literal.Value != "\nhello\n$name\n\n\n" {
 		t.Fatalf("unexpected multiline string value %q", literal.Value)
 	}
 }
@@ -195,8 +195,7 @@ $name
 func TestParseRejectsEmptyMultilineString(t *testing.T) {
 	_, err := Parse(`
 def run() Str {
-	return """
-"""
+	return """"""
 }
 `)
 	if err == nil {
