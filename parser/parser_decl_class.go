@@ -258,8 +258,12 @@ func (p *Parser) parseOperatorName() (string, Span, error) {
 		return token.Lexeme, tokenSpan(token), nil
 	case TokenColonPlus:
 		return ":+", tokenSpan(token), nil
+	case TokenColonMinus:
+		return ":-", tokenSpan(token), nil
 	case TokenPlusPlus:
 		return "++", tokenSpan(token), nil
+	case TokenMinusMinus:
+		return "--", tokenSpan(token), nil
 	case TokenPipe:
 		return "|", tokenSpan(token), nil
 	case TokenAmp:
@@ -310,7 +314,7 @@ func (p *Parser) parseDeclaredMethodName(allowShortApply bool, identifierMessage
 
 func isOperatorNameToken(tokenType TokenType) bool {
 	switch tokenType {
-	case TokenPlus, TokenMinus, TokenStar, TokenSlash, TokenPercent, TokenColonPlus, TokenPlusPlus, TokenPipe, TokenAmp, TokenGTGT, TokenLTLT, TokenTilde, TokenColonColon, TokenLBracket:
+	case TokenPlus, TokenMinus, TokenStar, TokenSlash, TokenPercent, TokenColonPlus, TokenColonMinus, TokenPlusPlus, TokenMinusMinus, TokenPipe, TokenAmp, TokenGTGT, TokenLTLT, TokenTilde, TokenColonColon, TokenLBracket:
 		return true
 	default:
 		return false

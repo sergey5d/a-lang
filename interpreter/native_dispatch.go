@@ -10,7 +10,9 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"size": nativeStrSize,
 		},
 		"Array": {
-			"size": nativeArraySize,
+			"size":         nativeArraySize,
+			"zip":          nativeArrayZip,
+			"zipWithIndex": nativeArrayZipWithIndex,
 		},
 		"List": {
 			"append":   nativeListAppend,
@@ -23,6 +25,8 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"forAll":   nativeListForAll,
 			"forEach":  nativeListForEach,
 			"sort":     nativeListSort,
+			"zip":      nativeListZip,
+			"zipWithIndex": nativeListZipWithIndex,
 			"get":      nativeListGet,
 			"head":     nativeListHead,
 			"tail":     nativeListTail,

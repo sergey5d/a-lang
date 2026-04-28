@@ -74,6 +74,9 @@ func (l *Lexer) nextToken() (Token, error) {
 		if l.match('+') {
 			return l.token(TokenColonPlus, ":+", startLine, startColumn), nil
 		}
+		if l.match('-') {
+			return l.token(TokenColonMinus, ":-", startLine, startColumn), nil
+		}
 		if l.match(':') {
 			return l.token(TokenColonColon, "::", startLine, startColumn), nil
 		}
@@ -106,6 +109,9 @@ func (l *Lexer) nextToken() (Token, error) {
 		}
 		if l.match('=') {
 			return l.token(TokenMinusEq, "-=", startLine, startColumn), nil
+		}
+		if l.match('-') {
+			return l.token(TokenMinusMinus, "--", startLine, startColumn), nil
 		}
 		return l.token(TokenMinus, "-", startLine, startColumn), nil
 	case '*':

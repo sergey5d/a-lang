@@ -4,6 +4,28 @@ record IntRange with Iterable[Int] {
     step Int
 
     impl def iterator() Iterator[Int] = RangeIterator(start = start, end = end, step = step)
+
+    def zip[X](other List[X]) List[(Int, X)] {
+        out List[(Int, X)] = []
+        right Iterator[X] = other.iterator()
+        for left <- this {
+            if !right.hasNext() {
+                return out
+            }
+            out.append((left, right.next()))
+        }
+        return out
+    }
+
+    def zipWithIndex() List[(Int, Int)] {
+        out List[(Int, Int)] = []
+        index := 0
+        for item <- this {
+            out.append((item, index))
+            index += 1
+        }
+        return out
+    }
 }
 
 private class RangeIterator with Iterator[Int] {

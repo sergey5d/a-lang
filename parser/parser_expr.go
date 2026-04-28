@@ -595,7 +595,7 @@ func precedence(t TokenType) int {
 		return 6
 	case TokenLTLT, TokenGTGT:
 		return 7
-	case TokenPlus, TokenMinus, TokenPlusPlus, TokenColonPlus:
+	case TokenPlus, TokenMinus, TokenPlusPlus, TokenMinusMinus, TokenColonPlus, TokenColonMinus:
 		return 8
 	case TokenStar, TokenSlash, TokenPercent:
 		return 9

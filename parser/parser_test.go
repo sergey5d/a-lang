@@ -1271,7 +1271,9 @@ class Vec {
 	impl def +(other Vec) Vec = this
 	def -() Vec = this
 	def :+(value Int) Vec = this
+	def :-(value Int) Vec = this
 	def ++(other Vec) Vec = this
+	def --(other Vec) Vec = this
 	def |(other Vec) Vec = this
 	def &(other Vec) Vec = this
 	def >>(bits Int) Vec = this
@@ -1288,7 +1290,7 @@ class Vec {
 	if len(program.Interfaces) != 1 || program.Interfaces[0].Methods[0].Name != "+" {
 		t.Fatalf("expected interface operator method, got %#v", program.Interfaces)
 	}
-	if len(program.Classes) != 1 || len(program.Classes[0].Methods) != 11 {
+	if len(program.Classes) != 1 || len(program.Classes[0].Methods) != 13 {
 		t.Fatalf("unexpected operator declarations %#v", program.Classes)
 	}
 	if !program.Classes[0].Methods[0].Operator || program.Classes[0].Methods[0].Name != "[]" {

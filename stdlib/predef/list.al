@@ -8,6 +8,8 @@ interface List[T] with Iterable[T] {
     def exists(f T -> Bool) Bool
     def forAll(f T -> Bool) Bool
     def sort(ordering Ordering[T]) List[T]
+    def zip[X](other List[X]) List[(T, X)]
+    def zipWithIndex() List[(T, Int)]
     def get(index Int) Option[T]
     def head() Option[T]
     def tail() List[T]

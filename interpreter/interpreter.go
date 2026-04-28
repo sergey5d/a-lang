@@ -2756,7 +2756,7 @@ func (in *Interpreter) evalOverloadedBinary(op string, left Value, rightExpr par
 				return out, true, nil
 			}
 		}
-	case "+", "-", "*", "/", "%", "|", "&", ">>", "<<", "::":
+	case "+", "-", "*", "/", "%", ":-", "--", "|", "&", ">>", "<<", "::":
 		if obj, ok := left.(*instance); ok {
 			value, err := in.invokeMethod(obj, op, []Value{right}, local, span)
 			return value, true, err

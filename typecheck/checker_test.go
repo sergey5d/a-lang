@@ -1432,6 +1432,61 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeListArrayAndRangeZipMethods(t *testing.T) {
+	src := `
+def run() Int {
+	items List[Int] = List(1, 2, 3)
+	pairs List[(Int, Str)] = items.zip(List("a", "b"))
+	indexed List[(Int, Int)] = items.zipWithIndex()
+
+	values Array[Int] = Array(3)
+	values[0] := 4
+	values[1] := 5
+	values[2] := 6
+	other Array[Str] = Array(2)
+	other[0] := "x"
+	other[1] := "y"
+	valuePairs Array[(Int, Str)] = values.zip(other)
+	valueIndexed Array[(Int, Int)] = values.zipWithIndex()
+
+	firstLeft Int, firstRight Str = pairs.get(0).get()
+	indexedValue Int, indexedPos Int = indexed.get(2).get()
+	arrayLeft Int, arrayRight Str = valuePairs[1]
+	arrayIndexedValue Int, arrayIndexedPos Int = valueIndexed[2]
+	total Int := 0
+
+	for left Int, right Str <- pairs {
+		if right == "b" {
+			total += left
+		}
+	}
+	for value Int, index Int <- indexed {
+		total += value + index
+	}
+	for left Int, right Str <- valuePairs {
+		if right == "y" {
+			total += left
+		}
+	}
+	for value Int, index Int <- valueIndexed {
+		if index == 2 {
+			total += value
+		}
+	}
+
+	if firstRight == "a" && arrayRight == "y" {
+		return firstLeft + indexedValue + indexedPos + arrayLeft + arrayIndexedValue + arrayIndexedPos + pairs.size() + valuePairs.size() + total
+	}
+	return 0
+}
+	`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeSetAndMapHigherOrderMethods(t *testing.T) {
 	src := `
 def run() Int {
@@ -1493,6 +1548,8 @@ class Vec {
 	def [](index Int) Int = items[index]
 	def +(other Vec) Vec = Vec(this[0] + other[0], this[1] + other[1])
 	def -() Vec = Vec(-this[0], -this[1])
+	def :-(other Vec) Vec = Vec(this[0] - other[0], this[1] - other[1])
+	def --(other Vec) Vec = Vec(this[0] - other[0] - 1, this[1] - other[1] - 1)
 }
 
 def run() Int {
@@ -1500,6 +1557,8 @@ def run() Int {
 	right Vec = Vec(3, 4)
 	total Vec = left + right
 	neg Vec = -total
+	diff Vec = total :- left
+	trimmed Vec = total -- left
 
 	items List[Int] = List(1, 2)
 	items2 List[Int] = items :+ 3
@@ -1508,7 +1567,7 @@ def run() Int {
 	seen Set[Int] = Set(1, 2)
 	all Set[Int] = seen ++ Set(3)
 
-	return neg[0] + merged[4] + all.size()
+	return neg[0] + diff[0] + trimmed[1] + merged[4] + all.size()
 }
 `
 

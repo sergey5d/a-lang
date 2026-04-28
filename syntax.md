@@ -711,13 +711,49 @@ Current operator overloading constraints:
 - Allowed to overload:
   - arithmetic: `+`, `-`, `*`, `/`, `%`
   - unary: unary `-`
-  - collection-oriented: `[]`, `:+`, `++`
+  - collection-oriented: `[]`, `:+`, `:-`, `++`, `--`
   - symbolic custom forms with no built-in language meaning: `|`, `&`, `>>`, `<<`, `~`, `::`
 - Not allowed to overload:
   - logical operators: `&&`, `||`, `!`
   - equality operators: `==`, `!=`
 - Comparison operators are intended to work through `Ordering[T]` rather than custom operator declarations.
 - Equality is intended to work through `Eq[T]` rather than custom operator declarations.
+
+Planned newline-continuation rule:
+
+- The intended direction is to stop treating ordinary expressions as broadly newline-insensitive.
+- A newline should continue the current expression only when the previous line clearly ends in a continuation form.
+- Planned continuation tokens:
+  - binary operators: `+`, `-`, `*`, `/`, `%`, `&&`, `||`, `==`, `!=`, `<`, `<=`, `>`, `>=`
+  - symbolic/custom infix operators: `<<`, `>>`, `|`, `&`, `::`
+  - match arrow: `=>`
+  - separators / chaining markers: `,`, `.`
+- Continuation is also intended to stay allowed inside unmatched delimiters:
+  - `(...)`
+  - `{...}`
+  - `[...]`
+- Assignment-style operators are intended to require a right-hand side on the same line:
+  - `=`
+  - `:=`
+  - `+=`, `-=`, `*=`, `/=`, `%=`
+  - `<-`
+- So this is intended to be invalid:
+
+```txt
+a =
+    1 + 2
+```
+
+- while this is intended to stay valid:
+
+```txt
+a = 1 +
+    2
+```
+
+- For dot chaining, the intended direction is stricter than Scala:
+  - allow newline after `.`
+  - do not rely on newline before `.`
 
 ## Visibility
 

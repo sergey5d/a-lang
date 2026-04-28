@@ -222,6 +222,44 @@ func nativeListSort(in *Interpreter, receiver Value, args []Value, local *env, s
 	return value, nil
 }
 
+func nativeListZip(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
+	value, ok := asNativeList(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native List.zip receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "zip expects 1 argument", Span: span}
+	}
+	other, ok := args[0].(*nativeList)
+	if !ok {
+		return nil, RuntimeError{Message: "zip expects List argument", Span: span}
+	}
+	limit := len(value.items)
+	if len(other.items) < limit {
+		limit = len(other.items)
+	}
+	out := &nativeList{items: make([]Value, 0, limit)}
+	for i := 0; i < limit; i++ {
+		out.items = append(out.items, &nativeTuple{items: []Value{value.items[i], other.items[i]}})
+	}
+	return out, nil
+}
+
+func nativeListZipWithIndex(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
+	value, ok := asNativeList(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native List.zipWithIndex receiver mismatch", Span: span}
+	}
+	if len(args) != 0 {
+		return nil, RuntimeError{Message: "zipWithIndex expects 0 arguments", Span: span}
+	}
+	out := &nativeList{items: make([]Value, 0, len(value.items))}
+	for i, item := range value.items {
+		out.items = append(out.items, &nativeTuple{items: []Value{item, int64(i)}})
+	}
+	return out, nil
+}
+
 func nativeListGet(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
 	value, ok := asNativeList(receiver)
 	if !ok {

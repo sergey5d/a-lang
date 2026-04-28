@@ -120,6 +120,65 @@ def run() Int {
 	}
 }
 
+func TestListArrayAndRangeZipMethods(t *testing.T) {
+	src := `
+def run() Int {
+	items = List(1, 2, 3)
+	pairs = items.zip(List("a", "b"))
+	indexed = items.zipWithIndex()
+
+	values = Array(3)
+	values[0] := 4
+	values[1] := 5
+	values[2] := 6
+	other = Array(2)
+	other[0] := "x"
+	other[1] := "y"
+	valuePairs = values.zip(other)
+	valueIndexed = values.zipWithIndex()
+
+	firstLeft, firstRight = pairs.get(0).get()
+	indexedValue, indexedPos = indexed.get(2).get()
+	arrayLeft, arrayRight = valuePairs[1]
+	arrayIndexedValue, arrayIndexedPos = valueIndexed[2]
+	total := 0
+
+	for left, right <- pairs {
+		if right == "b" {
+			total += left
+		}
+	}
+	for value, index <- indexed {
+		total += value + index
+	}
+	for left, right <- valuePairs {
+		if right == "y" {
+			total += left
+		}
+	}
+	for value, index <- valueIndexed {
+		if index == 2 {
+			total += value
+		}
+	}
+
+	if firstRight == "a" && arrayRight == "y" {
+		return firstLeft + indexedValue + indexedPos + arrayLeft + arrayIndexedValue + arrayIndexedPos + pairs.size() + valuePairs.size() + total
+	}
+	return 0
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(45) {
+		t.Fatalf("expected 45, got %#v", value)
+	}
+}
+
 func TestClassesAndMethods(t *testing.T) {
 	src := `
 class Counter {
@@ -805,6 +864,8 @@ class Vec {
 	def [](index Int) Int = items[index]
 	def +(other Vec) Vec = Vec(this[0] + other[0], this[1] + other[1])
 	def -() Vec = Vec(-this[0], -this[1])
+	def :-(other Vec) Vec = Vec(this[0] - other[0], this[1] - other[1])
+	def --(other Vec) Vec = Vec(this[0] - other[0] - 1, this[1] - other[1] - 1)
 }
 
 def run() Int {
@@ -812,6 +873,8 @@ def run() Int {
 	right Vec = Vec(3, 4)
 	total Vec = left + right
 	neg Vec = -total
+	diff Vec = total :- left
+	trimmed Vec = total -- left
 
 	items = List(1, 2)
 	items2 = items :+ 3
@@ -820,7 +883,7 @@ def run() Int {
 	seen = Set(1, 2)
 	all = seen ++ Set(3)
 
-	return neg[0] + merged[4] + all.size()
+	return neg[0] + diff[0] + trimmed[1] + merged[4] + all.size()
 }
 `
 
@@ -829,8 +892,8 @@ def run() Int {
 	if err != nil {
 		t.Fatalf("Call returned error: %v", err)
 	}
-	if value != int64(4) {
-		t.Fatalf("expected 4, got %#v", value)
+	if value != int64(10) {
+		t.Fatalf("expected 10, got %#v", value)
 	}
 }
 

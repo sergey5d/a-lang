@@ -651,7 +651,7 @@ func (c *Checker) checkOperatorMethods(class classInfo) {
 				continue
 			}
 			switch method.decl.Name {
-			case "[]", ":+", "++", "+", "*", "/", "%", "|", "&", ">>", "<<", "::":
+			case "[]", ":+", ":-", "++", "--", "+", "*", "/", "%", "|", "&", ">>", "<<", "::":
 				if len(method.decl.Parameters) != 1 {
 					c.addDiagnostic("invalid_operator_method", "operator '"+method.decl.Name+"' must declare exactly 1 parameter", method.decl.Span)
 				}
@@ -670,7 +670,7 @@ func (c *Checker) checkOperatorMethods(class classInfo) {
 
 func isAllowedOperatorName(name string) bool {
 	switch name {
-	case "+", "-", "*", "/", "%", "[]", ":+", "++", "|", "&", ">>", "<<", "~", "::":
+	case "+", "-", "*", "/", "%", "[]", ":+", ":-", "++", "--", "|", "&", ">>", "<<", "~", "::":
 		return true
 	default:
 		return false
@@ -2574,6 +2574,29 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 0, len(argTypes)), member.Span)
 			}
 			return builtin("Int")
+		case "zip":
+			if len(argTypes) != 1 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 1, len(argTypes)), member.Span)
+				return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
+			}
+			if argTypes[0].Kind != TypeBuiltin || argTypes[0].Name != "Array" || len(argTypes[0].Args) != 1 {
+				c.addDiagnostic("invalid_argument_type", "zip expects parameter of type Array[T]", member.Span)
+				return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
+			}
+			elemType := unknownType
+			if len(receiverType.Args) == 1 {
+				elemType = receiverType.Args[0]
+			}
+			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{{Kind: TypeTuple, Name: "Tuple", Args: []*Type{elemType, argTypes[0].Args[0]}}}}
+		case "zipWithIndex":
+			if len(argTypes) != 0 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 0, len(argTypes)), member.Span)
+			}
+			elemType := unknownType
+			if len(receiverType.Args) == 1 {
+				elemType = receiverType.Args[0]
+			}
+			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{{Kind: TypeTuple, Name: "Tuple", Args: []*Type{elemType, builtin("Int")}}}}
 		default:
 			c.addDiagnostic("unknown_member", "unknown member '"+member.Name+"'", member.Span)
 			return unknownType
@@ -2967,7 +2990,7 @@ func (c *Checker) checkBinaryOperation(left, right *Type, op string, span parser
 		}
 		c.addDiagnostic("invalid_binary_operand", "operator ++ requires matching collections or a matching operator overload", span)
 		return unknownType
-	case "|", "&", ">>", "<<", "::":
+	case ":-", "--", "|", "&", ">>", "<<", "::":
 		if result, ok := c.resolveOperatorExprType(left, op, []*Type{right}, span); ok {
 			return result
 		}

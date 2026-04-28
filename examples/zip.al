@@ -1,0 +1,90 @@
+# EXPECT:
+# list zip 1 a
+# list zip 2 b
+# list zipWithIndex 3 2
+# array zip 5 y
+# array zipWithIndex 6 2
+# range zip 11 q
+# range zipWithIndex 8 1
+# pair sum 3
+# indexed sum 4
+# array pair sum 5
+# range pair sum 21
+# range index sum 16
+
+def main() Unit {
+    items = List(1, 2, 3)
+    listPairs = items.zip(List("a", "b"))
+    listIndexed = items.zipWithIndex()
+
+    firstLeft, firstRight = listPairs.get(0).get()
+    secondLeft, secondRight = listPairs.get(1).get()
+    indexedValue, indexedPos = listIndexed.get(2).get()
+
+    Term.println("list zip", firstLeft, firstRight)
+    Term.println("list zip", secondLeft, secondRight)
+    Term.println("list zipWithIndex", indexedValue, indexedPos)
+
+    values = Array(3)
+    values[0] := 4
+    values[1] := 5
+    values[2] := 6
+    other = Array(2)
+    other[0] := "x"
+    other[1] := "y"
+    arrayPairs = values.zip(other)
+    arrayIndexed = values.zipWithIndex()
+
+    arrayLeft, arrayRight = arrayPairs[1]
+    arrayIndexedValue, arrayIndexedPos = arrayIndexed[2]
+
+    Term.println("array zip", arrayLeft, arrayRight)
+    Term.println("array zipWithIndex", arrayIndexedValue, arrayIndexedPos)
+
+    rangePairs = Range(10, 13).zip(List("p", "q"))
+    rangeIndexed = Range(7, 9).zipWithIndex()
+
+    rangeLeft, rangeRight = rangePairs.get(1).get()
+    rangeIndexedValue, rangeIndexedPos = rangeIndexed.get(1).get()
+
+    Term.println("range zip", rangeLeft, rangeRight)
+    Term.println("range zipWithIndex", rangeIndexedValue, rangeIndexedPos)
+
+    pairSum := 0
+    for left, right <- listPairs {
+        if right == "a" || right == "b" {
+            pairSum += left
+        }
+    }
+    Term.println("pair sum", pairSum)
+
+    indexedSum := 0
+    for value, index <- listIndexed {
+        if index < 2 {
+            indexedSum += value + index
+        }
+    }
+    Term.println("indexed sum", indexedSum)
+
+    arrayPairSum := 0
+    for left, right <- arrayPairs {
+        if right == "y" {
+            arrayPairSum += left
+        }
+    }
+    Term.println("array pair sum", arrayPairSum)
+
+    rangePairSum := 0
+    for left, right <- rangePairs {
+        if right == "p" || right == "q" {
+            rangePairSum += left
+        }
+    }
+    Term.println("range pair sum", rangePairSum)
+
+    rangeIndexSum := 0
+    for value, index <- rangeIndexed {
+        rangeIndexSum += value + index
+    }
+    Term.println("range index sum", rangeIndexSum)
+}
