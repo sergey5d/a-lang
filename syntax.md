@@ -302,6 +302,7 @@ Rules:
 - if an expression containing `_` appears where a one-argument function is expected, it expands to a lambda
 - `_ + 1` becomes `x -> x + 1`
 - the shorthand is contextual; outside a lambda-expected position, `_` is not a normal value
+- this also works with larger expressions such as `items.map(if _ > 5: 10 else: 8)` or `items.map(match _ { ... })`
 
 Explicitly typed lambda:
 
@@ -623,6 +624,16 @@ result = match value {
 }
 ```
 
+Partial expression form:
+
+```txt
+result Option[Int] = match? value {
+    SomeX(x) => x
+}
+```
+
+If no case matches, `match?` returns `None`.
+
 Supported pattern families:
 
 - wildcard: `_`
@@ -636,6 +647,7 @@ Supported pattern families:
 Current notes:
 
 - enum exhaustiveness is checked
+- `match?` skips exhaustiveness checking and wraps the result in `Option[...]`
 - bare singleton enum cases should still be written in qualified form when needed, for example `MaybeInt.NoneX`
 
 ## Destructuring
@@ -798,4 +810,4 @@ Package-private visibility applies across imported modules in the same package.
 
 This file is meant to describe the current surface syntax.
 
-Ideas that are still under discussion, such as one-line `:` shorthand or future partial-match syntax (`match?` / `try match`), belong in `features.md`, not here.
+Ideas that are still under discussion belong in `features.md`, not here.

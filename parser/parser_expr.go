@@ -437,6 +437,7 @@ func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
 }
 
 func (p *Parser) parseMatchExprAfterStart(start Token) (Expr, error) {
+	partial := p.match(TokenQuestion)
 	value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
 	if err != nil {
 		return nil, err
@@ -457,6 +458,7 @@ func (p *Parser) parseMatchExprAfterStart(start Token) (Expr, error) {
 		}
 	}
 	return &MatchExpr{
+		Partial: partial,
 		Value: value,
 		Cases: cases,
 		Span:  mergeSpans(tokenSpan(start), tokenSpan(end)),

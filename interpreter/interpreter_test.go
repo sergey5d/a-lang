@@ -1674,6 +1674,40 @@ def run() Str {
 	}
 }
 
+func TestPartialMatchAndPlaceholderMatchIf(t *testing.T) {
+	src := `
+enum MaybeInt {
+	case NoneX
+	case SomeX {
+		value Int
+	}
+}
+
+def run() Str {
+	values = List(1, 6, 3)
+	ifMapped = values.map(if _ > 5: 10 else: 8)
+	options = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
+	matchMapped = options.map(match _ {
+		SomeX(x) => x + 1
+		NoneX => 0
+	})
+	partialMapped = options.map(match? _ {
+		SomeX(x) => x + 1
+	})
+	return "${ifMapped.get(0).getOr(0)}-${ifMapped.get(1).getOr(0)}-${matchMapped.get(2).getOr(0)}-${partialMapped.get(0).get().getOr(0)}-${partialMapped.get(1).get().isEmpty()}"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "8-10-4-2-true" {
+		t.Fatalf("expected %q, got %#v", "8-10-4-2-true", value)
+	}
+}
+
 func TestStrSize(t *testing.T) {
 	src := `
 def run() Int {

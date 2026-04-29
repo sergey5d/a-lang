@@ -366,6 +366,7 @@ func (p *Parser) parseMatchStmt() (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
+	partial := p.match(TokenQuestion)
 	value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
 	if err != nil {
 		return nil, err
@@ -380,7 +381,7 @@ func (p *Parser) parseMatchStmt() (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	stmt := &MatchStmt{Value: value, Cases: cases}
+	stmt := &MatchStmt{Partial: partial, Value: value, Cases: cases}
 	stmt.Span = mergeSpans(tokenSpan(start), tokenSpan(end))
 	return stmt, nil
 }
@@ -695,7 +696,7 @@ func (p *Parser) parseYieldBodyBlock(owner string, stopTypes ...TokenType) (*Blo
 		return nil, fmt.Errorf("expected expression after ':'")
 	}
 	var expr Expr
-	if sameLine(colon, p.peek()) {
+	if sameLine(colon, p.peek()) && len(stopTypes) > 0 {
 		expr, err = p.parseInlineExpression(stopTypes...)
 	} else {
 		expr, err = p.parseExpression(0)

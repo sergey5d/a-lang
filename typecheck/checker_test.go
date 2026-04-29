@@ -2116,6 +2116,39 @@ def run(value Result[Int, Str]) Option[Int] {
 	}
 }
 
+func TestAnalyzePartialMatchAndPlaceholderMatchIf(t *testing.T) {
+	src := `
+enum MaybeInt {
+	case NoneX
+	case SomeX {
+		value Int
+	}
+}
+
+def run() Bool {
+	values List[Int] = List(1, 6, 3)
+	ifMapped List[Int] = values.map(if _ > 5: 10 else: 8)
+	options List[MaybeInt] = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
+	matchMapped List[Int] = options.map(match _ {
+		SomeX(x) => x + 1
+		NoneX => 0
+	})
+	partialMapped = options.map(match? _ {
+		SomeX(x) => x + 1
+	})
+	return ifMapped.get(1).getOr(0) == 10 &&
+		matchMapped.get(0).getOr(0) == 2 &&
+		partialMapped.get(0).get().getOr(0) == 2 &&
+		partialMapped.get(1).get().isEmpty()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeUnwrapStmtRejectsNonUnwrappable(t *testing.T) {
 	src := `
 def run(value Int) Option[Int] {

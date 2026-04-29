@@ -522,6 +522,36 @@ enum MaybeInt {
 	if matchExpr.Cases[0].Expr == nil {
 		t.Fatalf("expected shorthand match expression cases to have expressions, got %#v", matchExpr.Cases)
 	}
+	if matchExpr.Partial {
+		t.Fatalf("expected plain match expression to be exhaustive by default")
+	}
+}
+
+func TestParsePartialMatchExpr(t *testing.T) {
+	src := `
+def run(value MaybeInt) Option[Int] =
+	match? value {
+		SomeX(x) => x + 1
+	}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	stmt, ok := fn.Body.Statements[0].(*ExprStmt)
+	if !ok {
+		t.Fatalf("expected expression statement, got %T", fn.Body.Statements[0])
+	}
+	expr, ok := stmt.Expr.(*MatchExpr)
+	if !ok {
+		t.Fatalf("expected match expression, got %T", stmt.Expr)
+	}
+	if !expr.Partial {
+		t.Fatalf("expected partial match expression")
+	}
 }
 
 func TestParseColonShorthandAllowsNewlineBody(t *testing.T) {

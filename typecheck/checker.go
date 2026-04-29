@@ -1266,7 +1266,9 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			}
 			c.popScope()
 		}
-		c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
+		if !s.Partial {
+			c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
+		}
 	case *parser.LoopStmt:
 		c.pushScope()
 		if s.Body != nil {
@@ -1637,10 +1639,15 @@ func (c *Checker) checkMatchStmtResult(s *parser.MatchStmt, code, message string
 			resultType = unknownType
 		}
 	}
-	c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
+	if !s.Partial {
+		c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
+	}
 	if resultType == nil {
 		c.addDiagnostic(code, message, s.Span)
 		return unknownType
+	}
+	if s.Partial {
+		return &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{resultType}}
 	}
 	return resultType
 }
@@ -1822,12 +1829,18 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 				resultType = unknownType
 			}
 		}
-		c.checkMatchExhaustiveness(valueType, e.Cases, e.Span)
+		if !e.Partial {
+			c.checkMatchExhaustiveness(valueType, e.Cases, e.Span)
+		}
 		if resultType == nil {
 			result = unknownType
 			break
 		}
-		result = resultType
+		if e.Partial {
+			result = &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{resultType}}
+		} else {
+			result = resultType
+		}
 	case *parser.ForYieldExpr:
 		c.pushScope()
 		for _, binding := range e.Bindings {

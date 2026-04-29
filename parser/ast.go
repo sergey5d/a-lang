@@ -248,6 +248,7 @@ func (*IfStmt) statementNode() {}
 
 // MatchStmt represents a match statement with pattern cases.
 type MatchStmt struct {
+	Partial bool         `json:"partial,omitempty"`
 	Value Expr        `json:"value"`
 	Cases []MatchCase `json:"cases"`
 	Span  Span        `json:"span"`
@@ -497,6 +498,7 @@ func (*BlockExpr) exprNode() {}
 
 // MatchExpr is a match expression whose value comes from the matched case.
 type MatchExpr struct {
+	Partial bool         `json:"partial,omitempty"`
 	Value Expr        `json:"value"`
 	Cases []MatchCase `json:"cases"`
 	Span  Span        `json:"span"`

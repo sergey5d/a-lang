@@ -265,7 +265,7 @@ func replacePlaceholderExpr(expr Expr, param string) Expr {
 				Span:    matchCase.Span,
 			}
 		}
-		return &MatchExpr{Value: replacePlaceholderExpr(e.Value, param), Cases: cases, Span: e.Span}
+		return &MatchExpr{Partial: e.Partial, Value: replacePlaceholderExpr(e.Value, param), Cases: cases, Span: e.Span}
 	case *ForYieldExpr:
 		bindings := make([]ForBinding, len(e.Bindings))
 		for i, binding := range e.Bindings {
@@ -341,7 +341,7 @@ func replacePlaceholderStmt(stmt Statement, param string) Statement {
 				Span:    matchCase.Span,
 			}
 		}
-		return &MatchStmt{Value: replacePlaceholderExpr(s.Value, param), Cases: cases, Span: s.Span}
+		return &MatchStmt{Partial: s.Partial, Value: replacePlaceholderExpr(s.Value, param), Cases: cases, Span: s.Span}
 	case *ForStmt:
 		bindings := make([]ForBinding, len(s.Bindings))
 		for i, binding := range s.Bindings {

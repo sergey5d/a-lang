@@ -545,10 +545,10 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			return in.execBlock(s.Else, local, self)
 		}
 		return nil, nil, nil
-	case *parser.MatchStmt:
-		value, err := in.evalExpr(s.Value, local)
-		if err != nil {
-			return nil, nil, err
+		case *parser.MatchStmt:
+			value, err := in.evalExpr(s.Value, local)
+			if err != nil {
+				return nil, nil, err
 		}
 		for _, matchCase := range s.Cases {
 			bindings, ok, err := in.matchPattern(matchCase.Pattern, value, local)
@@ -568,10 +568,13 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			if matchCase.Expr != nil {
 				value, err := in.evalExpr(matchCase.Expr, caseEnv)
 				return value, nil, err
+				}
+				return nil, nil, nil
+			}
+			if s.Partial {
+				return nil, nil, nil
 			}
 			return nil, nil, nil
-		}
-		return nil, nil, nil
 	case *parser.LoopStmt:
 		return in.execLoop(s, local, self)
 	case *parser.ForStmt:
@@ -1075,17 +1078,39 @@ func (in *Interpreter) evalMatchStmtValue(s *parser.MatchStmt, local *env, self 
 			continue
 		}
 		caseEnv := newEnv(local)
-		for _, binding := range bindings {
-			caseEnv.define(binding.name, binding.value, false)
+			for _, binding := range bindings {
+				caseEnv.define(binding.name, binding.value, false)
+			}
+			if matchCase.Body != nil {
+				value, signal, err := in.evalBlockValue(matchCase.Body, caseEnv, self, message)
+				if err != nil {
+					return nil, nil, err
+				}
+				if !s.Partial {
+					return value, signal, nil
+				}
+				if signal != nil {
+					return nil, signal, nil
+				}
+				wrapped, err := in.constructStdlibOption(value, true, local, s.Span)
+				return wrapped, nil, err
+			}
+			if matchCase.Expr != nil {
+				value, err := in.evalExpr(matchCase.Expr, caseEnv)
+				if err != nil {
+					return nil, nil, err
+				}
+				if !s.Partial {
+					return value, nil, nil
+				}
+				wrapped, err := in.constructStdlibOption(value, true, local, s.Span)
+				return wrapped, nil, err
+			}
+			return nil, nil, RuntimeError{Message: message, Span: matchCase.Span}
 		}
-		if matchCase.Body != nil {
-			return in.evalBlockValue(matchCase.Body, caseEnv, self, message)
-		}
-		if matchCase.Expr != nil {
-			value, err := in.evalExpr(matchCase.Expr, caseEnv)
-			return value, nil, err
-		}
-		return nil, nil, RuntimeError{Message: message, Span: matchCase.Span}
+	if s.Partial {
+		value, err := in.constructStdlibOption(nil, false, local, s.Span)
+		return value, nil, err
 	}
 	return nil, nil, RuntimeError{Message: "non-exhaustive match statement used as value", Span: s.Span}
 }
@@ -1295,9 +1320,9 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			return nil, RuntimeError{Message: "unexpected control flow in block expression", Span: e.Span}
 		}
 		return value, nil
-	case *parser.MatchExpr:
-		value, err := in.evalExpr(e.Value, local)
-		if err != nil {
+		case *parser.MatchExpr:
+			value, err := in.evalExpr(e.Value, local)
+			if err != nil {
 			return nil, err
 		}
 		for _, matchCase := range e.Cases {
@@ -1312,19 +1337,32 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			for _, binding := range bindings {
 				caseEnv.define(binding.name, binding.value, false)
 			}
-			if matchCase.Body != nil {
-				value, signal, err := in.evalBlockValue(matchCase.Body, caseEnv, nil, "match case must end with an expression")
+				if matchCase.Body != nil {
+					value, signal, err := in.evalBlockValue(matchCase.Body, caseEnv, nil, "match case must end with an expression")
+					if err != nil {
+						return nil, err
+					}
+					if signal != nil {
+						return nil, RuntimeError{Message: "unexpected control flow in match expression", Span: e.Span}
+					}
+					if e.Partial {
+						return in.constructStdlibOption(value, true, local, e.Span)
+					}
+					return value, nil
+				}
+				value, err := in.evalExpr(matchCase.Expr, caseEnv)
 				if err != nil {
 					return nil, err
 				}
-				if signal != nil {
-					return nil, RuntimeError{Message: "unexpected control flow in match expression", Span: e.Span}
+				if e.Partial {
+					return in.constructStdlibOption(value, true, local, e.Span)
 				}
 				return value, nil
 			}
-			return in.evalExpr(matchCase.Expr, caseEnv)
-		}
-		return nil, RuntimeError{Message: "non-exhaustive match expression", Span: e.Span}
+			if e.Partial {
+				return in.constructStdlibOption(nil, false, local, e.Span)
+			}
+			return nil, RuntimeError{Message: "non-exhaustive match expression", Span: e.Span}
 	case *parser.ForYieldExpr:
 		var yielded []Value
 		signal, err := in.execForBindings(e.Bindings, 0, local, nil, func(loopEnv *env) (any, error) {
