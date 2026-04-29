@@ -315,6 +315,20 @@ Multi-parameter lambda:
 (left Int, right Int) -> left + right
 ```
 
+Tuple-destructuring lambda in a one-argument function context:
+
+```txt
+pairs.map((key, value) -> key + value)
+pairs.map((key, _) -> key)
+```
+
+Rules:
+
+- if a lambda is expected to take one argument and that argument is a tuple, `(a, b) -> ...` destructures that tuple into separate names
+- the same syntax still means a normal multi-parameter lambda when the contextual function type expects multiple arguments
+- `_` inside an explicit lambda parameter list means "ignore this parameter slot"
+- the placeholder shorthand rule for `_ + 1` only applies when there is no explicit `->` lambda parameter list
+
 Block lambda:
 
 ```txt

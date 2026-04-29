@@ -1821,6 +1821,43 @@ def vars() Int {
 	}
 }
 
+func TestParseLambdaIgnoreParameter(t *testing.T) {
+	src := `
+def run() Unit {
+	pairs.map((key, _) -> key)
+	_ -> 1
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	first := fn.Body.Statements[0].(*ExprStmt)
+	firstCall, ok := first.Expr.(*CallExpr)
+	if !ok {
+		t.Fatalf("expected first statement call expression, got %T", first.Expr)
+	}
+	firstLambda, ok := firstCall.Args[0].Value.(*LambdaExpr)
+	if !ok {
+		t.Fatalf("expected first call arg lambda, got %T", firstCall.Args[0].Value)
+	}
+	if len(firstLambda.Parameters) != 2 || firstLambda.Parameters[0].Name != "key" || firstLambda.Parameters[1].Name != "_" {
+		t.Fatalf("unexpected lambda params %#v", firstLambda.Parameters)
+	}
+
+	second := fn.Body.Statements[1].(*ExprStmt)
+	secondLambda, ok := second.Expr.(*LambdaExpr)
+	if !ok {
+		t.Fatalf("expected second statement lambda, got %T", second.Expr)
+	}
+	if len(secondLambda.Parameters) != 1 || secondLambda.Parameters[0].Name != "_" {
+		t.Fatalf("unexpected underscore lambda %#v", secondLambda.Parameters)
+	}
+}
+
 func TestParseGenericTypeRefs(t *testing.T) {
 	src := `
 interface Pairer[K, V] {

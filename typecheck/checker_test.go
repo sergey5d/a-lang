@@ -2217,3 +2217,29 @@ def run() Int {
 		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
 	}
 }
+
+func TestAnalyzeTupleDestructuringLambdas(t *testing.T) {
+	src := `
+def run() Int {
+	pairs List[(Str, Int)] = List(("a", 1), ("bb", 2))
+	pairMapped List[Int] = pairs.map((key, value) -> key.size() + value)
+	pairKeys List[Str] = pairs.map((key, _) -> key)
+	pairIgnored List[Int] = pairs.map((_, value) -> value * 2)
+	tuple4s List[(Int, Int, Int, Int)] = List((1, 2, 3, 4), (4, 5, 6, 7))
+	tuple4Mapped List[Int] = tuple4s.map((first, _, third, _) -> first + third)
+	entries Map[Str, Int] = Map("a": 1, "bbb": 2)
+	mapMapped List[Int] = entries.map((key, value) -> key.size() + value)
+	return pairMapped.get(0).getOr(0) +
+		pairMapped.get(1).getOr(0) +
+		pairKeys.get(1).getOr("").size() +
+		mapMapped.get(1).getOr(0) +
+		pairIgnored.get(1).getOr(0) +
+		tuple4Mapped.get(1).getOr(0)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}

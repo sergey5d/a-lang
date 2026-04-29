@@ -58,12 +58,13 @@ type instance struct {
 }
 
 type closure struct {
-	params     []string
-	variadic   bool
-	body       parser.Expr
-	blockBody  *parser.BlockStmt
-	returnType *parser.TypeRef
-	env        *env
+	params             []string
+	variadic           bool
+	tupleDestructuring bool
+	body               parser.Expr
+	blockBody          *parser.BlockStmt
+	returnType         *parser.TypeRef
+	env                *env
 }
 
 type builtinRef struct{ name string }
@@ -1495,7 +1496,7 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		for i, param := range e.Parameters {
 			params[i] = param.Name
 		}
-		return &closure{params: params, body: e.Body, blockBody: e.BlockBody, env: local}, nil
+		return &closure{params: params, tupleDestructuring: len(e.Parameters) > 1, body: e.Body, blockBody: e.BlockBody, env: local}, nil
 	case *parser.PlaceholderExpr:
 		return nil, RuntimeError{Message: "placeholder is not supported here", Span: e.Span}
 	default:
@@ -1667,12 +1668,28 @@ func (in *Interpreter) callClosure(fn *closure, args []Value) (Value, error) {
 		return nil, RuntimeError{Message: fmt.Sprintf("lambda expects %s args, got %d", expectedClosureArgs(fn), len(args)), Span: parser.Span{}}
 	}
 	local := newEnv(fn.env)
+	boundArgs := args
+	if fn.tupleDestructuring && len(args) == 1 && len(fn.params) > 1 {
+		items, kind, ok := destructurableValues(args[0])
+		if !ok || len(items) != len(fn.params) {
+			count := 1
+			if ok {
+				count = len(items)
+			}
+			return nil, RuntimeError{Message: fmt.Sprintf("lambda expects %d %s values, got %d", len(fn.params), kindOrTuple(kind), count), Span: parser.Span{}}
+		}
+		boundArgs = items
+	}
 	for i, param := range fn.params {
 		if fn.variadic && i == len(fn.params)-1 {
-			local.define(param, &nativeList{items: append([]Value{}, args[i:]...)}, false)
+			if param != "_" {
+				local.define(param, &nativeList{items: append([]Value{}, boundArgs[i:]...)}, false)
+			}
 			break
 		}
-		local.define(param, args[i], false)
+		if param != "_" {
+			local.define(param, boundArgs[i], false)
+		}
 	}
 	if fn.body != nil {
 		value, err := in.evalExpr(fn.body, local)
@@ -2483,6 +2500,9 @@ func acceptsClosureArgCount(fn *closure, count int) bool {
 	if fn.variadic {
 		return count >= len(fn.params)-1
 	}
+	if fn.tupleDestructuring && len(fn.params) > 1 && count == 1 {
+		return true
+	}
 	return count == len(fn.params)
 }
 
@@ -2490,7 +2510,17 @@ func expectedClosureArgs(fn *closure) string {
 	if fn.variadic {
 		return fmt.Sprintf("at least %d", len(fn.params)-1)
 	}
+	if fn.tupleDestructuring && len(fn.params) > 1 {
+		return fmt.Sprintf("1 tuple or %d", len(fn.params))
+	}
 	return fmt.Sprintf("%d", len(fn.params))
+}
+
+func kindOrTuple(kind string) string {
+	if kind == "" {
+		return "tuple"
+	}
+	return kind
 }
 
 func (in *Interpreter) runtimeMethodMatches(method *parser.MethodDecl, args []Value) bool {
@@ -3157,6 +3187,19 @@ func (in *Interpreter) bindingValues(bindings []parser.Binding, values []parser.
 }
 
 func (in *Interpreter) evalExprWithTypeRef(expr parser.Expr, expected *parser.TypeRef, local *env) (Value, error) {
+	if lambda, ok := expr.(*parser.LambdaExpr); ok {
+		params := make([]string, len(lambda.Parameters))
+		for i, param := range lambda.Parameters {
+			params[i] = param.Name
+		}
+		return &closure{
+			params:             params,
+			tupleDestructuring: len(lambda.Parameters) > 1,
+			body:               lambda.Body,
+			blockBody:          lambda.BlockBody,
+			env:                local,
+		}, nil
+	}
 	return in.evalExpr(parser.WrapContextualFunctionExpr(expected, expr), local)
 }
 

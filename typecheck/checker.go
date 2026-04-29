@@ -2749,11 +2749,23 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr, expected *Type) *Type
 
 	params := make([]*Type, len(expr.Parameters))
 	expectedSig := (*Signature)(nil)
+	destructuredTupleArg := false
 	if expected != nil && expected.Kind == TypeFunction && expected.Signature != nil {
 		expectedSig = expected.Signature
 		if len(expectedSig.Parameters) != len(expr.Parameters) {
-			c.addDiagnostic("invalid_lambda_type", "lambda parameter count does not match expected function type", expr.Span)
-			expectedSig = nil
+			if len(expectedSig.Parameters) == 1 && len(expr.Parameters) > 1 {
+				parts, _, ok := c.destructurableValueTypes(expectedSig.Parameters[0])
+				if ok && len(parts) == len(expr.Parameters) {
+					destructuredTupleArg = true
+					params = append([]*Type(nil), parts...)
+				} else {
+					c.addDiagnostic("invalid_lambda_type", "lambda parameter count does not match expected function type", expr.Span)
+					expectedSig = nil
+				}
+			} else {
+				c.addDiagnostic("invalid_lambda_type", "lambda parameter count does not match expected function type", expr.Span)
+				expectedSig = nil
+			}
 		}
 	}
 	for i, param := range expr.Parameters {
@@ -2761,12 +2773,25 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr, expected *Type) *Type
 		if param.Type != nil {
 			paramType = c.resolveDeclaredType(param.Type)
 		} else if expectedSig != nil {
+			if destructuredTupleArg {
+				paramType = params[i]
+			} else {
 			paramType = expectedSig.Parameters[i]
+			}
 		} else {
 			c.addDiagnostic("invalid_lambda_type", "untyped lambda parameters require a contextual function type", param.Span)
 		}
-		params[i] = paramType
-		c.define(param.Name, paramType, false)
+		if destructuredTupleArg {
+			if param.Type != nil {
+				c.requireAssignable(paramType, params[i], param.Span, "invalid_lambda_type", "lambda parameter does not match expected tuple element type")
+			}
+			params[i] = paramType
+		} else {
+			params[i] = paramType
+		}
+		if param.Name != "_" {
+			c.define(param.Name, paramType, false)
+		}
 	}
 
 	returnType := unknownType
@@ -2795,6 +2820,9 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr, expected *Type) *Type
 				c.requireAssignable(implicitReturn, returnType, expr.BlockBody.Span, "invalid_lambda_type", "lambda body does not match expected return type")
 			}
 		}
+	}
+	if destructuredTupleArg && expectedSig != nil {
+		return functionType("<lambda>", Signature{Parameters: expectedSig.Parameters, ReturnType: returnType})
 	}
 	return functionType("<lambda>", Signature{Parameters: params, ReturnType: returnType})
 }

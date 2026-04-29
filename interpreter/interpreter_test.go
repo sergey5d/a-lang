@@ -1774,3 +1774,33 @@ def run() Int {
 		t.Fatalf("expected 4, got %#v", value)
 	}
 }
+
+func TestTupleDestructuringLambdas(t *testing.T) {
+	src := `
+def run() Int {
+	pairs = List(("a", 1), ("bb", 2))
+	pairMapped = pairs.map((key, value) -> key.size() + value)
+	pairKeys = pairs.map((key, _) -> key)
+	pairIgnored = pairs.map((_, value) -> value * 2)
+	tuple4s = List((1, 2, 3, 4), (4, 5, 6, 7))
+	tuple4Mapped = tuple4s.map((first, _, third, _) -> first + third)
+	entries = Map("a": 1, "bbb": 2)
+	mapMapped = entries.map((key, value) -> key.size() + value)
+	return pairMapped.get(0).getOr(0) +
+		pairMapped.get(1).getOr(0) +
+		pairKeys.get(1).getOr("").size() +
+		mapMapped.get(1).getOr(0) +
+		pairIgnored.get(1).getOr(0) +
+		tuple4Mapped.get(1).getOr(0)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(27) {
+		t.Fatalf("expected 27, got %#v", value)
+	}
+}

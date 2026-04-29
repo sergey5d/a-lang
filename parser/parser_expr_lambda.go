@@ -1,12 +1,12 @@
 package parser
 
+import "fmt"
+
 func (p *Parser) parseLambdaIdentifier() (Expr, error) {
-	name, err := p.consume(TokenIdentifier, "expected lambda parameter")
+	param, err := p.parseLambdaParameter()
 	if err != nil {
 		return nil, err
 	}
-	param := LambdaParameter{Name: name.Lexeme}
-	param.Span = tokenSpan(name)
 	if p.check(TokenIdentifier) && p.simpleTypeRefFollowedBy(TokenArrow) {
 		typeRef, err := p.parseNamedTypeRef()
 		if err != nil {
@@ -71,12 +71,11 @@ func (p *Parser) parseLambdaParams() ([]LambdaParameter, error) {
 	var params []LambdaParameter
 	if !p.check(TokenRParen) {
 		for {
-			param, err := p.consume(TokenIdentifier, "expected lambda parameter")
+			param, err := p.parseLambdaParameter()
 			if err != nil {
 				return nil, err
 			}
-			lambdaParam := LambdaParameter{Name: param.Lexeme}
-			lambdaParam.Span = tokenSpan(param)
+			lambdaParam := param
 			if (p.check(TokenIdentifier) || p.check(TokenLParen)) && (p.typeRefFollowedBy(TokenComma) || p.typeRefFollowedBy(TokenRParen)) {
 				typeRef, err := p.parseTypeRef()
 				if err != nil {
@@ -98,13 +97,16 @@ func (p *Parser) parseLambdaParams() ([]LambdaParameter, error) {
 }
 
 func (p *Parser) isLambdaIdentifierStart() bool {
-	if !p.check(TokenIdentifier) {
+	if !p.check(TokenIdentifier) && !p.check(TokenUnder) {
 		return false
 	}
 	if p.checkNext(TokenArrow) {
 		return true
 	}
-	return p.checkNext(TokenIdentifier) && p.simpleTypeRefFollowedByAt(p.pos+1, TokenArrow)
+	if p.check(TokenIdentifier) {
+		return p.checkNext(TokenIdentifier) && p.simpleTypeRefFollowedByAt(p.pos+1, TokenArrow)
+	}
+	return false
 }
 
 func (p *Parser) isLambdaParenStart() bool {
@@ -122,11 +124,11 @@ func (p *Parser) isLambdaParenStart() bool {
 		return i+1 < len(p.tokens) && p.tokens[i+1].Type == TokenArrow
 	}
 	for {
-		if i >= len(p.tokens) || p.tokens[i].Type != TokenIdentifier {
+		if i >= len(p.tokens) || !isLambdaParamToken(p.tokens[i].Type) {
 			return false
 		}
 		i++
-		if i < len(p.tokens) && p.tokens[i].Type == TokenIdentifier {
+		if i < len(p.tokens) && p.tokens[i].Type == TokenIdentifier && p.tokens[i-1].Type != TokenUnder {
 			end, ok := p.scanTypeRef(i)
 			if !ok {
 				return false
@@ -145,4 +147,25 @@ func (p *Parser) isLambdaParenStart() bool {
 		}
 		return false
 	}
+}
+
+func (p *Parser) parseLambdaParameter() (LambdaParameter, error) {
+	var param Token
+	var err error
+	switch {
+	case p.check(TokenIdentifier):
+		param, err = p.consume(TokenIdentifier, "expected lambda parameter")
+	case p.check(TokenUnder):
+		param, err = p.consume(TokenUnder, "expected lambda parameter")
+	default:
+		return LambdaParameter{}, fmt.Errorf("expected lambda parameter, got %s", p.peek().String())
+	}
+	if err != nil {
+		return LambdaParameter{}, err
+	}
+	return LambdaParameter{Name: param.Lexeme, Span: tokenSpan(param)}, nil
+}
+
+func isLambdaParamToken(tokenType TokenType) bool {
+	return tokenType == TokenIdentifier || tokenType == TokenUnder
 }
