@@ -9,10 +9,12 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 		"Printer": {
 			"print":   nativePrinterPrint,
 			"println": nativePrinterPrintln,
+			"printf":  nativePrinterPrintf,
 		},
 		"OS": {
 			"print":   nativeOSPrint,
 			"println": nativeOSPrintln,
+			"printf":  nativeOSPrintf,
 		},
 		"Str": {
 			"size": nativeStrSize,

@@ -31,8 +31,8 @@ func TestLoadRegistry(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected Printer descriptor to be loaded")
 	}
-	if printer.Kind != KindInterface || len(printer.Methods) != 2 {
-		t.Fatalf("expected Printer to expose 2 methods, got %#v", printer)
+	if printer.Kind != KindInterface || len(printer.Methods) != 3 {
+		t.Fatalf("expected Printer to expose 3 methods, got %#v", printer)
 	}
 
 	osValue, ok := registry.Types["OS"]

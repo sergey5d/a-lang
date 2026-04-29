@@ -43,6 +43,29 @@ func nativePrinterPrintln(_ *Interpreter, receiver Value, args []Value, _ *env, 
 	return nil, nil
 }
 
+func nativePrinterPrintf(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
+	value, ok := asNativePrinter(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Printer.printf receiver mismatch", Span: span}
+	}
+	if len(args) == 0 {
+		return nil, RuntimeError{Message: "printf expects at least 1 argument", Span: span}
+	}
+	writer := os.Stdout
+	if value.stderr {
+		writer = os.Stderr
+	}
+	format := fmt.Sprint(args[0])
+	parts := make([]any, len(args)-1)
+	for i, arg := range args[1:] {
+		parts[i] = arg
+	}
+	if _, err := fmt.Fprintf(writer, format, parts...); err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
 func nativeOSPrint(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
 	value, ok := asNativeOS(receiver)
 	if !ok {
@@ -57,4 +80,12 @@ func nativeOSPrintln(in *Interpreter, receiver Value, args []Value, local *env, 
 		return nil, RuntimeError{Message: "native OS.println receiver mismatch", Span: span}
 	}
 	return nativePrinterPrintln(in, value.out, args, local, span)
+}
+
+func nativeOSPrintf(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeOS(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native OS.printf receiver mismatch", Span: span}
+	}
+	return nativePrinterPrintf(in, value.out, args, local, span)
 }

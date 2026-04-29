@@ -2672,7 +2672,7 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			okMethod    bool
 			orderedArgs []parser.Expr
 		)
-		if receiverType.Name == "OS" && (member.Name == "println" || member.Name == "print") {
+		if receiverType.Name == "OS" && (member.Name == "println" || member.Name == "print" || member.Name == "printf") {
 			if hasNamedCallArgs(args) {
 				c.addDiagnostic("invalid_named_argument", "named arguments are not supported for variadic methods", member.Span)
 				c.checkArgTypes(callArgValues(args))
@@ -2732,7 +2732,7 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			}
 			orderedArgs = reordered
 		}
-		if receiverType.Name == "Printer" && (member.Name == "println" || member.Name == "print") {
+		if receiverType.Name == "Printer" && (member.Name == "println" || member.Name == "print" || member.Name == "printf") {
 			for _, arg := range orderedArgs {
 				c.checkExpr(arg)
 			}

@@ -52,7 +52,9 @@ func TestOSPrinters(t *testing.T) {
 def run() Unit {
 	OS.print("out")
 	OS.out.println(" line")
+	OS.printf(" %s %d", "fmt", 7)
 	OS.err.println("err line")
+	OS.err.printf("err %s %d", "fmt", 3)
 	OS.println("legacy")
 }
 `
@@ -89,10 +91,10 @@ def run() Unit {
 	if err != nil {
 		t.Fatalf("ReadAll stderr returned error: %v", err)
 	}
-	if string(stdoutBytes) != "out line\nlegacy\n" {
+	if string(stdoutBytes) != "out line\n fmt 7legacy\n" {
 		t.Fatalf("unexpected stdout %q", string(stdoutBytes))
 	}
-	if string(stderrBytes) != "err line\n" {
+	if string(stderrBytes) != "err line\nerr fmt 3" {
 		t.Fatalf("unexpected stderr %q", string(stderrBytes))
 	}
 }
