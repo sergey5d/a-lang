@@ -20,22 +20,22 @@ record Triple {
 
 def main() Int {
     c Int, d Str = Pair(7, "world")
-    Term.println("record", c, d)
+    OS.println("record", c, d)
 
     inferredRecordLeft, inferredRecordRight = Pair(10, "infer")
-    Term.println("record inferred", inferredRecordLeft, inferredRecordRight)
+    OS.println("record inferred", inferredRecordLeft, inferredRecordRight)
 
     mixedRecordLeft Int, mixedRecordRight = Pair(11, "partial")
-    Term.println("record mixed", mixedRecordLeft, mixedRecordRight)
+    OS.println("record mixed", mixedRecordLeft, mixedRecordRight)
 
     recordPairLeft, recordPairRight = Pair(22, "record-pair")
-    Term.println("record pair", recordPairLeft, recordPairRight)
+    OS.println("record pair", recordPairLeft, recordPairRight)
 
     _, skippedOnlyRecordValue = Pair(23, "visible")
-    Term.println("record skip only", skippedOnlyRecordValue)
+    OS.println("record skip only", skippedOnlyRecordValue)
 
     skippedRecordLeft Int, _, skippedRecordRight Str = Triple(15, "drop", "kept")
-    Term.println("record skip", skippedRecordLeft, skippedRecordRight)
+    OS.println("record skip", skippedRecordLeft, skippedRecordRight)
 
     0
 }

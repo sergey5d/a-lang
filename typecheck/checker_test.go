@@ -1374,7 +1374,7 @@ def run() Int {
 
 	seen Set[Int] = Set(1, 2)
 	if seen.contains(2) {
-		Term.println("ok")
+		OS.println("ok")
 	}
 
 	return items.get(0).getOr(0) + values.get("a").getOr(0)
@@ -1418,7 +1418,7 @@ def run() Int {
 	reduced Option[Int] = items.reduce((left Int, right Int) -> left + right)
 	hasBig Bool = items.exists((item Int) -> item > 2)
 	allPositive Bool = items.forAll((item Int) -> item > 0)
-	doubled.forEach((item Int) -> Term.println(item))
+	doubled.forEach((item Int) -> OS.println(item))
 	if hasBig && allPositive {
 		return doubled.get(2).getOr(0) + doubled2.get(1).getOr(0) + expanded.get(5).getOr(0) + filtered.size() + total + reduced.getOr(0)
 	}
@@ -1498,7 +1498,7 @@ def run() Int {
 	setReduced Option[Int] = seen.reduce((left Int, right Int) -> left + right)
 	setHasBig Bool = seen.exists((item Int) -> item > 2)
 	setAllPositive Bool = seen.forAll((item Int) -> item > 0)
-	seen.forEach((item Int) -> Term.println(item))
+	seen.forEach((item Int) -> OS.println(item))
 
 	values Map[Str, Int] = Map("a" : 1, "b" : 2)
 	mapped List[Int] = values.map((key Str, value Int) -> value * 10)
@@ -1508,7 +1508,7 @@ def run() Int {
 	mapReduced Option[(Str, Int)] = values.reduce((leftKey Str, leftValue Int, rightKey Str, rightValue Int) -> (rightKey, rightValue))
 	mapHasB Bool = values.exists((key Str, value Int) -> key == "b")
 	mapAllSmall Bool = values.forAll((key Str, value Int) -> value < 3)
-	values.forEach((key Str, value Int) -> Term.println(key))
+	values.forEach((key Str, value Int) -> OS.println(key))
 
 	total Int := 0
 	for item Int <- seen {
@@ -1655,7 +1655,7 @@ def run() Int {
 func TestAnalyzeTermPrintlnAnyTypes(t *testing.T) {
 	src := `
 def run() Int {
-	Term.println("count", 10, true)
+	OS.println("count", 10, true)
 	return 0
 }
 `
@@ -1862,7 +1862,7 @@ def run() Int {
 func TestAnalyzeUnitLambda(t *testing.T) {
 	src := `
 def run() Int {
-	action () -> Unit = () -> Term.println("hi")
+	action () -> Unit = () -> OS.println("hi")
 	action()
 	return 0
 }
@@ -2186,7 +2186,7 @@ def run() Int {
 		1 + 7
 	}
 	{
-		Term.println("xxx")
+		OS.println("xxx")
 	}
 	v Int := {
 		a Int = 5

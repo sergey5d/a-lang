@@ -15,9 +15,9 @@ def main() Int {
 	}
 
 	for item <- items {
-		Term.println("combo " + item)
+		OS.println("combo " + item)
 	}
 
-	Term.println("size " + items.size())
+	OS.println("size " + items.size())
 	0
 }

@@ -47,6 +47,56 @@ def run(input Int) Int {
 	}
 }
 
+func TestOSPrinters(t *testing.T) {
+	src := `
+def run() Unit {
+	OS.print("out")
+	OS.out.println(" line")
+	OS.err.println("err line")
+	OS.println("legacy")
+}
+`
+
+	oldStdout := os.Stdout
+	oldStderr := os.Stderr
+	stdoutReader, stdoutWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe returned error: %v", err)
+	}
+	stderrReader, stderrWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe returned error: %v", err)
+	}
+	os.Stdout = stdoutWriter
+	os.Stderr = stderrWriter
+	defer func() {
+		os.Stdout = oldStdout
+		os.Stderr = oldStderr
+	}()
+
+	in := New(parseProgram(t, src))
+	if _, err := in.Call("run"); err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	_ = stdoutWriter.Close()
+	_ = stderrWriter.Close()
+
+	stdoutBytes, err := io.ReadAll(stdoutReader)
+	if err != nil {
+		t.Fatalf("ReadAll stdout returned error: %v", err)
+	}
+	stderrBytes, err := io.ReadAll(stderrReader)
+	if err != nil {
+		t.Fatalf("ReadAll stderr returned error: %v", err)
+	}
+	if string(stdoutBytes) != "out line\nlegacy\n" {
+		t.Fatalf("unexpected stdout %q", string(stdoutBytes))
+	}
+	if string(stderrBytes) != "err line\n" {
+		t.Fatalf("unexpected stderr %q", string(stderrBytes))
+	}
+}
+
 func TestForLoops(t *testing.T) {
 	src := `
 def run() Int {
@@ -468,7 +518,7 @@ def run() Str {
 func TestUnitLambda(t *testing.T) {
 	src := `
 def run() Int {
-	action () -> Unit = () -> Term.println("hi")
+	action () -> Unit = () -> OS.println("hi")
 	action()
 	return 0
 }
@@ -793,7 +843,7 @@ def run() Int {
 
 	seen = Set(1, 2)
 	if seen.contains(2) {
-		Term.println("ok", "done")
+		OS.println("ok", "done")
 	}
 
 	return items.get(0).getOr(0) + values.get("a").getOr(0) + values.size() + seen.size()
@@ -823,7 +873,7 @@ def run() Int {
 		t.Fatalf("expected 6, got %#v", value)
 	}
 	if strings.TrimSpace(string(output)) != "ok done" {
-		t.Fatalf("expected Term output 'ok', got %q", string(output))
+		t.Fatalf("expected OS output 'ok', got %q", string(output))
 	}
 }
 
@@ -904,7 +954,7 @@ def run() Int {
 	doubled = items.map((item Int) -> item * 2)
 	doubled2 = items.map(item -> item * 2)
 	expanded = items.flatMap((item Int) -> List(item, item + 10))
-	doubled.forEach((item Int) -> Term.println("item " + item))
+	doubled.forEach((item Int) -> OS.println("item " + item))
 	return doubled.get(2).getOr(0) * 100 + doubled2.get(1).getOr(0) * 10 + expanded.get(5).getOr(0)
 }
 `
@@ -947,7 +997,7 @@ def run() Int {
 	setReduced = seen.reduce((left Int, right Int) -> left + right)
 	setHasBig = seen.exists((item Int) -> item > 2)
 	setAllPositive = seen.forAll((item Int) -> item > 0)
-	seen.forEach((item Int) -> Term.println("set " + item))
+	seen.forEach((item Int) -> OS.println("set " + item))
 
 	values = Map("a" : 1, "b" : 2)
 	mapped = values.map((key Str, value Int) -> value * 10)
@@ -957,7 +1007,7 @@ def run() Int {
 	mapReduced = values.reduce((leftKey Str, leftValue Int, rightKey Str, rightValue Int) -> (rightKey, rightValue))
 	mapHasB = values.exists((key Str, value Int) -> key == "b")
 	mapAllSmall = values.forAll((key Str, value Int) -> value < 3)
-	values.forEach((key Str, value Int) -> Term.println("pair " + key + " " + value))
+	values.forEach((key Str, value Int) -> OS.println("pair " + key + " " + value))
 
 	total := 0
 	for item Int <- seen {
@@ -1035,7 +1085,7 @@ def run() Int {
 	removed = items.remove(1)
 	empty = None()
 
-	Term.print("left", "-", "right")
+	OS.print("left", "-", "right")
 
 	if empty.isEmpty() {
 		return head * 1000 + rest.size() * 100 + removed.getOr(0)
@@ -1147,7 +1197,7 @@ def run() Int {
 	items2 = for item <- values yield {
 		item + 1
 	}
-	Term.println("items " + items.size() + " " + items2.size())
+	OS.println("items " + items.size() + " " + items2.size())
 	return label + items.size() + items2.size()
 }
 `
@@ -1732,7 +1782,7 @@ def run() Int {
 		1 + 7
 	}
 	{
-		Term.println("xxx")
+		OS.println("xxx")
 	}
 	v := {
 		a = 5

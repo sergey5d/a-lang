@@ -4,6 +4,6 @@
 
 def main() Int {
     loop: break
-    Term.println("after loop")
+    OS.println("after loop")
     0
 }

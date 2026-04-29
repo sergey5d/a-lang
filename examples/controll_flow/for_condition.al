@@ -8,14 +8,14 @@
 # 0
 
 def next(label Str, value Int) Int {
-    Term.println(label + " " + value)
+    OS.println(label + " " + value)
     value + 1
 }
 
 def main() Int {
     count Int := 0
     for count < 3 {
-        Term.println("block " + count)
+        OS.println("block " + count)
         count += 1
     }
 

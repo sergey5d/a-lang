@@ -6,19 +6,19 @@ class Adder {
 	}
 
 	def add(value Int) Int {
-	    Term.println("value added int " + value)
+	    OS.println("value added int " + value)
 		this.base + value
 	}
 
 	def add(value Str) Int {
-	    Term.println("value added string " + value)
+	    OS.println("value added string " + value)
     	this.base + 4
     }
 
 	def alterThemAll(items Int...) {
     	for item <- items {
     	    increased = item + 5
-    	    Term.println("increased!", increased)
+    	    OS.println("increased!", increased)
     	    if increased != 9 {
     	        break
     	    }
@@ -44,10 +44,10 @@ class Bucket {
     }
 
     def print() {
-        Term.println("base " + this.base)
+        OS.println("base " + this.base)
     }
 
-    def print2() = Term.println("base " + this.base)
+    def print2() = OS.println("base " + this.base)
 
     def get2() Int = 5
  }
@@ -83,12 +83,12 @@ def main() Int {
 	first Int = 5
 	second Int = 7
 	third2 = 56
-	Term.println("third2 " + third2)
+	OS.println("third2 " + third2)
 
-	def x(term Int) = Term.println("xexe" + term)
+	def x(term Int) = OS.println("xexe" + term)
 
 	def lala() = {
-	    Term.println("lala")
+	    OS.println("lala")
 	}
 
 	x(5)
@@ -104,7 +104,7 @@ def main() Int {
 	    value + boost
 	}
 
-	Term.println("boost2 " + addBoost2(4))
+	OS.println("boost2 " + addBoost2(4))
 
 	lambdaResult Int = addBoost(counter)
 
@@ -116,39 +116,39 @@ def main() Int {
 	tuple1 = adder.tupleFun()
 	t1, t2 := tuple1
 
-	Term.println("tuple1", t1, t2)
+	OS.println("tuple1", t1, t2)
 
 	tuple2 = adder.tupleFun2()
     t21, t22 := tuple2
-    Term.println("tuple2", t21, t22, tuple2.amount, tuple2.descr)
+    OS.println("tuple2", t21, t22, tuple2.amount, tuple2.descr)
 
-    Term.println("tuple3", adder.tupleFun3().amount, adder.tupleFun3().descr)
+    OS.println("tuple3", adder.tupleFun3().amount, adder.tupleFun3().descr)
 
 	methodResult Int = adder.add(lambdaResult)
 
-	Term.println("counter " + counter)
-	Term.println("lambda " + lambdaResult)
-	Term.println("method " + methodResult)
+	OS.println("counter " + counter)
+	OS.println("lambda " + lambdaResult)
+	OS.println("method " + methodResult)
 
-	Term.println("global " + third)
+	OS.println("global " + third)
 
-	Term.println(suckItAll("haha"))
-	Term.println(suckItAll2("haha 2"))
-	Term.println("lalala " + suckItAll23("haha 2"))
+	OS.println(suckItAll("haha"))
+	OS.println(suckItAll2("haha 2"))
+	OS.println("lalala " + suckItAll23("haha 2"))
 
 	result = if first == 5 {
-	    Term.println("YES it's 5!!!")
+	    OS.println("YES it's 5!!!")
 	    6
 	} else {
-	    Term.println("NONONO")
+	    OS.println("NONONO")
 	    8
 	}
 
-	Term.println("result " + result)
+	OS.println("result " + result)
 
 	loop {
 	    if counter < 20 {
-	        Term.println("counter " + counter)
+	        OS.println("counter " + counter)
 	    } else {
 	        break
 	    }
@@ -159,11 +159,11 @@ def main() Int {
 
     crapper := 0
 	for item <- list {
-	    Term.println("item " + item)
+	    OS.println("item " + item)
 	    crapper += item
 	}
 
-	Term.println("item end " + crapper)
+	OS.println("item end " + crapper)
 
 	newList = for {
 	    item <- list
@@ -173,7 +173,7 @@ def main() Int {
 	}
 
 	for item <- newList {
-        Term.println("item", item)
+        OS.println("item", item)
     }
 
     var1, var2, var3 = 1, crapper, "5a7"
@@ -184,17 +184,17 @@ def main() Int {
 
     var9, var10 := 800, adder.add(7) + 700
 
-    Term.println(var1, var2, var3, var4, var5, var5, var6, var7, var8, var9, var10)
+    OS.println(var1, var2, var3, var4, var5, var5, var6, var7, var8, var9, var10)
 
     var9, var10 := 801, adder.add(7) + 701
 
-    Term.println(var1, var2, var3, var4, var5, var5, var6, var7, var8, var9, var10)
+    OS.println(var1, var2, var3, var4, var5, var5, var6, var7, var8, var9, var10)
 
     bucket Bucket = Bucket(10)
 
     bucket.print()
 
-    Term.println("bucket.get2 " + bucket.get2())
+    OS.println("bucket.get2 " + bucket.get2())
 
 	return methodResult
 }

@@ -5,7 +5,15 @@ import "a-lang/parser"
 type nativeMethodHandler func(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error)
 
 func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
-		return map[string]map[string]nativeMethodHandler{
+	return map[string]map[string]nativeMethodHandler{
+		"Printer": {
+			"print":   nativePrinterPrint,
+			"println": nativePrinterPrintln,
+		},
+		"OS": {
+			"print":   nativeOSPrint,
+			"println": nativeOSPrintln,
+		},
 		"Str": {
 			"size": nativeStrSize,
 		},
@@ -91,10 +99,6 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"contains": nativeMapContains,
 			"size":     nativeMapSize,
 		},
-		"Term": {
-			"print":   nativeTermPrint,
-			"println": nativeTermPrintln,
-		},
 	}
 }
 
@@ -150,6 +154,16 @@ func asNativeEither(receiver Value) (*nativeEither, bool) {
 	return value, ok
 }
 
+func asNativePrinter(receiver Value) (*nativePrinter, bool) {
+	value, ok := receiver.(*nativePrinter)
+	return value, ok
+}
+
+func asNativeOS(receiver Value) (*nativeOS, bool) {
+	value, ok := receiver.(*nativeOS)
+	return value, ok
+}
+
 func asNativeSet(receiver Value) (*nativeSet, bool) {
 	value, ok := receiver.(*nativeSet)
 	return value, ok
@@ -160,10 +174,6 @@ func asNativeMap(receiver Value) (*nativeMap, bool) {
 	return value, ok
 }
 
-func asNativeTerm(receiver Value) (*nativeTerm, bool) {
-	value, ok := receiver.(*nativeTerm)
-	return value, ok
-}
 
 func boolResult(value Value, methodName string, span parser.Span) (bool, error) {
 	result, ok := value.(bool)

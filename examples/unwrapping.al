@@ -34,24 +34,24 @@ def main() {
     optionSome = plusOneOption(Some(5))
     optionNone = plusOneOption(None())
 
-    Term.println("option some ${optionSome.getOr(0)}")
-    Term.println("option none ${optionNone.isEmpty()}")
+    OS.println("option some ${optionSome.getOr(0)}")
+    OS.println("option none ${optionNone.isEmpty()}")
 
     resultOk = plusOneResult(Ok(6))
     resultErr = plusOneResult(Err("bad"))
 
-    Term.println("result ok ${resultOk.getOr(0)}")
-    Term.println("result err ${resultErr.getError()}")
+    OS.println("result ok ${resultOk.getOr(0)}")
+    OS.println("result err ${resultErr.getError()}")
 
     eitherRight = plusOneEither(Right(7))
     eitherLeft = plusOneEither(Left("nope"))
-    Term.println("either right ${eitherRight.getOr(0)}")
-    Term.println("either left ${eitherLeft.getLeft()}")
+    OS.println("either right ${eitherRight.getOr(0)}")
+    OS.println("either left ${eitherLeft.getLeft()}")
 
     if true {
         combo = twoEithers(Right(7), Right("abc"))
         comboLeft = twoEithers(Right(7), Left("size bad"))
-        Term.println("either combo ${combo.getOr(0)}")
-        Term.println("either combo left ${comboLeft.getLeft()}")
+        OS.println("either combo ${combo.getOr(0)}")
+        OS.println("either combo left ${comboLeft.getLeft()}")
     }
 }

@@ -21,29 +21,29 @@
 def main() Unit {
     total Int := 0
     for item <- Range(1, 4) {
-        Term.println("range", item)
+        OS.println("range", item)
         total := total + item
     }
-    Term.println("total", total)
+    OS.println("total", total)
 
     multiplied := 1
     for item <- Range.apply(10, 14) {
-        Term.println("another range", item)
+        OS.println("another range", item)
         multiplied *= item
     }
-    Term.println("another multiplied", multiplied)
+    OS.println("another multiplied", multiplied)
 
     descendingTotal := 0
     for item <- Range.apply(5, 1) {
-        Term.println("descending", item)
+        OS.println("descending", item)
         descendingTotal += item
     }
-    Term.println("descending total", descendingTotal)
+    OS.println("descending total", descendingTotal)
 
     steppedTotal := 0
     for item <- Range.apply(10, 4, -2) {
-        Term.println("stepped", item)
+        OS.println("stepped", item)
         steppedTotal += item
     }
-    Term.println("stepped total", steppedTotal)
+    OS.println("stepped total", steppedTotal)
 }

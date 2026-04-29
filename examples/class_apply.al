@@ -10,6 +10,6 @@ class Adder {
 
 def main() Int {
     adder Adder = Adder(5)
-    Term.println(adder(7))
+    OS.println(adder(7))
     0
 }

@@ -210,7 +210,7 @@ def run() Int {
 		1 + 7
 	}
 	{
-		Term.println("xxx")
+		OS.println("xxx")
 	}
 	v := {
 		a = 5
@@ -415,7 +415,7 @@ func TestParseColonShorthandStatements(t *testing.T) {
 	src := `
 def run(values List[Int], flag Bool, maybe MaybeInt) Int {
 	if flag: return 1 else: return 2
-	for value <- values: Term.println(value)
+	for value <- values: OS.println(value)
 	loop: break
 	match maybe: SomeX(x) => return x
 }
@@ -776,10 +776,10 @@ class Counter {
 
 func TestParseExplicitUnitDefs(t *testing.T) {
 	src := `
-def printIt() Unit = Term.println("x")
+def printIt() Unit = OS.println("x")
 
 class Counter {
-	def print() Unit = Term.println("y")
+	def print() Unit = OS.println("y")
 }
 `
 
@@ -1004,7 +1004,7 @@ def run() Unit {
 func TestParseZeroArgFunctionBindingSugar(t *testing.T) {
 	src := `
 def run() Unit {
-	action () -> Unit = Term.println("x")
+	action () -> Unit = OS.println("x")
 }
 `
 
@@ -1991,7 +1991,7 @@ func TestParseIfOptionBinding(t *testing.T) {
 	src := `
 def run(value Option[Int]) Unit {
 	if item <- value {
-		Term.println(item)
+		OS.println(item)
 	}
 }
 `
@@ -2021,7 +2021,7 @@ func TestParseIfOptionDestructuring(t *testing.T) {
 	src := `
 def run(value Option[(Int, Str, Bool)]) Unit {
 	if _, name Str, _ <- value {
-		Term.println(name)
+		OS.println(name)
 	}
 }
 `

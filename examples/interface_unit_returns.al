@@ -12,11 +12,11 @@ interface ImplicitPrinter {
 
 class Printer with ExplicitPrinter, ImplicitPrinter {
     impl def printExplicit() {
-        Term.println("explicit")
+        OS.println("explicit")
     }
 
     impl def printImplicit() {
-        Term.println("implicit")
+        OS.println("implicit")
     }
 }
 

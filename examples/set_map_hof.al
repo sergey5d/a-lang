@@ -29,7 +29,7 @@ def main() {
     setReduced = seen.reduce((left Int, right Int) -> left + right)
     setHasBig = seen.exists((item Int) -> item > 2)
     setAllPositive = seen.forAll((item Int) -> item > 0)
-    seen.forEach((item Int) -> Term.println("set " + item))
+    seen.forEach((item Int) -> OS.println("set " + item))
 
     values = Map("a" : 1, "b" : 2)
     mapped = values.map((key Str, value Int) -> value * 10)
@@ -40,22 +40,22 @@ def main() {
     reducedKey, reducedValue = reducedPair
     mapHasB = values.exists((key Str, value Int) -> key == "b")
     mapAllSmall = values.forAll((key Str, value Int) -> value < 3)
-    values.forEach((key Str, value Int) -> Term.println("pair " + key + " " + value))
+    values.forEach((key Str, value Int) -> OS.println("pair " + key + " " + value))
 
-    Term.println("doubled " + doubled.contains(4) + " " + doubled.size())
-    Term.println("expanded " + expanded.contains(12) + " " + expanded.size())
-    Term.println("filtered " + filtered.contains(2) + " " + filtered.size())
-    Term.println("setFold " + setTotal)
-    Term.println("setReduce " + setReduced.getOr(0))
-    Term.println("setExists " + setHasBig)
-    Term.println("setForAll " + setAllPositive)
-    Term.println("mapped " + mapped.get(0).getOr(0) + " " + mapped.get(1).getOr(0))
-    Term.println("expandedValues " + expandedValues.get(0).getOr(0) + " " + expandedValues.get(3).getOr(0))
-    Term.println("filteredMap " + filteredMap.contains("b") + " " + filteredMap.size())
-    Term.println("mapFold " + mapTotal)
-    Term.println("mapReduce " + reducedKey + " " + reducedValue)
-    Term.println("mapExists " + mapHasB)
-    Term.println("mapForAll " + mapAllSmall)
+    OS.println("doubled " + doubled.contains(4) + " " + doubled.size())
+    OS.println("expanded " + expanded.contains(12) + " " + expanded.size())
+    OS.println("filtered " + filtered.contains(2) + " " + filtered.size())
+    OS.println("setFold " + setTotal)
+    OS.println("setReduce " + setReduced.getOr(0))
+    OS.println("setExists " + setHasBig)
+    OS.println("setForAll " + setAllPositive)
+    OS.println("mapped " + mapped.get(0).getOr(0) + " " + mapped.get(1).getOr(0))
+    OS.println("expandedValues " + expandedValues.get(0).getOr(0) + " " + expandedValues.get(3).getOr(0))
+    OS.println("filteredMap " + filteredMap.contains("b") + " " + filteredMap.size())
+    OS.println("mapFold " + mapTotal)
+    OS.println("mapReduce " + reducedKey + " " + reducedValue)
+    OS.println("mapExists " + mapHasB)
+    OS.println("mapForAll " + mapAllSmall)
 
     total := 0
     for item Int <- seen {
@@ -64,5 +64,5 @@ def main() {
     for key Str, value Int <- values {
         total += value
     }
-    Term.println("total " + total)
+    OS.println("total " + total)
 }

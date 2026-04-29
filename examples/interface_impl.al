@@ -20,7 +20,7 @@ class Rabbit with Hopper, Jumper {
 def main() Int {
     rabbit Hopper = Rabbit()
     jumper Jumper = Rabbit()
-    Term.println(rabbit.hop())
-    Term.println(jumper.jump(2))
+    OS.println(rabbit.hop())
+    OS.println(jumper.jump(2))
     0
 }

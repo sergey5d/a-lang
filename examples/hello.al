@@ -3,6 +3,6 @@
 # 0
 
 def main() Int {
-	Term.println("hello world")
+	OS.println("hello world")
 	0
 }

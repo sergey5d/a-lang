@@ -19,7 +19,7 @@ def main() Unit {
         1 + 7
     }
     {
-        Term.println("xxx")
+        OS.println("xxx")
     }
     v := {
         a = 5
@@ -52,10 +52,10 @@ def main() Unit {
         }
     }
 
-    Term.println(a1)
-    Term.println(v)
-    Term.println(branch)
-    Term.println(yielded.get(0).getOr(0))
-    Term.println(yielded.get(1).getOr(0))
-    Term.println(matched)
+    OS.println(a1)
+    OS.println(v)
+    OS.println(branch)
+    OS.println(yielded.get(0).getOr(0))
+    OS.println(yielded.get(1).getOr(0))
+    OS.println(matched)
 }

@@ -7,17 +7,17 @@
 
 def main() Int {
     if true {
-        Term.println("then")
+        OS.println("then")
     } else {
-        Term.println("else")
+        OS.println("else")
     }
 
     if false {
-        Term.println("nope")
+        OS.println("nope")
     } else if true {
-        Term.println("else-if")
+        OS.println("else-if")
     } else {
-        Term.println("also nope")
+        OS.println("also nope")
     }
 
     picked = if false {
@@ -25,13 +25,13 @@ def main() Int {
     } else {
         5
     }
-    Term.println("picked " + picked)
+    OS.println("picked " + picked)
 
     values = [7]
     if value <- values.get(0) {
-        Term.println("binding " + value)
+        OS.println("binding " + value)
     } else {
-        Term.println("binding none")
+        OS.println("binding none")
     }
 
     0

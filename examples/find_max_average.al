@@ -37,6 +37,6 @@ def main() Int {
     nums[4] := 50.
     nums[5] := 3.
 
-    Term.println(findMaxAverage(nums, 4))
+    OS.println(findMaxAverage(nums, 4))
     0
 }

@@ -55,9 +55,9 @@ def main() Unit {
     combo Int = aFromAlt.trueAge() + bManual.trueAge()
 
     if aFromFields.trueName() == "Sammy" {
-        Term.println("a fields", aFromFields.trueAge(), aFromFields.trueName())
-        Term.println("a alt", aFromAlt.trueAge(), aFromAlt.trueName())
-        Term.println("b manual", bManual.trueAge(), bManual.trueName())
-        Term.println("combo", combo)
+        OS.println("a fields", aFromFields.trueAge(), aFromFields.trueName())
+        OS.println("a alt", aFromAlt.trueAge(), aFromAlt.trueName())
+        OS.println("b manual", bManual.trueAge(), bManual.trueName())
+        OS.println("combo", combo)
     }
 }

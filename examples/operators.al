@@ -24,15 +24,15 @@ def main() Unit {
     total Vec = left + right
     neg Vec = -total
 
-    Term.println(total[0], total[1])
-    Term.println(neg[0])
+    OS.println(total[0], total[1])
+    OS.println(neg[0])
 
     items = List(1, 2)
     items2 = items :+ 3
     merged = items2 ++ List(4, 5)
-    Term.println(merged[4])
+    OS.println(merged[4])
 
     seen = Set(1, 2)
     all = seen ++ Set(3)
-    Term.println(all.size())
+    OS.println(all.size())
 }

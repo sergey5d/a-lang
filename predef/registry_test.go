@@ -27,12 +27,20 @@ func TestLoadRegistry(t *testing.T) {
 		t.Fatalf("expected Option to be a class, got %s", option.Kind)
 	}
 
-	term, ok := registry.Types["Term"]
+	printer, ok := registry.Types["Printer"]
 	if !ok {
-		t.Fatalf("expected Term descriptor to be loaded")
+		t.Fatalf("expected Printer descriptor to be loaded")
 	}
-	if len(term.Methods) != 2 {
-		t.Fatalf("expected Term to expose 2 methods, got %d", len(term.Methods))
+	if printer.Kind != KindInterface || len(printer.Methods) != 2 {
+		t.Fatalf("expected Printer to expose 2 methods, got %#v", printer)
+	}
+
+	osValue, ok := registry.Types["OS"]
+	if !ok {
+		t.Fatalf("expected OS descriptor to be loaded")
+	}
+	if osValue.Kind != KindObject || len(osValue.Fields) != 2 {
+		t.Fatalf("expected OS object descriptor, got %#v", osValue)
 	}
 
 	str, ok := registry.Types["Str"]

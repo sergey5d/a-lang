@@ -39,19 +39,19 @@ def syntax1(rows List[(Int, Int, Str)]) Unit {
         lastY := initialY
         for x Int, y Int, char Str <- rows {
             for lineStep <- Range.apply(y, lastY) {
-                Term.println()
+                OS.println()
             }
             if lastX < x {
                 for spaceStep <- Range.apply(lastX, x) {
-                    Term.print(" ")
+                    OS.print(" ")
                 }
             }
-            Term.print(char)
+            OS.print(char)
             lastX := x + 1
             lastY := y
         }
 
-        Term.println()
+        OS.println()
     }
 }
 
@@ -61,19 +61,19 @@ def syntax2(rows List[(Int, Int, Str)]) Unit {
         lastY := initialY
         for x, y, char <- rows {
             for lineStep <- Range.apply(y, lastY) {
-                Term.println()
+                OS.println()
             }
             if lastX < x {
                 for spaceStep <- Range.apply(lastX, x) {
-                    Term.print(" ")
+                    OS.print(" ")
                 }
             }
-            Term.print(char)
+            OS.print(char)
             lastX := x + 1
             lastY := y
         }
 
-        Term.println()
+        OS.println()
     }
 }
 
@@ -86,19 +86,19 @@ def syntax3(rows List[(Int, Int, Str)]) Unit {
         for row <- rows {
             x, y, char Str = row
             for lineStep <- Range.apply(y, lastY) {
-                Term.println()
+                OS.println()
             }
             if lastX < x {
                 for spaceStep <- Range.apply(lastX, x) {
-                    Term.print(" ")
+                    OS.print(" ")
                 }
             }
-            Term.print(char)
+            OS.print(char)
             lastX := x + 1
             lastY := y
         }
 
-        Term.println()
+        OS.println()
     }
 }
 
@@ -112,19 +112,19 @@ def syntax4(rows List[(Int, Int, Str)]) Unit {
         xImmutable = x
     } yield {
         for lineStep <- Range.apply(y, lastY) {
-            Term.println()
+            OS.println()
         }
         if lastX < xImmutable {
             for spaceStep <- Range.apply(lastX, xImmutable) {
-                Term.print(" ")
+                OS.print(" ")
             }
         }
-        Term.print(char)
+        OS.print(char)
         lastX := x + 1
         lastY := y
         char
     }
-    Term.println()
+    OS.println()
 }
 
 def main() Unit {

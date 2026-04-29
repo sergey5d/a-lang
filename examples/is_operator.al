@@ -17,10 +17,10 @@ interface Breaker {
 
 def main() Int {
 	counter = Counter()
-	Term.println("value is Counter? " + (counter is Counter))
-	Term.println("counter is CounterPrecursor? " + (counter is CounterPrecursor))
-	Term.println("string is Str? " + ("hello" is Str))
-	Term.println("value is Str? " + (counter is Str))
-	Term.println("counter is Breaker? " + (counter is Breaker))
+	OS.println("value is Counter? " + (counter is Counter))
+	OS.println("counter is CounterPrecursor? " + (counter is CounterPrecursor))
+	OS.println("string is Str? " + ("hello" is Str))
+	OS.println("value is Str? " + (counter is Str))
+	OS.println("counter is Breaker? " + (counter is Breaker))
 	0
 }

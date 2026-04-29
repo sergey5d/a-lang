@@ -102,7 +102,13 @@ type nativeMap struct {
 	keys  map[string]Value
 	order []string
 }
-type nativeTerm struct{}
+type nativePrinter struct {
+	stderr bool
+}
+type nativeOS struct {
+	out *nativePrinter
+	err *nativePrinter
+}
 
 type returnSignal struct {
 	value Value
@@ -1229,8 +1235,8 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		switch e.Name {
 		case "List", "Set", "Map", "Array", "Some", "None", "Ok", "Err", "Left", "Right":
 			return builtinRef{name: e.Name}, nil
-		case "Term":
-			return &nativeTerm{}, nil
+		case "OS":
+			return newNativeOS(), nil
 		}
 		if _, ok := in.imports[e.Name]; ok {
 			return moduleRef{name: e.Name}, nil
@@ -1974,7 +1980,18 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 			}
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
-	case string, *nativeList, *nativeArray, *nativeOption, *nativeResult, *nativeEither, *nativeSet, *nativeMap, *nativeTerm:
+	case *nativeOS:
+		switch expr.Name {
+		case "out":
+			return value.out, nil
+		case "err":
+			return value.err, nil
+		}
+		if in.nativeHasMethod(receiver, expr.Name) {
+			return nil, RuntimeError{Message: "method '" + expr.Name + "' must be called with ()", Span: expr.Span}
+		}
+		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
+	case string, *nativeList, *nativeArray, *nativeOption, *nativeResult, *nativeEither, *nativeSet, *nativeMap, *nativePrinter:
 		if in.nativeHasMethod(receiver, expr.Name) {
 			return nil, RuntimeError{Message: "method '" + expr.Name + "' must be called with ()", Span: expr.Span}
 		}
@@ -2317,8 +2334,10 @@ func nativeBuiltinTypeName(value Value) (string, bool) {
 		return "Set", true
 	case *nativeMap:
 		return "Map", true
-	case *nativeTerm:
-		return "Term", true
+	case *nativePrinter:
+		return "Printer", true
+	case *nativeOS:
+		return "OS", true
 	default:
 		return "", false
 	}
@@ -2561,6 +2580,13 @@ func kindOrTuple(kind string) string {
 	return kind
 }
 
+func newNativeOS() *nativeOS {
+	return &nativeOS{
+		out: &nativePrinter{},
+		err: &nativePrinter{stderr: true},
+	}
+}
+
 func (in *Interpreter) runtimeMethodMatches(method *parser.MethodDecl, args []Value) bool {
 	if !acceptsArgCount(method.Parameters, len(args)) {
 		return false
@@ -2603,7 +2629,7 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 		return ok && len(ref.TupleElements) == len(tuple.items)
 	}
 	switch ref.Name {
-	case "", "Unit", "Int", "Float", "Bool", "Str", "Rune", "List", "Iterable", "Iterator", "Set", "Map", "Option", "Result", "Either", "Unwrappable", "Array", "Term":
+	case "", "Unit", "Int", "Float", "Bool", "Str", "Rune", "List", "Iterable", "Iterator", "Set", "Map", "Option", "Result", "Either", "Unwrappable", "Array", "Printer", "OS":
 	default:
 		if _, ok := in.classes[ref.Name]; !ok {
 			if _, ok := in.interfaces[ref.Name]; !ok {
@@ -2690,9 +2716,14 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 	case "Array":
 		_, ok := value.(*nativeArray)
 		return ok
-	case "Term":
+	case "OS":
 		if typeName, ok := nativeBuiltinTypeName(value); ok {
-			return builtinTypeImplements(typeName, "Term")
+			return typeName == "OS"
+		}
+		return false
+	case "Printer":
+		if typeName, ok := nativeBuiltinTypeName(value); ok {
+			return builtinTypeImplements(typeName, "Printer")
 		}
 		return false
 	default:
@@ -3453,8 +3484,10 @@ func zeroValue(ref *parser.TypeRef) Value {
 		return &nativeTuple{items: items, names: append([]string(nil), ref.TupleNames...)}
 	case "Option":
 		return &nativeOption{set: false}
-	case "Term":
-		return &nativeTerm{}
+	case "OS":
+		return newNativeOS()
+	case "Printer":
+		return &nativePrinter{}
 	default:
 		return nil
 	}

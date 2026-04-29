@@ -8,8 +8,8 @@ def main() {
     name Str = "world"
     count Int = 2
 
-    Term.println("hello $name")
-    Term.println("next ${count + 1}")
-    Term.println("money \$${count + 3}")
-    Term.println("mix $name-${count + 2}")
+    OS.println("hello $name")
+    OS.println("next ${count + 1}")
+    OS.println("money \$${count + 3}")
+    OS.println("mix $name-${count + 2}")
 }

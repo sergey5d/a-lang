@@ -674,7 +674,7 @@ func (r *Resolver) isTypeParameter(name string) bool {
 
 func builtinTypeArity(name string) (int, bool) {
 	switch name {
-	case "Int", "Int64", "Bool", "Str", "Rune", "Float", "Float64", "Term", "Unit":
+	case "Int", "Int64", "Bool", "Str", "Rune", "Float", "Float64", "Printer", "OS", "Unit":
 		return 0, true
 	case "List", "Set", "Array", "Option":
 		return 1, true
@@ -757,7 +757,7 @@ func (r *Resolver) currentTypeScope() typeScope {
 
 func isBuiltin(name string) bool {
 	switch name {
-	case "List", "Map", "Set", "Array", "Some", "None", "Ok", "Err", "Left", "Right", "Term":
+	case "List", "Map", "Set", "Array", "Some", "None", "Ok", "Err", "Left", "Right", "OS":
 		return true
 	default:
 		return false

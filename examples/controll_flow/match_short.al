@@ -20,13 +20,13 @@ class Worker with WorkerLike {
 def main() Int {
     pair PairBox = PairBox(5, 9)
 
-    match pair: PairBox(left, right) => Term.println("pair " + left + "-" + right)
+    match pair: PairBox(left, right) => OS.println("pair " + left + "-" + right)
 
     picked = match pair: PairBox(left, right) => left + right
-    Term.println(picked)
+    OS.println(picked)
 
     workerLike WorkerLike = Worker()
-    match workerLike: worker Worker => Term.println("worker " + worker.doWork())
+    match workerLike: worker Worker => OS.println("worker " + worker.doWork())
 
     0
 }

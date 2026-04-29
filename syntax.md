@@ -28,6 +28,8 @@ Common stdlib/prelude types:
 - `Iterable[T]`
 - `Iterator[T]`
 - `Ordering[T]`
+- `Printer`
+- `OS`
 
 Tuple types:
 
@@ -76,6 +78,19 @@ Rules:
 - multiline strings preserve their contents exactly, including a leading newline
 - multiline strings do not interpolate
 - `"""` strings must not be empty
+
+## OS / Printing
+
+Console printing is available through `OS`:
+
+```txt
+OS.print("hello")
+OS.println("hello")
+OS.out.println("hello")
+OS.err.println("oops")
+```
+
+`OS.out` and `OS.err` implement `Printer`.
 
 ## Imports
 
@@ -506,7 +521,7 @@ Standalone nested blocks are valid expression statements:
 
 ```txt
 {
-    Term.println("xxx")
+    OS.println("xxx")
 }
 ```
 
@@ -516,9 +531,9 @@ Statement form:
 
 ```txt
 if value > 0 {
-    Term.println("positive")
+    OS.println("positive")
 } else {
-    Term.println("non-positive")
+    OS.println("non-positive")
 }
 ```
 
@@ -526,7 +541,7 @@ Option binding form:
 
 ```txt
 if item <- maybeValue {
-    Term.println(item)
+    OS.println(item)
 }
 ```
 
@@ -534,8 +549,8 @@ Destructuring also works in `if <-`:
 
 ```txt
 if x, y <- maybePair {
-    Term.println(x)
-    Term.println(y)
+    OS.println(x)
+    OS.println(y)
 }
 ```
 
@@ -555,7 +570,7 @@ Simple loop:
 
 ```txt
 for item <- [1, 2, 3] {
-    Term.println(item)
+    OS.println(item)
 }
 ```
 
@@ -563,7 +578,7 @@ Destructuring loop:
 
 ```txt
 for x, y, char <- rows {
-    Term.println(char)
+    OS.println(char)
 }
 ```
 
@@ -607,10 +622,10 @@ Statement form:
 ```txt
 match value {
     SomeX(x) => {
-        Term.println(x)
+        OS.println(x)
     }
     OptionX.NoneX => {
-        Term.println("none")
+        OS.println("none")
     }
 }
 ```

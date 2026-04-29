@@ -10,25 +10,25 @@
 
 def main() Int {
     a Int, b Str = (5, "hehe")
-    Term.println("tuple", a, b)
+    OS.println("tuple", a, b)
 
     inferredTupleLeft, inferredTupleRight = (6, "there")
-    Term.println("tuple inferred", inferredTupleLeft, inferredTupleRight)
+    OS.println("tuple inferred", inferredTupleLeft, inferredTupleRight)
 
     mixedTupleLeft Int, mixedTupleRight = (8, "mixed")
-    Term.println("tuple mixed", mixedTupleLeft, mixedTupleRight)
+    OS.println("tuple mixed", mixedTupleLeft, mixedTupleRight)
 
     mixedTuple2Left Int, mixedTuple2Right Str = (9, "mixed2")
-    Term.println("tuple mixed2", mixedTuple2Left, mixedTuple2Right)
+    OS.println("tuple mixed2", mixedTuple2Left, mixedTuple2Right)
 
     tuplePairLeft, tuplePairRight = (20, "pair")
-    Term.println("tuple pair", tuplePairLeft, tuplePairRight)
+    OS.println("tuple pair", tuplePairLeft, tuplePairRight)
 
     _, skippedOnlyTupleValue = (21, "unused")
-    Term.println("tuple skip only", skippedOnlyTupleValue)
+    OS.println("tuple skip only", skippedOnlyTupleValue)
 
     skippedTupleLeft Int, _, skippedTupleRight Str = (14, "drop", "xxx")
-    Term.println("tuple skip", skippedTupleLeft, skippedTupleRight)
+    OS.println("tuple skip", skippedTupleLeft, skippedTupleRight)
 
     0
 }

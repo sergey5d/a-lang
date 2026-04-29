@@ -9,7 +9,7 @@ record Amount {
 
 def main() Int {
     amount Amount = Amount(42, "hello")
-    Term.println(match amount {
+    OS.println(match amount {
         Amount(count, label) => count + "-" + label
     })
     0

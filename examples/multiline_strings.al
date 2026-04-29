@@ -16,7 +16,7 @@ done
 \nescaped
 """
 
-    Term.println(text)
+    OS.println(text)
 
     text2 = """Another
 multi-line

@@ -8,7 +8,7 @@ def main() Int {
 	counter Int := 0
 
 	loop {
-		Term.println("loop " + counter)
+		OS.println("loop " + counter)
 		counter += 1
 		if counter == 3 {
 			break

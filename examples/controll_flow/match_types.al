@@ -18,13 +18,13 @@ class Other with WorkerLike {
 def describe(value WorkerLike) {
     match value {
         worker Worker => {
-            Term.println("worker " + worker.doWork())
+            OS.println("worker " + worker.doWork())
         }
         other Other => {
-            Term.println("other " + other.doWork())
+            OS.println("other " + other.doWork())
         }
         _ => {
-            Term.println("unknown")
+            OS.println("unknown")
         }
     }
 }

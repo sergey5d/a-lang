@@ -90,7 +90,7 @@ func (b *typeRefBuilder) kindOf(name string) typecheck.TypeKind {
 		return typecheck.TypeInterface
 	}
 	switch name {
-	case "List", "Map", "Set", "Term", "Eq", "Option":
+	case "List", "Map", "Set", "Printer", "Eq", "Option":
 		return typecheck.TypeInterface
 	}
 	switch name {

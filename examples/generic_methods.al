@@ -13,7 +13,7 @@ class Mapper {
 
 def main() Int {
     mapper Mapper = Mapper()
-    Term.println(mapper.map(5, (x Int) -> x + 10))
-    Term.println(id(mapper.map(7, (x Int) -> "value=" + x)))
+    OS.println(mapper.map(5, (x Int) -> x + 10))
+    OS.println(id(mapper.map(7, (x Int) -> "value=" + x)))
     0
 }

@@ -19,9 +19,9 @@ def main() Int {
     valueB AliasB = AliasB()
     named Named = value
 
-    Term.println(named.label())
-    Term.println(aliasA.label())
-    Term.println(valueB.label())
-    Term.println(C(4) + things.C(5))
+    OS.println(named.label())
+    OS.println(aliasA.label())
+    OS.println(valueB.label())
+    OS.println(C(4) + things.C(5))
     return 0
 }

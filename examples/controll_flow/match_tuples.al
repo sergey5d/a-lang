@@ -10,24 +10,24 @@ def main() Int {
         (1, 2) => "exact tuple"
         _ => "miss"
     }
-    Term.println(exactPair)
+    OS.println(exactPair)
 
     exactPair2 = match (2, 3) {
         (a Int, b Int) => "exact tuple " + a + "-" + b
         _ => "miss"
     }
-    Term.println(exactPair2)
+    OS.println(exactPair2)
 
     exactPair3 = match (4, 5) {
         (a, b Int) => "exact tuple " + a + "-" + b
         _ => "miss"
     }
-    Term.println(exactPair3)
+    OS.println(exactPair3)
 
     pair = (1, 2)
     match pair {
         (left, right) => {
-            Term.println("tuple " + left + " " + right)
+            OS.println("tuple " + left + " " + right)
         }
     }
 

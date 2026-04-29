@@ -9,9 +9,9 @@ def main() Int {
     items = for item <- [1, 2, 3] yield: item + 1
 
     for item <- items {
-        Term.println("yield " + item)
+        OS.println("yield " + item)
     }
 
-    Term.println("size " + items.size())
+    OS.println("size " + items.size())
     0
 }

@@ -15,6 +15,6 @@ class Person {
 
 def main() Unit {
     person = Person(name = "Ada", age = 36)
-    Term.println(person.name())
-    Term.println(person.age())
+    OS.println(person.name())
+    OS.println(person.age())
 }

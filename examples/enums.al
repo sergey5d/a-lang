@@ -42,7 +42,7 @@ noneInt = OptionX.NoneX()
 someDefined = someInt.isDefined()
 
 def main() Unit {
-    Term.println("reddish:", reddish)
-    Term.println("some defined:", someDefined)
-    Term.println("none:", noneInt == OptionX.NoneX)
+    OS.println("reddish:", reddish)
+    OS.println("some defined:", someDefined)
+    OS.println("none:", noneInt == OptionX.NoneX)
 }

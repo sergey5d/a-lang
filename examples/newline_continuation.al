@@ -72,13 +72,13 @@ def main() Unit {
         fromFor +
         fromMatchStmt
 
-    Term.println("sum", sum)
-    Term.println("grouped", grouped)
-    Term.println("size", size)
-    Term.println("match", matched)
-    Term.println("def", helperValue)
-    Term.println("if", fromIf)
-    Term.println("for", fromFor)
-    Term.println("match stmt", fromMatchStmt)
-    Term.println("total", total)
+    OS.println("sum", sum)
+    OS.println("grouped", grouped)
+    OS.println("size", size)
+    OS.println("match", matched)
+    OS.println("def", helperValue)
+    OS.println("if", fromIf)
+    OS.println("for", fromFor)
+    OS.println("match stmt", fromMatchStmt)
+    OS.println("total", total)
 }

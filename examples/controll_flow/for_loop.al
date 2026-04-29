@@ -9,10 +9,10 @@ def main() Int {
 	total Int := 0
 
 	for item <- [1, 2, 3] {
-		Term.println("item " + item)
+		OS.println("item " + item)
 		total += item
 	}
 
-	Term.println("total " + total)
+	OS.println("total " + total)
 	0
 }

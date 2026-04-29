@@ -8,6 +8,6 @@ def main() Int {
         5 => "exact value"
         _ => "miss"
     }
-    Term.println(exactValue)
+    OS.println(exactValue)
     0
 }

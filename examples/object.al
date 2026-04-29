@@ -30,9 +30,9 @@ def main() Int {
     b1 B = A.apply(5)
     b2 B = A.apply("string of strings")
 
-    Term.println("value", A.value())
-    Term.println("test", A.test(5))
-    Term.println("b1", b1.size)
-    Term.println("b2", b2.size)
+    OS.println("value", A.value())
+    OS.println("test", A.test(5))
+    OS.println("b1", b1.size)
+    OS.println("b2", b2.size)
     0
 }

@@ -20,12 +20,12 @@ def format(prefix Str, value Int) Str {
 def main() Int {
 	formatter = Formatter()
 
-	Term.println("plain function", format("regular-", 7))
-	Term.println("mixed function", format("named-", value = 9))
-	Term.println("regular method", formatter.format("method-", 11))
-	Term.println("mixed method", formatter.format("method-", value = 13))
-	Term.println("named function", format(value = 15, prefix = "named-"))
-	Term.println("named method", formatter.format(value = 17, prefix = "method-"))
+	OS.println("plain function", format("regular-", 7))
+	OS.println("mixed function", format("named-", value = 9))
+	OS.println("regular method", formatter.format("method-", 11))
+	OS.println("mixed method", formatter.format("method-", value = 13))
+	OS.println("named function", format(value = 15, prefix = "named-"))
+	OS.println("named method", formatter.format(value = 17, prefix = "method-"))
 
 	0
 }

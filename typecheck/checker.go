@@ -1710,10 +1710,6 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			result = &Type{Kind: TypeClass, Name: e.Name}
 			break
 		}
-		if e.Name == "Term" {
-			result = &Type{Kind: TypeInterface, Name: "Term"}
-			break
-		}
 		if isBuiltinValue(e.Name) {
 			result = unknownType
 			break
@@ -2676,6 +2672,18 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			okMethod    bool
 			orderedArgs []parser.Expr
 		)
+		if receiverType.Name == "OS" && (member.Name == "println" || member.Name == "print") {
+			if hasNamedCallArgs(args) {
+				c.addDiagnostic("invalid_named_argument", "named arguments are not supported for variadic methods", member.Span)
+				c.checkArgTypes(callArgValues(args))
+				return unknownType
+			}
+			orderedArgs = callArgValues(args)
+			for _, arg := range orderedArgs {
+				c.checkExpr(arg)
+			}
+			return builtin("Unit")
+		}
 		if hasNamedCallArgs(args) {
 			method, orderedArgs, okMethod = c.resolveNamedMethodOverload(info, receiverType, member.Name, args, member.Span)
 		} else {
@@ -2724,11 +2732,11 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			}
 			orderedArgs = reordered
 		}
-		if receiverType.Name == "Term" && (member.Name == "println" || member.Name == "print") {
+		if receiverType.Name == "Printer" && (member.Name == "println" || member.Name == "print") {
 			for _, arg := range orderedArgs {
 				c.checkExpr(arg)
 			}
-			return receiverType
+			return builtin("Unit")
 		}
 		sig, ok := c.resolveInterfaceMethodCallSignature(info, receiverType, method.decl, orderedArgs, member.Span)
 		if !ok {
@@ -4332,7 +4340,7 @@ func isBuiltinType(name string) bool {
 
 func isBuiltinInterfaceType(name string) bool {
 	switch name {
-	case "Eq", "Ordering", "List", "Set", "Map", "Term", "Option", "Result", "Either", "Unwrappable":
+	case "Eq", "Ordering", "List", "Set", "Map", "Printer", "Option", "Result", "Either", "Unwrappable":
 		return true
 	default:
 		return false

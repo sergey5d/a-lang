@@ -96,7 +96,7 @@ Still open:
 - whether package-scoped methods should be exposed by default or require an explicit rule
 - if both a wide package import and a renamed selective import target the same package, the wide import should come first and the `as` import should come after it
 
-## Longer-Term Ideas
+## Longer-OS Ideas
 
 ### 9. Result / Either Style Error Values
 
@@ -192,6 +192,16 @@ Current leaning:
 - avoid runtime "no match" exceptions as a normal language outcome
 - keep `match` as the exhaustive / total form
 - if partial matching is needed, the current syntax candidates are `match?` and `try match`
+
+Related lambda-syntax discussion:
+- today placeholder-based forms like `list.map(match _ { ... })` work
+- possible future shorthand: allow implicit-input match lambdas without `_`
+  - block form: `list.map(match { ... })`
+  - single-expression shorthand form: `list.map(match: Some(x) => x + 1)`
+- this would only make sense in contexts where a one-argument lambda is expected
+- open question:
+  - is this worthwhile readability improvement
+  - or unnecessary contextual magic compared to the explicit `match _ { ... }` form
 
 ### Constructor / Companion Design
 

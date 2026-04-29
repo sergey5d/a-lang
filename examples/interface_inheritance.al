@@ -24,9 +24,9 @@ class Rabbit with Acrobat {
 
 def main() Unit {
     rabbit = Rabbit()
-    Term.println(rabbit.hop())
-    Term.println(rabbit.jump(3))
-    Term.println(rabbit is Acrobat)
-    Term.println(rabbit is Hopper)
-    Term.println(rabbit is Jumper)
+    OS.println(rabbit.hop())
+    OS.println(rabbit.jump(3))
+    OS.println(rabbit is Acrobat)
+    OS.println(rabbit is Hopper)
+    OS.println(rabbit is Jumper)
 }

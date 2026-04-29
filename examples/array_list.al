@@ -58,7 +58,7 @@ def main() Int {
         sum := sum + item
     }
 
-    Term.println("size " + values.size())
-    Term.println("sum " + sum)
+    OS.println("size " + values.size())
+    OS.println("sum " + sum)
     0
 }

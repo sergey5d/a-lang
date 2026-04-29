@@ -8,12 +8,12 @@ def main() Int {
 	items = for item <- values yield {
 		item + 1
 	}
-	Term.println("found " + items.get(0).get())
+	OS.println("found " + items.get(0).get())
 
 	total Int := 0
 	for item <- items {
 		total += item
 	}
-	Term.println("sum " + total)
+	OS.println("sum " + total)
 	0
 }

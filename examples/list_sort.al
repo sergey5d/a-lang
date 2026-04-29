@@ -14,11 +14,11 @@ object Descending with Ordering[Int] {
 def main() Int {
     asc List[Int] = List(3, 1, 4, 2)
     asc.sort(Ascending)
-    Term.println("asc " + asc.get(0).getOr(0) + " " + asc.get(1).getOr(0) + " " + asc.get(2).getOr(0) + " " + asc.get(3).getOr(0))
+    OS.println("asc " + asc.get(0).getOr(0) + " " + asc.get(1).getOr(0) + " " + asc.get(2).getOr(0) + " " + asc.get(3).getOr(0))
 
     desc List[Int] = List(3, 1, 4, 2)
     desc.sort(Descending)
-    Term.println("desc " + desc.get(0).getOr(0) + " " + desc.get(1).getOr(0) + " " + desc.get(2).getOr(0) + " " + desc.get(3).getOr(0))
+    OS.println("desc " + desc.get(0).getOr(0) + " " + desc.get(1).getOr(0) + " " + desc.get(2).getOr(0) + " " + desc.get(3).getOr(0))
 
     0
 }
