@@ -1584,6 +1584,20 @@ def run(user { name Str, age Int }) Int {
 	if len(record.Fields) != 3 || record.Fields[0].Name != "name" || record.Fields[1].Name != "age" || record.Fields[2].Name != "city" {
 		t.Fatalf("unexpected anonymous record fields %#v", record.Fields)
 	}
+
+	mixedExpr, err := ParseExpr(`record { a = 5, c = 7,
+		b = 8
+	}`)
+	if err != nil {
+		t.Fatalf("ParseExpr returned error for mixed record literal: %v", err)
+	}
+	mixed, ok := mixedExpr.(*AnonymousRecordExpr)
+	if !ok {
+		t.Fatalf("expected mixed literal to be AnonymousRecordExpr, got %#v", mixedExpr)
+	}
+	if len(mixed.Fields) != 3 || mixed.Fields[0].Name != "a" || mixed.Fields[1].Name != "c" || mixed.Fields[2].Name != "b" {
+		t.Fatalf("unexpected mixed record fields %#v", mixed.Fields)
+	}
 }
 
 func TestRejectInvalidRuneLiterals(t *testing.T) {

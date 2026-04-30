@@ -1371,7 +1371,10 @@ def run() Bool {
 		age = 10
 		city = "NYC"
 	}
-	return describe(full) == 10 && full.name == "Ana" && full.city == "NYC"
+	mixed = record { a = 5, c = 7,
+		b = 8
+	}
+	return describe(full) == 10 && full.name == "Ana" && full.city == "NYC" && mixed.a + mixed.b + mixed.c == 20
 }
 `
 
