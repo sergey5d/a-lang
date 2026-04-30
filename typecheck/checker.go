@@ -1127,65 +1127,26 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			c.addDiagnostic("invalid_unwrap", "unwrap binding used outside callable body", s.Span)
 			return
 		}
-		sourceType := c.checkExpr(s.Value)
-		successType, ok := c.unwrappableSuccessType(sourceType)
-		if !ok {
-			c.addDiagnostic("invalid_unwrap", "unwrap binding requires Unwrappable[T]", exprSpan(s.Value))
-			successType = unknownType
-		}
-		if !c.shortCircuitCompatible(sourceType, c.returnTypes[len(c.returnTypes)-1]) {
-			c.addDiagnostic("invalid_unwrap", "unwrap binding requires function return type compatible with "+sourceType.String(), s.Span)
-		}
-		bindingTypes := []*Type{successType}
-		if len(s.Bindings) > 1 {
-			bindingTypes = c.destructureValueTypes(len(s.Bindings), successType, s.Span, "invalid_binding_count", "unwrap binding")
-		}
-		for i, bindingDecl := range s.Bindings {
-			if bindingDecl.Name == "_" {
-				continue
-			}
-			bindingType := unknownType
-			if i < len(bindingTypes) && bindingTypes[i] != nil {
-				bindingType = bindingTypes[i]
-			}
-			if bindingDecl.Type != nil {
-				declType := c.resolveDeclaredType(bindingDecl.Type)
-				c.requireAssignable(bindingType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+bindingType.String()+" to "+declType.String())
-				bindingType = declType
-			}
-			c.define(bindingDecl.Name, bindingType, false)
-		}
+		c.checkUnwrapBindings(s.Bindings, s.Value, s.Span, true, c.returnTypes[len(c.returnTypes)-1], "invalid_unwrap", "unwrap binding")
 	case *parser.GuardStmt:
 		if len(c.returnTypes) == 0 {
 			c.addDiagnostic("invalid_guard", "guard used outside callable body", s.Span)
 			return
 		}
-		sourceType := c.checkExpr(s.Value)
-		successType, ok := c.unwrappableSuccessType(sourceType)
-		if !ok {
-			c.addDiagnostic("invalid_guard", "guard requires Unwrappable[T]", exprSpan(s.Value))
-			successType = unknownType
-		}
-		bindingTypes := []*Type{successType}
-		if len(s.Bindings) > 1 {
-			bindingTypes = c.destructureValueTypes(len(s.Bindings), successType, s.Span, "invalid_binding_count", "guard binding")
-		}
-		for i, bindingDecl := range s.Bindings {
-			if bindingDecl.Name == "_" {
-				continue
-			}
-			bindingType := unknownType
-			if i < len(bindingTypes) && bindingTypes[i] != nil {
-				bindingType = bindingTypes[i]
-			}
-			if bindingDecl.Type != nil {
-				declType := c.resolveDeclaredType(bindingDecl.Type)
-				c.requireAssignable(bindingType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+bindingType.String()+" to "+declType.String())
-				bindingType = declType
-			}
-			c.define(bindingDecl.Name, bindingType, false)
+		c.checkUnwrapBindings(s.Bindings, s.Value, s.Span, false, nil, "invalid_guard", "guard binding")
+		c.checkGuardFallbackBlock(s.Fallback, c.returnTypes[len(c.returnTypes)-1])
+	case *parser.GuardBlockStmt:
+		if len(c.returnTypes) == 0 {
+			c.addDiagnostic("invalid_guard", "guard used outside callable body", s.Span)
+			return
 		}
 		c.checkGuardFallbackBlock(s.Fallback, c.returnTypes[len(c.returnTypes)-1])
+		if len(s.Clauses) == 0 {
+			c.addDiagnostic("invalid_guard", "guard block must contain at least one '<-' binding", s.Span)
+		}
+		for _, clause := range s.Clauses {
+			c.checkUnwrapBindings(clause.Bindings, clause.Value, clause.Span, false, nil, "invalid_guard", "guard binding")
+		}
 	case *parser.LocalFunctionStmt:
 		sig := Signature{Parameters: make([]*Type, len(s.Function.Parameters)), ReturnType: fromTypeRef(s.Function.ReturnType, c), Variadic: len(s.Function.Parameters) > 0 && s.Function.Parameters[len(s.Function.Parameters)-1].Variadic}
 		for i, param := range s.Function.Parameters {
@@ -1591,6 +1552,37 @@ func (c *Checker) checkGuardFallbackBlock(block *parser.BlockStmt, expected *Typ
 	valueType := c.checkStmtResultWithExpected(last, expected, "invalid_guard", "guard block must end with a value-producing statement")
 	if !isUnknown(expected) && !isUnknown(valueType) {
 		c.requireAssignable(valueType, expected, stmtSpan(last), "invalid_guard", "guard block value must be assignable to "+expected.String())
+	}
+}
+
+func (c *Checker) checkUnwrapBindings(bindings []parser.Binding, value parser.Expr, span parser.Span, requireShortCircuit bool, returnType *Type, code, label string) {
+	sourceType := c.checkExpr(value)
+	successType, ok := c.unwrappableSuccessType(sourceType)
+	if !ok {
+		c.addDiagnostic(code, label+" requires Unwrappable[T]", exprSpan(value))
+		successType = unknownType
+	}
+	if requireShortCircuit && returnType != nil && !c.shortCircuitCompatible(sourceType, returnType) {
+		c.addDiagnostic(code, label+" requires function return type compatible with "+sourceType.String(), span)
+	}
+	bindingTypes := []*Type{successType}
+	if len(bindings) > 1 {
+		bindingTypes = c.destructureValueTypes(len(bindings), successType, span, "invalid_binding_count", label)
+	}
+	for i, bindingDecl := range bindings {
+		if bindingDecl.Name == "_" {
+			continue
+		}
+		bindingType := unknownType
+		if i < len(bindingTypes) && bindingTypes[i] != nil {
+			bindingType = bindingTypes[i]
+		}
+		if bindingDecl.Type != nil {
+			declType := c.resolveDeclaredType(bindingDecl.Type)
+			c.requireAssignable(bindingType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+bindingType.String()+" to "+declType.String())
+			bindingType = declType
+		}
+		c.define(bindingDecl.Name, bindingType, false)
 	}
 }
 

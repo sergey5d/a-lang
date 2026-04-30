@@ -2201,6 +2201,46 @@ def run(value Option[Int]) Result[Int, Str] {
 	}
 }
 
+func TestAnalyzeGuardBlockStmt(t *testing.T) {
+	src := `
+def run(left Option[Int], right Option[Int]) Result[Int, Str] {
+	guard {
+		a <- left
+		b <- right
+	} else {
+		Err("missing")
+	}
+	return Ok(a + b)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeGuardBlockStmtRejectsWrongElseType(t *testing.T) {
+	src := `
+def run(left Option[Int]) Result[Int, Str] {
+	guard {
+		a <- left
+	} else {
+		Some(0)
+	}
+	return Ok(a)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if result.Diagnostics[0].Code != "invalid_guard" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
 func TestAnalyzePartialMatchAndPlaceholderMatchIf(t *testing.T) {
 	src := `
 enum MaybeInt {

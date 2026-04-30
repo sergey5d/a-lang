@@ -207,6 +207,16 @@ type GuardStmt struct {
 func (*GuardStmt) stmtNode()              {}
 func (s *GuardStmt) GetSpan() parser.Span { return s.Span }
 
+// GuardBlockStmt is a typed block guard with sequential unwrap clauses and a fallback block.
+type GuardBlockStmt struct {
+	Clauses  []*UnwrapStmt
+	Fallback *BlockStmt
+	Span     parser.Span
+}
+
+func (*GuardBlockStmt) stmtNode()              {}
+func (s *GuardBlockStmt) GetSpan() parser.Span { return s.Span }
+
 // AssignmentStmt is a typed write to an assignment target.
 type AssignmentStmt struct {
 	Target   Expr

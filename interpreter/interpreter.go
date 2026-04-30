@@ -493,38 +493,16 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 		}
 		return nil, nil, nil
 	case *parser.UnwrapStmt:
-		sourceValue, err := in.evalExpr(s.Value, local)
-		if err != nil {
-			return nil, nil, err
-		}
-		ok, unwrapped, err := in.unwrappableBindingValue(sourceValue, local, exprSpan(s.Value))
+		ok, sourceValue, err := in.execUnwrapBinding(s.Bindings, s.Value, s.Span, local)
 		if err != nil {
 			return nil, nil, err
 		}
 		if !ok {
 			return nil, returnSignal{value: sourceValue}, nil
 		}
-		values, err := in.destructureBoundValue(s.Bindings, unwrapped, s.Span)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i, binding := range s.Bindings {
-			if binding.Name == "_" {
-				continue
-			}
-			var value Value
-			if i < len(values) {
-				value = in.coerceValueForBinding(binding.Type, values[i])
-			}
-			local.define(binding.Name, value, false)
-		}
 		return nil, nil, nil
 	case *parser.GuardStmt:
-		sourceValue, err := in.evalExpr(s.Value, local)
-		if err != nil {
-			return nil, nil, err
-		}
-		ok, unwrapped, err := in.unwrappableBindingValue(sourceValue, local, exprSpan(s.Value))
+		ok, _, err := in.execUnwrapBinding(s.Bindings, s.Value, s.Span, local)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -535,19 +513,21 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			}
 			return nil, returnSignal{value: value}, nil
 		}
-		values, err := in.destructureBoundValue(s.Bindings, unwrapped, s.Span)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i, binding := range s.Bindings {
-			if binding.Name == "_" {
-				continue
+		return nil, nil, nil
+	case *parser.GuardBlockStmt:
+		fallbackEnv := cloneEnvShallow(local)
+		for _, clause := range s.Clauses {
+			ok, _, err := in.execUnwrapBinding(clause.Bindings, clause.Value, clause.Span, local)
+			if err != nil {
+				return nil, nil, err
 			}
-			var value Value
-			if i < len(values) {
-				value = in.coerceValueForBinding(binding.Type, values[i])
+			if !ok {
+				value, signal, err := in.evalBlockValue(s.Fallback, fallbackEnv, self, "guard block must end with a value-producing statement")
+				if err != nil || signal != nil {
+					return nil, signal, err
+				}
+				return nil, returnSignal{value: value}, nil
 			}
-			local.define(binding.Name, value, false)
 		}
 		return nil, nil, nil
 	case *parser.IfStmt:
@@ -1068,6 +1048,35 @@ func (in *Interpreter) evalStmtValue(stmt parser.Statement, local *env, self *in
 	default:
 		return nil, nil, RuntimeError{Message: message, Span: stmtSpan(stmt)}
 	}
+}
+
+func (in *Interpreter) execUnwrapBinding(bindings []parser.Binding, expr parser.Expr, span parser.Span, local *env) (bool, Value, error) {
+	sourceValue, err := in.evalExpr(expr, local)
+	if err != nil {
+		return false, nil, err
+	}
+	ok, unwrapped, err := in.unwrappableBindingValue(sourceValue, local, exprSpan(expr))
+	if err != nil {
+		return false, nil, err
+	}
+	if !ok {
+		return false, sourceValue, nil
+	}
+	values, err := in.destructureBoundValue(bindings, unwrapped, span)
+	if err != nil {
+		return false, nil, err
+	}
+	for i, binding := range bindings {
+		if binding.Name == "_" {
+			continue
+		}
+		var value Value
+		if i < len(values) {
+			value = in.coerceValueForBinding(binding.Type, values[i])
+		}
+		local.define(binding.Name, value, false)
+	}
+	return true, nil, nil
 }
 
 func (in *Interpreter) evalIfStmtValue(s *parser.IfStmt, local *env, self *instance, message string) (Value, any, error) {
@@ -2538,6 +2547,17 @@ type enumCaseRef struct {
 
 func newEnv(parent *env) *env {
 	return &env{parent: parent, values: map[string]slot{}}
+}
+
+func cloneEnvShallow(source *env) *env {
+	if source == nil {
+		return newEnv(nil)
+	}
+	clone := &env{parent: source.parent, values: map[string]slot{}}
+	for name, value := range source.values {
+		clone.values[name] = value
+	}
+	return clone
 }
 
 func (e *env) define(name string, value Value, mutable bool) {

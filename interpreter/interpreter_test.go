@@ -1839,6 +1839,48 @@ def run() Str {
 	}
 }
 
+func TestGuardBlockStmt(t *testing.T) {
+	src := `
+def runSome(left Option[Int], right Option[Int]) Result[Int, Str] {
+	guard {
+		a <- left
+		b <- right
+	} else {
+		Err("missing")
+	}
+	return Ok(a + b)
+}
+
+def runNone(left Option[Int], right Option[Int]) Result[Int, Str] {
+	guard {
+		a <- left
+		b <- right
+	} else {
+		Err("missing")
+	}
+	return Ok(a + b)
+}
+
+def run() Str {
+	someValue = runSome(Some(4), Some(5))
+	noneValue = runNone(Some(4), None())
+	if someValue.getOr(0) == 9 && noneValue.getError() == "missing" {
+		return "ok"
+	}
+	return "broken"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "ok" {
+		t.Fatalf("expected %q, got %#v", "ok", value)
+	}
+}
+
 func TestPartialMatchAndPlaceholderMatchIf(t *testing.T) {
 	src := `
 enum MaybeInt {

@@ -2199,6 +2199,37 @@ def run(value Option[Int]) Result[Int, Str] {
 	}
 }
 
+func TestParseGuardBlockStmt(t *testing.T) {
+	src := `
+def run(b Option[Int], d Option[Int]) Result[Int, Str] {
+	guard {
+		a <- b
+		c <- d
+	} else {
+		Err("missing")
+	}
+	return Ok(a + c)
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	stmt, ok := fn.Body.Statements[0].(*GuardBlockStmt)
+	if !ok {
+		t.Fatalf("expected first statement to be guard block, got %T", fn.Body.Statements[0])
+	}
+	if len(stmt.Clauses) != 2 {
+		t.Fatalf("expected 2 guard clauses, got %d", len(stmt.Clauses))
+	}
+	if stmt.Fallback == nil || len(stmt.Fallback.Statements) != 1 {
+		t.Fatalf("expected fallback block on guard block statement")
+	}
+}
+
 func TestAttachSourceSpans(t *testing.T) {
 	src := `
 def sample(a Int) Bool {

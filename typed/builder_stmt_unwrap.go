@@ -20,6 +20,14 @@ type guardStmtBuilder struct {
 	types  *typeRefBuilder
 }
 
+// guardBlockStmtBuilder builds typed block guard statements.
+type guardBlockStmtBuilder struct {
+	ctx    *buildContext
+	exprs  Builder[parser.Expr, Expr]
+	blocks Builder[*parser.BlockStmt, *BlockStmt]
+	types  *typeRefBuilder
+}
+
 // Build converts a parser unwrap statement into a typed unwrap statement.
 func (b *unwrapStmtBuilder) Build(stmt *parser.UnwrapStmt) (Stmt, error) {
 	value, err := b.exprs.Build(stmt.Value)
@@ -42,6 +50,24 @@ func (b *guardStmtBuilder) Build(stmt *parser.GuardStmt) (Stmt, error) {
 	}
 	bindings := buildBindingDecls(b.ctx, b.types, stmt.Bindings)
 	return &GuardStmt{Bindings: bindings, Value: value, Fallback: fallback, Span: stmt.Span}, nil
+}
+
+// Build converts a parser block guard statement into a typed block guard statement.
+func (b *guardBlockStmtBuilder) Build(stmt *parser.GuardBlockStmt) (Stmt, error) {
+	clauses := make([]*UnwrapStmt, 0, len(stmt.Clauses))
+	for _, clause := range stmt.Clauses {
+		bindings := buildBindingDecls(b.ctx, b.types, clause.Bindings)
+		value, err := b.exprs.Build(clause.Value)
+		if err != nil {
+			return nil, err
+		}
+		clauses = append(clauses, &UnwrapStmt{Bindings: bindings, Value: value, Span: clause.Span})
+	}
+	fallback, err := b.blocks.Build(stmt.Fallback)
+	if err != nil {
+		return nil, err
+	}
+	return &GuardBlockStmt{Clauses: clauses, Fallback: fallback, Span: stmt.Span}, nil
 }
 
 func buildBindingDecls(ctx *buildContext, types *typeRefBuilder, bindings []parser.Binding) []BindingDecl {

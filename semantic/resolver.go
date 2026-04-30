@@ -395,6 +395,18 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 			r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
 		}
 		r.resolveBlock(s.Fallback)
+	case *parser.GuardBlockStmt:
+		r.resolveBlock(s.Fallback)
+		for _, clause := range s.Clauses {
+			r.resolveExpr(clause.Value)
+			for _, binding := range clause.Bindings {
+				r.resolveTypeRef(binding.Type)
+				if binding.Name == "_" {
+					continue
+				}
+				r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
+			}
+		}
 	case *parser.IfStmt:
 		if s.BindingValue != nil {
 			r.resolveExpr(s.BindingValue)

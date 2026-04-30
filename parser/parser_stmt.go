@@ -141,6 +141,9 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 
 func (p *Parser) parseGuardStmt() (Statement, error) {
 	start := p.advance()
+	if p.check(TokenLBrace) {
+		return p.parseGuardBlockStmt(start)
+	}
 	var name Token
 	var err error
 	if p.check(TokenIdentifier) {
@@ -174,6 +177,52 @@ func (p *Parser) parseGuardStmt() (Statement, error) {
 		Value:    value,
 		Fallback: fallback,
 		Span:     mergeSpans(tokenSpan(start), fallback.Span),
+	}, nil
+}
+
+func (p *Parser) parseGuardBlockStmt(start Token) (Statement, error) {
+	open, err := p.consume(TokenLBrace, "expected '{' after 'guard'")
+	if err != nil {
+		return nil, err
+	}
+	var clauses []*UnwrapStmt
+	var declared []string
+	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+		clause, ok := stmt.(*UnwrapStmt)
+		if !ok {
+			return nil, fmt.Errorf("guard body supports only '<-' unwrap bindings, got %T", stmt)
+		}
+		clauses = append(clauses, clause)
+		for _, binding := range clause.Bindings {
+			if binding.Name != "_" {
+				declared = append(declared, binding.Name)
+			}
+		}
+	}
+	close, err := p.consume(TokenRBrace, "expected '}' after guard body")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.consume(TokenElse, "expected 'else' after guard body"); err != nil {
+		return nil, err
+	}
+	fallback, err := p.parseStmtBodyBlock("guard else")
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range declared {
+		p.declare(name)
+	}
+	span := mergeSpans(tokenSpan(start), fallback.Span)
+	span = mergeSpans(span, mergeSpans(tokenSpan(open), tokenSpan(close)))
+	return &GuardBlockStmt{
+		Clauses:  clauses,
+		Fallback: fallback,
+		Span:     span,
 	}, nil
 }
 

@@ -231,6 +231,15 @@ type GuardStmt struct {
 
 func (*GuardStmt) statementNode() {}
 
+// GuardBlockStmt evaluates a sequence of unwrap bindings and runs a fallback block if any binding fails.
+type GuardBlockStmt struct {
+	Clauses  []*UnwrapStmt `json:"clauses"`
+	Fallback *BlockStmt    `json:"fallback"`
+	Span     Span          `json:"span"`
+}
+
+func (*GuardBlockStmt) statementNode() {}
+
 // AssignmentStmt writes a value to an existing assignment target.
 type AssignmentStmt struct {
 	Target   Expr   `json:"target"`

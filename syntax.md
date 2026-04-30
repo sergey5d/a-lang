@@ -635,6 +635,35 @@ result = if value > 0 {
 }
 ```
 
+## `guard`
+
+Single-binding guard:
+
+```txt
+guard item <- maybeValue {
+    Err("missing")
+}
+```
+
+Multi-binding guard:
+
+```txt
+guard {
+    left <- maybeLeft
+    right <- maybeRight
+} else {
+    Err("missing")
+}
+```
+
+Rules:
+
+- `guard` is only available on unwrap bindings
+- single-binding `guard item <- value { ... }` and `guard item <- value: expr` remain supported
+- block `guard { ... } else { ... }` runs unwrap bindings in order
+- if any guard binding fails, the fallback block is evaluated and its final value is implicitly returned from the current callable
+- successful bindings from the block form remain visible after the guard statement
+
 ## `for`
 
 Simple loop:
