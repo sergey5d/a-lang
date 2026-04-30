@@ -178,19 +178,13 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		}
 		return &ListLiteral{Elements: items, Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
 	case TokenLBrace:
-		if p.check(TokenIdentifier) && p.checkNext(TokenAssign) {
-			save := p.pos
-			record, err := p.parseAnonymousRecordExpr(token)
-			if err == nil {
-				return record, nil
-			}
-			p.pos = save
-		}
 		block, err := p.parseBlockAfterStart(token)
 		if err != nil {
 			return nil, err
 		}
 		return &BlockExpr{Body: block, Span: block.Span}, nil
+	case TokenRecord:
+		return p.parseAnonymousRecordExpr(token)
 	case TokenIf:
 		return p.parseIfExprAfterStart(token)
 	case TokenMatch:
@@ -218,7 +212,13 @@ func (p *Parser) isAnonymousInterfaceExprStart() bool {
 }
 
 func (p *Parser) parseAnonymousRecordExpr(start Token) (Expr, error) {
+	if _, err := p.consume(TokenLBrace, "expected '{' after 'record'"); err != nil {
+		return nil, err
+	}
 	var fields []CallArg
+	if p.check(TokenRBrace) {
+		return nil, fmt.Errorf("anonymous record literal must declare at least one field at %d:%d", start.Line, start.Column)
+	}
 	for {
 		name, err := p.consume(TokenIdentifier, "expected record field name")
 		if err != nil {

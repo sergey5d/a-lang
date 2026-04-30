@@ -6,8 +6,8 @@ def describe(user { name Str, age Int }) Str =
     user.name + " is " + user.age
 
 def main() Unit {
-    full = { name = "Ana", age = 10, city = "NYC" }
-    smaller = { name = "Ben", age = 12 }
+    full = record { name = "Ana", age = 10, city = "NYC" }
+    smaller = record { name = "Ben", age = 12 }
 
     OS.println(describe(full))
     OS.println(describe(smaller))

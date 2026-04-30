@@ -5,6 +5,6 @@ def describe(user { name Str, age Int }) Str =
     user.name
 
 def main() Unit {
-    value = { name = "Ana" }
+    value = record { name = "Ana" }
     OS.println(describe(value))
 }

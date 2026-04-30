@@ -249,7 +249,7 @@ updated = value with {
 Anonymous record literal:
 
 ```txt
-user = { name = "Ada", age = 10 }
+user = record { name = "Ada", age = 10 }
 ```
 
 Anonymous record shape type:
@@ -264,6 +264,7 @@ Anonymous record shapes are structural:
 - extra fields are allowed when passing a value to a narrower shape
 - missing fields are rejected
 - defaults are not part of the shape syntax
+- construction uses `record { ... }`; plain `{ ... }` remains a block expression
 
 ## Functions and Methods
 
