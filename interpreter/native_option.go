@@ -51,3 +51,25 @@ func nativeOptionGetOr(_ *Interpreter, receiver Value, args []Value, _ *env, spa
 	}
 	return args[0], nil
 }
+
+func nativeOptionGetOrElse(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	return nativeOptionGetOr(in, receiver, args, local, span)
+}
+
+func nativeOptionMap(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeOption(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Option.map receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "map expects 1 argument", Span: span}
+	}
+	if !value.set {
+		return in.constructStdlibOption(nil, false, local, span)
+	}
+	mapped, err := in.invokeCallableValue(args[0], []Value{value.value}, local, span)
+	if err != nil {
+		return nil, err
+	}
+	return in.constructStdlibOption(mapped, true, local, span)
+}

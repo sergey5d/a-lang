@@ -2291,6 +2291,8 @@ def run() Int {
 	inc (Int) -> Int = _ + 1
 	items List[Int] = List(1, 2, 3)
 	mapped List[Int] = items.map(_ + 1)
+	opt Option[Int] = Some(5)
+	mappedOpt Option[Int] = opt.map(_ -> 1)
 	return applyTwice(inc, mapped.get(0).getOr(0))
 }
 `

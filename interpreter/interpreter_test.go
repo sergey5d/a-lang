@@ -1915,7 +1915,9 @@ def run() Int {
 	inc (Int) -> Int = _ + 1
 	items = List(1, 2, 3)
 	mapped = items.map(_ + 1)
-	return applyTwice(inc, mapped.get(0).getOr(0))
+	opt = Some(5)
+	mappedOpt = opt.map(_ -> 1)
+	return applyTwice(inc, mapped.get(0).getOr(0)) + mappedOpt.getOr(0)
 }
 `
 
@@ -1924,8 +1926,8 @@ def run() Int {
 	if err != nil {
 		t.Fatalf("Call returned error: %v", err)
 	}
-	if value != int64(4) {
-		t.Fatalf("expected 4, got %#v", value)
+	if value != int64(5) {
+		t.Fatalf("expected 5, got %#v", value)
 	}
 }
 

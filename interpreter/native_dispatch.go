@@ -49,10 +49,12 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"next":    nativeIteratorNext,
 		},
 		"Option": {
-			"isSet":   nativeOptionIsSet,
-			"isEmpty": nativeOptionIsEmpty,
-			"get":     nativeOptionGet,
-			"getOr":   nativeOptionGetOr,
+			"isSet":     nativeOptionIsSet,
+			"isEmpty":   nativeOptionIsEmpty,
+			"get":       nativeOptionGet,
+			"getOr":     nativeOptionGetOr,
+			"getOrElse": nativeOptionGetOrElse,
+			"map":       nativeOptionMap,
 		},
 		"Result": {
 			"isOk":      nativeResultIsOk,

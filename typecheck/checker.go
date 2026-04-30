@@ -2058,7 +2058,7 @@ func (c *Checker) resolveFunctionCallSignature(fn *parser.FunctionDecl, args []p
 		return Signature{}, false
 	}
 	sig = c.instantiateFunctionSignature(fn, inferred)
-	argTypes := c.checkArgTypes(args)
+	argTypes := c.checkArgTypesWithSignature(args, sig)
 	if !signatureMatches(sig, argTypes) {
 		c.addDiagnostic("no_matching_overload", fmt.Sprintf("function '%s' does not match %d arguments", fn.Name, argCount), span)
 		return Signature{}, false
@@ -2086,12 +2086,24 @@ func (c *Checker) resolveMethodCallSignature(class classInfo, receiver *Type, me
 		return Signature{}, false
 	}
 	sig = c.instantiateMethodSignature(method, class.decl, mergeSubst(inferred, baseSubst))
-	argTypes := c.checkArgTypes(args)
+	argTypes := c.checkArgTypesWithSignature(args, sig)
 	if !signatureMatches(sig, argTypes) {
 		c.addDiagnostic("no_matching_overload", fmt.Sprintf("no overload of method '%s' matches %d arguments", method.Name, len(argTypes)), span)
 		return Signature{}, false
 	}
 	return sig, true
+}
+
+func (c *Checker) checkArgTypesWithSignature(args []parser.Expr, sig Signature) []*Type {
+	types := make([]*Type, len(args))
+	for i, arg := range args {
+		if expected, ok := paramTypeForArg(sig, i); ok {
+			types[i] = c.checkExprWithExpected(arg, expected)
+		} else {
+			types[i] = c.checkExpr(arg)
+		}
+	}
+	return types
 }
 
 func (c *Checker) inferCallableTypeArgsFromExprs(typeParams []parser.TypeParameter, params []parser.Parameter, args []parser.Expr, baseSubst map[string]*Type) (map[string]*Type, bool) {
@@ -2289,7 +2301,7 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 		return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
 	case "Some":
 		optionType := &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
-		if _, ok := c.classes["Option"]; ok {
+		if _, ok := c.lookupClassInfo("Option"); ok {
 			optionType = &Type{Kind: TypeClass, Name: "Option", Args: []*Type{unknownType}}
 		}
 		if len(call.Args) != 1 {
@@ -2304,7 +2316,7 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 		return optionType
 	case "None":
 		optionType := &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
-		if _, ok := c.classes["Option"]; ok {
+		if _, ok := c.lookupClassInfo("Option"); ok {
 			optionType = &Type{Kind: TypeClass, Name: "Option", Args: []*Type{unknownType}}
 		}
 		if len(call.Args) != 0 {
@@ -2701,7 +2713,7 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 	}
 	switch receiverType.Kind {
 	case TypeClass:
-		info, ok := c.classes[receiverType.Name]
+		info, ok := c.lookupClassInfo(receiverType.Name)
 		if !ok {
 			c.checkArgTypes(callArgValues(args))
 			return unknownType
@@ -2753,6 +2765,29 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 				c.checkExpr(arg)
 			}
 			return builtin("Unit")
+		}
+		if !hasNamedCallArgs(args) {
+			if methods := info.methods[member.Name]; len(methods) == 1 {
+				if methods[0].decl.Private && !c.canAccessPrivate(info.decl) {
+					c.addDiagnostic("private_access", "cannot access private method '"+member.Name+"' outside class '"+info.decl.Name+"'", member.Span)
+					return unknownType
+				}
+				method = methods[0]
+				orderedArgs = callArgValues(args)
+				sig, ok := c.resolveMethodCallSignature(info, receiverType, method.decl, orderedArgs, member.Span)
+				if !ok {
+					return unknownType
+				}
+				for i := range orderedArgs {
+					if expected, ok := paramTypeForArg(sig, i); ok {
+						argType := c.checkExprWithExpected(orderedArgs[i], expected)
+						c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+					} else {
+						c.checkExpr(orderedArgs[i])
+					}
+				}
+				return sig.ReturnType
+			}
 		}
 		if hasNamedCallArgs(args) {
 			method, orderedArgs, okMethod = c.resolveNamedMethodOverload(info, receiverType, member.Name, args, member.Span)
@@ -3997,6 +4032,16 @@ func (c *Checker) lookupTypeInstance(name string) (*Type, bool) {
 		return &Type{Kind: TypeInterface, Name: c.importedInterfaceNames[name]}, true
 	}
 	return nil, false
+}
+
+func (c *Checker) lookupClassInfo(name string) (classInfo, bool) {
+	if info, ok := c.classes[name]; ok {
+		return info, true
+	}
+	if info, ok := c.importedClasses[name]; ok {
+		return info, true
+	}
+	return classInfo{}, false
 }
 
 func (c *Checker) iterableElementType(t *Type) *Type {

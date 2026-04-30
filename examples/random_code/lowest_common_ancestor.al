@@ -21,13 +21,7 @@ def find(
     foundQNode Option[TreeNode]
 ) { foundP Option[TreeNode], foundQ Option[TreeNode], ancestor Option[TreeNode] } = {
 
-    if node.isEmpty() {
-        return record {
-            foundP = foundPNode
-            foundQ = foundQNode
-            ancestor = None()
-        }
-    }
+    if node.isEmpty(): return record { foundP = foundPNode, foundQ = foundQNode, ancestor = None() }
 
     foundPNodeOrig = foundPNode
     foundQNodeOrig = foundQNode
@@ -43,8 +37,8 @@ def find(
         currentFoundQ := Some(current)
     }
 
-    foundPCount = if currentFoundP.isEmpty() { 0 } else { 1 }
-    foundQCount = if currentFoundQ.isEmpty() { 0 } else { 1 }
+    foundPCount = currentFoundP.map(_ -> 1).getOrElse(0)
+    foundQCount = currentFoundQ.map(_ -> 1).getOrElse(0)
 
     if foundPCount + foundQCount < 2 {
         leftResult = find(current.left, valP, valQ, currentFoundP, currentFoundQ)

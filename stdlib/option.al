@@ -28,6 +28,8 @@ class Option[T] with Unwrappable[T] {
             defaultValue
         }
 
+    def getOrElse(defaultValue T) T = this.getOr(defaultValue)
+
     def map[X](f T -> X) Option[X] =
         if set {
             Some(f(value))
