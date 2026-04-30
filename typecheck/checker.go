@@ -926,7 +926,11 @@ func (c *Checker) checkBlock(block *parser.BlockStmt) *Type {
 	}
 	last := block.Statements[len(block.Statements)-1]
 	if exprStmt, ok := last.(*parser.ExprStmt); ok {
-		return c.checkExpr(exprStmt.Expr)
+		expected := unknownType
+		if len(c.returnTypes) > 0 && c.returnTypes[len(c.returnTypes)-1] != nil {
+			expected = c.returnTypes[len(c.returnTypes)-1]
+		}
+		return c.checkExprWithExpected(exprStmt.Expr, expected)
 	}
 	c.checkStmt(last)
 	return unknownType
