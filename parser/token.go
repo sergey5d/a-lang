@@ -7,38 +7,38 @@ import (
 type TokenType string
 
 const (
-	TokenEOF        TokenType = "EOF"
-	TokenIdentifier TokenType = "IDENT"
-	TokenInteger    TokenType = "INT"
-	TokenFloat      TokenType = "FLOAT"
-	TokenRune       TokenType = "RUNE"
-	TokenString     TokenType = "STRING"
+	TokenEOF             TokenType = "EOF"
+	TokenIdentifier      TokenType = "IDENT"
+	TokenInteger         TokenType = "INT"
+	TokenFloat           TokenType = "FLOAT"
+	TokenRune            TokenType = "RUNE"
+	TokenString          TokenType = "STRING"
 	TokenMultilineString TokenType = "MULTILINE_STRING"
-	TokenBool       TokenType = "BOOL"
+	TokenBool            TokenType = "BOOL"
 
-	TokenDef        TokenType = "DEF"
-	TokenImpl       TokenType = "IMPL"
-	TokenOperator   TokenType = "OPERATOR"
-	TokenPackage    TokenType = "PACKAGE"
-	TokenImport     TokenType = "IMPORT"
-	TokenAs         TokenType = "AS"
-	TokenInterface  TokenType = "INTERFACE"
-	TokenClass      TokenType = "CLASS"
-	TokenObject     TokenType = "OBJECT"
-	TokenRecord     TokenType = "RECORD"
-	TokenEnum       TokenType = "ENUM"
-	TokenCase       TokenType = "CASE"
-	TokenWith       TokenType = "WITH"
-	TokenPrivate    TokenType = "PRIVATE"
-	TokenIf         TokenType = "IF"
-	TokenMatch      TokenType = "MATCH"
-	TokenIs         TokenType = "IS"
-	TokenElse       TokenType = "ELSE"
-	TokenLoop       TokenType = "LOOP"
-	TokenFor        TokenType = "FOR"
-	TokenYield      TokenType = "YIELD"
-	TokenReturn     TokenType = "RETURN"
-	TokenBreak      TokenType = "BREAK"
+	TokenDef       TokenType = "DEF"
+	TokenImpl      TokenType = "IMPL"
+	TokenOperator  TokenType = "OPERATOR"
+	TokenPackage   TokenType = "PACKAGE"
+	TokenImport    TokenType = "IMPORT"
+	TokenAs        TokenType = "AS"
+	TokenInterface TokenType = "INTERFACE"
+	TokenClass     TokenType = "CLASS"
+	TokenObject    TokenType = "OBJECT"
+	TokenRecord    TokenType = "RECORD"
+	TokenEnum      TokenType = "ENUM"
+	TokenCase      TokenType = "CASE"
+	TokenWith      TokenType = "WITH"
+	TokenPrivate   TokenType = "PRIVATE"
+	TokenIf        TokenType = "IF"
+	TokenMatch     TokenType = "MATCH"
+	TokenIs        TokenType = "IS"
+	TokenElse      TokenType = "ELSE"
+	TokenLoop      TokenType = "LOOP"
+	TokenFor       TokenType = "FOR"
+	TokenYield     TokenType = "YIELD"
+	TokenReturn    TokenType = "RETURN"
+	TokenBreak     TokenType = "BREAK"
 
 	TokenLParen   TokenType = "("
 	TokenRParen   TokenType = ")"
@@ -47,25 +47,25 @@ const (
 	TokenLBracket TokenType = "["
 	TokenRBracket TokenType = "]"
 
-	TokenComma  TokenType = ","
-	TokenColon  TokenType = ":"
-	TokenColonPlus TokenType = ":+"
-	TokenColonMinus TokenType = ":-"
-	TokenColonColon TokenType = "::"
-	TokenDot    TokenType = "."
-	TokenQuestion TokenType = "?"
-	TokenEllipsis TokenType = "..."
-	TokenAssign TokenType = "="
-	TokenFatArrow TokenType = "=>"
+	TokenComma       TokenType = ","
+	TokenColon       TokenType = ":"
+	TokenColonPlus   TokenType = ":+"
+	TokenColonMinus  TokenType = ":-"
+	TokenColonColon  TokenType = "::"
+	TokenDot         TokenType = "."
+	TokenQuestion    TokenType = "?"
+	TokenEllipsis    TokenType = "..."
+	TokenAssign      TokenType = "="
+	TokenFatArrow    TokenType = "=>"
 	TokenColonAssign TokenType = ":="
 
-	TokenPlus    TokenType = "+"
-	TokenPlusPlus TokenType = "++"
-	TokenMinus   TokenType = "-"
+	TokenPlus       TokenType = "+"
+	TokenPlusPlus   TokenType = "++"
+	TokenMinus      TokenType = "-"
 	TokenMinusMinus TokenType = "--"
-	TokenStar    TokenType = "*"
-	TokenSlash   TokenType = "/"
-	TokenPercent TokenType = "%"
+	TokenStar       TokenType = "*"
+	TokenSlash      TokenType = "/"
+	TokenPercent    TokenType = "%"
 
 	TokenPlusEq    TokenType = "+="
 	TokenMinusEq   TokenType = "-="
@@ -85,41 +85,41 @@ const (
 	TokenGTGT      TokenType = ">>"
 	TokenGTE       TokenType = ">="
 
-	TokenAmp   TokenType = "&"
+	TokenAmp    TokenType = "&"
 	TokenAndAnd TokenType = "&&"
-	TokenPipe  TokenType = "|"
+	TokenPipe   TokenType = "|"
 	TokenOrOr   TokenType = "||"
-	TokenTilde TokenType = "~"
+	TokenTilde  TokenType = "~"
 
 	TokenUnder TokenType = "_"
 )
 
 var keywords = map[string]TokenType{
-	"def":        TokenDef,
-	"impl":       TokenImpl,
-	"operator":   TokenOperator,
-	"package":    TokenPackage,
-	"import":     TokenImport,
-	"as":         TokenAs,
-	"interface":  TokenInterface,
-	"class":      TokenClass,
-	"object":     TokenObject,
-	"record":     TokenRecord,
-	"enum":       TokenEnum,
-	"case":       TokenCase,
-	"with":       TokenWith,
-	"private":    TokenPrivate,
-	"if":         TokenIf,
-	"match":      TokenMatch,
-	"is":         TokenIs,
-	"else":       TokenElse,
-	"loop":       TokenLoop,
-	"for":        TokenFor,
-	"yield":      TokenYield,
-	"return":     TokenReturn,
-	"break":      TokenBreak,
-	"true":       TokenBool,
-	"false":      TokenBool,
+	"def":       TokenDef,
+	"impl":      TokenImpl,
+	"operator":  TokenOperator,
+	"package":   TokenPackage,
+	"import":    TokenImport,
+	"as":        TokenAs,
+	"interface": TokenInterface,
+	"class":     TokenClass,
+	"object":    TokenObject,
+	"record":    TokenRecord,
+	"enum":      TokenEnum,
+	"case":      TokenCase,
+	"with":      TokenWith,
+	"private":   TokenPrivate,
+	"if":        TokenIf,
+	"match":     TokenMatch,
+	"is":        TokenIs,
+	"else":      TokenElse,
+	"loop":      TokenLoop,
+	"for":       TokenFor,
+	"yield":     TokenYield,
+	"return":    TokenReturn,
+	"break":     TokenBreak,
+	"true":      TokenBool,
+	"false":     TokenBool,
 }
 
 type Token struct {

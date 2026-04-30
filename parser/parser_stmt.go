@@ -223,9 +223,9 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 		if i >= len(p.tokens) {
 			return false
 		}
-			if p.tokens[i].Type == TokenAssign || p.tokens[i].Type == TokenLeftArrow {
-				return true
-			}
+		if p.tokens[i].Type == TokenAssign || p.tokens[i].Type == TokenLeftArrow {
+			return true
+		}
 		if p.tokens[i].Type == TokenColonAssign {
 			return sawType || sawUndeclared
 		}
@@ -621,7 +621,7 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 			Bindings: []ForBinding{binding},
 			Body:     body,
 			Span:     mergeSpans(tokenSpan(start), body.Span),
-			}, nil
+		}, nil
 	}
 	if p.check(TokenLBrace) && p.isForYieldStart() {
 		bindings, err := p.parseForBindingsBlock()
@@ -639,7 +639,7 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 			Bindings:  bindings,
 			YieldBody: yieldBody,
 			Span:      mergeSpans(tokenSpan(start), yieldBody.Span),
-			}, nil
+		}, nil
 	}
 	condition, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
 	if err != nil {

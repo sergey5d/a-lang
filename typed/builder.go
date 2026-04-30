@@ -47,16 +47,16 @@ func Build(program *parser.Program, info typecheck.Result) (*Program, error) {
 	exprs.calls = calls
 	exprs.lambdas = lambdas
 	stmts := &stmtBuilder{
-		bindings:    &bindingStmtBuilder{ctx: ctx, exprs: exprs, types: typeRefs},
-		unwraps:     &unwrapStmtBuilder{ctx: ctx, exprs: exprs, types: typeRefs},
-		assignments: &assignmentStmtBuilder{exprs: exprs},
+		bindings:         &bindingStmtBuilder{ctx: ctx, exprs: exprs, types: typeRefs},
+		unwraps:          &unwrapStmtBuilder{ctx: ctx, exprs: exprs, types: typeRefs},
+		assignments:      &assignmentStmtBuilder{exprs: exprs},
 		multiAssignments: &multiAssignmentStmtBuilder{exprs: exprs},
-		ifs:         &ifStmtBuilder{ctx: ctx, exprs: exprs, blocks: blocks, types: typeRefs},
-		loops:       &loopStmtBuilder{blocks: blocks},
-		fors:        &forStmtBuilder{ctx: ctx, exprs: exprs, blocks: blocks, types: typeRefs},
-		returns:     &returnStmtBuilder{exprs: exprs},
-		breaks:      &breakStmtBuilder{},
-		exprs:       &exprStmtBuilder{exprs: exprs},
+		ifs:              &ifStmtBuilder{ctx: ctx, exprs: exprs, blocks: blocks, types: typeRefs},
+		loops:            &loopStmtBuilder{blocks: blocks},
+		fors:             &forStmtBuilder{ctx: ctx, exprs: exprs, blocks: blocks, types: typeRefs},
+		returns:          &returnStmtBuilder{exprs: exprs},
+		breaks:           &breakStmtBuilder{},
+		exprs:            &exprStmtBuilder{exprs: exprs},
 	}
 	blocks.stmts = stmts
 

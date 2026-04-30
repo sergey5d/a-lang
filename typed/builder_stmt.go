@@ -8,16 +8,16 @@ import (
 
 // stmtBuilder dispatches parser statements to their dedicated typed builders.
 type stmtBuilder struct {
-	bindings    Builder[*parser.ValStmt, Stmt]
-	unwraps     Builder[*parser.UnwrapStmt, Stmt]
-	assignments Builder[*parser.AssignmentStmt, Stmt]
+	bindings         Builder[*parser.ValStmt, Stmt]
+	unwraps          Builder[*parser.UnwrapStmt, Stmt]
+	assignments      Builder[*parser.AssignmentStmt, Stmt]
 	multiAssignments Builder[*parser.MultiAssignmentStmt, Stmt]
-	ifs         Builder[*parser.IfStmt, Stmt]
-	loops       Builder[*parser.LoopStmt, Stmt]
-	fors        Builder[*parser.ForStmt, Stmt]
-	returns     Builder[*parser.ReturnStmt, Stmt]
-	breaks      Builder[*parser.BreakStmt, Stmt]
-	exprs       Builder[*parser.ExprStmt, Stmt]
+	ifs              Builder[*parser.IfStmt, Stmt]
+	loops            Builder[*parser.LoopStmt, Stmt]
+	fors             Builder[*parser.ForStmt, Stmt]
+	returns          Builder[*parser.ReturnStmt, Stmt]
+	breaks           Builder[*parser.BreakStmt, Stmt]
+	exprs            Builder[*parser.ExprStmt, Stmt]
 }
 
 // Build converts a parser statement into its typed equivalent.

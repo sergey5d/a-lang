@@ -16,9 +16,9 @@ func Parse(input string) (*Program, error) {
 }
 
 type Parser struct {
-	tokens []Token
-	pos    int
-	scopes []map[string]struct{}
+	tokens             []Token
+	pos                int
+	scopes             []map[string]struct{}
 	multilineExprDepth int
 }
 

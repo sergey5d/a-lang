@@ -25,24 +25,24 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"zipWithIndex": nativeArrayZipWithIndex,
 		},
 		"List": {
-			"append":   nativeListAppend,
-			"map":      nativeListMap,
-			"flatMap":  nativeListFlatMap,
-			"filter":   nativeListFilter,
-			"fold":     nativeListFold,
-			"reduce":   nativeListReduce,
-			"exists":   nativeListExists,
-			"forAll":   nativeListForAll,
-			"forEach":  nativeListForEach,
-			"sort":     nativeListSort,
-			"zip":      nativeListZip,
+			"append":       nativeListAppend,
+			"map":          nativeListMap,
+			"flatMap":      nativeListFlatMap,
+			"filter":       nativeListFilter,
+			"fold":         nativeListFold,
+			"reduce":       nativeListReduce,
+			"exists":       nativeListExists,
+			"forAll":       nativeListForAll,
+			"forEach":      nativeListForEach,
+			"sort":         nativeListSort,
+			"zip":          nativeListZip,
 			"zipWithIndex": nativeListZipWithIndex,
-			"get":      nativeListGet,
-			"head":     nativeListHead,
-			"tail":     nativeListTail,
-			"remove":   nativeListRemove,
-			"size":     nativeListSize,
-			"iterator": nativeListIteratorMethod,
+			"get":          nativeListGet,
+			"head":         nativeListHead,
+			"tail":         nativeListTail,
+			"remove":       nativeListRemove,
+			"size":         nativeListSize,
+			"iterator":     nativeListIteratorMethod,
 		},
 		"Iterator": {
 			"hasNext": nativeIteratorHasNext,
@@ -175,7 +175,6 @@ func asNativeMap(receiver Value) (*nativeMap, bool) {
 	value, ok := receiver.(*nativeMap)
 	return value, ok
 }
-
 
 func boolResult(value Value, methodName string, span parser.Span) (bool, error) {
 	result, ok := value.(bool)

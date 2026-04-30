@@ -33,11 +33,11 @@ type MethodDescriptor struct {
 }
 
 type TypeDescriptor struct {
-	Name                string
-	Kind                Kind
-	TypeParameters      []parser.TypeParameter
-	Fields              []parser.FieldDecl
-	Methods             []MethodDescriptor
+	Name                  string
+	Kind                  Kind
+	TypeParameters        []parser.TypeParameter
+	Fields                []parser.FieldDecl
+	Methods               []MethodDescriptor
 	ImplementedInterfaces []*parser.TypeRef
 }
 
@@ -105,10 +105,10 @@ func load() (*Registry, error) {
 				}
 			}
 			registry.Types[decl.Name] = TypeDescriptor{
-				Name:                decl.Name,
-				Kind:                KindInterface,
-				TypeParameters:      append([]parser.TypeParameter(nil), decl.TypeParameters...),
-				Methods:             methods,
+				Name:                  decl.Name,
+				Kind:                  KindInterface,
+				TypeParameters:        append([]parser.TypeParameter(nil), decl.TypeParameters...),
+				Methods:               methods,
 				ImplementedInterfaces: append([]*parser.TypeRef(nil), decl.Extends...),
 			}
 		}
@@ -136,11 +136,11 @@ func load() (*Registry, error) {
 				}
 			}
 			registry.Types[decl.Name] = TypeDescriptor{
-				Name:                decl.Name,
-				Kind:                kind,
-				TypeParameters:      append([]parser.TypeParameter(nil), decl.TypeParameters...),
-				Fields:              append([]parser.FieldDecl(nil), decl.Fields...),
-				Methods:             methods,
+				Name:                  decl.Name,
+				Kind:                  kind,
+				TypeParameters:        append([]parser.TypeParameter(nil), decl.TypeParameters...),
+				Fields:                append([]parser.FieldDecl(nil), decl.Fields...),
+				Methods:               methods,
 				ImplementedInterfaces: append([]*parser.TypeRef(nil), decl.Implements...),
 			}
 		}
