@@ -1,6 +1,7 @@
 # EXPECT:
 # x
 # closed
+# solo
 
 interface Reader {
     def read() Str
@@ -16,6 +17,11 @@ def main() Unit {
         impl def close() Unit = OS.println("closed")
     }
 
+    single = Reader {
+        impl def read() Str = "solo"
+    }
+
     OS.println(handler.read())
     handler.close()
+    OS.println(single.read())
 }
