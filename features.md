@@ -4,8 +4,6 @@ This file captures the main language gaps and near-term design directions.
 
 ## Highest Priority
 
-TBO: add value as Some(x)
-
 ### 1. Match / Pattern Matching
 
 `match` exists now, including:
@@ -64,7 +62,6 @@ These can mostly live in the stdlib, but may still need runtime support in place
 This is not a core blocker, but it would help:
 - numeric wrappers
 - small value types
-- vector-like records
 - domain-specific types
 
 Constraint:
@@ -80,7 +77,6 @@ Still open:
 Still useful for:
 - one-off adapters
 - inline protocol implementations
-- small configuration objects
 - temporary helper instances
 
 There is already an example reminder for this idea.
