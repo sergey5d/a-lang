@@ -2166,6 +2166,37 @@ def run(value Result[Int, Str]) Option[Int] {
 	}
 }
 
+func TestAnalyzeGuardedUnwrapStmt(t *testing.T) {
+	src := `
+def run(value Option[Int]) Result[Int, Str] {
+	item <- value guard Err("missing")
+	return Ok(item + 1)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeGuardedUnwrapStmtRejectsWrongGuardType(t *testing.T) {
+	src := `
+def run(value Option[Int]) Result[Int, Str] {
+	item <- value guard Some(0)
+	return Ok(item + 1)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if result.Diagnostics[0].Code != "invalid_unwrap" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
+	}
+}
+
 func TestAnalyzePartialMatchAndPlaceholderMatchIf(t *testing.T) {
 	src := `
 enum MaybeInt {

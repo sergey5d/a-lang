@@ -95,8 +95,18 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 		if err != nil {
 			return nil, err
 		}
-		stmt := &UnwrapStmt{Bindings: bindings, Value: value}
+		var guard Expr
+		if p.match(TokenGuard) {
+			guard, err = p.parseExpression(0)
+			if err != nil {
+				return nil, err
+			}
+		}
+		stmt := &UnwrapStmt{Bindings: bindings, Value: value, Guard: guard}
 		stmt.Span = mergeSpans(tokenSpan(start), exprSpan(value))
+		if guard != nil {
+			stmt.Span = mergeSpans(stmt.Span, exprSpan(guard))
+		}
 		return stmt, nil
 	}
 	mutable := operator == TokenColonAssign

@@ -502,6 +502,13 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			return nil, nil, err
 		}
 		if !ok {
+			if s.Guard != nil {
+				guardValue, err := in.evalExpr(s.Guard, local)
+				if err != nil {
+					return nil, nil, err
+				}
+				return nil, returnSignal{value: guardValue}, nil
+			}
 			return nil, returnSignal{value: sourceValue}, nil
 		}
 		values, err := in.destructureBoundValue(s.Bindings, unwrapped, s.Span)

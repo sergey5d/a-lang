@@ -1129,7 +1129,10 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			c.addDiagnostic("invalid_unwrap", "unwrap binding requires Unwrappable[T]", exprSpan(s.Value))
 			successType = unknownType
 		}
-		if !c.shortCircuitCompatible(sourceType, c.returnTypes[len(c.returnTypes)-1]) {
+		if s.Guard != nil {
+			guardType := c.checkExprWithExpected(s.Guard, c.returnTypes[len(c.returnTypes)-1])
+			c.requireAssignable(guardType, c.returnTypes[len(c.returnTypes)-1], exprSpan(s.Guard), "invalid_unwrap", "guard value must be assignable to "+c.returnTypes[len(c.returnTypes)-1].String())
+		} else if !c.shortCircuitCompatible(sourceType, c.returnTypes[len(c.returnTypes)-1]) {
 			c.addDiagnostic("invalid_unwrap", "unwrap binding requires function return type compatible with "+sourceType.String(), s.Span)
 		}
 		bindingTypes := []*Type{successType}

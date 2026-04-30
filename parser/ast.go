@@ -216,6 +216,7 @@ func (*ValStmt) statementNode() {}
 type UnwrapStmt struct {
 	Bindings []Binding `json:"bindings"`
 	Value    Expr      `json:"value"`
+	Guard    Expr      `json:"guard,omitempty"`
 	Span     Span      `json:"span"`
 }
 

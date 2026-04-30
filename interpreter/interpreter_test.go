@@ -1803,6 +1803,38 @@ def run() Str {
 	}
 }
 
+func TestGuardedUnwrapStmt(t *testing.T) {
+	src := `
+def runSome(value Option[Int]) Result[Int, Str] {
+	item <- value guard Err("missing")
+	return Ok(item + 1)
+}
+
+def runNone(value Option[Int]) Result[Int, Str] {
+	item <- value guard Err("missing")
+	return Ok(item + 1)
+}
+
+def run() Str {
+	someValue = runSome(Some(4))
+	noneValue = runNone(None())
+	if someValue.getOr(0) == 5 && noneValue.getError() == "missing" {
+		return "ok"
+	}
+	return "broken"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "ok" {
+		t.Fatalf("expected %q, got %#v", "ok", value)
+	}
+}
+
 func TestPartialMatchAndPlaceholderMatchIf(t *testing.T) {
 	src := `
 enum MaybeInt {

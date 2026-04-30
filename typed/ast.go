@@ -190,6 +190,7 @@ func (s *BindingStmt) GetSpan() parser.Span { return s.Span }
 type UnwrapStmt struct {
 	Bindings []BindingDecl
 	Value    Expr
+	Guard    Expr
 	Span     parser.Span
 }
 

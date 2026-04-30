@@ -21,25 +21,12 @@ def find(
     foundQNode Option[TreeNode]
 ) { foundP Option[TreeNode], foundQ Option[TreeNode], ancestor Option[TreeNode] } = {
 
-    if node.isEmpty(): return record {
-        foundP = foundPNode, foundQ = foundQNode, ancestor = None()
+    current <- node guard {
+        record { foundP = foundPNode, foundQ = foundQNode, ancestor = None() }
     }
 
-    # current <- node otherwise return record {
-    #        foundP = foundPNode, foundQ = foundQNode, ancestor = None()
-    #  }
-
-    # TODO:
-    # Perhaps do something like that:
-    # current <- node orReturn/guard with/guard by/ record {
-    #        foundP = foundPNode, foundQ = foundQNode, ancestor = None()
-    # }
-
-    foundPNodeOrig = foundPNode
-    foundQNodeOrig = foundQNode
     currentFoundP := foundPNode
     currentFoundQ := foundQNode
-    current = node.get()
 
     if currentFoundP.isEmpty() && current.val == valP {
         currentFoundP := Some(current)
@@ -60,22 +47,14 @@ def find(
         mergedP = chooseNode(leftResult.foundP, rightResult.foundP)
         mergedQ = chooseNode(leftResult.foundQ, rightResult.foundQ)
 
-        if !mergedP.isEmpty() && !mergedQ.isEmpty() && mergedAncestor.isEmpty() && foundPNodeOrig.isEmpty() && foundQNodeOrig.isEmpty() {
+        if !mergedP.isEmpty() && !mergedQ.isEmpty() && mergedAncestor.isEmpty() && foundPNode.isEmpty() && foundQNode.isEmpty() {
             mergedAncestor := Some(current)
         }
 
-        return record {
-            foundP = mergedP
-            foundQ = mergedQ
-            ancestor = mergedAncestor
-        }
+        return record(mergedP, mergedQ, mergedAncestor)
     }
 
-    return record {
-        foundP = currentFoundP
-        foundQ = currentFoundQ
-        ancestor = None()
-    }
+    record(currentFoundP, currentFoundQ, None())
 }
 
 def lowestCommonAncestor(root TreeNode, valP Int, valQ Int) Option[TreeNode] =

@@ -378,6 +378,9 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		}
 	case *parser.UnwrapStmt:
 		r.resolveExpr(s.Value)
+		if s.Guard != nil {
+			r.resolveExpr(s.Guard)
+		}
 		for _, binding := range s.Bindings {
 			r.resolveTypeRef(binding.Type)
 			if binding.Name == "_" {

@@ -18,6 +18,13 @@ func (b *unwrapStmtBuilder) Build(stmt *parser.UnwrapStmt) (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
+	var guard Expr
+	if stmt.Guard != nil {
+		guard, err = b.exprs.Build(stmt.Guard)
+		if err != nil {
+			return nil, err
+		}
+	}
 	bindings := make([]BindingDecl, len(stmt.Bindings))
 	for i, binding := range stmt.Bindings {
 		symbol := b.ctx.newSymbol(SymbolBinding, binding.Name, "", binding.Span)
@@ -39,5 +46,5 @@ func (b *unwrapStmtBuilder) Build(stmt *parser.UnwrapStmt) (Stmt, error) {
 			b.ctx.defineSymbol(symbol)
 		}
 	}
-	return &UnwrapStmt{Bindings: bindings, Value: value, Span: stmt.Span}, nil
+	return &UnwrapStmt{Bindings: bindings, Value: value, Guard: guard, Span: stmt.Span}, nil
 }

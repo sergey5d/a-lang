@@ -2176,6 +2176,29 @@ def run(value Result[Int, Str]) Result[Int, Str] {
 	}
 }
 
+func TestParseGuardedUnwrapStmt(t *testing.T) {
+	src := `
+def run(value Option[Int]) Result[Int, Str] {
+	item <- value guard Err("missing")
+	return Ok(item + 1)
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	stmt, ok := fn.Body.Statements[0].(*UnwrapStmt)
+	if !ok {
+		t.Fatalf("expected first statement to be unwrap, got %T", fn.Body.Statements[0])
+	}
+	if stmt.Guard == nil {
+		t.Fatalf("expected guard expression on unwrap statement")
+	}
+}
+
 func TestAttachSourceSpans(t *testing.T) {
 	src := `
 def sample(a Int) Bool {
