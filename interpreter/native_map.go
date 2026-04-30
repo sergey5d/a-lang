@@ -56,6 +56,27 @@ func nativeMapMap(in *Interpreter, receiver Value, args []Value, local *env, spa
 	return out, nil
 }
 
+func nativeMapMapValues(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeMap(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Map.mapValues receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "mapValues expects 1 argument", Span: span}
+	}
+	out := &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: make([]string, 0, len(value.order))}
+	for _, key := range value.order {
+		mapped, err := in.invokeCallableValue(args[0], []Value{value.items[key]}, local, span)
+		if err != nil {
+			return nil, err
+		}
+		out.order = append(out.order, key)
+		out.keys[key] = value.keys[key]
+		out.items[key] = mapped
+	}
+	return out, nil
+}
+
 func nativeMapFlatMap(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
 	value, ok := asNativeMap(receiver)
 	if !ok {

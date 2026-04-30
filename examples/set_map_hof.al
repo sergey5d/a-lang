@@ -12,6 +12,7 @@
 # setExists true
 # setForAll true
 # mapped 10 20
+# mappedValues 100 200
 # expandedValues 1 12
 # filteredMap true 1
 # mapFold 3
@@ -33,6 +34,7 @@ def main() {
 
     values = Map("a" : 1, "b" : 2)
     mapped = values.map((key Str, value Int) -> value * 10)
+    mappedValues = values.mapValues((value Int) -> value * 100)
     expandedValues = values.flatMap((key Str, value Int) -> List(value, value + 10))
     filteredMap = values.filter((key Str, value Int) -> value > 1)
     mapTotal = values.fold(0, (acc Int, key Str, value Int) -> acc + value)
@@ -50,6 +52,7 @@ def main() {
     OS.println("setExists " + setHasBig)
     OS.println("setForAll " + setAllPositive)
     OS.println("mapped " + mapped.get(0).getOr(0) + " " + mapped.get(1).getOr(0))
+    OS.println("mappedValues " + mappedValues["a"].getOr(0) + " " + mappedValues["b"].getOr(0))
     OS.println("expandedValues " + expandedValues.get(0).getOr(0) + " " + expandedValues.get(3).getOr(0))
     OS.println("filteredMap " + filteredMap.contains("b") + " " + filteredMap.size())
     OS.println("mapFold " + mapTotal)

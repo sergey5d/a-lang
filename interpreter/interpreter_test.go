@@ -1021,6 +1021,7 @@ def run() Int {
 
 	values = Map("a" : 1, "b" : 2)
 	mapped = values.map((key Str, value Int) -> value * 10)
+	mappedValues = values.mapValues((value Int) -> value * 100)
 	expandedValues = values.flatMap((key Str, value Int) -> List(value, value + 10))
 	filteredMap = values.filter((key Str, value Int) -> value > 1)
 	mapTotal = values.fold(0, (acc Int, key Str, value Int) -> acc + value)
@@ -1040,7 +1041,7 @@ def run() Int {
 	reducedKey, reducedValue = mapReduced.get()
 	if expanded.contains(12) && setHasBig && setAllPositive && mapHasB && mapAllSmall {
 		if reducedKey == "b" {
-			return total * 1000000 + mapped.get(0).getOr(0) * 100000 + expandedValues.get(3).getOr(0) * 10000 + doubled.size() * 1000 + filtered.size() * 100 + setTotal * 10 + setReduced.getOr(0) + filteredMap.size() + mapTotal + reducedValue
+			return total * 1000000 + mapped.get(0).getOr(0) * 100000 + mappedValues["b"].getOr(0) * 10000 + expandedValues.get(3).getOr(0) * 1000 + doubled.size() * 100 + filtered.size() * 10 + setTotal + setReduced.getOr(0) + filteredMap.size() + mapTotal + reducedValue
 		}
 	}
 	return 0
@@ -1066,8 +1067,8 @@ def run() Int {
 	if callErr != nil {
 		t.Fatalf("Call returned error: %v", callErr)
 	}
-	if value != int64(10123272) {
-		t.Fatalf("expected 10123272, got %#v", value)
+	if value != int64(12012338) {
+		t.Fatalf("expected 12012338, got %#v", value)
 	}
 	if strings.TrimSpace(string(output)) != "set 1\nset 2\nset 3\npair a 1\npair b 2" {
 		t.Fatalf("unexpected output %q", string(output))

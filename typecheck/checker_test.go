@@ -1552,6 +1552,7 @@ def run() Int {
 
 	values Map[Str, Int] = Map("a" : 1, "b" : 2)
 	mapped List[Int] = values.map((key Str, value Int) -> value * 10)
+	mappedValues Map[Str, Int] = values.mapValues((value Int) -> value * 100)
 	expandedValues List[Int] = values.flatMap((key Str, value Int) -> List(value, value + 10))
 	filteredMap Map[Str, Int] = values.filter((key Str, value Int) -> value > 1)
 	mapTotal Int = values.fold(0, (acc Int, key Str, value Int) -> acc + value)
@@ -1571,7 +1572,7 @@ def run() Int {
 	reducedKey Str, reducedValue Int = mapReduced.get()
 	if expanded.contains(12) && setHasBig && setAllPositive && mapHasB && mapAllSmall {
 		if reducedKey == "b" {
-			return total + mapped.get(0).getOr(0) + expandedValues.get(3).getOr(0) + doubled.size() + filtered.size() + setTotal + setReduced.getOr(0) + filteredMap.size() + mapTotal + reducedValue
+			return total + mapped.get(0).getOr(0) + mappedValues["b"].getOr(0) + expandedValues.get(3).getOr(0) + doubled.size() + filtered.size() + setTotal + setReduced.getOr(0) + filteredMap.size() + mapTotal + reducedValue
 		}
 	}
 	return 0

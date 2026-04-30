@@ -2,6 +2,7 @@ interface Map[K, V] with Iterable[(K, V)] {
     def set(key K, value V) Map[K, V]
     def iterator() Iterator[(K, V)]
     def map[X](f (K, V) -> X) List[X]
+    def mapValues[X](f V -> X) Map[K, X]
     def flatMap[X](f (K, V) -> List[X]) List[X]
     def filter(f (K, V) -> Bool) Map[K, V]
     def fold[X](initial X, f (X, K, V) -> X) X

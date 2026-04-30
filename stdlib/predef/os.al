@@ -7,3 +7,4 @@ object OS with Printer {
     impl def printf(format Str, value Str...) Unit = ()
     impl def panic(value Str...) Unit = ()
 }
+
