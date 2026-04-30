@@ -1366,7 +1366,11 @@ def describe(user { name Str, age Int }) Int {
 }
 
 def run() Bool {
-	full = record { name = "Ana", age = 10, city = "NYC" }
+	full = record {
+		name = "Ana"
+		age = 10
+		city = "NYC"
+	}
 	return describe(full) == 10 && full.name == "Ana" && full.city == "NYC"
 }
 `

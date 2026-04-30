@@ -252,6 +252,24 @@ Anonymous record literal:
 user = record { name = "Ada", age = 10 }
 ```
 
+Multiline anonymous record literal:
+
+```txt
+user = record {
+    name = "Ada"
+    age = 10
+}
+```
+
+Inferred field type from a local value:
+
+```txt
+a = 1
+b = record {
+    count = a
+}
+```
+
 Anonymous record shape type:
 
 ```txt
@@ -265,6 +283,7 @@ Anonymous record shapes are structural:
 - missing fields are rejected
 - defaults are not part of the shape syntax
 - construction uses `record { ... }`; plain `{ ... }` remains a block expression
+- multiline record literals may separate fields by newlines instead of commas
 
 ## Functions and Methods
 

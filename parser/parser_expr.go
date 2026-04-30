@@ -236,9 +236,16 @@ func (p *Parser) parseAnonymousRecordExpr(start Token) (Expr, error) {
 			Value: value,
 			Span:  mergeSpans(tokenSpan(name), exprSpan(value)),
 		})
-		if !p.match(TokenComma) {
+		if p.match(TokenComma) {
+			continue
+		}
+		if p.check(TokenRBrace) {
 			break
 		}
+		if p.check(TokenIdentifier) && exprSpan(value).End.Line < p.peek().Line {
+			continue
+		}
+		return nil, fmt.Errorf("expected ',' or newline between record fields, got %s", p.peek().String())
 	}
 	end, err := p.consume(TokenRBrace, "expected '}' after anonymous record literal")
 	if err != nil {

@@ -1556,7 +1556,11 @@ def run() Str {
 func TestParseAnonymousRecordExpr(t *testing.T) {
 	src := `
 def run(user { name Str, age Int }) Int {
-	value = record { name = "Ana", age = 10, city = "NYC" }
+	value = record {
+		name = "Ana"
+		age = 10
+		city = "NYC"
+	}
 	return user.age
 }
 `

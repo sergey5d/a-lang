@@ -482,7 +482,11 @@ def describe(user { name Str, age Int }) Int {
 }
 
 def run() Int {
-	full = record { name = "Ana", age = 10, city = "NYC" }
+	full = record {
+		name = "Ana"
+		age = 10
+		city = "NYC"
+	}
 	describe(full)
 	return full.age
 }
