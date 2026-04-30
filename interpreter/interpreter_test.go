@@ -1379,11 +1379,20 @@ def run() Bool {
 		city = "NYC"
 	}
 	narrow { name Str, age Int } = full
+	positional { name Str, age Int } = record("Ben", 12)
 	counter { count Int, next Int } = makeCounter(5)
 	mixed = record { a = 5, c = 7,
 		b = 8
 	}
-	return describe(full) == 10 && narrow.name == "Ana" && counter.next == 6 && full.city == "NYC" && mixed.a + mixed.b + mixed.c == 20
+	return describe(full) == 10 &&
+		describe(record("Cara", 14)) == 14 &&
+		narrow.name == "Ana" &&
+		positional.name == "Ben" &&
+		positional.age == 12 &&
+		counter.next == 6 &&
+		counter.count == 5 &&
+		full.city == "NYC" &&
+		mixed.a + mixed.b + mixed.c == 20
 }
 `
 

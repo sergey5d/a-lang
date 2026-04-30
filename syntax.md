@@ -251,6 +251,12 @@ Anonymous record literal:
 user = record { name = "Ada", age = 10 }
 ```
 
+Positional anonymous record construction is also allowed when the target shape is already known:
+
+```txt
+user { name Str, age Int } = record("Ada", 10)
+```
+
 Multiline anonymous record literal:
 
 ```txt
@@ -284,12 +290,23 @@ def describe(user { name Str, age Int }) Str =
     user.name + " is " + user.age
 ```
 
+Positional construction also works for shaped parameters and shaped return values:
+
+```txt
+def makeUser() { name Str, age Int } = {
+    return record("Ada", 10)
+}
+
+describe(record("Cara", 14))
+```
+
 Anonymous record shapes are structural:
 - field names and field types must match at compile time
 - extra fields are allowed when passing a value to a narrower shape
 - missing fields are rejected
 - defaults are not part of the shape syntax
 - construction uses `record { ... }`; plain `{ ... }` remains a block expression
+- `record(...)` is allowed only when an anonymous record shape is known from context
 - inside `record { ... }`, fields may be separated by commas, newlines, or a mix of both
 
 ## Functions and Methods

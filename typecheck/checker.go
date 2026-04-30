@@ -1794,7 +1794,7 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 	case *parser.RecordUpdateExpr:
 		result = c.checkRecordUpdateExpr(e)
 	case *parser.AnonymousRecordExpr:
-		result = c.checkAnonymousRecordExpr(e)
+		result = c.checkAnonymousRecordExpr(e, expected)
 	case *parser.AnonymousInterfaceExpr:
 		result = c.checkAnonymousInterfaceExpr(e)
 	case *parser.IfExpr:
@@ -2482,7 +2482,40 @@ func (c *Checker) checkRecordUpdateExpr(expr *parser.RecordUpdateExpr) *Type {
 	return receiverType
 }
 
-func (c *Checker) checkAnonymousRecordExpr(expr *parser.AnonymousRecordExpr) *Type {
+func (c *Checker) checkAnonymousRecordExpr(expr *parser.AnonymousRecordExpr, expected *Type) *Type {
+	if len(expr.Values) > 0 {
+		if expected == nil || expected.Kind != TypeRecord {
+			for _, value := range expr.Values {
+				c.checkExpr(value)
+			}
+			c.addDiagnostic("invalid_record_literal", "positional record(...) requires an expected anonymous record shape", expr.Span)
+			return unknownType
+		}
+		if len(expr.Values) != len(expected.Fields) {
+			for _, value := range expr.Values {
+				c.checkExpr(value)
+			}
+			c.addDiagnostic("invalid_record_literal", fmt.Sprintf("record(...) expects %d values for shape %s, got %d", len(expected.Fields), expected.String(), len(expr.Values)), expr.Span)
+			return expected
+		}
+		fields := make([]RecordField, len(expected.Fields))
+		expr.Fields = make([]parser.CallArg, len(expected.Fields))
+		for i, field := range expected.Fields {
+			valueType := c.checkExprWithExpected(expr.Values[i], field.Type)
+			c.requireAssignable(valueType, field.Type, exprSpan(expr.Values[i]), "type_mismatch", "cannot assign "+valueType.String()+" to "+field.Type.String())
+			fields[i] = RecordField{Name: field.Name, Type: field.Type}
+			expr.Fields[i] = parser.CallArg{
+				Name:  field.Name,
+				Value: expr.Values[i],
+				Span: parser.Span{
+					Start: expr.Span.Start,
+					End:   exprSpan(expr.Values[i]).End,
+				},
+			}
+		}
+		expr.Values = nil
+		return &Type{Kind: TypeRecord, Name: "Record", Fields: fields}
+	}
 	fields := make([]RecordField, len(expr.Fields))
 	seen := map[string]bool{}
 	for i, field := range expr.Fields {

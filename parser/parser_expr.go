@@ -212,47 +212,74 @@ func (p *Parser) isAnonymousInterfaceExprStart() bool {
 }
 
 func (p *Parser) parseAnonymousRecordExpr(start Token) (Expr, error) {
-	if _, err := p.consume(TokenLBrace, "expected '{' after 'record'"); err != nil {
+	if p.check(TokenLBrace) {
+		p.advance()
+		var fields []CallArg
+		if p.check(TokenRBrace) {
+			return nil, fmt.Errorf("anonymous record literal must declare at least one field at %d:%d", start.Line, start.Column)
+		}
+		for {
+			name, err := p.consume(TokenIdentifier, "expected record field name")
+			if err != nil {
+				return nil, err
+			}
+			if _, err := p.consume(TokenAssign, "expected '=' after record field name"); err != nil {
+				return nil, err
+			}
+			value, err := p.parseExpressionWithOptions(0, true)
+			if err != nil {
+				return nil, err
+			}
+			fields = append(fields, CallArg{
+				Name:  name.Lexeme,
+				Value: value,
+				Span:  mergeSpans(tokenSpan(name), exprSpan(value)),
+			})
+			if p.match(TokenComma) {
+				continue
+			}
+			if p.check(TokenRBrace) {
+				break
+			}
+			if p.check(TokenIdentifier) && exprSpan(value).End.Line < p.peek().Line {
+				continue
+			}
+			return nil, fmt.Errorf("expected ',' or newline between record fields, got %s", p.peek().String())
+		}
+		end, err := p.consume(TokenRBrace, "expected '}' after anonymous record literal")
+		if err != nil {
+			return nil, err
+		}
+		return &AnonymousRecordExpr{
+			Fields: fields,
+			Span:   mergeSpans(tokenSpan(start), tokenSpan(end)),
+		}, nil
+	}
+	if _, err := p.consume(TokenLParen, "expected '{' or '(' after 'record'"); err != nil {
 		return nil, err
 	}
-	var fields []CallArg
-	if p.check(TokenRBrace) {
-		return nil, fmt.Errorf("anonymous record literal must declare at least one field at %d:%d", start.Line, start.Column)
+	var values []Expr
+	if !p.check(TokenRParen) {
+		for {
+			value, err := p.parseExpressionUntil(TokenComma, TokenRParen)
+			if err != nil {
+				return nil, err
+			}
+			values = append(values, value)
+			if !p.match(TokenComma) {
+				break
+			}
+		}
 	}
-	for {
-		name, err := p.consume(TokenIdentifier, "expected record field name")
-		if err != nil {
-			return nil, err
-		}
-		if _, err := p.consume(TokenAssign, "expected '=' after record field name"); err != nil {
-			return nil, err
-		}
-		value, err := p.parseExpressionWithOptions(0, true)
-		if err != nil {
-			return nil, err
-		}
-		fields = append(fields, CallArg{
-			Name:  name.Lexeme,
-			Value: value,
-			Span:  mergeSpans(tokenSpan(name), exprSpan(value)),
-		})
-		if p.match(TokenComma) {
-			continue
-		}
-		if p.check(TokenRBrace) {
-			break
-		}
-		if p.check(TokenIdentifier) && exprSpan(value).End.Line < p.peek().Line {
-			continue
-		}
-		return nil, fmt.Errorf("expected ',' or newline between record fields, got %s", p.peek().String())
-	}
-	end, err := p.consume(TokenRBrace, "expected '}' after anonymous record literal")
+	end, err := p.consume(TokenRParen, "expected ')' after positional anonymous record literal")
 	if err != nil {
 		return nil, err
 	}
+	if len(values) == 0 {
+		return nil, fmt.Errorf("anonymous record literal must declare at least one value at %d:%d", start.Line, start.Column)
+	}
 	return &AnonymousRecordExpr{
-		Fields: fields,
+		Values: values,
 		Span:   mergeSpans(tokenSpan(start), tokenSpan(end)),
 	}, nil
 }

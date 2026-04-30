@@ -489,6 +489,7 @@ func (*RecordUpdateExpr) exprNode() {}
 // AnonymousRecordExpr creates a structural anonymous record value.
 type AnonymousRecordExpr struct {
 	Fields []CallArg `json:"fields"`
+	Values []Expr    `json:"values,omitempty"`
 	Span   Span      `json:"span"`
 }
 
