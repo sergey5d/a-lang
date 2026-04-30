@@ -378,9 +378,6 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		}
 	case *parser.UnwrapStmt:
 		r.resolveExpr(s.Value)
-		if s.Guard != nil {
-			r.resolveExpr(s.Guard)
-		}
 		for _, binding := range s.Bindings {
 			r.resolveTypeRef(binding.Type)
 			if binding.Name == "_" {
@@ -388,6 +385,16 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 			}
 			r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
 		}
+	case *parser.GuardStmt:
+		r.resolveExpr(s.Value)
+		for _, binding := range s.Bindings {
+			r.resolveTypeRef(binding.Type)
+			if binding.Name == "_" {
+				continue
+			}
+			r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
+		}
+		r.resolveBlock(s.Fallback)
 	case *parser.IfStmt:
 		if s.BindingValue != nil {
 			r.resolveExpr(s.BindingValue)

@@ -1803,15 +1803,19 @@ def run() Str {
 	}
 }
 
-func TestGuardedUnwrapStmt(t *testing.T) {
+func TestGuardStmt(t *testing.T) {
 	src := `
 def runSome(value Option[Int]) Result[Int, Str] {
-	item <- value guard Err("missing")
+	guard item <- value {
+		Err("missing")
+	}
 	return Ok(item + 1)
 }
 
 def runNone(value Option[Int]) Result[Int, Str] {
-	item <- value guard Err("missing")
+	guard item <- value {
+		Err("missing")
+	}
 	return Ok(item + 1)
 }
 

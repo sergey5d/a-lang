@@ -2176,10 +2176,12 @@ def run(value Result[Int, Str]) Result[Int, Str] {
 	}
 }
 
-func TestParseGuardedUnwrapStmt(t *testing.T) {
+func TestParseGuardStmt(t *testing.T) {
 	src := `
 def run(value Option[Int]) Result[Int, Str] {
-	item <- value guard Err("missing")
+	guard item <- value {
+		Err("missing")
+	}
 	return Ok(item + 1)
 }
 `
@@ -2190,12 +2192,12 @@ def run(value Option[Int]) Result[Int, Str] {
 	}
 
 	fn := program.Functions[0]
-	stmt, ok := fn.Body.Statements[0].(*UnwrapStmt)
+	stmt, ok := fn.Body.Statements[0].(*GuardStmt)
 	if !ok {
-		t.Fatalf("expected first statement to be unwrap, got %T", fn.Body.Statements[0])
+		t.Fatalf("expected first statement to be guard, got %T", fn.Body.Statements[0])
 	}
-	if stmt.Guard == nil {
-		t.Fatalf("expected guard expression on unwrap statement")
+	if stmt.Fallback == nil || len(stmt.Fallback.Statements) != 1 {
+		t.Fatalf("expected fallback block on guard statement")
 	}
 }
 

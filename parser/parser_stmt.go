@@ -31,6 +31,8 @@ func (p *Parser) parseBlockAfterStart(start Token) (*BlockStmt, error) {
 
 func (p *Parser) parseStatement() (Statement, error) {
 	switch p.peek().Type {
+	case TokenGuard:
+		return p.parseGuardStmt()
 	case TokenIf:
 		return p.parseIfStmt()
 	case TokenMatch:
@@ -95,18 +97,8 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 		if err != nil {
 			return nil, err
 		}
-		var guard Expr
-		if p.match(TokenGuard) {
-			guard, err = p.parseExpression(0)
-			if err != nil {
-				return nil, err
-			}
-		}
-		stmt := &UnwrapStmt{Bindings: bindings, Value: value, Guard: guard}
+		stmt := &UnwrapStmt{Bindings: bindings, Value: value}
 		stmt.Span = mergeSpans(tokenSpan(start), exprSpan(value))
-		if guard != nil {
-			stmt.Span = mergeSpans(stmt.Span, exprSpan(guard))
-		}
 		return stmt, nil
 	}
 	mutable := operator == TokenColonAssign
@@ -145,6 +137,44 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 		}
 	}
 	return stmt, nil
+}
+
+func (p *Parser) parseGuardStmt() (Statement, error) {
+	start := p.advance()
+	var name Token
+	var err error
+	if p.check(TokenIdentifier) {
+		name, err = p.consume(TokenIdentifier, "expected binding name after 'guard'")
+	} else {
+		name, err = p.consume(TokenUnder, "expected binding name after 'guard'")
+	}
+	if err != nil {
+		return nil, err
+	}
+	bindings, err := p.parseBindingsWithStart(name, true)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.consume(TokenLeftArrow, "expected '<-' after guard bindings"); err != nil {
+		return nil, err
+	}
+	if err := p.requireSameLineExpressionStart(p.previous()); err != nil {
+		return nil, err
+	}
+	value, err := p.parseExpressionUntil(TokenLBrace)
+	if err != nil {
+		return nil, err
+	}
+	fallback, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &GuardStmt{
+		Bindings: bindings,
+		Value:    value,
+		Fallback: fallback,
+		Span:     mergeSpans(tokenSpan(start), fallback.Span),
+	}, nil
 }
 
 func (p *Parser) parseBindingsWithStart(start Token, firstIsName bool) ([]Binding, error) {

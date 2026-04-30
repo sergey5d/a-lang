@@ -190,12 +190,22 @@ func (s *BindingStmt) GetSpan() parser.Span { return s.Span }
 type UnwrapStmt struct {
 	Bindings []BindingDecl
 	Value    Expr
-	Guard    Expr
 	Span     parser.Span
 }
 
 func (*UnwrapStmt) stmtNode()              {}
 func (s *UnwrapStmt) GetSpan() parser.Span { return s.Span }
+
+// GuardStmt is a typed guarded unwrap statement with a fallback block.
+type GuardStmt struct {
+	Bindings []BindingDecl
+	Value    Expr
+	Fallback *BlockStmt
+	Span     parser.Span
+}
+
+func (*GuardStmt) stmtNode()              {}
+func (s *GuardStmt) GetSpan() parser.Span { return s.Span }
 
 // AssignmentStmt is a typed write to an assignment target.
 type AssignmentStmt struct {

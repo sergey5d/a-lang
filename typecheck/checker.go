@@ -1133,10 +1133,7 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			c.addDiagnostic("invalid_unwrap", "unwrap binding requires Unwrappable[T]", exprSpan(s.Value))
 			successType = unknownType
 		}
-		if s.Guard != nil {
-			guardType := c.checkExprWithExpected(s.Guard, c.returnTypes[len(c.returnTypes)-1])
-			c.requireAssignable(guardType, c.returnTypes[len(c.returnTypes)-1], exprSpan(s.Guard), "invalid_unwrap", "guard value must be assignable to "+c.returnTypes[len(c.returnTypes)-1].String())
-		} else if !c.shortCircuitCompatible(sourceType, c.returnTypes[len(c.returnTypes)-1]) {
+		if !c.shortCircuitCompatible(sourceType, c.returnTypes[len(c.returnTypes)-1]) {
 			c.addDiagnostic("invalid_unwrap", "unwrap binding requires function return type compatible with "+sourceType.String(), s.Span)
 		}
 		bindingTypes := []*Type{successType}
@@ -1158,6 +1155,37 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			}
 			c.define(bindingDecl.Name, bindingType, false)
 		}
+	case *parser.GuardStmt:
+		if len(c.returnTypes) == 0 {
+			c.addDiagnostic("invalid_guard", "guard used outside callable body", s.Span)
+			return
+		}
+		sourceType := c.checkExpr(s.Value)
+		successType, ok := c.unwrappableSuccessType(sourceType)
+		if !ok {
+			c.addDiagnostic("invalid_guard", "guard requires Unwrappable[T]", exprSpan(s.Value))
+			successType = unknownType
+		}
+		bindingTypes := []*Type{successType}
+		if len(s.Bindings) > 1 {
+			bindingTypes = c.destructureValueTypes(len(s.Bindings), successType, s.Span, "invalid_binding_count", "guard binding")
+		}
+		for i, bindingDecl := range s.Bindings {
+			if bindingDecl.Name == "_" {
+				continue
+			}
+			bindingType := unknownType
+			if i < len(bindingTypes) && bindingTypes[i] != nil {
+				bindingType = bindingTypes[i]
+			}
+			if bindingDecl.Type != nil {
+				declType := c.resolveDeclaredType(bindingDecl.Type)
+				c.requireAssignable(bindingType, declType, bindingDecl.Span, "type_mismatch", "cannot assign "+bindingType.String()+" to "+declType.String())
+				bindingType = declType
+			}
+			c.define(bindingDecl.Name, bindingType, false)
+		}
+		c.checkGuardFallbackBlock(s.Fallback, c.returnTypes[len(c.returnTypes)-1])
 	case *parser.LocalFunctionStmt:
 		sig := Signature{Parameters: make([]*Type, len(s.Function.Parameters)), ReturnType: fromTypeRef(s.Function.ReturnType, c), Variadic: len(s.Function.Parameters) > 0 && s.Function.Parameters[len(s.Function.Parameters)-1].Variadic}
 		for i, param := range s.Function.Parameters {
@@ -1547,9 +1575,35 @@ func (c *Checker) checkBlockResult(block *parser.BlockStmt, code, message string
 	return c.checkStmtResult(last, code, message)
 }
 
+func (c *Checker) checkGuardFallbackBlock(block *parser.BlockStmt, expected *Type) {
+	if block == nil || len(block.Statements) == 0 {
+		c.addDiagnostic("invalid_guard", "guard block must return a value", blockSpan(block))
+		return
+	}
+	for i := 0; i < len(block.Statements)-1; i++ {
+		c.checkStmt(block.Statements[i])
+	}
+	last := block.Statements[len(block.Statements)-1]
+	if ret, ok := last.(*parser.ReturnStmt); ok {
+		c.checkStmt(ret)
+		return
+	}
+	valueType := c.checkStmtResultWithExpected(last, expected, "invalid_guard", "guard block must end with a value-producing statement")
+	if !isUnknown(expected) && !isUnknown(valueType) {
+		c.requireAssignable(valueType, expected, stmtSpan(last), "invalid_guard", "guard block value must be assignable to "+expected.String())
+	}
+}
+
 func (c *Checker) checkStmtResult(stmt parser.Statement, code, message string) *Type {
+	return c.checkStmtResultWithExpected(stmt, nil, code, message)
+}
+
+func (c *Checker) checkStmtResultWithExpected(stmt parser.Statement, expected *Type, code, message string) *Type {
 	switch s := stmt.(type) {
 	case *parser.ExprStmt:
+		if expected != nil {
+			return c.checkExprWithExpected(s.Expr, expected)
+		}
 		return c.checkExpr(s.Expr)
 	case *parser.IfStmt:
 		return c.checkIfStmtResult(s, code, message)

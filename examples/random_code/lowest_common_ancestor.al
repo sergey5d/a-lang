@@ -21,8 +21,8 @@ def find(
     foundQNode Option[TreeNode]
 ) { foundP Option[TreeNode], foundQ Option[TreeNode], ancestor Option[TreeNode] } = {
 
-    current <- node guard {
-        record { foundP = foundPNode, foundQ = foundQNode, ancestor = None() }
+    guard current <- node {
+        return record { foundP = foundPNode, foundQ = foundQNode, ancestor = None() }
     }
 
     currentFoundP := foundPNode

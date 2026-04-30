@@ -10,6 +10,7 @@ import (
 type stmtBuilder struct {
 	bindings         Builder[*parser.ValStmt, Stmt]
 	unwraps          Builder[*parser.UnwrapStmt, Stmt]
+	guards           Builder[*parser.GuardStmt, Stmt]
 	assignments      Builder[*parser.AssignmentStmt, Stmt]
 	multiAssignments Builder[*parser.MultiAssignmentStmt, Stmt]
 	ifs              Builder[*parser.IfStmt, Stmt]
@@ -27,6 +28,8 @@ func (b *stmtBuilder) Build(stmt parser.Statement) (Stmt, error) {
 		return b.bindings.Build(s)
 	case *parser.UnwrapStmt:
 		return b.unwraps.Build(s)
+	case *parser.GuardStmt:
+		return b.guards.Build(s)
 	case *parser.AssignmentStmt:
 		return b.assignments.Build(s)
 	case *parser.MultiAssignmentStmt:

@@ -502,14 +502,38 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			return nil, nil, err
 		}
 		if !ok {
-			if s.Guard != nil {
-				guardValue, err := in.evalExpr(s.Guard, local)
-				if err != nil {
-					return nil, nil, err
-				}
-				return nil, returnSignal{value: guardValue}, nil
-			}
 			return nil, returnSignal{value: sourceValue}, nil
+		}
+		values, err := in.destructureBoundValue(s.Bindings, unwrapped, s.Span)
+		if err != nil {
+			return nil, nil, err
+		}
+		for i, binding := range s.Bindings {
+			if binding.Name == "_" {
+				continue
+			}
+			var value Value
+			if i < len(values) {
+				value = in.coerceValueForBinding(binding.Type, values[i])
+			}
+			local.define(binding.Name, value, false)
+		}
+		return nil, nil, nil
+	case *parser.GuardStmt:
+		sourceValue, err := in.evalExpr(s.Value, local)
+		if err != nil {
+			return nil, nil, err
+		}
+		ok, unwrapped, err := in.unwrappableBindingValue(sourceValue, local, exprSpan(s.Value))
+		if err != nil {
+			return nil, nil, err
+		}
+		if !ok {
+			value, signal, err := in.evalBlockValue(s.Fallback, local, self, "guard block must end with a value-producing statement")
+			if err != nil || signal != nil {
+				return nil, signal, err
+			}
+			return nil, returnSignal{value: value}, nil
 		}
 		values, err := in.destructureBoundValue(s.Bindings, unwrapped, s.Span)
 		if err != nil {
@@ -1038,6 +1062,9 @@ func (in *Interpreter) evalStmtValue(stmt parser.Statement, local *env, self *in
 			return in.execFor(s, local, self)
 		}
 		return nil, nil, RuntimeError{Message: message, Span: stmtSpan(stmt)}
+	case *parser.ReturnStmt:
+		value, signal, err := in.execStmt(s, local, self)
+		return value, signal, err
 	default:
 		return nil, nil, RuntimeError{Message: message, Span: stmtSpan(stmt)}
 	}

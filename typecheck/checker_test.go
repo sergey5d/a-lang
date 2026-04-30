@@ -2166,10 +2166,12 @@ def run(value Result[Int, Str]) Option[Int] {
 	}
 }
 
-func TestAnalyzeGuardedUnwrapStmt(t *testing.T) {
+func TestAnalyzeGuardStmt(t *testing.T) {
 	src := `
 def run(value Option[Int]) Result[Int, Str] {
-	item <- value guard Err("missing")
+	guard item <- value {
+		Err("missing")
+	}
 	return Ok(item + 1)
 }
 `
@@ -2180,10 +2182,12 @@ def run(value Option[Int]) Result[Int, Str] {
 	}
 }
 
-func TestAnalyzeGuardedUnwrapStmtRejectsWrongGuardType(t *testing.T) {
+func TestAnalyzeGuardStmtRejectsWrongGuardType(t *testing.T) {
 	src := `
 def run(value Option[Int]) Result[Int, Str] {
-	item <- value guard Some(0)
+	guard item <- value {
+		Some(0)
+	}
 	return Ok(item + 1)
 }
 `
@@ -2192,7 +2196,7 @@ def run(value Option[Int]) Result[Int, Str] {
 	if len(result.Diagnostics) == 0 {
 		t.Fatalf("expected diagnostics, got none")
 	}
-	if result.Diagnostics[0].Code != "invalid_unwrap" {
+	if result.Diagnostics[0].Code != "invalid_guard" {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }

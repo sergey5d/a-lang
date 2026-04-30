@@ -216,11 +216,20 @@ func (*ValStmt) statementNode() {}
 type UnwrapStmt struct {
 	Bindings []Binding `json:"bindings"`
 	Value    Expr      `json:"value"`
-	Guard    Expr      `json:"guard,omitempty"`
 	Span     Span      `json:"span"`
 }
 
 func (*UnwrapStmt) statementNode() {}
+
+// GuardStmt extracts a success value from an unwrappable value or evaluates a fallback block on failure.
+type GuardStmt struct {
+	Bindings []Binding  `json:"bindings"`
+	Value    Expr       `json:"value"`
+	Fallback *BlockStmt `json:"fallback"`
+	Span     Span       `json:"span"`
+}
+
+func (*GuardStmt) statementNode() {}
 
 // AssignmentStmt writes a value to an existing assignment target.
 type AssignmentStmt struct {
