@@ -568,6 +568,21 @@ def run(flag Bool) Int {
 	}
 }
 
+func TestParseColonShorthandAllowsMultilineRecordLiteral(t *testing.T) {
+	src := `
+def run(flag Bool) { value Int } {
+	if flag: return record {
+		value = 1
+	}
+	return record { value = 0 }
+}
+`
+
+	if _, err := Parse(src); err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+}
+
 func TestParseNewlineContinuationAfterOperatorsAndDelimiters(t *testing.T) {
 	src := `
 def run() Int {

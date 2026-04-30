@@ -21,7 +21,19 @@ def find(
     foundQNode Option[TreeNode]
 ) { foundP Option[TreeNode], foundQ Option[TreeNode], ancestor Option[TreeNode] } = {
 
-    if node.isEmpty(): return record { foundP = foundPNode, foundQ = foundQNode, ancestor = None() }
+    if node.isEmpty(): return record {
+        foundP = foundPNode, foundQ = foundQNode, ancestor = None()
+    }
+
+    # current <- node otherwise return record {
+    #        foundP = foundPNode, foundQ = foundQNode, ancestor = None()
+    #  }
+
+    # TODO:
+    # Perhaps do something like that:
+    # current <- node orReturn/guard with/guard by/ record {
+    #        foundP = foundPNode, foundQ = foundQNode, ancestor = None()
+    # }
 
     foundPNodeOrig = foundPNode
     foundQNodeOrig = foundQNode

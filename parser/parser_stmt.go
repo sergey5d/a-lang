@@ -826,7 +826,7 @@ func (p *Parser) inlineBodyParser(stopTypes ...TokenType) (*Parser, int, error) 
 	end := p.pos
 	for end < len(p.tokens) {
 		token := p.tokens[end]
-		if token.Line != line {
+		if token.Line != line && depthParen == 0 && depthBracket == 0 && depthBrace == 0 {
 			break
 		}
 		if depthParen == 0 && depthBracket == 0 && depthBrace == 0 {
