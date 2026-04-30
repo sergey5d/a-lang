@@ -1366,16 +1366,24 @@ def describe(user { name Str, age Int }) Int {
 	return user.age
 }
 
+def makeCounter(base Int) { count Int, next Int } =
+	record {
+		count = base
+		next = base + 1
+	}
+
 def run() Bool {
 	full = record {
 		name = "Ana"
 		age = 10
 		city = "NYC"
 	}
+	narrow { name Str, age Int } = full
+	counter { count Int, next Int } = makeCounter(5)
 	mixed = record { a = 5, c = 7,
 		b = 8
 	}
-	return describe(full) == 10 && full.name == "Ana" && full.city == "NYC" && mixed.a + mixed.b + mixed.c == 20
+	return describe(full) == 10 && narrow.name == "Ana" && counter.next == 6 && full.city == "NYC" && mixed.a + mixed.b + mixed.c == 20
 }
 `
 

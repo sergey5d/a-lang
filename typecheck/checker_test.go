@@ -475,14 +475,22 @@ def describe(user { name Str, age Int }) Int {
 	return user.age
 }
 
+def makeCounter(base Int) { count Int, next Int } =
+	record {
+		count = base
+		next = base + 1
+	}
+
 def run() Int {
 	full = record {
 		name = "Ana"
 		age = 10
 		city = "NYC"
 	}
+	narrow { name Str, age Int } = full
+	counter { count Int, next Int } = makeCounter(5)
 	describe(full)
-	return full.age
+	return full.age + narrow.age + counter.next
 }
 `
 
