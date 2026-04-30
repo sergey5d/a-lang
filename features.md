@@ -67,10 +67,10 @@ This is not a core blocker, but it would help:
 Constraint:
 - keep it same-line only; no newline-based implicit body after `:`
 
-Still open:
-- decide whether operator overloading should be limited to classes / records / enums / interfaces
-- decide what to do with operator overloading for objects
-- decide whether top-level functions should ever be allowed to participate in operator overloading
+Finalized policy:
+- operator overloading is limited to interfaces, classes, records, and enums
+- objects do not participate
+- top-level functions do not participate
 
 ### 6. Module / Visibility Polish
 
@@ -102,6 +102,14 @@ One possible follow-up is a Rust-style propagation form that:
 Important design constraint:
 - expressing "same container family, different success type" is hard without higher-kinded types
 - so the current propagation model still relies on compiler help for failure rewrapping
+
+Clarification on "failure conversion":
+- this does not necessarily mean superclass/subclass conversion
+- the more likely model is wrapper-style conversion into a broader application error type
+- example:
+  - `readFile() Result[Str, IoError]`
+  - enclosing function returns `Result[Int, AppError]`
+  - failure conversion would mean allowing `IoError` to be turned into something like `AppError.Io(...)` during propagation
 
 ### 10. Smarter Type Narrowing
 
