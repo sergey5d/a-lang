@@ -1,6 +1,7 @@
 # EXPECT:
 # worker 7
 # other 3
+# slacker -1
 # 0
 
 interface WorkerLike {
@@ -38,5 +39,6 @@ def describe(value WorkerLike) {
 def main() Int {
     describe(Worker())
     describe(Other())
+    describe(Slacker())
     0
 }
