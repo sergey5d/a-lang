@@ -270,6 +270,14 @@ b = record {
 }
 ```
 
+Mixed separators are also valid:
+
+```txt
+user = record { name = "Ada",
+    age = 10
+}
+```
+
 Anonymous record shape type:
 
 ```txt
@@ -283,7 +291,7 @@ Anonymous record shapes are structural:
 - missing fields are rejected
 - defaults are not part of the shape syntax
 - construction uses `record { ... }`; plain `{ ... }` remains a block expression
-- multiline record literals may separate fields by newlines instead of commas
+- inside `record { ... }`, fields may be separated by commas, newlines, or a mix of both
 
 ## Functions and Methods
 

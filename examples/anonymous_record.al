@@ -3,6 +3,7 @@
 # Ben is 12
 # 1
 # 20
+# Ada-10
 
 def describe(user { name Str, age Int }) Str =
     user.name + " is " + user.age
@@ -24,9 +25,13 @@ def main() Unit {
     mixed = record { a = 5, c = 7,
         b = 8
     }
+    mixedShape = record { name = "Ada",
+        age = 10
+    }
 
     OS.println(describe(full))
     OS.println(describe(smaller))
     OS.println(inferred.count)
     OS.println(mixed.a + mixed.b + mixed.c)
+    OS.println(mixedShape.name + "-" + mixedShape.age)
 }
