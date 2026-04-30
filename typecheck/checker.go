@@ -2985,14 +2985,6 @@ func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*
 		return unknownType, true
 	}
 	if receiver.Kind == TypeTuple {
-		for i, tupleName := range receiver.TupleNames {
-			if tupleName == name {
-				if i < len(receiver.Args) {
-					return receiver.Args[i], true
-				}
-				return unknownType, true
-			}
-		}
 		return unknownType, false
 	}
 	if receiver.Kind == TypeRecord {

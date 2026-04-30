@@ -686,11 +686,12 @@ def run() Int {
 func TestTupleDestructuring(t *testing.T) {
 	src := `
 def run() Int {
-	a (value Int, size Int) = (1, 2)
+	a (Int, Int) = (1, 2)
 	b (Int, Int) = a
 	c = a
-	d (left Int, right Int) = a
-	a.value + c.value + d.left + d.right
+	left Int, right Int = c
+	otherLeft Int, otherRight Int = b
+	left + right + otherLeft + otherRight
 }
 `
 
@@ -699,21 +700,21 @@ def run() Int {
 	if err != nil {
 		t.Fatalf("Call returned error: %v", err)
 	}
-	if value != int64(5) {
-		t.Fatalf("expected 5, got %#v", value)
+	if value != int64(6) {
+		t.Fatalf("expected 6, got %#v", value)
 	}
 }
 
-func TestNamedTupleAccessAfterMethodReturn(t *testing.T) {
+func TestTupleDestructuringAfterMethodReturn(t *testing.T) {
 	src := `
 class Counter {
-	def pair() (value Int, size Int) = (2, 3)
+	def pair() (Int, Int) = (2, 3)
 }
 
 def run() Int {
 	counter = Counter()
-	pair = counter.pair()
-	return pair.value + pair.size
+	left Int, right Int = counter.pair()
+	return left + right
 }
 `
 

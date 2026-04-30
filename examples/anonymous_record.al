@@ -4,9 +4,16 @@
 # 1
 # 20
 # Ada-10
+# 11
 
 def describe(user { name Str, age Int }) Str =
     user.name + " is " + user.age
+
+def makeCounter(base Int) { count Int, next Int } =
+    record {
+        count = base
+        next = base + 1
+    }
 
 def main() Unit {
     full = record {
@@ -34,4 +41,6 @@ def main() Unit {
     OS.println(inferred.count)
     OS.println(mixed.a + mixed.b + mixed.c)
     OS.println(mixedShape.name + "-" + mixedShape.age)
+    counter = makeCounter(5)
+    OS.println(counter.count + counter.next)
 }

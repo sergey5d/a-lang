@@ -626,18 +626,6 @@ func (r *Resolver) resolveTypeRef(ref *parser.TypeRef) {
 		return
 	}
 	if len(ref.TupleElements) > 0 {
-		seen := map[string]parser.Span{}
-		for i, elem := range ref.TupleElements {
-			if i < len(ref.TupleNames) && ref.TupleNames[i] != "" {
-				name := ref.TupleNames[i]
-				if previous, ok := seen[name]; ok {
-					r.addDiagnostic("duplicate_tuple_field", "duplicate tuple field '"+name+"'", ref.Span)
-					r.addDiagnostic("duplicate_tuple_field", "previous declaration of tuple field '"+name+"'", previous)
-				} else {
-					seen[name] = elem.Span
-				}
-			}
-		}
 		for _, elem := range ref.TupleElements {
 			r.resolveTypeRef(elem)
 		}

@@ -1153,7 +1153,6 @@ func (in *Interpreter) assign(target parser.Expr, operator string, value Value, 
 			}
 			value = updated
 		}
-		value = preserveTupleNames(current.value(), value)
 		return current.set(value)
 	case *parser.MemberExpr:
 		receiver, err := in.evalExpr(t.Receiver, local)
@@ -2038,14 +2037,6 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
 	case *nativeTuple:
-		for i, name := range value.names {
-			if name == expr.Name {
-				if i < len(value.items) {
-					return value.items[i], nil
-				}
-				break
-			}
-		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
 	case *nativeRecord:
 		if field, ok := value.fields[expr.Name]; ok {
@@ -3423,24 +3414,7 @@ func (in *Interpreter) coerceValueForTypeRef(ref *parser.TypeRef, value Value) V
 	if isUnitTypeRef(ref) {
 		return nil
 	}
-	tuple, ok := value.(*nativeTuple)
-	if !ok || len(ref.TupleElements) == 0 {
-		return value
-	}
-	renamed := append([]string(nil), ref.TupleNames...)
-	return &nativeTuple{items: append([]Value(nil), tuple.items...), names: renamed}
-}
-
-func preserveTupleNames(current Value, next Value) Value {
-	currentTuple, ok := current.(*nativeTuple)
-	if !ok {
-		return next
-	}
-	nextTuple, ok := next.(*nativeTuple)
-	if !ok {
-		return next
-	}
-	return &nativeTuple{items: append([]Value(nil), nextTuple.items...), names: append([]string(nil), currentTuple.names...)}
+	return value
 }
 
 func (in *Interpreter) assignmentValues(targetCount int, values []parser.Expr, local *env, span parser.Span) ([]Value, error) {
@@ -3539,7 +3513,7 @@ func zeroValue(ref *parser.TypeRef) Value {
 		for i, elem := range ref.TupleElements {
 			items[i] = zeroValue(elem)
 		}
-		return &nativeTuple{items: items, names: append([]string(nil), ref.TupleNames...)}
+		return &nativeTuple{items: items}
 	case "Record":
 		fields := make(map[string]Value, len(ref.RecordFields))
 		order := make([]string, 0, len(ref.RecordFields))

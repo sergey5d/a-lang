@@ -34,7 +34,6 @@ Common stdlib/prelude types:
 Tuple types:
 
 - unnamed tuples: `(Int, Str)`
-- named tuples: `(value Int, label Str)`
 
 Function types:
 
@@ -553,7 +552,6 @@ Tuple literal:
 
 ```txt
 (1, "x")
-(value = 1, label = "x")
 ```
 
 ## Statements

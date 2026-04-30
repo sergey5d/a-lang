@@ -28,7 +28,7 @@ func (p *Parser) parseFunctionWithPrivate(private bool) (*FunctionDecl, error) {
 		return nil, err
 	}
 	var returnType *TypeRef
-	if !p.check(TokenAssign) && !p.check(TokenLBrace) {
+	if !p.check(TokenAssign) && !(p.check(TokenLBrace) && !p.typeRefFollowedBy(TokenAssign)) {
 		returnType, err = p.parseTypeRef()
 		if err != nil {
 			return nil, err

@@ -72,16 +72,7 @@ Still open:
 - decide what to do with operator overloading for objects
 - decide whether top-level functions should ever be allowed to participate in operator overloading
 
-### 6. Anonymous Objects / Object Literals
-
-Still useful for:
-- one-off adapters
-- inline protocol implementations
-- temporary helper instances
-
-There is already an example reminder for this idea.
-
-### 7. Module / Visibility Polish
+### 6. Module / Visibility Polish
 
 Current package/import support is usable.
 
