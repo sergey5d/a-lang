@@ -161,11 +161,11 @@ func (p *Parser) parseGuardStmt() (Statement, error) {
 	if err := p.requireSameLineExpressionStart(p.previous()); err != nil {
 		return nil, err
 	}
-	value, err := p.parseExpressionUntil(TokenLBrace)
+	value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
 	if err != nil {
 		return nil, err
 	}
-	fallback, err := p.parseBlock()
+	fallback, err := p.parseStmtBodyBlock("guard")
 	if err != nil {
 		return nil, err
 	}
