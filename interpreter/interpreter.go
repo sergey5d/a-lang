@@ -1554,9 +1554,9 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 				}
 				value, exists := m.items[key]
 				if !exists {
-					return nil, RuntimeError{Message: "map key not found", Span: e.Span}
+					return in.constructStdlibOption(nil, false, local, e.Span)
 				}
-				return value, nil
+				return in.constructStdlibOption(value, true, local, e.Span)
 			}
 			return nil, RuntimeError{Message: "indexing requires Array, List, Map, or operator []", Span: e.Span}
 		}

@@ -89,3 +89,17 @@ func nativeOSPrintf(in *Interpreter, receiver Value, args []Value, local *env, s
 	}
 	return nativePrinterPrintf(in, value.out, args, local, span)
 }
+
+func nativeOSPanic(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
+	if _, ok := asNativeOS(receiver); !ok {
+		return nil, RuntimeError{Message: "native OS.panic receiver mismatch", Span: span}
+	}
+	if len(args) == 0 {
+		return nil, RuntimeError{Message: "panic", Span: span}
+	}
+	message := ""
+	for _, arg := range args {
+		message += fmt.Sprint(arg)
+	}
+	return nil, RuntimeError{Message: "panic: " + message, Span: span}
+}

@@ -99,6 +99,23 @@ def run() Unit {
 	}
 }
 
+func TestOSPanic(t *testing.T) {
+	src := `
+def run() Unit {
+	OS.panic("boom ", 7)
+}
+`
+
+	in := New(parseProgram(t, src))
+	_, err := in.Call("run")
+	if err == nil {
+		t.Fatalf("expected panic error, got nil")
+	}
+	if err.Error() != "panic: boom 7 at 3:2" {
+		t.Fatalf("unexpected panic error %q", err.Error())
+	}
+}
+
 func TestForLoops(t *testing.T) {
 	src := `
 def run() Int {
@@ -1865,6 +1882,29 @@ def run() Str {
 	someValue = runSome(Some(4), Some(5))
 	noneValue = runNone(Some(4), None())
 	if someValue.getOr(0) == 9 && noneValue.getError() == "missing" {
+		return "ok"
+	}
+	return "broken"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "ok" {
+		t.Fatalf("expected %q, got %#v", "ok", value)
+	}
+}
+
+func TestMapIndexReturnsOption(t *testing.T) {
+	src := `
+def run() Str {
+	entries = Map("a": 1, "b": 2)
+	present = entries["a"]
+	missing = entries["z"]
+	if present.getOr(0) == 1 && missing.isEmpty() {
 		return "ok"
 	}
 	return "broken"

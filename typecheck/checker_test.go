@@ -2241,6 +2241,22 @@ def run(left Option[Int]) Result[Int, Str] {
 	}
 }
 
+func TestAnalyzeMapIndexReturnsOption(t *testing.T) {
+	src := `
+def run() Bool {
+	entries Map[Str, Int] = Map("a": 1)
+	present Option[Int] = entries["a"]
+	missing Option[Int] = entries["z"]
+	return present.isSet() && missing.isEmpty()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzePartialMatchAndPlaceholderMatchIf(t *testing.T) {
 	src := `
 enum MaybeInt {

@@ -86,6 +86,7 @@ Console printing is available through `OS`:
 OS.print("hello")
 OS.println("hello")
 OS.printf("value=%d\n", 42)
+OS.panic("boom")
 OS.out.println("hello")
 OS.err.println("oops")
 ```

@@ -15,6 +15,7 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"print":   nativeOSPrint,
 			"println": nativeOSPrintln,
 			"printf":  nativeOSPrintf,
+			"panic":   nativeOSPanic,
 		},
 		"Str": {
 			"size": nativeStrSize,

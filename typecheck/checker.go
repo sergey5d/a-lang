@@ -2450,14 +2450,15 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 func (c *Checker) checkIndexExpr(expr *parser.IndexExpr) *Type {
 	receiverType := c.checkExpr(expr.Receiver)
 	indexType := c.checkExpr(expr.Index)
-	c.requireAssignable(indexType, builtin("Int"), exprSpan(expr.Index), "invalid_index_type", "index expression must be Int")
 	if isUnknown(receiverType) {
 		return unknownType
 	}
 	if receiverType.Kind == TypeBuiltin && receiverType.Name == "Array" && len(receiverType.Args) == 1 {
+		c.requireAssignable(indexType, builtin("Int"), exprSpan(expr.Index), "invalid_index_type", "array index must be Int")
 		return receiverType.Args[0]
 	}
 	if receiverType.Kind == TypeInterface && receiverType.Name == "List" && len(receiverType.Args) == 1 {
+		c.requireAssignable(indexType, builtin("Int"), exprSpan(expr.Index), "invalid_index_type", "list index must be Int")
 		return receiverType.Args[0]
 	}
 	if receiverType.Kind == TypeInterface && receiverType.Name == "Map" && len(receiverType.Args) == 2 {
@@ -2465,7 +2466,7 @@ func (c *Checker) checkIndexExpr(expr *parser.IndexExpr) *Type {
 		if !sameType(indexType, expectedKey) {
 			c.addDiagnostic("type_mismatch", "map index must have key type "+expectedKey.String(), expr.Span)
 		}
-		return receiverType.Args[1]
+		return c.optionType(receiverType.Args[1])
 	}
 	if result, ok := c.resolveOperatorExprType(receiverType, "[]", []*Type{indexType}, expr.Span); ok {
 		return result
@@ -2840,7 +2841,7 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			okMethod    bool
 			orderedArgs []parser.Expr
 		)
-		if receiverType.Name == "OS" && (member.Name == "println" || member.Name == "print" || member.Name == "printf") {
+		if receiverType.Name == "OS" && (member.Name == "println" || member.Name == "print" || member.Name == "printf" || member.Name == "panic") {
 			if hasNamedCallArgs(args) {
 				c.addDiagnostic("invalid_named_argument", "named arguments are not supported for variadic methods", member.Span)
 				c.checkArgTypes(callArgValues(args))
@@ -4170,6 +4171,14 @@ func (c *Checker) optionElementType(t *Type) *Type {
 		return t.Args[0]
 	}
 	return unknownType
+}
+
+func (c *Checker) optionType(elem *Type) *Type {
+	optionType := &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{elem}}
+	if _, ok := c.lookupClassInfo("Option"); ok {
+		optionType = &Type{Kind: TypeClass, Name: "Option", Args: []*Type{elem}}
+	}
+	return optionType
 }
 
 func (c *Checker) unwrappableSuccessType(t *Type) (*Type, bool) {
