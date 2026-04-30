@@ -59,10 +59,11 @@ These can mostly live in the stdlib, but may still need runtime support in place
 
 ### 5. Operator Overloading
 
-This is not a core blocker, but it would help:
-- numeric wrappers
-- small value types
-- domain-specific types
+Operator overloading now exists and is mainly intended for compact value-oriented declared types such as:
+- numeric-like wrappers
+- vectors / matrices / geometry values
+- record/class domain values like `Money`, `Distance`, or `Duration`
+- interface-driven abstractions that want symbolic operators over implementing types
 
 Constraint:
 - keep it same-line only; no newline-based implicit body after `:`
