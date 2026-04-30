@@ -17,11 +17,11 @@ type Program struct {
 	PackageName string           `json:"packageName,omitempty"`
 	PackageSpan Span             `json:"packageSpan,omitempty"`
 	Imports     []ImportDecl     `json:"imports,omitempty"`
-	Functions  []*FunctionDecl  `json:"functions"`
-	Interfaces []*InterfaceDecl `json:"interfaces,omitempty"`
-	Classes    []*ClassDecl     `json:"classes,omitempty"`
-	Statements []Statement      `json:"statements,omitempty"`
-	Span       Span             `json:"span"`
+	Functions   []*FunctionDecl  `json:"functions"`
+	Interfaces  []*InterfaceDecl `json:"interfaces,omitempty"`
+	Classes     []*ClassDecl     `json:"classes,omitempty"`
+	Statements  []Statement      `json:"statements,omitempty"`
+	Span        Span             `json:"span"`
 }
 
 // ImportDecl describes a single imported module path.
@@ -248,10 +248,10 @@ func (*IfStmt) statementNode() {}
 
 // MatchStmt represents a match statement with pattern cases.
 type MatchStmt struct {
-	Partial bool         `json:"partial,omitempty"`
-	Value Expr        `json:"value"`
-	Cases []MatchCase `json:"cases"`
-	Span  Span        `json:"span"`
+	Partial bool        `json:"partial,omitempty"`
+	Value   Expr        `json:"value"`
+	Cases   []MatchCase `json:"cases"`
+	Span    Span        `json:"span"`
 }
 
 func (*MatchStmt) statementNode() {}
@@ -478,6 +478,15 @@ type RecordUpdateExpr struct {
 
 func (*RecordUpdateExpr) exprNode() {}
 
+// AnonymousInterfaceExpr creates an anonymous object implementing one or more interfaces.
+type AnonymousInterfaceExpr struct {
+	Interfaces []*TypeRef    `json:"interfaces"`
+	Methods    []*MethodDecl `json:"methods"`
+	Span       Span          `json:"span"`
+}
+
+func (*AnonymousInterfaceExpr) exprNode() {}
+
 // IfExpr is an if / else expression whose value comes from the chosen branch.
 type IfExpr struct {
 	Condition Expr       `json:"condition"`
@@ -498,10 +507,10 @@ func (*BlockExpr) exprNode() {}
 
 // MatchExpr is a match expression whose value comes from the matched case.
 type MatchExpr struct {
-	Partial bool         `json:"partial,omitempty"`
-	Value Expr        `json:"value"`
-	Cases []MatchCase `json:"cases"`
-	Span  Span        `json:"span"`
+	Partial bool        `json:"partial,omitempty"`
+	Value   Expr        `json:"value"`
+	Cases   []MatchCase `json:"cases"`
+	Span    Span        `json:"span"`
 }
 
 func (*MatchExpr) exprNode() {}

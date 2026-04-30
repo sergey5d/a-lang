@@ -56,6 +56,8 @@ func (l *Lowerer) lowerExpr(expr typed.Expr) (Expr, error) {
 		return l.lowerExpr(e.Inner)
 	case *typed.BlockExpr:
 		return nil, unsupportedExprErr(expr)
+	case *typed.AnonymousInterfaceExpr:
+		return nil, unsupportedExprErr(expr)
 	case *typed.UnaryExpr:
 		right, err := l.lowerExpr(e.Right)
 		if err != nil {

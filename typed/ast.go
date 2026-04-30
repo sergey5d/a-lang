@@ -445,6 +445,14 @@ type RecordUpdateExpr struct {
 
 func (*RecordUpdateExpr) exprNode() {}
 
+// AnonymousInterfaceExpr is an inline object implementing one or more interfaces.
+type AnonymousInterfaceExpr struct {
+	baseExpr
+	Interfaces []*typecheck.Type
+}
+
+func (*AnonymousInterfaceExpr) exprNode() {}
+
 // IfExpr is a typed if / else expression.
 type IfExpr struct {
 	baseExpr

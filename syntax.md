@@ -427,6 +427,14 @@ class Box with Named {
     impl def label() Str = "box"
 }
 ```
+
+Anonymous interface implementation expressions:
+
+```txt
+handler = Reader with Closer {
+    impl def read() Str = "x"
+    impl def close() Unit = ()
+}
 ```
 
 Enums:

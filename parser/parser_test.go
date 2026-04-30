@@ -1513,6 +1513,46 @@ def run() Amount {
 	}
 }
 
+func TestParseAnonymousInterfaceExpr(t *testing.T) {
+	src := `
+interface Reader {
+	def read() Str
+}
+
+interface Closer {
+	def close() Unit
+}
+
+def run() Str {
+	handler = Reader with Closer {
+		impl def read() Str = "x"
+		impl def close() Unit = ()
+	}
+	return handler.read()
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	run := program.Functions[0]
+	binding, ok := run.Body.Statements[0].(*ValStmt)
+	if !ok {
+		t.Fatalf("expected binding statement, got %#v", run.Body.Statements[0])
+	}
+	anon, ok := binding.Values[0].(*AnonymousInterfaceExpr)
+	if !ok {
+		t.Fatalf("expected anonymous interface expr, got %#v", binding.Values[0])
+	}
+	if len(anon.Interfaces) != 2 || anon.Interfaces[0].Name != "Reader" || anon.Interfaces[1].Name != "Closer" {
+		t.Fatalf("unexpected interfaces %#v", anon.Interfaces)
+	}
+	if len(anon.Methods) != 2 || anon.Methods[0].Name != "read" || anon.Methods[1].Name != "close" {
+		t.Fatalf("unexpected methods %#v", anon.Methods)
+	}
+}
+
 func TestRejectInvalidRuneLiterals(t *testing.T) {
 	cases := []string{
 		"def bad() Bool { a = '' return true }",

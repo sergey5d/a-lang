@@ -450,6 +450,31 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeAnonymousInterfaceExpr(t *testing.T) {
+	src := `
+interface Reader {
+	def read() Str
+}
+
+interface Closer {
+	def close() Unit
+}
+
+def run() Str {
+	handler = Reader with Closer {
+		impl def read() Str = "x"
+		impl def close() Unit = ()
+	}
+	return handler.read()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeRecordAndClassDestructuring(t *testing.T) {
 	src := `
 record Pair {
@@ -1608,7 +1633,7 @@ def run() Int {
 }
 
 func TestAnalyzeGenericBoundsRejectMissingWitness(t *testing.T) {
-src := `
+	src := `
 class Box[T with Ordering[T]] {
 	value T
 }

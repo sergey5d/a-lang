@@ -35,26 +35,26 @@ type env struct {
 }
 
 type Interpreter struct {
-	program   *parser.Program
-	functions map[string]*parser.FunctionDecl
-	classes   map[string]*parser.ClassDecl
-	interfaces map[string]*parser.InterfaceDecl
-	imports   map[string]*Interpreter
+	program       *parser.Program
+	functions     map[string]*parser.FunctionDecl
+	classes       map[string]*parser.ClassDecl
+	interfaces    map[string]*parser.InterfaceDecl
+	imports       map[string]*Interpreter
 	directImports map[string]runtimeImportedSymbol
-	globals   *env
-	ready     bool
+	globals       *env
+	ready         bool
 }
 
 type runtimeImportedSymbol struct {
-	module     *Interpreter
-	original   string
+	module      *Interpreter
+	original    string
 	isInterface bool
 }
 
 type instance struct {
-	class  *parser.ClassDecl
+	class    *parser.ClassDecl
 	caseName string
-	fields map[string]Value
+	fields   map[string]Value
 }
 
 type closure struct {
@@ -130,11 +130,11 @@ func (t *nativeTuple) String() string {
 
 func New(program *parser.Program) *Interpreter {
 	in := &Interpreter{
-		program:    program,
-		functions:  map[string]*parser.FunctionDecl{},
-		classes:    map[string]*parser.ClassDecl{},
-		interfaces: map[string]*parser.InterfaceDecl{},
-		imports:    map[string]*Interpreter{},
+		program:       program,
+		functions:     map[string]*parser.FunctionDecl{},
+		classes:       map[string]*parser.ClassDecl{},
+		interfaces:    map[string]*parser.InterfaceDecl{},
+		imports:       map[string]*Interpreter{},
 		directImports: map[string]runtimeImportedSymbol{},
 	}
 	for _, fn := range program.Functions {
@@ -156,8 +156,8 @@ func NewModule(mod *module.LoadedModule) *Interpreter {
 	}
 	for localName, symbol := range mod.SymbolImports {
 		in.directImports[localName] = runtimeImportedSymbol{
-			module:     NewModule(symbol.Module),
-			original:   symbol.OriginalName,
+			module:      NewModule(symbol.Module),
+			original:    symbol.OriginalName,
 			isInterface: symbol.IsInterface,
 		}
 	}
@@ -551,10 +551,10 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			return in.execBlock(s.Else, local, self)
 		}
 		return nil, nil, nil
-		case *parser.MatchStmt:
-			value, err := in.evalExpr(s.Value, local)
-			if err != nil {
-				return nil, nil, err
+	case *parser.MatchStmt:
+		value, err := in.evalExpr(s.Value, local)
+		if err != nil {
+			return nil, nil, err
 		}
 		for _, matchCase := range s.Cases {
 			bindings, ok, err := in.matchPattern(matchCase.Pattern, value, local)
@@ -574,13 +574,13 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			if matchCase.Expr != nil {
 				value, err := in.evalExpr(matchCase.Expr, caseEnv)
 				return value, nil, err
-				}
-				return nil, nil, nil
-			}
-			if s.Partial {
-				return nil, nil, nil
 			}
 			return nil, nil, nil
+		}
+		if s.Partial {
+			return nil, nil, nil
+		}
+		return nil, nil, nil
 	case *parser.LoopStmt:
 		return in.execLoop(s, local, self)
 	case *parser.ForStmt:
@@ -1084,36 +1084,36 @@ func (in *Interpreter) evalMatchStmtValue(s *parser.MatchStmt, local *env, self 
 			continue
 		}
 		caseEnv := newEnv(local)
-			for _, binding := range bindings {
-				caseEnv.define(binding.name, binding.value, false)
-			}
-			if matchCase.Body != nil {
-				value, signal, err := in.evalBlockValue(matchCase.Body, caseEnv, self, message)
-				if err != nil {
-					return nil, nil, err
-				}
-				if !s.Partial {
-					return value, signal, nil
-				}
-				if signal != nil {
-					return nil, signal, nil
-				}
-				wrapped, err := in.constructStdlibOption(value, true, local, s.Span)
-				return wrapped, nil, err
-			}
-			if matchCase.Expr != nil {
-				value, err := in.evalExpr(matchCase.Expr, caseEnv)
-				if err != nil {
-					return nil, nil, err
-				}
-				if !s.Partial {
-					return value, nil, nil
-				}
-				wrapped, err := in.constructStdlibOption(value, true, local, s.Span)
-				return wrapped, nil, err
-			}
-			return nil, nil, RuntimeError{Message: message, Span: matchCase.Span}
+		for _, binding := range bindings {
+			caseEnv.define(binding.name, binding.value, false)
 		}
+		if matchCase.Body != nil {
+			value, signal, err := in.evalBlockValue(matchCase.Body, caseEnv, self, message)
+			if err != nil {
+				return nil, nil, err
+			}
+			if !s.Partial {
+				return value, signal, nil
+			}
+			if signal != nil {
+				return nil, signal, nil
+			}
+			wrapped, err := in.constructStdlibOption(value, true, local, s.Span)
+			return wrapped, nil, err
+		}
+		if matchCase.Expr != nil {
+			value, err := in.evalExpr(matchCase.Expr, caseEnv)
+			if err != nil {
+				return nil, nil, err
+			}
+			if !s.Partial {
+				return value, nil, nil
+			}
+			wrapped, err := in.constructStdlibOption(value, true, local, s.Span)
+			return wrapped, nil, err
+		}
+		return nil, nil, RuntimeError{Message: message, Span: matchCase.Span}
+	}
 	if s.Partial {
 		value, err := in.constructStdlibOption(nil, false, local, s.Span)
 		return value, nil, err
@@ -1326,9 +1326,9 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			return nil, RuntimeError{Message: "unexpected control flow in block expression", Span: e.Span}
 		}
 		return value, nil
-		case *parser.MatchExpr:
-			value, err := in.evalExpr(e.Value, local)
-			if err != nil {
+	case *parser.MatchExpr:
+		value, err := in.evalExpr(e.Value, local)
+		if err != nil {
 			return nil, err
 		}
 		for _, matchCase := range e.Cases {
@@ -1343,32 +1343,32 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			for _, binding := range bindings {
 				caseEnv.define(binding.name, binding.value, false)
 			}
-				if matchCase.Body != nil {
-					value, signal, err := in.evalBlockValue(matchCase.Body, caseEnv, nil, "match case must end with an expression")
-					if err != nil {
-						return nil, err
-					}
-					if signal != nil {
-						return nil, RuntimeError{Message: "unexpected control flow in match expression", Span: e.Span}
-					}
-					if e.Partial {
-						return in.constructStdlibOption(value, true, local, e.Span)
-					}
-					return value, nil
-				}
-				value, err := in.evalExpr(matchCase.Expr, caseEnv)
+			if matchCase.Body != nil {
+				value, signal, err := in.evalBlockValue(matchCase.Body, caseEnv, nil, "match case must end with an expression")
 				if err != nil {
 					return nil, err
+				}
+				if signal != nil {
+					return nil, RuntimeError{Message: "unexpected control flow in match expression", Span: e.Span}
 				}
 				if e.Partial {
 					return in.constructStdlibOption(value, true, local, e.Span)
 				}
 				return value, nil
 			}
-			if e.Partial {
-				return in.constructStdlibOption(nil, false, local, e.Span)
+			value, err := in.evalExpr(matchCase.Expr, caseEnv)
+			if err != nil {
+				return nil, err
 			}
-			return nil, RuntimeError{Message: "non-exhaustive match expression", Span: e.Span}
+			if e.Partial {
+				return in.constructStdlibOption(value, true, local, e.Span)
+			}
+			return value, nil
+		}
+		if e.Partial {
+			return in.constructStdlibOption(nil, false, local, e.Span)
+		}
+		return nil, RuntimeError{Message: "non-exhaustive match expression", Span: e.Span}
 	case *parser.ForYieldExpr:
 		var yielded []Value
 		signal, err := in.execForBindings(e.Bindings, 0, local, nil, func(loopEnv *env) (any, error) {
@@ -1535,6 +1535,14 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			copyFields[update.Name] = value
 		}
 		return &instance{class: record.class, fields: copyFields}, nil
+	case *parser.AnonymousInterfaceExpr:
+		class := &parser.ClassDecl{
+			Name:       fmt.Sprintf("__anon_iface_%d_%d", e.Span.Start.Line, e.Span.Start.Column),
+			Implements: e.Interfaces,
+			Methods:    e.Methods,
+			Span:       e.Span,
+		}
+		return in.construct(class, nil, local)
 	case *parser.LambdaExpr:
 		params := make([]string, len(e.Parameters))
 		for i, param := range e.Parameters {
@@ -1621,10 +1629,10 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 			if !ok {
 				return nil, RuntimeError{Message: "undefined object '" + fn.name + "'", Span: call.Span}
 			}
-				argsOnly := make([]Value, len(ordered))
-				for i, arg := range ordered {
-					argsOnly[i] = arg
-				}
+			argsOnly := make([]Value, len(ordered))
+			for i, arg := range ordered {
+				argsOnly[i] = arg
+			}
 			return fn.module.invokeCallableValue(value.value, argsOnly, local, call.Span)
 		}
 		if hasNamedParserArgs(call.Args) {
@@ -1787,20 +1795,20 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 			args[i] = namedValueArg{Name: arg.Name, Value: value, Span: arg.Span}
 		}
 		ordered := namedArgValues(args)
-			if class, ok := mod.classes[member.Name]; ok {
-				if class.Object {
-					value, ok := mod.globals.get(member.Name)
-					if !ok {
-						return nil, RuntimeError{Message: "undefined object '" + member.Name + "'", Span: member.Span}
-					}
-					argsOnly := make([]Value, len(ordered))
-					for i, arg := range ordered {
-						argsOnly[i] = arg
-					}
-					return mod.invokeCallableValue(value.value, argsOnly, mod.globals, member.Span)
+		if class, ok := mod.classes[member.Name]; ok {
+			if class.Object {
+				value, ok := mod.globals.get(member.Name)
+				if !ok {
+					return nil, RuntimeError{Message: "undefined object '" + member.Name + "'", Span: member.Span}
 				}
-				if hasNamedParserArgs(argExprs) {
-					reordered, err := reorderConstructorValueArgs(class, args, member.Span)
+				argsOnly := make([]Value, len(ordered))
+				for i, arg := range ordered {
+					argsOnly[i] = arg
+				}
+				return mod.invokeCallableValue(value.value, argsOnly, mod.globals, member.Span)
+			}
+			if hasNamedParserArgs(argExprs) {
+				reordered, err := reorderConstructorValueArgs(class, args, member.Span)
 				if err != nil {
 					return nil, err
 				}
@@ -2865,7 +2873,6 @@ func (in *Interpreter) evalOverloadedBinary(op string, left Value, rightExpr par
 	}
 	return nil, false, nil
 }
-
 
 func applyArithmetic(op string, left, right Value, span parser.Span) (Value, error) {
 	if ls, ok := left.(string); ok && op == "+" {

@@ -1329,6 +1329,36 @@ def run() Bool {
 	}
 }
 
+func TestAnonymousInterfaceExpr(t *testing.T) {
+	src := `
+interface Reader {
+	def read() Str
+}
+
+interface Closer {
+	def close() Unit
+}
+
+def run() Bool {
+	handler = Reader with Closer {
+		impl def read() Str = "x"
+		impl def close() Unit = ()
+	}
+	handler.close()
+	return handler.read() == "x"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != true {
+		t.Fatalf("expected true, got %#v", value)
+	}
+}
+
 func TestRecordAndClassDestructuring(t *testing.T) {
 	src := `
 record Pair {

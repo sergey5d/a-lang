@@ -42,6 +42,13 @@ func HasPlaceholderExpr(expr Expr) bool {
 			}
 		}
 		return false
+	case *AnonymousInterfaceExpr:
+		for _, method := range e.Methods {
+			if blockHasPlaceholder(method.Body) {
+				return true
+			}
+		}
+		return false
 	case *ListLiteral:
 		for _, item := range e.Elements {
 			if HasPlaceholderExpr(item) {
@@ -234,6 +241,14 @@ func replacePlaceholderExpr(expr Expr, param string) Expr {
 			updates[i] = CallArg{Name: update.Name, Value: replacePlaceholderExpr(update.Value, param), Span: update.Span}
 		}
 		return &RecordUpdateExpr{Receiver: replacePlaceholderExpr(e.Receiver, param), Updates: updates, Span: e.Span}
+	case *AnonymousInterfaceExpr:
+		methods := make([]*MethodDecl, len(e.Methods))
+		for i, method := range e.Methods {
+			copyMethod := *method
+			copyMethod.Body = replacePlaceholderBlock(method.Body, param)
+			methods[i] = &copyMethod
+		}
+		return &AnonymousInterfaceExpr{Interfaces: append([]*TypeRef(nil), e.Interfaces...), Methods: methods, Span: e.Span}
 	case *ListLiteral:
 		items := make([]Expr, len(e.Elements))
 		for i, item := range e.Elements {

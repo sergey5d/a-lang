@@ -62,23 +62,24 @@ type Result struct {
 }
 
 type Checker struct {
-	diagnostics   []semantic.Diagnostic
-	scopes        []scope
-	typeScopes    []typeScope
-	globals       map[string]binding
-	functions     map[string]Signature
-	functionDecls map[string]*parser.FunctionDecl
-	classes       map[string]classInfo
-	interfaces    map[string]interfaceInfo
-	imports       map[string]moduleInfo
-	importedClasses    map[string]classInfo
-	importedInterfaces map[string]interfaceInfo
+	diagnostics            []semantic.Diagnostic
+	scopes                 []scope
+	typeScopes             []typeScope
+	globals                map[string]binding
+	functions              map[string]Signature
+	functionDecls          map[string]*parser.FunctionDecl
+	classes                map[string]classInfo
+	interfaces             map[string]interfaceInfo
+	imports                map[string]moduleInfo
+	importedClasses        map[string]classInfo
+	importedInterfaces     map[string]interfaceInfo
 	importedInterfaceNames map[string]string
-	returnTypes   []*Type
-	exprTypes     map[parser.Expr]*Type
-	currentClass  *parser.ClassDecl
-	currentMethod *parser.MethodDecl
-	lambdaScopes  []int
+	returnTypes            []*Type
+	exprTypes              map[parser.Expr]*Type
+	currentClass           *parser.ClassDecl
+	currentMethod          *parser.MethodDecl
+	lambdaScopes           []int
+	anonClassID            int
 }
 
 type typeLookup interface {
@@ -87,16 +88,16 @@ type typeLookup interface {
 
 func Analyze(program *parser.Program) Result {
 	c := &Checker{
-		globals:       map[string]binding{},
-		functions:     map[string]Signature{},
-		functionDecls: map[string]*parser.FunctionDecl{},
-		classes:       map[string]classInfo{},
-		interfaces:    map[string]interfaceInfo{},
-		imports:       map[string]moduleInfo{},
-		importedClasses:    map[string]classInfo{},
-		importedInterfaces: map[string]interfaceInfo{},
+		globals:                map[string]binding{},
+		functions:              map[string]Signature{},
+		functionDecls:          map[string]*parser.FunctionDecl{},
+		classes:                map[string]classInfo{},
+		interfaces:             map[string]interfaceInfo{},
+		imports:                map[string]moduleInfo{},
+		importedClasses:        map[string]classInfo{},
+		importedInterfaces:     map[string]interfaceInfo{},
 		importedInterfaceNames: map[string]string{},
-		exprTypes:     map[parser.Expr]*Type{},
+		exprTypes:              map[parser.Expr]*Type{},
 	}
 	c.installBuiltinInterfaces()
 	c.collectDecls(program)
@@ -112,27 +113,27 @@ func AnalyzeModule(mod *module.LoadedModule) Result {
 			return result
 		}
 		c := &Checker{
-			globals:       map[string]binding{},
-			functions:     map[string]Signature{},
-			functionDecls: map[string]*parser.FunctionDecl{},
-			classes:       map[string]classInfo{},
-			interfaces:    map[string]interfaceInfo{},
-				imports:       map[string]moduleInfo{},
-				importedClasses:    map[string]classInfo{},
-				importedInterfaces: map[string]interfaceInfo{},
-				importedInterfaceNames: map[string]string{},
-				exprTypes:     map[parser.Expr]*Type{},
-			}
+			globals:                map[string]binding{},
+			functions:              map[string]Signature{},
+			functionDecls:          map[string]*parser.FunctionDecl{},
+			classes:                map[string]classInfo{},
+			interfaces:             map[string]interfaceInfo{},
+			imports:                map[string]moduleInfo{},
+			importedClasses:        map[string]classInfo{},
+			importedInterfaces:     map[string]interfaceInfo{},
+			importedInterfaceNames: map[string]string{},
+			exprTypes:              map[parser.Expr]*Type{},
+		}
 		c.installBuiltinInterfaces()
 		c.installModuleImports(current)
 		c.collectDecls(current.Program)
 		c.checkProgram(current.Program)
 		result := Result{Diagnostics: append([]semantic.Diagnostic(nil), c.diagnostics...), ExprTypes: c.exprTypes}
 		seen[current.Path] = result
-			for _, imported := range current.Dependencies {
-				child := analyzeOne(imported)
-				result.Diagnostics = append(result.Diagnostics, child.Diagnostics...)
-			}
+		for _, imported := range current.Dependencies {
+			child := analyzeOne(imported)
+			result.Diagnostics = append(result.Diagnostics, child.Diagnostics...)
+		}
 		seen[current.Path] = result
 		return result
 	}
@@ -251,8 +252,8 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 			info.classes[decl.Name] = class
 			c.classes[qualified] = class
 		}
-			c.imports[alias] = info
-		}
+		c.imports[alias] = info
+	}
 	for localName, symbol := range current.SymbolImports {
 		samePackage := currentPackage != "" && symbol.Module.SourceProgram.PackageName == currentPackage
 		if symbol.IsInterface {
@@ -1690,19 +1691,19 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			result = fieldType
 			break
 		}
-			if _, ok := c.imports[e.Name]; ok {
-				result = &Type{Kind: TypeModule, Name: e.Name}
-				break
-			}
-			if class, ok := c.importedClasses[e.Name]; ok {
-				result = &Type{Kind: TypeClass, Name: class.name}
-				break
-			}
-			if _, ok := c.importedInterfaces[e.Name]; ok {
-				result = &Type{Kind: TypeInterface, Name: c.importedInterfaceNames[e.Name]}
-				break
-			}
-			if sig, ok := c.functions[e.Name]; ok {
+		if _, ok := c.imports[e.Name]; ok {
+			result = &Type{Kind: TypeModule, Name: e.Name}
+			break
+		}
+		if class, ok := c.importedClasses[e.Name]; ok {
+			result = &Type{Kind: TypeClass, Name: class.name}
+			break
+		}
+		if _, ok := c.importedInterfaces[e.Name]; ok {
+			result = &Type{Kind: TypeInterface, Name: c.importedInterfaceNames[e.Name]}
+			break
+		}
+		if sig, ok := c.functions[e.Name]; ok {
 			result = functionType(e.Name, sig)
 			break
 		}
@@ -1792,6 +1793,8 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		result = c.checkIndexExpr(e)
 	case *parser.RecordUpdateExpr:
 		result = c.checkRecordUpdateExpr(e)
+	case *parser.AnonymousInterfaceExpr:
+		result = c.checkAnonymousInterfaceExpr(e)
 	case *parser.IfExpr:
 		condType := c.checkExpr(e.Condition)
 		c.requireAssignable(condType, builtin("Bool"), exprSpan(e.Condition), "invalid_condition_type", "if condition must be Bool")
@@ -1899,19 +1902,19 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 		if isBuiltinValue(ident.Name) {
 			return c.checkBuiltinConstructorCall(ident.Name, call)
 		}
-			if class, ok := c.classes[ident.Name]; ok {
-				if class.decl.Object {
-					return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, call.Args, call.Span, "object '"+class.decl.Name+"' is not callable")
-				}
-				return c.checkConstructorCall(class, call)
+		if class, ok := c.classes[ident.Name]; ok {
+			if class.decl.Object {
+				return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, call.Args, call.Span, "object '"+class.decl.Name+"' is not callable")
 			}
-			if class, ok := c.importedClasses[ident.Name]; ok {
-				if class.decl.Object {
-					return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, call.Args, call.Span, "object '"+ident.Name+"' is not callable")
-				}
-				return c.checkConstructorCall(class, call)
+			return c.checkConstructorCall(class, call)
+		}
+		if class, ok := c.importedClasses[ident.Name]; ok {
+			if class.decl.Object {
+				return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, call.Args, call.Span, "object '"+ident.Name+"' is not callable")
 			}
-			if fnDecl, ok := c.functionDecls[ident.Name]; ok {
+			return c.checkConstructorCall(class, call)
+		}
+		if fnDecl, ok := c.functionDecls[ident.Name]; ok {
 			orderedArgs := callArgValues(call.Args)
 			if hasNamedCallArgs(call.Args) {
 				reordered, ok := c.reorderCallArgs(fnDecl.Parameters, call.Args, call.Span, "function '"+ident.Name+"'")
@@ -2282,10 +2285,10 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 		lengthType := c.checkExpr(call.Args[0].Value)
 		c.requireAssignable(lengthType, builtin("Int"), exprSpan(call.Args[0].Value), "invalid_argument_type", "Array constructor length must be Int")
 		return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
-		case "Some":
-			optionType := &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
-			if _, ok := c.classes["Option"]; ok {
-				optionType = &Type{Kind: TypeClass, Name: "Option", Args: []*Type{unknownType}}
+	case "Some":
+		optionType := &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
+		if _, ok := c.classes["Option"]; ok {
+			optionType = &Type{Kind: TypeClass, Name: "Option", Args: []*Type{unknownType}}
 		}
 		if len(call.Args) != 1 {
 			for _, arg := range call.Args {
@@ -2307,71 +2310,71 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 				c.checkExpr(arg.Value)
 			}
 			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("None constructor expects 0 arguments, got %d", len(call.Args)), call.Span)
-			}
-			return optionType
-		case "Ok":
-			resultType := &Type{Kind: TypeInterface, Name: "Result", Args: []*Type{unknownType, unknownType}}
-			if _, ok := c.classes["Result"]; ok {
-				resultType = &Type{Kind: TypeClass, Name: "Result", Args: []*Type{unknownType, unknownType}}
-			}
-			if len(call.Args) != 1 {
-				for _, arg := range call.Args {
-					c.checkExpr(arg.Value)
-				}
-				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Ok constructor expects 1 argument, got %d", len(call.Args)), call.Span)
-				return resultType
-			}
-			valueType := c.checkExpr(call.Args[0].Value)
-			resultType.Args = []*Type{valueType, unknownType}
-			return resultType
-		case "Err":
-			resultType := &Type{Kind: TypeInterface, Name: "Result", Args: []*Type{unknownType, unknownType}}
-			if _, ok := c.classes["Result"]; ok {
-				resultType = &Type{Kind: TypeClass, Name: "Result", Args: []*Type{unknownType, unknownType}}
-			}
-			if len(call.Args) != 1 {
-				for _, arg := range call.Args {
-					c.checkExpr(arg.Value)
-				}
-				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Err constructor expects 1 argument, got %d", len(call.Args)), call.Span)
-				return resultType
-			}
-			errorType := c.checkExpr(call.Args[0].Value)
-			resultType.Args = []*Type{unknownType, errorType}
-			return resultType
-		case "Left":
-			eitherType := &Type{Kind: TypeInterface, Name: "Either", Args: []*Type{unknownType, unknownType}}
-			if _, ok := c.classes["Either"]; ok {
-				eitherType = &Type{Kind: TypeClass, Name: "Either", Args: []*Type{unknownType, unknownType}}
-			}
-			if len(call.Args) != 1 {
-				for _, arg := range call.Args {
-					c.checkExpr(arg.Value)
-				}
-				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Left constructor expects 1 argument, got %d", len(call.Args)), call.Span)
-				return eitherType
-			}
-			leftType := c.checkExpr(call.Args[0].Value)
-			eitherType.Args = []*Type{leftType, unknownType}
-			return eitherType
-		case "Right":
-			eitherType := &Type{Kind: TypeInterface, Name: "Either", Args: []*Type{unknownType, unknownType}}
-			if _, ok := c.classes["Either"]; ok {
-				eitherType = &Type{Kind: TypeClass, Name: "Either", Args: []*Type{unknownType, unknownType}}
-			}
-			if len(call.Args) != 1 {
-				for _, arg := range call.Args {
-					c.checkExpr(arg.Value)
-				}
-				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Right constructor expects 1 argument, got %d", len(call.Args)), call.Span)
-				return eitherType
-			}
-			rightType := c.checkExpr(call.Args[0].Value)
-			eitherType.Args = []*Type{unknownType, rightType}
-			return eitherType
-		default:
+		}
+		return optionType
+	case "Ok":
+		resultType := &Type{Kind: TypeInterface, Name: "Result", Args: []*Type{unknownType, unknownType}}
+		if _, ok := c.classes["Result"]; ok {
+			resultType = &Type{Kind: TypeClass, Name: "Result", Args: []*Type{unknownType, unknownType}}
+		}
+		if len(call.Args) != 1 {
 			for _, arg := range call.Args {
 				c.checkExpr(arg.Value)
+			}
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Ok constructor expects 1 argument, got %d", len(call.Args)), call.Span)
+			return resultType
+		}
+		valueType := c.checkExpr(call.Args[0].Value)
+		resultType.Args = []*Type{valueType, unknownType}
+		return resultType
+	case "Err":
+		resultType := &Type{Kind: TypeInterface, Name: "Result", Args: []*Type{unknownType, unknownType}}
+		if _, ok := c.classes["Result"]; ok {
+			resultType = &Type{Kind: TypeClass, Name: "Result", Args: []*Type{unknownType, unknownType}}
+		}
+		if len(call.Args) != 1 {
+			for _, arg := range call.Args {
+				c.checkExpr(arg.Value)
+			}
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Err constructor expects 1 argument, got %d", len(call.Args)), call.Span)
+			return resultType
+		}
+		errorType := c.checkExpr(call.Args[0].Value)
+		resultType.Args = []*Type{unknownType, errorType}
+		return resultType
+	case "Left":
+		eitherType := &Type{Kind: TypeInterface, Name: "Either", Args: []*Type{unknownType, unknownType}}
+		if _, ok := c.classes["Either"]; ok {
+			eitherType = &Type{Kind: TypeClass, Name: "Either", Args: []*Type{unknownType, unknownType}}
+		}
+		if len(call.Args) != 1 {
+			for _, arg := range call.Args {
+				c.checkExpr(arg.Value)
+			}
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Left constructor expects 1 argument, got %d", len(call.Args)), call.Span)
+			return eitherType
+		}
+		leftType := c.checkExpr(call.Args[0].Value)
+		eitherType.Args = []*Type{leftType, unknownType}
+		return eitherType
+	case "Right":
+		eitherType := &Type{Kind: TypeInterface, Name: "Either", Args: []*Type{unknownType, unknownType}}
+		if _, ok := c.classes["Either"]; ok {
+			eitherType = &Type{Kind: TypeClass, Name: "Either", Args: []*Type{unknownType, unknownType}}
+		}
+		if len(call.Args) != 1 {
+			for _, arg := range call.Args {
+				c.checkExpr(arg.Value)
+			}
+			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Right constructor expects 1 argument, got %d", len(call.Args)), call.Span)
+			return eitherType
+		}
+		rightType := c.checkExpr(call.Args[0].Value)
+		eitherType.Args = []*Type{unknownType, rightType}
+		return eitherType
+	default:
+		for _, arg := range call.Args {
+			c.checkExpr(arg.Value)
 		}
 		return unknownType
 	}
@@ -2452,6 +2455,47 @@ func (c *Checker) checkRecordUpdateExpr(expr *parser.RecordUpdateExpr) *Type {
 		c.requireAssignable(valueType, expected, exprSpan(update.Value), "type_mismatch", "cannot assign "+valueType.String()+" to "+expected.String())
 	}
 	return receiverType
+}
+
+func (c *Checker) checkAnonymousInterfaceExpr(expr *parser.AnonymousInterfaceExpr) *Type {
+	c.anonClassID++
+	name := fmt.Sprintf("__anon_iface_%d", c.anonClassID)
+	decl := &parser.ClassDecl{
+		Name:       name,
+		Implements: expr.Interfaces,
+		Methods:    expr.Methods,
+		Span:       expr.Span,
+	}
+	info := classInfo{
+		name:      name,
+		decl:      decl,
+		fields:    map[string]fieldInfo{},
+		methods:   map[string][]methodInfo{},
+		enumCases: map[string]parser.EnumCaseDecl{},
+	}
+	for _, method := range expr.Methods {
+		info.methods[method.Name] = append(info.methods[method.Name], methodInfo{decl: method})
+		if method.Constructor {
+			info.constructors = append(info.constructors, method)
+		}
+	}
+	c.classes[name] = info
+
+	for _, impl := range expr.Interfaces {
+		implType := c.resolveDeclaredType(impl)
+		if implType.Kind != TypeInterface {
+			c.addDiagnostic("invalid_anonymous_interface", "anonymous object can only implement interfaces", impl.Span)
+		}
+	}
+	for _, method := range expr.Methods {
+		c.checkMethod(method, decl)
+	}
+	c.checkOperatorMethods(info)
+	c.checkImplMethodMarkers(info)
+	for _, impl := range expr.Interfaces {
+		c.checkInterfaceImplementation(info, impl)
+	}
+	return &Type{Kind: TypeClass, Name: name}
 }
 
 func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *Type {
@@ -2559,13 +2603,13 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			}
 			return sig.ReturnType
 		}
-			if class, ok := info.classes[member.Name]; ok {
-				if class.decl.Object {
-					return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, args, member.Span, "object '"+class.decl.Name+"' is not callable")
-				}
-				call := &parser.CallExpr{Callee: member, Args: args, Span: member.Span}
-				return c.checkConstructorCall(class, call)
+		if class, ok := info.classes[member.Name]; ok {
+			if class.decl.Object {
+				return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, args, member.Span, "object '"+class.decl.Name+"' is not callable")
 			}
+			call := &parser.CallExpr{Callee: member, Args: args, Span: member.Span}
+			return c.checkConstructorCall(class, call)
+		}
 		c.checkArgTypes(callArgValues(args))
 		c.addDiagnostic("unknown_member", "unknown imported member '"+member.Name+"' on module '"+receiverType.Name+"'", member.Span)
 		return unknownType
@@ -2797,7 +2841,7 @@ func (c *Checker) checkLambdaExpr(expr *parser.LambdaExpr, expected *Type) *Type
 			if destructuredTupleArg {
 				paramType = params[i]
 			} else {
-			paramType = expectedSig.Parameters[i]
+				paramType = expectedSig.Parameters[i]
 			}
 		} else {
 			c.addDiagnostic("invalid_lambda_type", "untyped lambda parameters require a contextual function type", param.Span)

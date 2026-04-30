@@ -94,8 +94,8 @@ func (b *typeRefBuilder) kindOf(name string) typecheck.TypeKind {
 		return typecheck.TypeInterface
 	}
 	switch name {
-		case "Int", "Float", "Bool", "Str", "Rune", "Decimal", "Array", "Unit":
-			return typecheck.TypeBuiltin
+	case "Int", "Float", "Bool", "Str", "Rune", "Decimal", "Array", "Unit":
+		return typecheck.TypeBuiltin
 	}
 	return typecheck.TypeUnknown
 }
@@ -324,7 +324,6 @@ func (b *typeRefBuilder) iterableTypeFromRefs(refs []*parser.TypeRef, args []*ty
 	return nil
 }
 
-
 // exprSpan returns the parser span for a parser expression node.
 func exprSpan(expr parser.Expr) parser.Span {
 	switch e := expr.(type) {
@@ -353,6 +352,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 	case *parser.IndexExpr:
 		return e.Span
 	case *parser.RecordUpdateExpr:
+		return e.Span
+	case *parser.AnonymousInterfaceExpr:
 		return e.Span
 	case *parser.IfExpr:
 		return e.Span

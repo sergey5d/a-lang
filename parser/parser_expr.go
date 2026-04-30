@@ -116,6 +116,9 @@ func (p *Parser) parseExpressionWithOptions(minPrec int, allowRecordUpdate bool)
 }
 
 func (p *Parser) parsePrefix() (Expr, error) {
+	if p.check(TokenIdentifier) && p.isAnonymousInterfaceExprStart() {
+		return p.parseAnonymousInterfaceExpr()
+	}
 	if p.isLambdaIdentifierStart() {
 		return p.parseLambdaIdentifier()
 	}
@@ -189,6 +192,64 @@ func (p *Parser) parsePrefix() (Expr, error) {
 	default:
 		return nil, fmt.Errorf("unexpected token %s", token.String())
 	}
+}
+
+func (p *Parser) isAnonymousInterfaceExprStart() bool {
+	start := p.pos
+	defer func() { p.pos = start }()
+
+	if _, err := p.parseTypeRef(); err != nil {
+		return false
+	}
+	for p.match(TokenWith) {
+		if _, err := p.parseTypeRef(); err != nil {
+			return false
+		}
+	}
+	return p.check(TokenLBrace)
+}
+
+func (p *Parser) parseAnonymousInterfaceExpr() (Expr, error) {
+	first, err := p.parseTypeRef()
+	if err != nil {
+		return nil, err
+	}
+	interfaces := []*TypeRef{first}
+	for p.match(TokenWith) {
+		iface, err := p.parseTypeRef()
+		if err != nil {
+			return nil, err
+		}
+		interfaces = append(interfaces, iface)
+	}
+	if _, err := p.consume(TokenLBrace, "expected '{' after anonymous interface list"); err != nil {
+		return nil, err
+	}
+	var methods []*MethodDecl
+	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		private := p.match(TokenPrivate)
+		switch p.peek().Type {
+		case TokenDef, TokenImpl:
+			method, err := p.parseMethodLike(private, false)
+			if err != nil {
+				return nil, err
+			}
+			methods = append(methods, method)
+		case TokenOperator:
+			return nil, fmt.Errorf("use symbolic 'def' declarations instead of the 'operator' keyword")
+		default:
+			return nil, fmt.Errorf("expected anonymous interface member, got %s", p.peek().String())
+		}
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after anonymous interface body")
+	if err != nil {
+		return nil, err
+	}
+	return &AnonymousInterfaceExpr{
+		Interfaces: interfaces,
+		Methods:    methods,
+		Span:       mergeSpans(typeSpan(first), tokenSpan(end)),
+	}, nil
 }
 
 func (p *Parser) parseStringLiteralExpr(token Token) (Expr, error) {
@@ -459,9 +520,9 @@ func (p *Parser) parseMatchExprAfterStart(start Token) (Expr, error) {
 	}
 	return &MatchExpr{
 		Partial: partial,
-		Value: value,
-		Cases: cases,
-		Span:  mergeSpans(tokenSpan(start), tokenSpan(end)),
+		Value:   value,
+		Cases:   cases,
+		Span:    mergeSpans(tokenSpan(start), tokenSpan(end)),
 	}, nil
 }
 

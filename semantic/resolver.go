@@ -6,19 +6,19 @@ import (
 )
 
 type Resolver struct {
-	diagnostics []Diagnostic
-	scopes      []scope
-	typeScopes  []typeScope
-	globals     map[string]symbol
-	functions   map[string]parser.Span
-	classes     map[string]parser.Span
-	interfaces  map[string]parser.Span
-	imports     map[string]importInfo
+	diagnostics        []Diagnostic
+	scopes             []scope
+	typeScopes         []typeScope
+	globals            map[string]symbol
+	functions          map[string]parser.Span
+	classes            map[string]parser.Span
+	interfaces         map[string]parser.Span
+	imports            map[string]importInfo
 	importedClasses    map[string]parser.Span
 	importedInterfaces map[string]parser.Span
-	classTypes  map[string]typeDecl
-	ifaceTypes  map[string]typeDecl
-	loopDepth   int
+	classTypes         map[string]typeDecl
+	ifaceTypes         map[string]typeDecl
+	loopDepth          int
 }
 
 type importInfo struct {
@@ -42,15 +42,15 @@ type typeDecl struct {
 
 func Analyze(program *parser.Program) []Diagnostic {
 	resolver := &Resolver{
-		globals:    map[string]symbol{},
-		functions:  map[string]parser.Span{},
-		classes:    map[string]parser.Span{},
-		interfaces: map[string]parser.Span{},
-		imports:    map[string]importInfo{},
+		globals:            map[string]symbol{},
+		functions:          map[string]parser.Span{},
+		classes:            map[string]parser.Span{},
+		interfaces:         map[string]parser.Span{},
+		imports:            map[string]importInfo{},
 		importedClasses:    map[string]parser.Span{},
 		importedInterfaces: map[string]parser.Span{},
-		classTypes: map[string]typeDecl{},
-		ifaceTypes: map[string]typeDecl{},
+		classTypes:         map[string]typeDecl{},
+		ifaceTypes:         map[string]typeDecl{},
 	}
 	resolver.resolveProgram(program)
 	return resolver.diagnostics
@@ -65,24 +65,24 @@ func AnalyzeModule(mod *module.LoadedModule) []Diagnostic {
 			return
 		}
 		seen[current.Path] = true
-			for _, imported := range current.Dependencies {
-				walk(imported)
-			}
-			resolver := &Resolver{
-				globals:    map[string]symbol{},
-				functions:  map[string]parser.Span{},
-				classes:    map[string]parser.Span{},
-				interfaces: map[string]parser.Span{},
-				imports:    moduleImportInfo(current),
-				importedClasses:    map[string]parser.Span{},
-				importedInterfaces: map[string]parser.Span{},
-				classTypes: map[string]typeDecl{},
-				ifaceTypes: map[string]typeDecl{},
-			}
-			resolver.installDirectImports(current)
-			resolver.resolveProgram(current.Program)
-			diagnostics = append(diagnostics, resolver.diagnostics...)
+		for _, imported := range current.Dependencies {
+			walk(imported)
 		}
+		resolver := &Resolver{
+			globals:            map[string]symbol{},
+			functions:          map[string]parser.Span{},
+			classes:            map[string]parser.Span{},
+			interfaces:         map[string]parser.Span{},
+			imports:            moduleImportInfo(current),
+			importedClasses:    map[string]parser.Span{},
+			importedInterfaces: map[string]parser.Span{},
+			classTypes:         map[string]typeDecl{},
+			ifaceTypes:         map[string]typeDecl{},
+		}
+		resolver.installDirectImports(current)
+		resolver.resolveProgram(current.Program)
+		diagnostics = append(diagnostics, resolver.diagnostics...)
+	}
 	walk(mod)
 	return diagnostics
 }
@@ -495,6 +495,13 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 		r.resolveExpr(e.Receiver)
 		for _, update := range e.Updates {
 			r.resolveExpr(update.Value)
+		}
+	case *parser.AnonymousInterfaceExpr:
+		for _, iface := range e.Interfaces {
+			r.resolveTypeRef(iface)
+		}
+		for _, method := range e.Methods {
+			r.resolveMethod(method)
 		}
 	case *parser.IfExpr:
 		r.resolveExpr(e.Condition)
