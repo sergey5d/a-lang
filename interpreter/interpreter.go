@@ -79,6 +79,10 @@ type nativeTuple struct {
 	items []Value
 	names []string
 }
+type nativeRecord struct {
+	fields map[string]Value
+	order  []string
+}
 type nativeOption struct {
 	value Value
 	set   bool
@@ -126,6 +130,14 @@ func (t *nativeTuple) String() string {
 		}
 	}
 	return "(" + strings.Join(parts, ", ") + ")"
+}
+
+func (r *nativeRecord) String() string {
+	parts := make([]string, 0, len(r.order))
+	for _, name := range r.order {
+		parts = append(parts, name+"="+fmt.Sprint(r.fields[name]))
+	}
+	return "{" + strings.Join(parts, ", ") + "}"
 }
 
 func New(program *parser.Program) *Interpreter {
@@ -1520,8 +1532,15 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			return nil, err
 		}
 		record, ok := receiver.(*instance)
-		if !ok || !record.class.Record {
-			return nil, RuntimeError{Message: "record update requires a record value", Span: e.Span}
+		if !ok || record.class.Object || record.class.Enum {
+			return nil, RuntimeError{Message: "update requires a record or class value", Span: e.Span}
+		}
+		if !record.class.Record {
+			for _, field := range record.class.Fields {
+				if field.Private {
+					return nil, RuntimeError{Message: "class update requires a class without private fields", Span: e.Span}
+				}
+			}
 		}
 		copyFields := make(map[string]Value, len(record.fields))
 		for name, value := range record.fields {
@@ -1535,6 +1554,20 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			copyFields[update.Name] = value
 		}
 		return &instance{class: record.class, fields: copyFields}, nil
+	case *parser.AnonymousRecordExpr:
+		fields := make(map[string]Value, len(e.Fields))
+		order := make([]string, 0, len(e.Fields))
+		for _, field := range e.Fields {
+			value, err := in.evalExpr(field.Value, local)
+			if err != nil {
+				return nil, err
+			}
+			if _, exists := fields[field.Name]; !exists {
+				order = append(order, field.Name)
+			}
+			fields[field.Name] = value
+		}
+		return &nativeRecord{fields: fields, order: order}, nil
 	case *parser.AnonymousInterfaceExpr:
 		class := &parser.ClassDecl{
 			Name:       fmt.Sprintf("__anon_iface_%d_%d", e.Span.Start.Line, e.Span.Start.Column),
@@ -2014,8 +2047,13 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 			}
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
+	case *nativeRecord:
+		if field, ok := value.fields[expr.Name]; ok {
+			return field, nil
+		}
+		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
 	default:
-		return nil, RuntimeError{Message: "member access expects class instance", Span: expr.Span}
+		return nil, RuntimeError{Message: "member access expects class or record instance", Span: expr.Span}
 	}
 }
 
@@ -2635,6 +2673,19 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 	if len(ref.TupleElements) > 0 {
 		tuple, ok := value.(*nativeTuple)
 		return ok && len(ref.TupleElements) == len(tuple.items)
+	}
+	if len(ref.RecordFields) > 0 {
+		record, ok := value.(*nativeRecord)
+		if !ok {
+			return false
+		}
+		for _, field := range ref.RecordFields {
+			fieldValue, exists := record.fields[field.Name]
+			if !exists || !in.runtimeValueMatchesType(fieldValue, field.Type) {
+				return false
+			}
+		}
+		return true
 	}
 	switch ref.Name {
 	case "", "Unit", "Int", "Float", "Bool", "Str", "Rune", "List", "Iterable", "Iterator", "Set", "Map", "Option", "Result", "Either", "Unwrappable", "Array", "Printer", "OS":
@@ -3489,6 +3540,14 @@ func zeroValue(ref *parser.TypeRef) Value {
 			items[i] = zeroValue(elem)
 		}
 		return &nativeTuple{items: items, names: append([]string(nil), ref.TupleNames...)}
+	case "Record":
+		fields := make(map[string]Value, len(ref.RecordFields))
+		order := make([]string, 0, len(ref.RecordFields))
+		for _, field := range ref.RecordFields {
+			order = append(order, field.Name)
+			fields[field.Name] = zeroValue(field.Type)
+		}
+		return &nativeRecord{fields: fields, order: order}
 	case "Option":
 		return &nativeOption{set: false}
 	case "OS":

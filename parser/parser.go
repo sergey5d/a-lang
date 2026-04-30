@@ -90,6 +90,8 @@ func exprSpan(expr Expr) Span {
 		return e.Span
 	case *IndexExpr:
 		return e.Span
+	case *AnonymousRecordExpr:
+		return e.Span
 	case *IfExpr:
 		return e.Span
 	case *BlockExpr:

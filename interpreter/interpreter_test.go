@@ -1359,6 +1359,28 @@ def run() Bool {
 	}
 }
 
+func TestAnonymousRecordExpr(t *testing.T) {
+	src := `
+def describe(user { name Str, age Int }) Int {
+	return user.age
+}
+
+def run() Bool {
+	full = { name = "Ana", age = 10, city = "NYC" }
+	return describe(full) == 10 && full.name == "Ana" && full.city == "NYC"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != true {
+		t.Fatalf("expected true, got %#v", value)
+	}
+}
+
 func TestRecordAndClassDestructuring(t *testing.T) {
 	src := `
 record Pair {

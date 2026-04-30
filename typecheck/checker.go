@@ -1793,6 +1793,8 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		result = c.checkIndexExpr(e)
 	case *parser.RecordUpdateExpr:
 		result = c.checkRecordUpdateExpr(e)
+	case *parser.AnonymousRecordExpr:
+		result = c.checkAnonymousRecordExpr(e)
 	case *parser.AnonymousInterfaceExpr:
 		result = c.checkAnonymousInterfaceExpr(e)
 	case *parser.IfExpr:
@@ -2419,29 +2421,40 @@ func (c *Checker) checkRecordUpdateExpr(expr *parser.RecordUpdateExpr) *Type {
 		for _, update := range expr.Updates {
 			c.checkExpr(update.Value)
 		}
-		c.addDiagnostic("invalid_record_update", "record update requires a record value", expr.Span)
+		c.addDiagnostic("invalid_record_update", "update requires a record or class value", expr.Span)
 		return unknownType
 	}
 	info, ok := c.classes[receiverType.Name]
-	if !ok || !info.decl.Record {
+	if !ok || info.decl.Object || info.decl.Enum {
 		for _, update := range expr.Updates {
 			c.checkExpr(update.Value)
 		}
-		c.addDiagnostic("invalid_record_update", "record update requires a record value", expr.Span)
+		c.addDiagnostic("invalid_record_update", "update requires a record or class value", expr.Span)
 		return unknownType
+	}
+	if !info.decl.Record {
+		for _, field := range info.decl.Fields {
+			if field.Private {
+				for _, update := range expr.Updates {
+					c.checkExpr(update.Value)
+				}
+				c.addDiagnostic("invalid_record_update", "class update requires a class without private fields", expr.Span)
+				return unknownType
+			}
+		}
 	}
 	subst := c.substForDecl(info.decl.TypeParameters, receiverType.Args)
 	seen := map[string]bool{}
 	for _, update := range expr.Updates {
 		if seen[update.Name] {
-			c.addDiagnostic("invalid_record_update", "duplicate record field '"+update.Name+"'", expr.Span)
+			c.addDiagnostic("invalid_record_update", "duplicate updated field '"+update.Name+"'", expr.Span)
 			c.checkExpr(update.Value)
 			continue
 		}
 		seen[update.Name] = true
 		field, ok := info.fields[update.Name]
 		if !ok {
-			c.addDiagnostic("unknown_member", "unknown record field '"+update.Name+"'", expr.Span)
+			c.addDiagnostic("unknown_member", "unknown field '"+update.Name+"'", expr.Span)
 			c.checkExpr(update.Value)
 			continue
 		}
@@ -2455,6 +2468,19 @@ func (c *Checker) checkRecordUpdateExpr(expr *parser.RecordUpdateExpr) *Type {
 		c.requireAssignable(valueType, expected, exprSpan(update.Value), "type_mismatch", "cannot assign "+valueType.String()+" to "+expected.String())
 	}
 	return receiverType
+}
+
+func (c *Checker) checkAnonymousRecordExpr(expr *parser.AnonymousRecordExpr) *Type {
+	fields := make([]RecordField, len(expr.Fields))
+	seen := map[string]bool{}
+	for i, field := range expr.Fields {
+		if seen[field.Name] {
+			c.addDiagnostic("duplicate_record_field", "duplicate record field '"+field.Name+"'", field.Span)
+		}
+		seen[field.Name] = true
+		fields[i] = RecordField{Name: field.Name, Type: c.checkExpr(field.Value)}
+	}
+	return &Type{Kind: TypeRecord, Name: "Record", Fields: fields}
 }
 
 func (c *Checker) checkAnonymousInterfaceExpr(expr *parser.AnonymousInterfaceExpr) *Type {
@@ -2969,6 +2995,14 @@ func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*
 		}
 		return unknownType, false
 	}
+	if receiver.Kind == TypeRecord {
+		for _, field := range receiver.Fields {
+			if field.Name == name {
+				return field.Type, true
+			}
+		}
+		return unknownType, false
+	}
 	if receiver.Kind == TypeBuiltin && receiver.Name == "Array" {
 		if name == "size" {
 			c.addDiagnostic("invalid_member_access", "method '"+name+"' must be called with ()", span)
@@ -3302,6 +3336,13 @@ func (c *Checker) instantiateTypeRef(ref *parser.TypeRef, subst map[string]*Type
 			args[i] = c.instantiateTypeRef(arg, subst)
 		}
 		return &Type{Kind: TypeTuple, Name: "Tuple", Args: args, TupleNames: append([]string(nil), ref.TupleNames...)}
+	}
+	if len(ref.RecordFields) > 0 {
+		fields := make([]RecordField, len(ref.RecordFields))
+		for i, field := range ref.RecordFields {
+			fields[i] = RecordField{Name: field.Name, Type: c.instantiateTypeRef(field.Type, subst)}
+		}
+		return &Type{Kind: TypeRecord, Name: "Record", Fields: fields}
 	}
 	if subst != nil {
 		if resolved, ok := subst[ref.Name]; ok && len(ref.Arguments) == 0 {
@@ -4158,6 +4199,28 @@ func (c *Checker) requireAssignable(actual, expected *Type, span parser.Span, co
 
 func (c *Checker) isAssignable(actual, expected *Type) bool {
 	if sameType(actual, expected) {
+		return true
+	}
+	if expected.Kind == TypeRecord {
+		if actual.Kind != TypeRecord {
+			return false
+		}
+		for _, expectedField := range expected.Fields {
+			found := false
+			for _, actualField := range actual.Fields {
+				if actualField.Name != expectedField.Name {
+					continue
+				}
+				if !c.isAssignable(actualField.Type, expectedField.Type) {
+					return false
+				}
+				found = true
+				break
+			}
+			if !found {
+				return false
+			}
+		}
 		return true
 	}
 	if expected.Kind != TypeInterface {

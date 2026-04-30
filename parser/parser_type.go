@@ -1,8 +1,13 @@
 package parser
 
+import "fmt"
+
 func (p *Parser) parseTypeRef() (*TypeRef, error) {
 	if p.check(TokenLParen) {
 		return p.parseParenTypeRef()
+	}
+	if p.check(TokenLBrace) {
+		return p.parseRecordTypeRef()
 	}
 	return p.parseArrowTypeRef()
 }
@@ -111,6 +116,44 @@ func (p *Parser) parseParenTypeRef() (*TypeRef, error) {
 	}, nil
 }
 
+func (p *Parser) parseRecordTypeRef() (*TypeRef, error) {
+	start, err := p.consume(TokenLBrace, "expected '{'")
+	if err != nil {
+		return nil, err
+	}
+	if p.check(TokenRBrace) {
+		return nil, fmt.Errorf("anonymous record type must declare at least one field at %d:%d", start.Line, start.Column)
+	}
+	var fields []TypeField
+	for {
+		name, err := p.consume(TokenIdentifier, "expected record field name")
+		if err != nil {
+			return nil, err
+		}
+		typ, err := p.parseTypeRef()
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, TypeField{
+			Name: name.Lexeme,
+			Type: typ,
+			Span: mergeSpans(tokenSpan(name), typeSpan(typ)),
+		})
+		if !p.match(TokenComma) {
+			break
+		}
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after anonymous record type")
+	if err != nil {
+		return nil, err
+	}
+	return &TypeRef{
+		Name:         "Record",
+		RecordFields: fields,
+		Span:         mergeSpans(tokenSpan(start), tokenSpan(end)),
+	}, nil
+}
+
 func (p *Parser) isNamedTupleElementStartAt(start int) bool {
 	if start >= len(p.tokens) || p.tokens[start].Type != TokenIdentifier {
 		return false
@@ -156,6 +199,31 @@ func (p *Parser) simpleTypeRefFollowedByAt(start int, tt TokenType) bool {
 func (p *Parser) scanTypeRef(start int) (int, bool) {
 	if start >= len(p.tokens) {
 		return start, false
+	}
+	if p.tokens[start].Type == TokenLBrace {
+		i := start + 1
+		if i >= len(p.tokens) || p.tokens[i].Type == TokenRBrace {
+			return start, false
+		}
+		for {
+			if i >= len(p.tokens) || p.tokens[i].Type != TokenIdentifier {
+				return start, false
+			}
+			i++
+			var ok bool
+			i, ok = p.scanTypeRef(i)
+			if !ok || i >= len(p.tokens) {
+				return start, false
+			}
+			if p.tokens[i].Type == TokenComma {
+				i++
+				continue
+			}
+			if p.tokens[i].Type == TokenRBrace {
+				return i + 1, true
+			}
+			return start, false
+		}
 	}
 	if p.tokens[start].Type == TokenLParen {
 		i := start + 1

@@ -1553,6 +1553,35 @@ def run() Str {
 	}
 }
 
+func TestParseAnonymousRecordExpr(t *testing.T) {
+	src := `
+def run(user { name Str, age Int }) Int {
+	value = { name = "Ana", age = 10, city = "NYC" }
+	return user.age
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	run := program.Functions[0]
+	if len(run.Parameters) != 1 || len(run.Parameters[0].Type.RecordFields) != 2 {
+		t.Fatalf("expected anonymous record parameter type, got %#v", run.Parameters)
+	}
+	binding, ok := run.Body.Statements[0].(*ValStmt)
+	if !ok {
+		t.Fatalf("expected binding statement, got %#v", run.Body.Statements[0])
+	}
+	record, ok := binding.Values[0].(*AnonymousRecordExpr)
+	if !ok {
+		t.Fatalf("expected anonymous record expr, got %#v", binding.Values[0])
+	}
+	if len(record.Fields) != 3 || record.Fields[0].Name != "name" || record.Fields[1].Name != "age" || record.Fields[2].Name != "city" {
+		t.Fatalf("unexpected anonymous record fields %#v", record.Fields)
+	}
+}
+
 func TestRejectInvalidRuneLiterals(t *testing.T) {
 	cases := []string{
 		"def bad() Bool { a = '' return true }",

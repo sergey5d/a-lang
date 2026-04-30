@@ -16,14 +16,21 @@ const (
 	TypeParam     TypeKind = "type_param"
 	TypeFunction  TypeKind = "function"
 	TypeTuple     TypeKind = "tuple"
+	TypeRecord    TypeKind = "record"
 	TypeModule    TypeKind = "module"
 )
+
+type RecordField struct {
+	Name string
+	Type *Type
+}
 
 type Type struct {
 	Kind       TypeKind
 	Name       string
 	Args       []*Type
 	TupleNames []string
+	Fields     []RecordField
 	Signature  *Signature
 }
 
@@ -50,6 +57,13 @@ func (t *Type) String() string {
 			}
 		}
 		return "(" + strings.Join(parts, ", ") + ")"
+	}
+	if t.Kind == TypeRecord {
+		parts := make([]string, len(t.Fields))
+		for i, field := range t.Fields {
+			parts[i] = field.Name + " " + field.Type.String()
+		}
+		return "{" + strings.Join(parts, ", ") + "}"
 	}
 	if len(t.Args) == 0 {
 		return t.Name
@@ -97,6 +111,28 @@ func sameType(left, right *Type) bool {
 		}
 		return true
 	}
+	if left.Kind == TypeRecord {
+		if len(left.Fields) != len(right.Fields) {
+			return false
+		}
+		for _, leftField := range left.Fields {
+			matched := false
+			for _, rightField := range right.Fields {
+				if leftField.Name != rightField.Name {
+					continue
+				}
+				if !sameType(leftField.Type, rightField.Type) {
+					return false
+				}
+				matched = true
+				break
+			}
+			if !matched {
+				return false
+			}
+		}
+		return true
+	}
 	if left.Name != right.Name || len(left.Args) != len(right.Args) {
 		return false
 	}
@@ -132,6 +168,13 @@ func fromTypeRef(ref *parser.TypeRef, lookup typeLookup) *Type {
 			args[i] = fromTypeRef(arg, lookup)
 		}
 		return &Type{Kind: TypeTuple, Name: "Tuple", Args: args, TupleNames: append([]string(nil), ref.TupleNames...)}
+	}
+	if len(ref.RecordFields) > 0 {
+		fields := make([]RecordField, len(ref.RecordFields))
+		for i, field := range ref.RecordFields {
+			fields[i] = RecordField{Name: field.Name, Type: fromTypeRef(field.Type, lookup)}
+		}
+		return &Type{Kind: TypeRecord, Name: "Record", Fields: fields}
 	}
 	args := make([]*Type, len(ref.Arguments))
 	for i, arg := range ref.Arguments {

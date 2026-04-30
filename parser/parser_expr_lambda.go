@@ -76,7 +76,7 @@ func (p *Parser) parseLambdaParams() ([]LambdaParameter, error) {
 				return nil, err
 			}
 			lambdaParam := param
-			if (p.check(TokenIdentifier) || p.check(TokenLParen)) && (p.typeRefFollowedBy(TokenComma) || p.typeRefFollowedBy(TokenRParen)) {
+			if (p.check(TokenIdentifier) || p.check(TokenLParen) || p.check(TokenLBrace)) && (p.typeRefFollowedBy(TokenComma) || p.typeRefFollowedBy(TokenRParen)) {
 				typeRef, err := p.parseTypeRef()
 				if err != nil {
 					return nil, err

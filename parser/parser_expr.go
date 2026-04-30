@@ -178,6 +178,14 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		}
 		return &ListLiteral{Elements: items, Span: mergeSpans(tokenSpan(token), tokenSpan(p.previous()))}, nil
 	case TokenLBrace:
+		if p.check(TokenIdentifier) && p.checkNext(TokenAssign) {
+			save := p.pos
+			record, err := p.parseAnonymousRecordExpr(token)
+			if err == nil {
+				return record, nil
+			}
+			p.pos = save
+		}
 		block, err := p.parseBlockAfterStart(token)
 		if err != nil {
 			return nil, err
@@ -207,6 +215,39 @@ func (p *Parser) isAnonymousInterfaceExprStart() bool {
 		}
 	}
 	return p.check(TokenLBrace)
+}
+
+func (p *Parser) parseAnonymousRecordExpr(start Token) (Expr, error) {
+	var fields []CallArg
+	for {
+		name, err := p.consume(TokenIdentifier, "expected record field name")
+		if err != nil {
+			return nil, err
+		}
+		if _, err := p.consume(TokenAssign, "expected '=' after record field name"); err != nil {
+			return nil, err
+		}
+		value, err := p.parseExpressionWithOptions(0, true)
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, CallArg{
+			Name:  name.Lexeme,
+			Value: value,
+			Span:  mergeSpans(tokenSpan(name), exprSpan(value)),
+		})
+		if !p.match(TokenComma) {
+			break
+		}
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after anonymous record literal")
+	if err != nil {
+		return nil, err
+	}
+	return &AnonymousRecordExpr{
+		Fields: fields,
+		Span:   mergeSpans(tokenSpan(start), tokenSpan(end)),
+	}, nil
 }
 
 func (p *Parser) parseAnonymousInterfaceExpr() (Expr, error) {

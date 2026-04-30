@@ -475,6 +475,25 @@ def run() Str {
 	}
 }
 
+func TestAnalyzeAnonymousRecordExpr(t *testing.T) {
+	src := `
+def describe(user { name Str, age Int }) Int {
+	return user.age
+}
+
+def run() Int {
+	full = { name = "Ana", age = 10, city = "NYC" }
+	describe(full)
+	return full.age
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeRecordAndClassDestructuring(t *testing.T) {
 	src := `
 record Pair {

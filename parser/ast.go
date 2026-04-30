@@ -41,13 +41,21 @@ type ImportSymbol struct {
 
 // TypeRef represents a named, generic, or function type in source.
 type TypeRef struct {
-	Name           string     `json:"name,omitempty"`
-	Arguments      []*TypeRef `json:"arguments,omitempty"`
-	TupleElements  []*TypeRef `json:"tupleElements,omitempty"`
-	TupleNames     []string   `json:"tupleNames,omitempty"`
-	ParameterTypes []*TypeRef `json:"parameterTypes,omitempty"`
-	ReturnType     *TypeRef   `json:"returnType,omitempty"`
-	Span           Span       `json:"span"`
+	Name           string      `json:"name,omitempty"`
+	Arguments      []*TypeRef  `json:"arguments,omitempty"`
+	TupleElements  []*TypeRef  `json:"tupleElements,omitempty"`
+	TupleNames     []string    `json:"tupleNames,omitempty"`
+	RecordFields   []TypeField `json:"recordFields,omitempty"`
+	ParameterTypes []*TypeRef  `json:"parameterTypes,omitempty"`
+	ReturnType     *TypeRef    `json:"returnType,omitempty"`
+	Span           Span        `json:"span"`
+}
+
+// TypeField describes a named field in an anonymous record shape.
+type TypeField struct {
+	Name string   `json:"name"`
+	Type *TypeRef `json:"type"`
+	Span Span     `json:"span"`
 }
 
 // TypeParameter declares a generic type parameter name.
@@ -477,6 +485,14 @@ type RecordUpdateExpr struct {
 }
 
 func (*RecordUpdateExpr) exprNode() {}
+
+// AnonymousRecordExpr creates a structural anonymous record value.
+type AnonymousRecordExpr struct {
+	Fields []CallArg `json:"fields"`
+	Span   Span      `json:"span"`
+}
+
+func (*AnonymousRecordExpr) exprNode() {}
 
 // AnonymousInterfaceExpr creates an anonymous object implementing one or more interfaces.
 type AnonymousInterfaceExpr struct {

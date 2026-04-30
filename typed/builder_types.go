@@ -74,6 +74,13 @@ func (b *typeRefBuilder) BuildType(ref *parser.TypeRef) *typecheck.Type {
 		}
 		return &typecheck.Type{Kind: typecheck.TypeTuple, Name: "Tuple", Args: args, TupleNames: append([]string(nil), ref.TupleNames...)}
 	}
+	if len(ref.RecordFields) > 0 {
+		fields := make([]typecheck.RecordField, len(ref.RecordFields))
+		for i, field := range ref.RecordFields {
+			fields[i] = typecheck.RecordField{Name: field.Name, Type: b.BuildType(field.Type)}
+		}
+		return &typecheck.Type{Kind: typecheck.TypeRecord, Name: "Record", Fields: fields}
+	}
 	args := make([]*typecheck.Type, len(ref.Arguments))
 	for i, arg := range ref.Arguments {
 		args[i] = b.BuildType(arg)
@@ -353,6 +360,8 @@ func exprSpan(expr parser.Expr) parser.Span {
 		return e.Span
 	case *parser.RecordUpdateExpr:
 		return e.Span
+	case *parser.AnonymousRecordExpr:
+		return e.Span
 	case *parser.AnonymousInterfaceExpr:
 		return e.Span
 	case *parser.IfExpr:
@@ -388,6 +397,28 @@ func sameType(left, right *typecheck.Type) bool {
 		}
 		for i := range left.Args {
 			if !sameType(left.Args[i], right.Args[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	if left.Kind == typecheck.TypeRecord && right.Kind == typecheck.TypeRecord {
+		if len(left.Fields) != len(right.Fields) {
+			return false
+		}
+		for _, leftField := range left.Fields {
+			found := false
+			for _, rightField := range right.Fields {
+				if leftField.Name != rightField.Name {
+					continue
+				}
+				if !sameType(leftField.Type, rightField.Type) {
+					return false
+				}
+				found = true
+				break
+			}
+			if !found {
 				return false
 			}
 		}

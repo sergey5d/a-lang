@@ -158,7 +158,7 @@ func (p *Parser) parseBindingsWithStart(start Token, firstIsName bool) ([]Bindin
 		}
 		binding.Name = name.Lexeme
 		binding.Span = tokenSpan(name)
-		if p.bindingTypeStartsOnSameLine(name) && (p.check(TokenIdentifier) || p.check(TokenLParen)) {
+		if p.bindingTypeStartsOnSameLine(name) && (p.check(TokenIdentifier) || p.check(TokenLParen) || p.check(TokenLBrace)) {
 			typeRef, err := p.parseTypeRef()
 			if err != nil {
 				return nil, err
@@ -193,7 +193,7 @@ func (p *Parser) isBareBindingStart() bool {
 		return !p.isDeclared(p.peek().Lexeme)
 	}
 
-	if p.checkNext(TokenIdentifier) || p.checkNext(TokenLParen) || p.checkNext(TokenComma) {
+	if p.checkNext(TokenIdentifier) || p.checkNext(TokenLParen) || p.checkNext(TokenLBrace) || p.checkNext(TokenComma) {
 		return p.bindingListFollowedByAssign(p.pos)
 	}
 
@@ -212,7 +212,7 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 			sawUndeclared = true
 		}
 		i++
-		if i < len(p.tokens) && p.sameLineTokens(i-1, i) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen) {
+		if i < len(p.tokens) && p.sameLineTokens(i-1, i) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen || p.tokens[i].Type == TokenLBrace) {
 			end, ok := p.scanTypeRef(i)
 			if !ok {
 				return false
@@ -428,7 +428,7 @@ func (p *Parser) parsePattern() (Pattern, error) {
 	token := p.advance()
 	switch token.Type {
 	case TokenUnder:
-		if p.bindingTypeStartsOnSameLine(token) && p.check(TokenIdentifier) {
+		if p.bindingTypeStartsOnSameLine(token) && (p.check(TokenIdentifier) || p.check(TokenLBrace)) {
 			target, err := p.parseTypeRef()
 			if err != nil {
 				return nil, err
@@ -484,7 +484,7 @@ func (p *Parser) parsePattern() (Pattern, error) {
 		}
 		return &TuplePattern{Elements: elements, Span: mergeSpans(tokenSpan(token), tokenSpan(end))}, nil
 	case TokenIdentifier:
-		if p.bindingTypeStartsOnSameLine(token) && p.check(TokenIdentifier) {
+		if p.bindingTypeStartsOnSameLine(token) && (p.check(TokenIdentifier) || p.check(TokenLBrace)) {
 			target, err := p.parseTypeRef()
 			if err != nil {
 				return nil, err
@@ -537,7 +537,7 @@ func (p *Parser) bindingListFollowedByArrow(start int) bool {
 
 	i := start + 1
 	for {
-		if i < len(p.tokens) && p.sameLineTokens(i-1, i) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen) {
+		if i < len(p.tokens) && p.sameLineTokens(i-1, i) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen || p.tokens[i].Type == TokenLBrace) {
 			end, ok := p.scanTypeRef(i)
 			if !ok {
 				return false

@@ -375,6 +375,14 @@ type TupleLiteral struct {
 
 func (*TupleLiteral) exprNode() {}
 
+// AnonymousRecordExpr is a typed structural anonymous record literal.
+type AnonymousRecordExpr struct {
+	baseExpr
+	Fields []RecordUpdateField
+}
+
+func (*AnonymousRecordExpr) exprNode() {}
+
 // GroupExpr preserves a parenthesized typed expression.
 type GroupExpr struct {
 	baseExpr

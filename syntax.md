@@ -246,6 +246,25 @@ updated = value with {
 }
 ```
 
+Anonymous record literal:
+
+```txt
+user = { name = "Ada", age = 10 }
+```
+
+Anonymous record shape type:
+
+```txt
+def describe(user { name Str, age Int }) Str =
+    user.name + " is " + user.age
+```
+
+Anonymous record shapes are structural:
+- field names and field types must match at compile time
+- extra fields are allowed when passing a value to a narrower shape
+- missing fields are rejected
+- defaults are not part of the shape syntax
+
 ## Functions and Methods
 
 Expression-bodied function:

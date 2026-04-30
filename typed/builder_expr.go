@@ -42,6 +42,8 @@ func (b *exprBuilder) Build(expr parser.Expr) (Expr, error) {
 		return b.buildListLiteral(expr, e)
 	case *parser.TupleLiteral:
 		return b.buildTupleLiteral(expr, e)
+	case *parser.AnonymousRecordExpr:
+		return b.buildAnonymousRecordExpr(expr, e)
 	case *parser.GroupExpr:
 		inner, err := b.Build(e.Inner)
 		if err != nil {

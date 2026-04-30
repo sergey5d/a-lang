@@ -42,6 +42,13 @@ func HasPlaceholderExpr(expr Expr) bool {
 			}
 		}
 		return false
+	case *AnonymousRecordExpr:
+		for _, field := range e.Fields {
+			if HasPlaceholderExpr(field.Value) {
+				return true
+			}
+		}
+		return false
 	case *AnonymousInterfaceExpr:
 		for _, method := range e.Methods {
 			if blockHasPlaceholder(method.Body) {
@@ -241,6 +248,12 @@ func replacePlaceholderExpr(expr Expr, param string) Expr {
 			updates[i] = CallArg{Name: update.Name, Value: replacePlaceholderExpr(update.Value, param), Span: update.Span}
 		}
 		return &RecordUpdateExpr{Receiver: replacePlaceholderExpr(e.Receiver, param), Updates: updates, Span: e.Span}
+	case *AnonymousRecordExpr:
+		fields := make([]CallArg, len(e.Fields))
+		for i, field := range e.Fields {
+			fields[i] = CallArg{Name: field.Name, Value: replacePlaceholderExpr(field.Value, param), Span: field.Span}
+		}
+		return &AnonymousRecordExpr{Fields: fields, Span: e.Span}
 	case *AnonymousInterfaceExpr:
 		methods := make([]*MethodDecl, len(e.Methods))
 		for i, method := range e.Methods {

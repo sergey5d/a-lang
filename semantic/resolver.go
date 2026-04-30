@@ -496,6 +496,17 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 		for _, update := range e.Updates {
 			r.resolveExpr(update.Value)
 		}
+	case *parser.AnonymousRecordExpr:
+		seen := map[string]parser.Span{}
+		for _, field := range e.Fields {
+			if previous, ok := seen[field.Name]; ok {
+				r.addDiagnostic("duplicate_record_field", "duplicate record field '"+field.Name+"'", field.Span)
+				r.addDiagnostic("duplicate_record_field", "previous declaration of record field '"+field.Name+"'", previous)
+			} else {
+				seen[field.Name] = field.Span
+			}
+			r.resolveExpr(field.Value)
+		}
 	case *parser.AnonymousInterfaceExpr:
 		for _, iface := range e.Interfaces {
 			r.resolveTypeRef(iface)
@@ -629,6 +640,19 @@ func (r *Resolver) resolveTypeRef(ref *parser.TypeRef) {
 		}
 		for _, elem := range ref.TupleElements {
 			r.resolveTypeRef(elem)
+		}
+		return
+	}
+	if len(ref.RecordFields) > 0 {
+		seen := map[string]parser.Span{}
+		for _, field := range ref.RecordFields {
+			if previous, ok := seen[field.Name]; ok {
+				r.addDiagnostic("duplicate_record_field", "duplicate record field '"+field.Name+"'", field.Span)
+				r.addDiagnostic("duplicate_record_field", "previous declaration of record field '"+field.Name+"'", previous)
+			} else {
+				seen[field.Name] = field.Span
+			}
+			r.resolveTypeRef(field.Type)
 		}
 		return
 	}
