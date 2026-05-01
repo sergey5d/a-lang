@@ -112,7 +112,7 @@
           "end": ":",
           "endCaptures": {
             "0": {
-              "name": "punctuation.section.block.begin.a-lang"
+              "name": "keyword.operator.a-lang"
             }
           },
           "patterns": [
@@ -162,8 +162,32 @@
     "operators": {
       "patterns": [
         {
-          "name": "keyword.operator.a-lang",
-          "match": "<-|=>|->|:=|::|:\\+|\\+\\+|:-|--|==|!=|<=|>=|&&|\\|\\||<<|>>|[+\\-*/%=&|<>.:]"
+          "name": "keyword.operator.assignment.a-lang",
+          "match": "<-|:=|="
+        },
+        {
+          "name": "keyword.operator.comparison.a-lang",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.logical.a-lang",
+          "match": "&&|\\|\\|"
+        },
+        {
+          "name": "keyword.operator.arrow.a-lang",
+          "match": "=>|->"
+        },
+        {
+          "name": "keyword.operator.symbolic.a-lang",
+          "match": "::|:\\+|\\+\\+|:-|--|<<|>>|[+\\-*/%&|]"
+        },
+        {
+          "name": "punctuation.separator.arguments.a-lang",
+          "match": ","
+        },
+        {
+          "name": "punctuation.accessor.dot.a-lang",
+          "match": "\\."
         }
       ]
     }
