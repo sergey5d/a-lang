@@ -64,7 +64,7 @@ def main() {
     mapTotal = values.fold(0, (acc, key, value) -> acc + value)
     OS.println("mapFold " + mapTotal)
 
-    reducedPairOpt = values.reduce((leftKey, leftValue, rightKey, rightValue) -> (rightKey, rightValue))
+    reducedPairOpt = values.reduce((leftKey, leftVal, rightKey, rightVal) -> (rightKey, rightVal))
 
     guard reducedPair <- reducedPairOpt: ()
 
