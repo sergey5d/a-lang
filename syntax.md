@@ -636,6 +636,27 @@ result = if value > 0 {
 }
 ```
 
+Shorthand expression form:
+
+```txt
+result = if value > 0: 1 else: 0
+```
+
+Multiline shorthand is also valid:
+
+```txt
+result = if value > 0: 1
+else: 0
+```
+
+This also extends through `else if` chains:
+
+```txt
+result = if value > 0: 1
+else if value < 0: -1
+else: 0
+```
+
 ## `guard`
 
 Single-binding guard:

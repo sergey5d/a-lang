@@ -557,12 +557,27 @@ func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := p.consume(TokenElse, "expected 'else' in if expression"); err != nil {
-		return nil, err
-	}
-	elseBlock, err := p.parseYieldBodyBlock("else")
+	elseToken, err := p.consume(TokenElse, "expected 'else' in if expression")
 	if err != nil {
 		return nil, err
+	}
+	var elseBlock *BlockStmt
+	if p.check(TokenIf) {
+		nestedStart := p.advance()
+		nestedExpr, err := p.parseIfExprAfterStart(nestedStart)
+		if err != nil {
+			return nil, err
+		}
+		stmt := &ExprStmt{Expr: nestedExpr, Span: exprSpan(nestedExpr)}
+		elseBlock = &BlockStmt{
+			Statements: []Statement{stmt},
+			Span:       mergeSpans(tokenSpan(elseToken), exprSpan(nestedExpr)),
+		}
+	} else {
+		elseBlock, err = p.parseYieldBodyBlock("else")
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &IfExpr{
 		Condition: condition,

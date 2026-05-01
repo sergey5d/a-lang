@@ -2,6 +2,8 @@
 # then
 # else-if
 # picked 5
+# picked2 7
+# picked3 9
 # binding 7
 # 0
 
@@ -11,6 +13,13 @@ def main() Int {
 
     picked = if false: 1 else: 5
     OS.println("picked " + picked)
+    picked2 = if true: 7
+    else: 8
+    OS.println("picked2 " + picked2)
+    picked3 = if false: 1
+    else if false: 2
+    else: 9
+    OS.println("picked3 " + picked3)
 
     values = [7]
     if value <- values.get(0): OS.println("binding " + value) else: OS.println("binding none")

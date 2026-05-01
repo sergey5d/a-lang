@@ -506,6 +506,11 @@ func TestParseColonShorthandExpressions(t *testing.T) {
 	src := `
 def run(values List[Int], flag Bool, maybe MaybeInt) Int {
 	label = if flag: 1 else: 2
+	label2 = if flag: 3
+	else: 4
+	label3 = if flag: 5
+	else if false: 6
+	else: 7
 	items = for value <- values yield: value + 1
 	picked = match maybe: SomeX(x) => x
 	return label + picked
@@ -534,19 +539,39 @@ enum MaybeInt {
 		t.Fatalf("expected shorthand if expression blocks to wrap single expressions, got %#v", ifExpr)
 	}
 
-	second := fn.Body.Statements[1].(*ValStmt)
-	forYield, ok := second.Values[0].(*ForYieldExpr)
+	secondIf := fn.Body.Statements[1].(*ValStmt)
+	ifExpr2, ok := secondIf.Values[0].(*IfExpr)
 	if !ok {
-		t.Fatalf("expected second binding value to be for-yield expression, got %T", second.Values[0])
+		t.Fatalf("expected second binding value to be multiline shorthand if expression, got %T", secondIf.Values[0])
+	}
+	if len(ifExpr2.Then.Statements) != 1 || len(ifExpr2.Else.Statements) != 1 {
+		t.Fatalf("expected multiline shorthand if expression blocks to wrap single expressions, got %#v", ifExpr2)
+	}
+
+	thirdIf := fn.Body.Statements[2].(*ValStmt)
+	ifExpr3, ok := thirdIf.Values[0].(*IfExpr)
+	if !ok {
+		t.Fatalf("expected third binding value to be shorthand else-if expression, got %T", thirdIf.Values[0])
+	}
+	if nestedElse, ok := ifExpr3.Else.Statements[0].(*ExprStmt); !ok {
+		t.Fatalf("expected else-if shorthand to be wrapped as expression statement, got %#v", ifExpr3.Else.Statements)
+	} else if _, ok := nestedElse.Expr.(*IfExpr); !ok {
+		t.Fatalf("expected else branch to contain nested if expression, got %T", nestedElse.Expr)
+	}
+
+	fourth := fn.Body.Statements[3].(*ValStmt)
+	forYield, ok := fourth.Values[0].(*ForYieldExpr)
+	if !ok {
+		t.Fatalf("expected fourth binding value to be for-yield expression, got %T", fourth.Values[0])
 	}
 	if len(forYield.YieldBody.Statements) != 1 {
 		t.Fatalf("expected shorthand yield body to wrap one expression, got %#v", forYield.YieldBody)
 	}
 
-	third := fn.Body.Statements[2].(*ValStmt)
-	matchExpr, ok := third.Values[0].(*MatchExpr)
+	fifth := fn.Body.Statements[4].(*ValStmt)
+	matchExpr, ok := fifth.Values[0].(*MatchExpr)
 	if !ok {
-		t.Fatalf("expected third binding value to be match expression, got %T", third.Values[0])
+		t.Fatalf("expected fifth binding value to be match expression, got %T", fifth.Values[0])
 	}
 	if len(matchExpr.Cases) != 1 {
 		t.Fatalf("expected 1 inline match expression case, got %d", len(matchExpr.Cases))
