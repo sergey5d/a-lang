@@ -45,7 +45,6 @@ This reduces boilerplate and helps stdlib types feel native.
 The language now has `for ... yield`, `map`, `flatMap`, `filter`, `fold`, `reduce`, `exists`, `forAll`, and `forEach`, but stdlib collection ergonomics still need growth.
 
 Likely missing methods:
-- richer `Map` transforms like `mapValues`
 - clearer `Map` indexing ergonomics:
   - `map[key]` should likely act as lookup and return `Option[V]`
   - `map[key] := value` should likely act as set/update

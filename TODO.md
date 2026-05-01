@@ -4,8 +4,6 @@
 
 - Revisit `Set[T]` / `Map[K, V]` collection API breadth.
   - `iterator`, `map`, `flatMap`, `filter`, `fold`, `reduce`, `exists`, `forAll`, and `forEach` now exist in `stdlib/predef` and are wired through the runtime.
-  - Remaining question is whether `Map` should eventually grow richer transforms such as:
-    - `mapValues(value -> X) Map[K, X]`
 
 - Revisit `Option[T]` representation.
   - Current implementation still models `Option` as a class-like builtin for historical/runtime convenience.

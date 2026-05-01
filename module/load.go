@@ -202,6 +202,12 @@ func loadPreludePrograms(stdlibDir, currentFile string) ([]*parser.Program, erro
 		paths = append(paths, path)
 	}
 	sort.Strings(paths)
+	if _, err := os.Stat(filepath.Join(stdlibDir, "list.al")); err != nil {
+		predefList := filepath.Join(stdlibDir, "predef", "list.al")
+		if _, statErr := os.Stat(predefList); statErr == nil && predefList != currentFile {
+			paths = append(paths, predefList)
+		}
+	}
 
 	out := make([]*parser.Program, 0, len(paths))
 	for _, path := range paths {
