@@ -30,9 +30,7 @@ def find(
         currentFoundP := Some(current)
     }
 
-    if currentFoundQ.isEmpty() && current.val == valQ {
-        currentFoundQ := Some(current)
-    }
+    if currentFoundQ.isEmpty() && current.val == valQ: currentFoundQ := Some(current)
 
     foundPCount = currentFoundP.map(_ -> 1).getOrElse(0)
     foundQCount = currentFoundQ.map(_ -> 1).getOrElse(0)

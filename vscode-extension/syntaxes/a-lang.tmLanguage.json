@@ -1,0 +1,171 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "a-lang",
+  "scopeName": "source.a-lang",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#controlShorthand"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#constructors"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.a-lang",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.multiline.a-lang",
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.a-lang",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.double.a-lang",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.a-lang",
+              "match": "\\\\."
+            },
+            {
+              "name": "meta.interpolation.a-lang",
+              "begin": "\\$\\{",
+              "end": "\\}",
+              "patterns": [
+                {
+                  "include": "$self"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.a-lang",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.a-lang",
+          "match": "\\b(?:if|else|for|yield|loop|match|guard|return|break|is)\\b"
+        },
+        {
+          "name": "keyword.declaration.a-lang",
+          "match": "\\b(?:def|class|record|enum|interface|object|impl|import|module|with|private)\\b"
+        }
+      ]
+    },
+    "controlShorthand": {
+      "patterns": [
+        {
+          "name": "meta.control.shorthand.a-lang",
+          "begin": "\\b(if|else|for|yield|match|guard)\\b",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.a-lang"
+            }
+          },
+          "end": ":",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.block.begin.a-lang"
+            }
+          },
+          "patterns": [
+            {
+              "include": "$self"
+            }
+          ]
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.a-lang",
+          "match": "\\b(?:true|false|this)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.builtin.a-lang",
+          "match": "\\b(?:Int|Str|Bool|Float|Unit|Array|List|Set|Map|Option|Result|Either|Iterator|Printer|OS)\\b"
+        },
+        {
+          "name": "entity.name.type.a-lang",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        }
+      ]
+    },
+    "constructors": {
+      "patterns": [
+        {
+          "name": "support.function.constructor.a-lang",
+          "match": "\\b(?:Some|None|Ok|Err|Left|Right)\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.a-lang",
+          "match": "\\b[a-zA-Z_][A-Za-z0-9_]*\\s*(?=\\()"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.a-lang",
+          "match": "<-|=>|->|:=|::|:\\+|\\+\\+|:-|--|==|!=|<=|>=|&&|\\|\\||<<|>>|[+\\-*/%=&|<>.:]"
+        }
+      ]
+    }
+  }
+}
