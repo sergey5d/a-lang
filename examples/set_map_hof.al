@@ -61,13 +61,13 @@ def main() {
     filteredMap = values.filter((key, value) -> value > 1)
     OS.println("filteredMap " + filteredMap.contains("b") + " " + filteredMap.size())
 
-    mapTotal = values.fold(0, (acc Int, key, value) -> acc + value)
+    mapTotal = values.fold(0, (acc, key, value) -> acc + value)
     OS.println("mapFold " + mapTotal)
 
-    guard reducedPair <- values.reduce(
-        (leftKey, leftValue, rightKey, rightValue) -> (rightKey, rightValue)) {
-        ()
-    }
+    reducedPairOpt = values.reduce((leftKey, leftValue, rightKey, rightValue) -> (rightKey, rightValue))
+
+    guard reducedPair <- reducedPairOpt: ()
+
     reducedKey, reducedValue = reducedPair
     OS.println("mapReduce " + reducedKey + " " + reducedValue)
 

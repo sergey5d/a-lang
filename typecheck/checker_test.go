@@ -1649,6 +1649,21 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeMapFoldInfersAccumulatorLambdaType(t *testing.T) {
+	src := `
+def run() Int {
+	values Map[Str, Int] = Map("a" : 1, "b" : 2)
+	total Int = values.fold(0, (acc, key, value) -> acc + value)
+	return total
+}
+	`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeCustomAndCollectionOperators(t *testing.T) {
 	src := `
 class Vec {

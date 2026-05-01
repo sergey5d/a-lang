@@ -2185,7 +2185,7 @@ func (c *Checker) inferCallableTypeArgsFromExprs(typeParams []parser.TypeParamet
 	templateSubst := mergeSubst(c.substForDecl(typeParams, nil), baseSubst)
 	inferred := map[string]*Type{}
 	for i, param := range params {
-		template := c.instantiateTypeRef(param.Type, templateSubst)
+		template := c.instantiateTypeRef(param.Type, mergeSubst(inferred, templateSubst))
 		contextual := replaceTypeParamsWithUnknown(template, typeParamNames)
 		argType := c.checkExprWithExpected(args[i], contextual)
 		if !inferTypeArgsFromTypes(argType, template, inferred, typeParamNames) {
