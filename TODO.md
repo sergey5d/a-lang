@@ -17,3 +17,18 @@ enum Option[T] {
     case Some { value T }
 }
 ```
+
+## Syntax Follow-Ups
+
+- Consider block-style trailing lambda syntax for call sites that take a function parameter.
+  - Example target shape:
+
+```txt
+def fun((x Int, y Int) -> Int)
+
+fun { x, y ->
+    x + y
+}
+```
+
+  - Main question: whether this reads as a natural extension of the current lambda syntax, or adds too much overlap with block expressions and existing `fun(x -> ...)` / `fun((x, y) -> ...)` call forms.
