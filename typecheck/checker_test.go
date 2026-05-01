@@ -1598,6 +1598,32 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeArrayHigherOrderMethods(t *testing.T) {
+	src := `
+def run() Int {
+	values Array[Int] = Array(3)
+	values[0] := 4
+	values[1] := 5
+	values[2] := 6
+
+	mapped Array[Int] = values.map(item -> item * 2)
+	hasBig Bool = values.exists(item -> item > 5)
+	allPositive Bool = values.forAll(item -> item > 0)
+	mapped.forEach(item -> OS.println(item))
+
+	if hasBig && allPositive {
+		return mapped[0] + mapped[2] + values.size()
+	}
+	return 0
+}
+	`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeSetAndMapHigherOrderMethods(t *testing.T) {
 	src := `
 def run() Int {

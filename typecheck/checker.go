@@ -2757,14 +2757,86 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			c.addDiagnostic("invalid_named_argument", "named arguments are not supported for Array methods", member.Span)
 			return unknownType
 		}
-		argTypes := c.checkArgTypes(callArgValues(args))
+		orderedArgs := callArgValues(args)
 		switch member.Name {
+		case "map":
+			if len(orderedArgs) != 1 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 1, len(orderedArgs)), member.Span)
+				return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
+			}
+			elemType := unknownType
+			if len(receiverType.Args) == 1 {
+				elemType = receiverType.Args[0]
+			}
+			expected := functionType("map", Signature{Parameters: []*Type{elemType}, ReturnType: unknownType})
+			mappedType := c.checkExprWithExpected(orderedArgs[0], expected)
+			if mappedType.Kind != TypeFunction || mappedType.Signature == nil || len(mappedType.Signature.Parameters) != 1 {
+				c.addDiagnostic("invalid_argument_type", "map expects parameter of type T -> X", exprSpan(orderedArgs[0]))
+				return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
+			}
+			c.requireAssignable(mappedType.Signature.Parameters[0], elemType, exprSpan(orderedArgs[0]), "invalid_argument_type", "map lambda must accept "+elemType.String())
+			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{mappedType.Signature.ReturnType}}
+		case "exists":
+			if len(orderedArgs) != 1 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 1, len(orderedArgs)), member.Span)
+				return builtin("Bool")
+			}
+			elemType := unknownType
+			if len(receiverType.Args) == 1 {
+				elemType = receiverType.Args[0]
+			}
+			expected := functionType("exists", Signature{Parameters: []*Type{elemType}, ReturnType: builtin("Bool")})
+			predicateType := c.checkExprWithExpected(orderedArgs[0], expected)
+			if predicateType.Kind != TypeFunction || predicateType.Signature == nil || len(predicateType.Signature.Parameters) != 1 {
+				c.addDiagnostic("invalid_argument_type", "exists expects parameter of type T -> Bool", exprSpan(orderedArgs[0]))
+				return builtin("Bool")
+			}
+			c.requireAssignable(predicateType.Signature.Parameters[0], elemType, exprSpan(orderedArgs[0]), "invalid_argument_type", "exists lambda must accept "+elemType.String())
+			c.requireAssignable(predicateType.Signature.ReturnType, builtin("Bool"), exprSpan(orderedArgs[0]), "invalid_argument_type", "exists lambda must return Bool")
+			return builtin("Bool")
+		case "forAll":
+			if len(orderedArgs) != 1 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 1, len(orderedArgs)), member.Span)
+				return builtin("Bool")
+			}
+			elemType := unknownType
+			if len(receiverType.Args) == 1 {
+				elemType = receiverType.Args[0]
+			}
+			expected := functionType("forAll", Signature{Parameters: []*Type{elemType}, ReturnType: builtin("Bool")})
+			predicateType := c.checkExprWithExpected(orderedArgs[0], expected)
+			if predicateType.Kind != TypeFunction || predicateType.Signature == nil || len(predicateType.Signature.Parameters) != 1 {
+				c.addDiagnostic("invalid_argument_type", "forAll expects parameter of type T -> Bool", exprSpan(orderedArgs[0]))
+				return builtin("Bool")
+			}
+			c.requireAssignable(predicateType.Signature.Parameters[0], elemType, exprSpan(orderedArgs[0]), "invalid_argument_type", "forAll lambda must accept "+elemType.String())
+			c.requireAssignable(predicateType.Signature.ReturnType, builtin("Bool"), exprSpan(orderedArgs[0]), "invalid_argument_type", "forAll lambda must return Bool")
+			return builtin("Bool")
+		case "forEach":
+			if len(orderedArgs) != 1 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 1, len(orderedArgs)), member.Span)
+				return builtin("Unit")
+			}
+			elemType := unknownType
+			if len(receiverType.Args) == 1 {
+				elemType = receiverType.Args[0]
+			}
+			expected := functionType("forEach", Signature{Parameters: []*Type{elemType}, ReturnType: builtin("Unit")})
+			callbackType := c.checkExprWithExpected(orderedArgs[0], expected)
+			if callbackType.Kind != TypeFunction || callbackType.Signature == nil || len(callbackType.Signature.Parameters) != 1 {
+				c.addDiagnostic("invalid_argument_type", "forEach expects parameter of type T -> Unit", exprSpan(orderedArgs[0]))
+				return builtin("Unit")
+			}
+			c.requireAssignable(callbackType.Signature.Parameters[0], elemType, exprSpan(orderedArgs[0]), "invalid_argument_type", "forEach lambda must accept "+elemType.String())
+			return builtin("Unit")
 		case "size":
+			argTypes := c.checkArgTypes(orderedArgs)
 			if len(argTypes) != 0 {
 				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 0, len(argTypes)), member.Span)
 			}
 			return builtin("Int")
 		case "zip":
+			argTypes := c.checkArgTypes(orderedArgs)
 			if len(argTypes) != 1 {
 				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 1, len(argTypes)), member.Span)
 				return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
@@ -2779,6 +2851,7 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			}
 			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{{Kind: TypeTuple, Name: "Tuple", Args: []*Type{elemType, argTypes[0].Args[0]}}}}
 		case "zipWithIndex":
+			argTypes := c.checkArgTypes(orderedArgs)
 			if len(argTypes) != 0 {
 				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 0, len(argTypes)), member.Span)
 			}

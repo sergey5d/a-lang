@@ -254,6 +254,36 @@ def run() Int {
 	}
 }
 
+func TestArrayHigherOrderMethods(t *testing.T) {
+	src := `
+def run() Int {
+	values = Array(3)
+	values[0] := 4
+	values[1] := 5
+	values[2] := 6
+
+	mapped = values.map(item -> item * 2)
+	hasBig = values.exists(item -> item > 5)
+	allPositive = values.forAll(item -> item > 0)
+	mapped.forEach(item -> OS.println("array " + item))
+
+	if hasBig && allPositive {
+		return mapped[0] * 100 + mapped[2] * 10 + values.size()
+	}
+	return 0
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(923) {
+		t.Fatalf("expected 923, got %#v", value)
+	}
+}
+
 func TestClassesAndMethods(t *testing.T) {
 	src := `
 class Counter {
