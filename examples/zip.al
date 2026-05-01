@@ -17,9 +17,16 @@ def main() Unit {
     listPairs = items.zip(List("a", "b"))
     listIndexed = items.zipWithIndex()
 
-    firstLeft, firstRight = listPairs.get(0).get()
-    secondLeft, secondRight = listPairs.get(1).get()
-    indexedValue, indexedPos = listIndexed.get(2).get()
+    guard firstPair <- listPairs.get(0) {
+        ()
+    }
+    guard secondPair <- listPairs.get(1): ()
+
+    guard indexedPair <- listIndexed.get(2): ()
+
+    firstLeft, firstRight = firstPair
+    secondLeft, secondRight = secondPair
+    indexedValue, indexedPos = indexedPair
 
     OS.println("list zip", firstLeft, firstRight)
     OS.println("list zip", secondLeft, secondRight)
@@ -44,8 +51,14 @@ def main() Unit {
     rangePairs = Range(10, 13).zip(List("p", "q"))
     rangeIndexed = Range(7, 9).zipWithIndex()
 
-    rangeLeft, rangeRight = rangePairs.get(1).get()
-    rangeIndexedValue, rangeIndexedPos = rangeIndexed.get(1).get()
+    guard rangePair <- rangePairs.get(1) {
+        ()
+    }
+    guard rangeIndexedPair <- rangeIndexed.get(1) {
+        ()
+    }
+    rangeLeft, rangeRight = rangePair
+    rangeIndexedValue, rangeIndexedPos = rangeIndexedPair
 
     OS.println("range zip", rangeLeft, rangeRight)
     OS.println("range zipWithIndex", rangeIndexedValue, rangeIndexedPos)

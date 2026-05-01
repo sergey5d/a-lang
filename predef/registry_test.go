@@ -19,6 +19,17 @@ func TestLoadRegistry(t *testing.T) {
 		t.Fatalf("expected List to declare methods")
 	}
 
+	array, ok := registry.Types["Array"]
+	if !ok {
+		t.Fatalf("expected Array descriptor to be loaded")
+	}
+	if array.Kind != KindInterface {
+		t.Fatalf("expected Array to be an interface, got %s", array.Kind)
+	}
+	if len(array.Methods) != 3 {
+		t.Fatalf("expected Array to expose 3 methods, got %#v", array)
+	}
+
 	option, ok := registry.Types["Option"]
 	if !ok {
 		t.Fatalf("expected Option descriptor to be loaded")

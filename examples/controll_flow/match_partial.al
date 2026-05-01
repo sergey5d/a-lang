@@ -30,6 +30,8 @@ def main() Unit {
     OS.println(ifMapped.get(1).getOr(0))
     OS.println(matchMapped.get(0).getOr(0))
     OS.println(matchMapped.get(1).getOr(0))
-    OS.println(partialMapped.get(0).get().getOr(0))
-    OS.println(partialMapped.get(1).get().isEmpty())
+    guard firstPartial <- partialMapped.get(0): ()
+    guard secondPartial <- partialMapped.get(1): ()
+    OS.println(firstPartial.getOr(0))
+    OS.println(secondPartial.isEmpty())
 }

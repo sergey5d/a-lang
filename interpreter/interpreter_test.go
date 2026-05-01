@@ -206,8 +206,14 @@ def run() Int {
 	valuePairs = values.zip(other)
 	valueIndexed = values.zipWithIndex()
 
-	firstLeft, firstRight = pairs.get(0).get()
-	indexedValue, indexedPos = indexed.get(2).get()
+	guard firstPair <- pairs.get(0) {
+		0
+	}
+	guard indexedPair <- indexed.get(2) {
+		0
+	}
+	firstLeft, firstRight = firstPair
+	indexedValue, indexedPos = indexedPair
 	arrayLeft, arrayRight = valuePairs[1]
 	arrayIndexedValue, arrayIndexedPos = valueIndexed[2]
 	total := 0
@@ -1069,7 +1075,10 @@ def run() Int {
 		total += value
 	}
 
-	reducedKey, reducedValue = mapReduced.get()
+	guard reducedPair <- mapReduced {
+		0
+	}
+	reducedKey, reducedValue = reducedPair
 	if expanded.contains(12) && setHasBig && setAllPositive && mapHasB && mapAllSmall {
 		if reducedKey == "b" {
 			return total * 1000000 + mapped.get(0).getOr(0) * 100000 + mappedValues["b"].getOr(0) * 10000 + expandedValues.get(3).getOr(0) * 1000 + doubled.size() * 100 + filtered.size() * 10 + setTotal + setReduced.getOr(0) + filteredMap.size() + mapTotal + reducedValue
@@ -1111,10 +1120,8 @@ func TestOptionRuntime(t *testing.T) {
 def run() Int {
 	found = Some(5)
 	missing = None()
-	if found.isSet() {
-		return found.get() + missing.getOr(2)
-	}
-	return 0
+	guard value <- found: return 0
+	return value + missing.getOr(2)
 }
 `
 
@@ -1696,7 +1703,10 @@ def run() Int {
 		next
 	}
 
-	return items.get(0).get() + items.get(1).get() + items.get(2).get()
+	guard first <- items.get(0): return 0
+	guard second <- items.get(1): return 0
+	guard third <- items.get(2): return 0
+	return first + second + third
 }
 `
 
@@ -1742,7 +1752,10 @@ def run() Int {
 		total
 	}
 
-	return items.get(0).get() + items.get(1).get() + items.get(2).get()
+	guard first <- items.get(0): return 0
+	guard second <- items.get(1): return 0
+	guard third <- items.get(2): return 0
+	return first + second + third
 }
 `
 
@@ -1973,7 +1986,13 @@ def run() Str {
 	partialMapped = options.map(try match _ {
 		SomeX(x) => x + 1
 	})
-	return "${ifMapped.get(0).getOr(0)}-${ifMapped.get(1).getOr(0)}-${matchMapped.get(2).getOr(0)}-${partialMapped.get(0).get().getOr(0)}-${partialMapped.get(1).get().isEmpty()}"
+	guard firstPartial <- partialMapped.get(0) {
+		""
+	}
+	guard secondPartial <- partialMapped.get(1) {
+		""
+	}
+	return "${ifMapped.get(0).getOr(0)}-${ifMapped.get(1).getOr(0)}-${matchMapped.get(2).getOr(0)}-${firstPartial.getOr(0)}-${secondPartial.isEmpty()}"
 }
 `
 

@@ -1554,8 +1554,14 @@ def run() Int {
 	valuePairs Array[(Int, Str)] = values.zip(other)
 	valueIndexed Array[(Int, Int)] = values.zipWithIndex()
 
-	firstLeft Int, firstRight Str = pairs.get(0).get()
-	indexedValue Int, indexedPos Int = indexed.get(2).get()
+	guard firstPair <- pairs.get(0) {
+		0
+	}
+	guard indexedPair <- indexed.get(2) {
+		0
+	}
+	firstLeft Int, firstRight Str = firstPair
+	indexedValue Int, indexedPos Int = indexedPair
 	arrayLeft Int, arrayRight Str = valuePairs[1]
 	arrayIndexedValue Int, arrayIndexedPos Int = valueIndexed[2]
 	total Int := 0
@@ -1624,7 +1630,10 @@ def run() Int {
 		total += value
 	}
 
-	reducedKey Str, reducedValue Int = mapReduced.get()
+	guard reducedPair <- mapReduced {
+		0
+	}
+	reducedKey Str, reducedValue Int = reducedPair
 	if expanded.contains(12) && setHasBig && setAllPositive && mapHasB && mapAllSmall {
 		if reducedKey == "b" {
 			return total + mapped.get(0).getOr(0) + mappedValues["b"].getOr(0) + expandedValues.get(3).getOr(0) + doubled.size() + filtered.size() + setTotal + setReduced.getOr(0) + filteredMap.size() + mapTotal + reducedValue
@@ -1777,10 +1786,8 @@ func TestAnalyzeOptionConstructorsAndMethods(t *testing.T) {
 def run() Int {
 	found Option[Int] = Some(5)
 	missing Option[Int] = None()
-	if found.isSet() {
-		return found.get()
-	}
-	return missing.getOr(7)
+	guard value <- found: return missing.getOr(7)
+	return value
 }
 `
 
@@ -2333,10 +2340,16 @@ def run() Bool {
 	partialMapped = options.map(try match _ {
 		SomeX(x) => x + 1
 	})
+	guard firstPartial <- partialMapped.get(0) {
+		false
+	}
+	guard secondPartial <- partialMapped.get(1) {
+		false
+	}
 	return ifMapped.get(1).getOr(0) == 10 &&
 		matchMapped.get(0).getOr(0) == 2 &&
-		partialMapped.get(0).get().getOr(0) == 2 &&
-		partialMapped.get(1).get().isEmpty()
+		firstPartial.getOr(0) == 2 &&
+		secondPartial.isEmpty()
 }
 `
 

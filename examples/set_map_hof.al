@@ -38,7 +38,11 @@ def main() {
     expandedValues = values.flatMap((key Str, value Int) -> List(value, value + 10))
     filteredMap = values.filter((key Str, value Int) -> value > 1)
     mapTotal = values.fold(0, (acc Int, key Str, value Int) -> acc + value)
-    reducedPair = values.reduce((leftKey Str, leftValue Int, rightKey Str, rightValue Int) -> (rightKey, rightValue)).get()
+
+    guard reducedPair <- values.reduce(
+        (leftKey Str, leftValue Int, rightKey Str, rightValue Int) -> (rightKey, rightValue)) {
+        ()
+    }
     reducedKey, reducedValue = reducedPair
     mapHasB = values.exists((key Str, value Int) -> key == "b")
     mapAllSmall = values.forAll((key Str, value Int) -> value < 3)
