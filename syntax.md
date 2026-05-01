@@ -774,12 +774,12 @@ result = match value {
 Partial expression form:
 
 ```txt
-result Option[Int] = match? value {
+result Option[Int] = try match value {
     SomeX(x) => x
 }
 ```
 
-If no case matches, `match?` returns `None`.
+If no case matches, `try match` returns `None`.
 
 Supported pattern families:
 
@@ -794,7 +794,7 @@ Supported pattern families:
 Current notes:
 
 - enum exhaustiveness is checked
-- `match?` skips exhaustiveness checking and wraps the result in `Option[...]`
+- `try match` skips exhaustiveness checking and wraps the result in `Option[...]`
 - bare singleton enum cases should still be written in qualified form when needed, for example `MaybeInt.NoneX`
 
 ## Destructuring

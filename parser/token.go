@@ -31,6 +31,7 @@ const (
 	TokenWith      TokenType = "WITH"
 	TokenPrivate   TokenType = "PRIVATE"
 	TokenIf        TokenType = "IF"
+	TokenTry       TokenType = "TRY"
 	TokenMatch     TokenType = "MATCH"
 	TokenIs        TokenType = "IS"
 	TokenElse      TokenType = "ELSE"
@@ -111,6 +112,7 @@ var keywords = map[string]TokenType{
 	"with":      TokenWith,
 	"private":   TokenPrivate,
 	"if":        TokenIf,
+	"try":       TokenTry,
 	"match":     TokenMatch,
 	"is":        TokenIs,
 	"else":      TokenElse,

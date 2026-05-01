@@ -2330,7 +2330,7 @@ def run() Bool {
 		SomeX(x) => x + 1
 		NoneX => 0
 	})
-	partialMapped = options.map(match? _ {
+	partialMapped = options.map(try match _ {
 		SomeX(x) => x + 1
 	})
 	return ifMapped.get(1).getOr(0) == 10 &&

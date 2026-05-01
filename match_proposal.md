@@ -46,11 +46,11 @@ This would improve diagnostics and make `match` feel more complete as a checked 
 
 ## 5. Partial-Match Story
 
-`match?` already exists, so the main open question is whether that is the final shape.
+`try match` already exists, so the main open question is whether that is the final shape.
 
 Open questions:
 
-- is `match?` the final partial-match syntax?
+- is `try match` the final partial-match syntax?
 - should there ever be something like `try match` instead?
 - should partial matching get better fallback ergonomics?
 

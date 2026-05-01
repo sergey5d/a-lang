@@ -1970,7 +1970,7 @@ def run() Str {
 		SomeX(x) => x + 1
 		NoneX => 0
 	})
-	partialMapped = options.map(match? _ {
+	partialMapped = options.map(try match _ {
 		SomeX(x) => x + 1
 	})
 	return "${ifMapped.get(0).getOr(0)}-${ifMapped.get(1).getOr(0)}-${matchMapped.get(2).getOr(0)}-${partialMapped.get(0).get().getOr(0)}-${partialMapped.get(1).get().isEmpty()}"

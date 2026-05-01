@@ -187,6 +187,8 @@ func (p *Parser) parsePrefix() (Expr, error) {
 		return p.parseAnonymousRecordExpr(token)
 	case TokenIf:
 		return p.parseIfExprAfterStart(token)
+	case TokenTry:
+		return p.parseTryMatchExprAfterStart(token)
 	case TokenMatch:
 		return p.parseMatchExprAfterStart(token)
 	case TokenFor:
@@ -588,7 +590,17 @@ func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
 }
 
 func (p *Parser) parseMatchExprAfterStart(start Token) (Expr, error) {
-	partial := p.match(TokenQuestion)
+	return p.parseMatchExprAfterKeyword(start, false)
+}
+
+func (p *Parser) parseTryMatchExprAfterStart(start Token) (Expr, error) {
+	if _, err := p.consume(TokenMatch, "expected 'match' after 'try'"); err != nil {
+		return nil, err
+	}
+	return p.parseMatchExprAfterKeyword(start, true)
+}
+
+func (p *Parser) parseMatchExprAfterKeyword(start Token, partial bool) (Expr, error) {
 	value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
 	if err != nil {
 		return nil, err

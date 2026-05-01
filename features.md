@@ -81,6 +81,7 @@ Still open:
 - private by default vs public by default
 - whether package variables should ever be exposed through imports
 - whether package-scoped methods should be exposed by default or require an explicit rule
+- whether object members should ever be importable directly, for example importing `OS.println`-style names without importing the whole object surface
 - if both a wide package import and a renamed selective import target the same package, the wide import should come first and the `as` import should come after it
 
 ## Longer-OS Ideas
@@ -172,10 +173,10 @@ Open options under discussion:
    - strongest enum / `Option` ergonomics
    - needs exhaustiveness checking
 
-2. Add `match?` as the partial form
+2. Add `try match` as the partial form
    Possible shapes:
    - `match value { ... }` returns `T`
-   - `match? value { ... }` returns `Option[T]`
+   - `try match value { ... }` returns `Option[T]`
    Good fit:
    - explicit
    - very compact
@@ -193,7 +194,7 @@ Open options under discussion:
 Current leaning:
 - avoid runtime "no match" exceptions as a normal language outcome
 - keep `match` as the exhaustive / total form
-- if partial matching is needed, the current syntax candidates are `match?` and `try match`
+- partial matching now uses `try match`
 
 Related lambda-syntax discussion:
 - today placeholder-based forms like `list.map(match _ { ... })` work

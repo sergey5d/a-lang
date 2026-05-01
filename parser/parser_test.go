@@ -587,7 +587,7 @@ enum MaybeInt {
 func TestParsePartialMatchExpr(t *testing.T) {
 	src := `
 def run(value MaybeInt) Option[Int] =
-	match? value {
+	try match value {
 		SomeX(x) => x + 1
 	}
 `

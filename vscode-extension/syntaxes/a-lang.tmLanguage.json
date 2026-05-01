@@ -91,11 +91,11 @@
       "patterns": [
         {
           "name": "keyword.control.a-lang",
-          "match": "\\b(?:if|else|for|yield|loop|match|guard|return|break|is)\\b"
+          "match": "\\b(?:if|else|for|yield|loop|try|match|guard|return|break|is)\\b"
         },
         {
           "name": "keyword.declaration.a-lang",
-          "match": "\\b(?:def|class|record|enum|interface|object|impl|import|module|with|private)\\b"
+          "match": "\\b(?:def|class|record|enum|interface|object|impl|import|module|package|with|private)\\b"
         }
       ]
     },
