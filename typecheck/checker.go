@@ -1791,6 +1791,17 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 	case *parser.UnitLiteral:
 		result = builtin("Unit")
 	case *parser.ListLiteral:
+		if expected != nil && expected.Kind == TypeBuiltin && expected.Name == "Array" && len(expected.Args) == 1 {
+			elemType := expected.Args[0]
+			for _, elem := range e.Elements {
+				nextType := c.checkExprWithExpected(elem, elemType)
+				if !sameType(elemType, nextType) {
+					c.addDiagnostic("type_mismatch", "array literal elements must have the same type as "+elemType.String(), exprSpan(elem))
+				}
+			}
+			result = expected
+			break
+		}
 		if len(e.Elements) == 0 {
 			result = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{unknownType}}
 			break
@@ -2361,8 +2372,14 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Array constructor expects 1 argument, got %d", len(call.Args)), call.Span)
 			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
 		}
-		lengthType := c.checkExpr(call.Args[0].Value)
-		c.requireAssignable(lengthType, builtin("Int"), exprSpan(call.Args[0].Value), "invalid_argument_type", "Array constructor length must be Int")
+		argType := c.checkExpr(call.Args[0].Value)
+		if sameType(argType, builtin("Int")) {
+			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
+		}
+		if argType.Kind == TypeInterface && argType.Name == "List" && len(argType.Args) == 1 {
+			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{argType.Args[0]}}
+		}
+		c.addDiagnostic("invalid_argument_type", "Array constructor expects Int length or List[T] source", exprSpan(call.Args[0].Value))
 		return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
 	case "Some":
 		optionType := &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
@@ -2759,6 +2776,38 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 		}
 		orderedArgs := callArgValues(args)
 		switch member.Name {
+		case "get":
+			argTypes := c.checkArgTypes(orderedArgs)
+			if len(argTypes) != 1 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 1, len(argTypes)), member.Span)
+				return c.optionType(unknownType)
+			}
+			c.requireAssignable(argTypes[0], builtin("Int"), exprSpan(orderedArgs[0]), "invalid_argument_type", "get index must be Int")
+			elemType := unknownType
+			if len(receiverType.Args) == 1 {
+				elemType = receiverType.Args[0]
+			}
+			return c.optionType(elemType)
+		case "first":
+			argTypes := c.checkArgTypes(orderedArgs)
+			if len(argTypes) != 0 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 0, len(argTypes)), member.Span)
+			}
+			elemType := unknownType
+			if len(receiverType.Args) == 1 {
+				elemType = receiverType.Args[0]
+			}
+			return c.optionType(elemType)
+		case "last":
+			argTypes := c.checkArgTypes(orderedArgs)
+			if len(argTypes) != 0 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 0, len(argTypes)), member.Span)
+			}
+			elemType := unknownType
+			if len(receiverType.Args) == 1 {
+				elemType = receiverType.Args[0]
+			}
+			return c.optionType(elemType)
 		case "map":
 			if len(orderedArgs) != 1 {
 				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 1, len(orderedArgs)), member.Span)

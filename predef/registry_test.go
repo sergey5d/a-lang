@@ -26,8 +26,8 @@ func TestLoadRegistry(t *testing.T) {
 	if array.Kind != KindInterface {
 		t.Fatalf("expected Array to be an interface, got %s", array.Kind)
 	}
-	if len(array.Methods) != 3 {
-		t.Fatalf("expected Array to expose 3 methods, got %#v", array)
+	if len(array.Methods) != 10 {
+		t.Fatalf("expected Array to expose 10 methods, got %#v", array)
 	}
 
 	option, ok := registry.Types["Option"]

@@ -20,15 +20,18 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 		"Str": {
 			"size": nativeStrSize,
 		},
-			"Array": {
-				"map":          nativeArrayMap,
-				"exists":       nativeArrayExists,
-				"forAll":       nativeArrayForAll,
-				"forEach":      nativeArrayForEach,
-				"size":         nativeArraySize,
-				"zip":          nativeArrayZip,
-				"zipWithIndex": nativeArrayZipWithIndex,
-			},
+		"Array": {
+			"get":          nativeArrayGet,
+			"first":        nativeArrayFirst,
+			"last":         nativeArrayLast,
+			"map":          nativeArrayMap,
+			"exists":       nativeArrayExists,
+			"forAll":       nativeArrayForAll,
+			"forEach":      nativeArrayForEach,
+			"size":         nativeArraySize,
+			"zip":          nativeArrayZip,
+			"zipWithIndex": nativeArrayZipWithIndex,
+		},
 		"List": {
 			"append":       nativeListAppend,
 			"map":          nativeListMap,

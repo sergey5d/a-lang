@@ -18,10 +18,11 @@ interface Array[T] with Iterable[T] {
 
     # TODO: think more about whether these belong on Array directly.
     # Arrays have fixed size, so the result shape is less obvious here.
-    # def filter(f T -> Bool) List[T]
-    # def flatMap[X](f T -> Iterable[X]) List[X]
+    #def filter(f T -> Bool) List[T]
+    #def flatMap[X](f T -> Iterable[X]) List[X]
 
     def zip[X](other Array[X]) Array[(T, X)]
     def zipWithIndex() Array[(T, Int)]
+
     def size() Int
 }

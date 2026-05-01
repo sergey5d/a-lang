@@ -388,6 +388,25 @@ def run(values Array[Int]) Int {
 	}
 }
 
+func TestAnalyzeArrayLiteralFromExpectedType(t *testing.T) {
+	src := `
+class Box {
+	value Int
+}
+
+def run() Int {
+	values Array[Int] = [4, 5, 6]
+	boxes Array[Box] = [Box(7), Box(8)]
+	return values[0] + values[2] + boxes[1].value
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeInvalidIndexing(t *testing.T) {
 	src := `
 def fromSet(values Set[Int]) Int {

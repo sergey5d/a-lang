@@ -2,6 +2,52 @@ package interpreter
 
 import "a-lang/parser"
 
+func nativeArrayGet(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeArray(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Array.get receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "get expects 1 argument", Span: span}
+	}
+	index, ok := args[0].(int64)
+	if !ok {
+		return nil, RuntimeError{Message: "get index must be Int", Span: span}
+	}
+	if index < 0 || index >= int64(len(value.items)) {
+		return in.constructStdlibOption(nil, false, local, span)
+	}
+	return in.constructStdlibOption(value.items[index], true, local, span)
+}
+
+func nativeArrayFirst(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeArray(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Array.first receiver mismatch", Span: span}
+	}
+	if len(args) != 0 {
+		return nil, RuntimeError{Message: "first expects 0 arguments", Span: span}
+	}
+	if len(value.items) == 0 {
+		return in.constructStdlibOption(nil, false, local, span)
+	}
+	return in.constructStdlibOption(value.items[0], true, local, span)
+}
+
+func nativeArrayLast(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeArray(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Array.last receiver mismatch", Span: span}
+	}
+	if len(args) != 0 {
+		return nil, RuntimeError{Message: "last expects 0 arguments", Span: span}
+	}
+	if len(value.items) == 0 {
+		return in.constructStdlibOption(nil, false, local, span)
+	}
+	return in.constructStdlibOption(value.items[len(value.items)-1], true, local, span)
+}
+
 func nativeArrayMap(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
 	value, ok := asNativeArray(receiver)
 	if !ok {

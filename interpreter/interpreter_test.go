@@ -964,6 +964,29 @@ def run() Int {
 	}
 }
 
+func TestArrayLiteralFromExpectedType(t *testing.T) {
+	src := `
+class Box {
+	value Int
+}
+
+def run() Int {
+	values Array[Int] = [4, 5, 6]
+	boxes Array[Box] = [Box(7), Box(8)]
+	return values[0] * 1000 + values[1] * 100 + values[2] * 10 + boxes[1].value
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(4568) {
+		t.Fatalf("expected 4568, got %#v", value)
+	}
+}
+
 func TestListSortWithOrdering(t *testing.T) {
 	src := `
 object Descending with Ordering[Int] {

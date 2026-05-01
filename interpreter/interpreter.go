@@ -2247,9 +2247,12 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 				args[i] = value
 			}
 		}
+		if source, ok := args[0].(*nativeList); ok {
+			return &nativeArray{items: append([]Value(nil), source.items...)}, nil
+		}
 		length, ok := args[0].(int64)
 		if !ok {
-			return nil, RuntimeError{Message: "Array constructor length must be Int", Span: exprSpan(argExprs[0].Value)}
+			return nil, RuntimeError{Message: "Array constructor expects Int length or List source", Span: exprSpan(argExprs[0].Value)}
 		}
 		if length < 0 {
 			return nil, RuntimeError{Message: "Array constructor length must be non-negative", Span: exprSpan(argExprs[0].Value)}
@@ -3401,6 +3404,17 @@ func (in *Interpreter) bindingValues(bindings []parser.Binding, values []parser.
 }
 
 func (in *Interpreter) evalExprWithTypeRef(expr parser.Expr, expected *parser.TypeRef, local *env) (Value, error) {
+	if list, ok := expr.(*parser.ListLiteral); ok && expected != nil && expected.Name == "Array" && len(expected.Arguments) == 1 {
+		items := make([]Value, len(list.Elements))
+		for i, item := range list.Elements {
+			value, err := in.evalExprWithTypeRef(item, expected.Arguments[0], local)
+			if err != nil {
+				return nil, err
+			}
+			items[i] = value
+		}
+		return &nativeArray{items: items}, nil
+	}
 	if record, ok := expr.(*parser.AnonymousRecordExpr); ok && len(record.Values) > 0 && expected != nil && len(expected.RecordFields) > 0 {
 		if len(record.Values) != len(expected.RecordFields) {
 			return nil, RuntimeError{Message: fmt.Sprintf("record(...) expects %d values, got %d", len(expected.RecordFields), len(record.Values)), Span: record.Span}
