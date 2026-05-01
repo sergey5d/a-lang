@@ -591,6 +591,19 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			for _, binding := range bindings {
 				caseEnv.define(binding.name, binding.value, false)
 			}
+			if matchCase.Guard != nil {
+				guardValue, err := in.evalExpr(matchCase.Guard, caseEnv)
+				if err != nil {
+					return nil, nil, err
+				}
+				truthy, err := asBool(guardValue, exprSpan(matchCase.Guard))
+				if err != nil {
+					return nil, nil, err
+				}
+				if !truthy {
+					continue
+				}
+			}
 			if matchCase.Body != nil {
 				return in.execBlock(matchCase.Body, caseEnv, self)
 			}
@@ -1142,6 +1155,19 @@ func (in *Interpreter) evalMatchStmtValue(s *parser.MatchStmt, local *env, self 
 		for _, binding := range bindings {
 			caseEnv.define(binding.name, binding.value, false)
 		}
+		if matchCase.Guard != nil {
+			guardValue, err := in.evalExpr(matchCase.Guard, caseEnv)
+			if err != nil {
+				return nil, nil, err
+			}
+			truthy, err := asBool(guardValue, exprSpan(matchCase.Guard))
+			if err != nil {
+				return nil, nil, err
+			}
+			if !truthy {
+				continue
+			}
+		}
 		if matchCase.Body != nil {
 			value, signal, err := in.evalBlockValue(matchCase.Body, caseEnv, self, message)
 			if err != nil {
@@ -1396,6 +1422,19 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 			caseEnv := newEnv(local)
 			for _, binding := range bindings {
 				caseEnv.define(binding.name, binding.value, false)
+			}
+			if matchCase.Guard != nil {
+				guardValue, err := in.evalExpr(matchCase.Guard, caseEnv)
+				if err != nil {
+					return nil, err
+				}
+				truthy, err := asBool(guardValue, exprSpan(matchCase.Guard))
+				if err != nil {
+					return nil, err
+				}
+				if !truthy {
+					continue
+				}
 			}
 			if matchCase.Body != nil {
 				value, signal, err := in.evalBlockValue(matchCase.Body, caseEnv, nil, "match case must end with an expression")

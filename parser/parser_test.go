@@ -120,6 +120,38 @@ enum OptionX[T] {
 	}
 }
 
+func TestParseMatchGuard(t *testing.T) {
+	program, err := Parse(`
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+def run(value OptionX[Int]) Int =
+	match value {
+		SomeX(x) if x > 10 => x
+		_ => 0
+	}
+`)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	fn := program.Functions[0]
+	exprStmt, ok := fn.Body.Statements[0].(*ExprStmt)
+	if !ok {
+		t.Fatalf("expected expression statement, got %T", fn.Body.Statements[0])
+	}
+	matchExpr, ok := exprStmt.Expr.(*MatchExpr)
+	if !ok {
+		t.Fatalf("expected match expression, got %T", exprStmt.Expr)
+	}
+	if matchExpr.Cases[0].Guard == nil {
+		t.Fatalf("expected first case to have guard")
+	}
+}
+
 func TestParseMatchTypePattern(t *testing.T) {
 	program, err := Parse(`
 class Worker {

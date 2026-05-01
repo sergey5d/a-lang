@@ -86,6 +86,9 @@ func HasPlaceholderExpr(expr Expr) bool {
 			return true
 		}
 		for _, matchCase := range e.Cases {
+			if matchCase.Guard != nil && HasPlaceholderExpr(matchCase.Guard) {
+				return true
+			}
 			if matchCase.Expr != nil && HasPlaceholderExpr(matchCase.Expr) {
 				return true
 			}
@@ -156,6 +159,9 @@ func stmtHasPlaceholder(stmt Statement) bool {
 			return true
 		}
 		for _, matchCase := range s.Cases {
+			if matchCase.Guard != nil && HasPlaceholderExpr(matchCase.Guard) {
+				return true
+			}
 			if matchCase.Expr != nil && HasPlaceholderExpr(matchCase.Expr) {
 				return true
 			}
@@ -299,6 +305,7 @@ func replacePlaceholderExpr(expr Expr, param string) Expr {
 		for i, matchCase := range e.Cases {
 			cases[i] = MatchCase{
 				Pattern: matchCase.Pattern,
+				Guard:   replacePlaceholderExpr(matchCase.Guard, param),
 				Body:    replacePlaceholderBlock(matchCase.Body, param),
 				Expr:    replacePlaceholderExpr(matchCase.Expr, param),
 				Span:    matchCase.Span,
@@ -375,6 +382,7 @@ func replacePlaceholderStmt(stmt Statement, param string) Statement {
 		for i, matchCase := range s.Cases {
 			cases[i] = MatchCase{
 				Pattern: matchCase.Pattern,
+				Guard:   replacePlaceholderExpr(matchCase.Guard, param),
 				Body:    replacePlaceholderBlock(matchCase.Body, param),
 				Expr:    replacePlaceholderExpr(matchCase.Expr, param),
 				Span:    matchCase.Span,

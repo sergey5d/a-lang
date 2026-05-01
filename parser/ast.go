@@ -286,6 +286,7 @@ func (*MatchStmt) statementNode() {}
 // MatchCase represents a single pattern/body case in a match statement.
 type MatchCase struct {
 	Pattern Pattern    `json:"pattern"`
+	Guard   Expr       `json:"guard,omitempty"`
 	Body    *BlockStmt `json:"body"`
 	Expr    Expr       `json:"expr,omitempty"`
 	Span    Span       `json:"span"`

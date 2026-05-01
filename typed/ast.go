@@ -503,6 +503,7 @@ func (*BlockExpr) exprNode() {}
 // MatchCase is a typed case in a match statement or expression.
 type MatchCase struct {
 	Pattern parser.Pattern
+	Guard   Expr
 	Body    *BlockStmt
 	Expr    Expr
 }

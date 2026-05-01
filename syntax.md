@@ -740,6 +740,16 @@ result = match value {
 }
 ```
 
+Guards are supported on cases with `if ... =>`:
+
+```txt
+result = match value {
+    SomeX(x) if x > 10 => x
+    SomeX(_) => 10
+    OptionX.NoneX => 0
+}
+```
+
 Partial expression form:
 
 ```txt

@@ -463,6 +463,37 @@ def run() Int {
 	}
 }
 
+func TestMatchGuard(t *testing.T) {
+	src := `
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+def describe(value OptionX[Int]) Int =
+	match value {
+		SomeX(x) if x > 10 => x
+		SomeX(_) => 10
+		OptionX.NoneX => 0
+	}
+
+def run() Int {
+	return describe(OptionX.SomeX(12)) * 100 + describe(OptionX.SomeX(3)) * 10 + describe(OptionX.NoneX())
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(1300) {
+		t.Fatalf("expected 1300, got %#v", value)
+	}
+}
+
 func TestMatchClassExtractor(t *testing.T) {
 	src := `
 class PairBox {

@@ -1255,6 +1255,10 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		for _, matchCase := range s.Cases {
 			c.pushScope()
 			c.checkMatchPattern(matchCase.Pattern, valueType)
+			if matchCase.Guard != nil {
+				guardType := c.checkExpr(matchCase.Guard)
+				c.requireAssignable(guardType, builtin("Bool"), exprSpan(matchCase.Guard), "invalid_condition_type", "match guard must be Bool")
+			}
 			if matchCase.Body != nil {
 				c.checkBlockStatements(matchCase.Body.Statements, false)
 			}
@@ -1675,6 +1679,10 @@ func (c *Checker) checkMatchStmtResult(s *parser.MatchStmt, code, message string
 	for _, matchCase := range s.Cases {
 		c.pushScope()
 		c.checkMatchPattern(matchCase.Pattern, valueType)
+		if matchCase.Guard != nil {
+			guardType := c.checkExpr(matchCase.Guard)
+			c.requireAssignable(guardType, builtin("Bool"), exprSpan(matchCase.Guard), "invalid_condition_type", "match guard must be Bool")
+		}
 		caseType := unknownType
 		if matchCase.Body != nil {
 			caseType = c.checkBlockResult(matchCase.Body, code, message)
@@ -1867,6 +1875,10 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		for _, matchCase := range e.Cases {
 			c.pushScope()
 			c.checkMatchPattern(matchCase.Pattern, valueType)
+			if matchCase.Guard != nil {
+				guardType := c.checkExpr(matchCase.Guard)
+				c.requireAssignable(guardType, builtin("Bool"), exprSpan(matchCase.Guard), "invalid_condition_type", "match guard must be Bool")
+			}
 			caseType := unknownType
 			if matchCase.Body != nil {
 				caseType = c.checkBlockResult(matchCase.Body, "invalid_match_expression", "match case must end with an expression")

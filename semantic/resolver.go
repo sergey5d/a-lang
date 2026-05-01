@@ -429,6 +429,22 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		if s.Else != nil {
 			r.resolveBlock(s.Else)
 		}
+	case *parser.MatchStmt:
+		r.resolveExpr(s.Value)
+		for _, matchCase := range s.Cases {
+			r.pushScope()
+			r.resolveMatchPattern(matchCase.Pattern)
+			if matchCase.Guard != nil {
+				r.resolveExpr(matchCase.Guard)
+			}
+			if matchCase.Body != nil {
+				r.resolveBlockStatements(matchCase.Body.Statements)
+			}
+			if matchCase.Expr != nil {
+				r.resolveExpr(matchCase.Expr)
+			}
+			r.popScope()
+		}
 	case *parser.LoopStmt:
 		r.pushScope()
 		r.loopDepth++
@@ -544,6 +560,22 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 		r.pushScope()
 		r.resolveBlockStatements(e.Else.Statements)
 		r.popScope()
+	case *parser.MatchExpr:
+		r.resolveExpr(e.Value)
+		for _, matchCase := range e.Cases {
+			r.pushScope()
+			r.resolveMatchPattern(matchCase.Pattern)
+			if matchCase.Guard != nil {
+				r.resolveExpr(matchCase.Guard)
+			}
+			if matchCase.Body != nil {
+				r.resolveBlockStatements(matchCase.Body.Statements)
+			}
+			if matchCase.Expr != nil {
+				r.resolveExpr(matchCase.Expr)
+			}
+			r.popScope()
+		}
 	case *parser.ForYieldExpr:
 		r.pushScope()
 		for _, binding := range e.Bindings {
@@ -611,6 +643,30 @@ func (r *Resolver) resolveAssignment(stmt *parser.AssignmentStmt) {
 		r.addDiagnostic("invalid_assignment_target", "invalid assignment target", stmt.Span)
 	}
 	r.resolveExpr(stmt.Value)
+}
+
+func (r *Resolver) resolveMatchPattern(pattern parser.Pattern) {
+	switch p := pattern.(type) {
+	case *parser.WildcardPattern:
+		return
+	case *parser.BindingPattern:
+		r.defineMutable(p.Name, p.Span, false, "duplicate_binding", "duplicate binding '"+p.Name+"'")
+	case *parser.TypePattern:
+		r.resolveTypeRef(p.Target)
+		if p.Name != "" && p.Name != "_" {
+			r.defineMutable(p.Name, p.Span, false, "duplicate_binding", "duplicate binding '"+p.Name+"'")
+		}
+	case *parser.LiteralPattern:
+		r.resolveExpr(p.Value)
+	case *parser.TuplePattern:
+		for _, elem := range p.Elements {
+			r.resolveMatchPattern(elem)
+		}
+	case *parser.ConstructorPattern:
+		for _, arg := range p.Args {
+			r.resolveMatchPattern(arg)
+		}
+	}
 }
 
 func (r *Resolver) defineMutable(name string, span parser.Span, mutable bool, code, message string) {

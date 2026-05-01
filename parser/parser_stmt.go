@@ -485,10 +485,13 @@ func (p *Parser) parseMatchCases() ([]MatchCase, Token, error) {
 		if err != nil {
 			return nil, Token{}, err
 		}
+		matchCase := MatchCase{Pattern: pattern}
+		if matchCase.Guard, err = p.parseOptionalMatchGuard(); err != nil {
+			return nil, Token{}, err
+		}
 		if _, err := p.consume(TokenFatArrow, "expected '=>' after match pattern"); err != nil {
 			return nil, Token{}, err
 		}
-		matchCase := MatchCase{Pattern: pattern}
 		if p.check(TokenLBrace) {
 			body, err := p.parseBlock()
 			if err != nil {
@@ -511,6 +514,20 @@ func (p *Parser) parseMatchCases() ([]MatchCase, Token, error) {
 		return nil, Token{}, err
 	}
 	return cases, end, nil
+}
+
+func (p *Parser) parseOptionalMatchGuard() (Expr, error) {
+	if !p.match(TokenIf) {
+		return nil, nil
+	}
+	if err := p.requireSameLineExpressionStart(p.previous()); err != nil {
+		return nil, err
+	}
+	guard, err := p.parseExpressionUntil(TokenFatArrow)
+	if err != nil {
+		return nil, err
+	}
+	return guard, nil
 }
 
 func (p *Parser) parsePattern() (Pattern, error) {
@@ -811,6 +828,10 @@ func (p *Parser) parseInlineMatchCases(statementMode bool) ([]MatchCase, Token, 
 	if err != nil {
 		return nil, Token{}, err
 	}
+	matchCase := MatchCase{Pattern: pattern}
+	if matchCase.Guard, err = p.parseOptionalMatchGuard(); err != nil {
+		return nil, Token{}, err
+	}
 	arrow, err := p.consume(TokenFatArrow, "expected '=>' after match pattern")
 	if err != nil {
 		return nil, Token{}, err
@@ -818,7 +839,6 @@ func (p *Parser) parseInlineMatchCases(statementMode bool) ([]MatchCase, Token, 
 	if p.isAtEnd() {
 		return nil, Token{}, fmt.Errorf("expected match case body after '=>'")
 	}
-	matchCase := MatchCase{Pattern: pattern}
 	if statementMode {
 		p.beginScope()
 		var stmt Statement

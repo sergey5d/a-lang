@@ -10,7 +10,14 @@ func (b *exprBuilder) buildMatchExpr(expr parser.Expr, match *parser.MatchExpr) 
 	cases := make([]MatchCase, len(match.Cases))
 	for i, matchCase := range match.Cases {
 		var body *BlockStmt
+		var guard Expr
 		var caseExpr Expr
+		if matchCase.Guard != nil {
+			guard, err = b.Build(matchCase.Guard)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if matchCase.Body != nil {
 			body, err = b.blocks.Build(matchCase.Body)
 			if err != nil {
@@ -25,6 +32,7 @@ func (b *exprBuilder) buildMatchExpr(expr parser.Expr, match *parser.MatchExpr) 
 		}
 		cases[i] = MatchCase{
 			Pattern: matchCase.Pattern,
+			Guard:   guard,
 			Body:    body,
 			Expr:    caseExpr,
 		}

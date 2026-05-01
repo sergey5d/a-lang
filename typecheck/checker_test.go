@@ -147,6 +147,61 @@ def run(value OptionX[Int]) Int {
 	}
 }
 
+func TestAnalyzeMatchGuard(t *testing.T) {
+	src := `
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+def run(value OptionX[Int]) Int =
+	match value {
+		SomeX(x) if x > 10 => x
+		SomeX(_) => 10
+		OptionX.NoneX => 0
+	}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeMatchGuardRequiresBool(t *testing.T) {
+	src := `
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+def run(value OptionX[Int]) Int =
+	match value {
+		SomeX(x) if x => x
+		OptionX.NoneX => 0
+	}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	found := false
+	for _, diag := range result.Diagnostics {
+		if diag.Code == "invalid_condition_type" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected invalid_condition_type diagnostic, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeMatchStmtRequiresEnumExhaustiveness(t *testing.T) {
 	src := `
 enum OptionX[T] {
