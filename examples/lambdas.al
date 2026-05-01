@@ -5,6 +5,11 @@
 # 45
 # 56
 # 66
+# map 1 true 3
+# map 2 true 3
+# map 3 true 3
+# map 4 true 3
+# map 5 true 3
 # 0
 
 class Adder {
@@ -40,5 +45,20 @@ def main() Int {
 
     lambda6 = (left Int, right Int) -> adder.apply(left + right)
     OS.println(lambda6(30, 31))
+
+    seen = Set(1, 2, 3)
+    doubled = seen.map((item Int) -> item * 2)
+    doubledV2 = seen.map((item) -> item * 2)
+    doubledV3 = seen.map(item -> item * 2)
+    doubledV4 = seen.map(_ * 2)
+    doubledV5 = seen.map(item ->
+        item * 2
+    )
+
+    OS.println("map 1 " + doubled.contains(4) + " " + doubled.size())
+    OS.println("map 2 " + doubledV2.contains(4) + " " + doubledV2.size())
+    OS.println("map 3 " + doubledV3.contains(4) + " " + doubledV3.size())
+    OS.println("map 4 " + doubledV4.contains(4) + " " + doubledV4.size())
+    OS.println("map 5 " + doubledV5.contains(4) + " " + doubledV5.size())
     0
 }
