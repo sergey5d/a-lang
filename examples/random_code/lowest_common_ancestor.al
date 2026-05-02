@@ -25,13 +25,6 @@ def find(
         record { foundP = foundPNode, foundQ = foundQNode, ancestor = None() }
     }
 
-    #guard {
-    #    current <- node
-    #    simple <- current
-    #} else match { 
-    #    failure Err[Int] => record { foundP = foundPNode, foundQ = foundQNode, ancestor = None() }
-    #}
-
     currentFoundP := foundPNode
     currentFoundQ := foundQNode
 

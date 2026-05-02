@@ -96,11 +96,24 @@ Still open:
 - whether the current `Unwrappable[T]` surface is enough, or needs a richer protocol later
 - whether custom-shape early exit should move from single-binding `guard` syntax toward a block form such as:
   - `guard { a <- b; c <- d } else { ... }`
+  - `guard { a <- b; c <- d } else match { ... }`
   - `guard { a <- b; c <- d } fail { ... }`
 - if a block-style `guard` is added:
   - whether successful `<-` bindings stay visible after the guard block
   - whether only `<-` failures should trigger the fallback block
   - whether the fallback block should implicitly return its final value
+  - whether `else match` should bind the failure value explicitly (for example `failure Err[Int] => ...`) and how that should interact across `Option`, `Result`, `Either`, and custom `Unwrappable` types
+
+Possible shape to revisit:
+
+```txt
+#guard {
+#    current <- node
+#    simple <- current
+#} else match {
+#    failure Err[Int] => record { foundP = foundPNode, foundQ = foundQNode, ancestor = None() }
+#}
+```
 
 One possible follow-up is a Rust-style propagation form that:
 - extracts the success value from `Ok`
