@@ -6,15 +6,15 @@
 # sumFail sum-missing
 
 def plusOne(value Option[Int]) Result[Int, Str] {
-    guard item <- value: Err("missing")
+    guard item <- value else: Err("missing")
     Ok(item + 1)
 }
 
 def pairwise(left Option[Int], right Option[Str]) { count Int, label Str } = {
-    guard count <- left {
+    guard count <- left else {
         record { count = 0, label = "no-left" }
     }
-    guard label <- right {
+    guard label <- right else {
         record { count = count, label = "no-right" }
     }
     record(count, label)

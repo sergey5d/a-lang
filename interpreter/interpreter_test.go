@@ -206,10 +206,10 @@ def run() Int {
 	valuePairs = values.zip(other)
 	valueIndexed = values.zipWithIndex()
 
-	guard firstPair <- pairs.get(0) {
+	guard firstPair <- pairs.get(0) else {
 		0
 	}
-	guard indexedPair <- indexed.get(2) {
+	guard indexedPair <- indexed.get(2) else {
 		0
 	}
 	firstLeft, firstRight = firstPair
@@ -1128,7 +1128,7 @@ def run() Int {
 		total += value
 	}
 
-	guard reducedPair <- mapReduced {
+	guard reducedPair <- mapReduced else {
 		0
 	}
 	reducedKey, reducedValue = reducedPair
@@ -1173,7 +1173,7 @@ func TestOptionRuntime(t *testing.T) {
 def run() Int {
 	found = Some(5)
 	missing = None()
-	guard value <- found: return 0
+	guard value <- found else: return 0
 	return value + missing.getOr(2)
 }
 `
@@ -1756,9 +1756,9 @@ def run() Int {
 		next
 	}
 
-	guard first <- items.get(0): return 0
-	guard second <- items.get(1): return 0
-	guard third <- items.get(2): return 0
+	guard first <- items.get(0) else: return 0
+	guard second <- items.get(1) else: return 0
+	guard third <- items.get(2) else: return 0
 	return first + second + third
 }
 `
@@ -1805,9 +1805,9 @@ def run() Int {
 		total
 	}
 
-	guard first <- items.get(0): return 0
-	guard second <- items.get(1): return 0
-	guard third <- items.get(2): return 0
+	guard first <- items.get(0) else: return 0
+	guard second <- items.get(1) else: return 0
+	guard third <- items.get(2) else: return 0
 	return first + second + third
 }
 `
@@ -1921,14 +1921,14 @@ def run() Str {
 func TestGuardStmt(t *testing.T) {
 	src := `
 def runSome(value Option[Int]) Result[Int, Str] {
-	guard item <- value {
+	guard item <- value else {
 		Err("missing")
 	}
 	return Ok(item + 1)
 }
 
 def runNone(value Option[Int]) Result[Int, Str] {
-	guard item <- value {
+	guard item <- value else {
 		Err("missing")
 	}
 	return Ok(item + 1)
@@ -2039,10 +2039,10 @@ def run() Str {
 	partialMapped = options.map(try match _ {
 		SomeX(x) => x + 1
 	})
-	guard firstPartial <- partialMapped.get(0) {
+	guard firstPartial <- partialMapped.get(0) else {
 		""
 	}
-	guard secondPartial <- partialMapped.get(1) {
+	guard secondPartial <- partialMapped.get(1) else {
 		""
 	}
 	return "${ifMapped.get(0).getOr(0)}-${ifMapped.get(1).getOr(0)}-${matchMapped.get(2).getOr(0)}-${firstPartial.getOr(0)}-${secondPartial.isEmpty()}"

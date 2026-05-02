@@ -1573,10 +1573,10 @@ def run() Int {
 	valuePairs Array[(Int, Str)] = values.zip(other)
 	valueIndexed Array[(Int, Int)] = values.zipWithIndex()
 
-	guard firstPair <- pairs.get(0) {
+	guard firstPair <- pairs.get(0) else {
 		0
 	}
-	guard indexedPair <- indexed.get(2) {
+	guard indexedPair <- indexed.get(2) else {
 		0
 	}
 	firstLeft Int, firstRight Str = firstPair
@@ -1675,7 +1675,7 @@ def run() Int {
 		total += value
 	}
 
-	guard reducedPair <- mapReduced {
+	guard reducedPair <- mapReduced else {
 		0
 	}
 	reducedKey Str, reducedValue Int = reducedPair
@@ -1846,7 +1846,7 @@ func TestAnalyzeOptionConstructorsAndMethods(t *testing.T) {
 def run() Int {
 	found Option[Int] = Some(5)
 	missing Option[Int] = None()
-	guard value <- found: return missing.getOr(7)
+	guard value <- found else: return missing.getOr(7)
 	return value
 }
 `
@@ -2292,7 +2292,7 @@ def run(value Result[Int, Str]) Option[Int] {
 func TestAnalyzeGuardStmt(t *testing.T) {
 	src := `
 def run(value Option[Int]) Result[Int, Str] {
-	guard item <- value {
+	guard item <- value else {
 		Err("missing")
 	}
 	return Ok(item + 1)
@@ -2308,7 +2308,7 @@ def run(value Option[Int]) Result[Int, Str] {
 func TestAnalyzeGuardStmtRejectsWrongGuardType(t *testing.T) {
 	src := `
 def run(value Option[Int]) Result[Int, Str] {
-	guard item <- value {
+	guard item <- value else {
 		Some(0)
 	}
 	return Ok(item + 1)
@@ -2400,10 +2400,10 @@ def run() Bool {
 	partialMapped = options.map(try match _ {
 		SomeX(x) => x + 1
 	})
-	guard firstPartial <- partialMapped.get(0) {
+	guard firstPartial <- partialMapped.get(0) else {
 		false
 	}
-	guard secondPartial <- partialMapped.get(1) {
+	guard secondPartial <- partialMapped.get(1) else {
 		false
 	}
 	return ifMapped.get(1).getOr(0) == 10 &&

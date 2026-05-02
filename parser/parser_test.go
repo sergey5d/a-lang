@@ -2236,7 +2236,7 @@ def run(value Result[Int, Str]) Result[Int, Str] {
 func TestParseGuardStmt(t *testing.T) {
 	src := `
 def run(value Option[Int]) Result[Int, Str] {
-	guard item <- value: Err("missing")
+	guard item <- value else: Err("missing")
 	return Ok(item + 1)
 }
 `

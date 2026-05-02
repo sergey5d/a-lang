@@ -166,11 +166,14 @@ func (p *Parser) parseGuardStmt() (Statement, error) {
 	if err := p.requireSameLineExpressionStart(p.previous()); err != nil {
 		return nil, err
 	}
-	value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
+	value, err := p.parseExpressionUntil(TokenElse)
 	if err != nil {
 		return nil, err
 	}
-	fallback, err := p.parseStmtBodyBlock("guard")
+	if _, err := p.consume(TokenElse, "expected 'else' after guard unwrap expression"); err != nil {
+		return nil, err
+	}
+	fallback, err := p.parseStmtBodyBlock("guard else")
 	if err != nil {
 		return nil, err
 	}

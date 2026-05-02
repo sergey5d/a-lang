@@ -25,9 +25,9 @@ def main() Unit {
     values.forEach(item -> OS.println("each " + item))
     OS.println("index " + values[0] + " " + values[2])
 
-    guard middle <- values.get(1): ()
-    guard first <- values.first(): ()
-    guard last <- values.last(): ()
+    guard middle <- values.get(1) else: ()
+    guard first <- values.first() else: ()
+    guard last <- values.last() else: ()
 
     pairs = values.zip(labels)
     indexed = values.zipWithIndex()
