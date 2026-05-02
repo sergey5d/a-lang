@@ -19,6 +19,9 @@
       "include": "#keywords"
     },
     {
+      "include": "#enumCases"
+    },
+    {
       "include": "#constants"
     },
     {
@@ -95,7 +98,23 @@
         },
         {
           "name": "keyword.declaration.a-lang",
-          "match": "\\b(?:def|class|record|enum|interface|object|impl|import|module|package|with|private)\\b"
+          "match": "\\b(?:def|class|record|enum|interface|object|impl|import|module|package|with|private|case)\\b"
+        }
+      ]
+    },
+    "enumCases": {
+      "patterns": [
+        {
+          "name": "meta.enum.case.a-lang",
+          "match": "\\b(case)\\b\\s+([A-Z][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.declaration.a-lang"
+            },
+            "2": {
+              "name": "entity.name.type.variant.a-lang"
+            }
+          }
         }
       ]
     },
