@@ -40,6 +40,7 @@ type classInfo struct {
 	decl         *parser.ClassDecl
 	fields       map[string]fieldInfo
 	methods      map[string][]methodInfo
+	caseMethods  map[string]map[string][]methodInfo
 	constructors []*parser.MethodDecl
 	enumCases    map[string]parser.EnumCaseDecl
 }
@@ -167,6 +168,7 @@ func (c *Checker) installBuiltinInterfaces() {
 			decl:      decl,
 			fields:    map[string]fieldInfo{},
 			methods:   map[string][]methodInfo{},
+			caseMethods: map[string]map[string][]methodInfo{},
 			enumCases: map[string]parser.EnumCaseDecl{},
 		}
 		for _, field := range decl.Fields {
@@ -180,6 +182,12 @@ func (c *Checker) installBuiltinInterfaces() {
 		}
 		for _, enumCase := range decl.Cases {
 			info.enumCases[enumCase.Name] = enumCase
+			if len(enumCase.Methods) > 0 {
+				info.caseMethods[enumCase.Name] = map[string][]methodInfo{}
+				for _, method := range enumCase.Methods {
+					info.caseMethods[enumCase.Name][method.Name] = append(info.caseMethods[enumCase.Name][method.Name], methodInfo{decl: method})
+				}
+			}
 		}
 		c.classes[decl.Name] = info
 	}
@@ -235,6 +243,7 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 				decl:      decl,
 				fields:    map[string]fieldInfo{},
 				methods:   map[string][]methodInfo{},
+				caseMethods: map[string]map[string][]methodInfo{},
 				enumCases: map[string]parser.EnumCaseDecl{},
 			}
 			for _, field := range decl.Fields {
@@ -248,6 +257,12 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 			}
 			for _, enumCase := range decl.Cases {
 				class.enumCases[enumCase.Name] = enumCase
+				if len(enumCase.Methods) > 0 {
+					class.caseMethods[enumCase.Name] = map[string][]methodInfo{}
+					for _, method := range enumCase.Methods {
+						class.caseMethods[enumCase.Name][method.Name] = append(class.caseMethods[enumCase.Name][method.Name], methodInfo{decl: method})
+					}
+				}
 			}
 			info.classes[decl.Name] = class
 			c.classes[qualified] = class
@@ -291,6 +306,7 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 				decl:      decl,
 				fields:    map[string]fieldInfo{},
 				methods:   map[string][]methodInfo{},
+				caseMethods: map[string]map[string][]methodInfo{},
 				enumCases: map[string]parser.EnumCaseDecl{},
 			}
 			for _, field := range decl.Fields {
@@ -304,6 +320,12 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 			}
 			for _, enumCase := range decl.Cases {
 				class.enumCases[enumCase.Name] = enumCase
+				if len(enumCase.Methods) > 0 {
+					class.caseMethods[enumCase.Name] = map[string][]methodInfo{}
+					for _, method := range enumCase.Methods {
+						class.caseMethods[enumCase.Name][method.Name] = append(class.caseMethods[enumCase.Name][method.Name], methodInfo{decl: method})
+					}
+				}
 			}
 			c.importedClasses[localName] = class
 			c.classes[class.name] = class
@@ -329,6 +351,7 @@ func (c *Checker) collectDecls(program *parser.Program) {
 			decl:      decl,
 			fields:    map[string]fieldInfo{},
 			methods:   map[string][]methodInfo{},
+			caseMethods: map[string]map[string][]methodInfo{},
 			enumCases: map[string]parser.EnumCaseDecl{},
 		}
 		for _, field := range decl.Fields {
@@ -342,6 +365,12 @@ func (c *Checker) collectDecls(program *parser.Program) {
 		}
 		for _, enumCase := range decl.Cases {
 			info.enumCases[enumCase.Name] = enumCase
+			if len(enumCase.Methods) > 0 {
+				info.caseMethods[enumCase.Name] = map[string][]methodInfo{}
+				for _, method := range enumCase.Methods {
+					info.caseMethods[enumCase.Name][method.Name] = append(info.caseMethods[enumCase.Name][method.Name], methodInfo{decl: method})
+				}
+			}
 		}
 		c.classes[decl.Name] = info
 		if decl.Object {
@@ -789,6 +818,64 @@ func (c *Checker) checkEnumCases(info classInfo) {
 				c.addDiagnostic("invalid_enum_case", "enum case '"+enumCase.Name+"' must initialize shared field '"+field.Name+"'", enumCase.Span)
 			}
 		}
+		for _, method := range enumCase.Methods {
+			c.checkEnumCaseMethod(info.decl, enumCase, method)
+		}
+	}
+}
+
+func (c *Checker) checkEnumCaseMethod(owner *parser.ClassDecl, enumCase parser.EnumCaseDecl, method *parser.MethodDecl) {
+	c.pushTypeScope()
+	defer c.popTypeScope()
+	for _, param := range owner.TypeParameters {
+		c.currentTypeScope()[param.Name] = TypeParam
+	}
+	for _, param := range method.TypeParameters {
+		c.currentTypeScope()[param.Name] = TypeParam
+	}
+	c.validateTypeParameterBounds(method.TypeParameters)
+
+	c.pushScope()
+	defer c.popScope()
+
+	prevClass := c.currentClass
+	prevMethod := c.currentMethod
+	c.currentClass = owner
+	c.currentMethod = method
+	defer func() {
+		c.currentClass = prevClass
+		c.currentMethod = prevMethod
+	}()
+
+	classArgs := make([]*Type, len(owner.TypeParameters))
+	for i, param := range owner.TypeParameters {
+		classArgs[i] = &Type{Kind: TypeParam, Name: param.Name}
+	}
+	c.define("this", &Type{Kind: TypeClass, Name: owner.Name, Args: classArgs}, false)
+
+	expectedReturn := c.resolveDeclaredType(method.ReturnType)
+	c.returnTypes = append(c.returnTypes, expectedReturn)
+	defer func() { c.returnTypes = c.returnTypes[:len(c.returnTypes)-1] }()
+
+	for _, field := range owner.Fields {
+		c.define(field.Name, c.resolveDeclaredType(field.Type), false)
+	}
+	for _, field := range enumCase.Fields {
+		c.define(field.Name, c.resolveDeclaredType(field.Type), false)
+	}
+	for _, param := range method.Parameters {
+		paramType := c.resolveDeclaredType(param.Type)
+		if param.Variadic {
+			paramType = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{paramType}}
+		}
+		c.define(param.Name, paramType, false)
+	}
+	if method.Constructor {
+		c.addDiagnostic("invalid_enum_method", "enum case '"+owner.Name+"."+enumCase.Name+"' cannot declare constructors", method.Span)
+	}
+	implicitReturn := c.checkBlock(method.Body)
+	if method.ReturnType != nil && !isUnknown(implicitReturn) && !isUnitType(expectedReturn) {
+		c.requireAssignable(implicitReturn, expectedReturn, method.Body.Span, "invalid_return_type", "cannot implicitly return "+implicitReturn.String()+" from method returning "+expectedReturn.String())
 	}
 }
 

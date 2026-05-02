@@ -385,3 +385,72 @@ func (p *Parser) parseEnumCase() (EnumCaseDecl, error) {
 	decl.Span = mergeSpans(tokenSpan(start), tokenSpan(end))
 	return decl, nil
 }
+
+func (p *Parser) parseTopLevelImpl(program *Program) error {
+	start, err := p.consume(TokenImpl, "expected 'impl'")
+	if err != nil {
+		return err
+	}
+	target, err := p.parseTypeRef()
+	if err != nil {
+		return err
+	}
+	var targetClass *ClassDecl
+	for i := len(program.Classes) - 1; i >= 0; i-- {
+		if program.Classes[i].Name == target.Name {
+			targetClass = program.Classes[i]
+			break
+		}
+	}
+	if targetClass == nil {
+		return fmt.Errorf("unknown impl target '%s'", target.Name)
+	}
+	var targetCase *EnumCaseDecl
+	if p.match(TokenDot) {
+		caseName, err := p.consume(TokenIdentifier, "expected enum case name after '.'")
+		if err != nil {
+			return err
+		}
+		if !targetClass.Enum {
+			return fmt.Errorf("impl target '%s.%s' requires enum '%s'", target.Name, caseName.Lexeme, target.Name)
+		}
+		for i := range targetClass.Cases {
+			if targetClass.Cases[i].Name == caseName.Lexeme {
+				targetCase = &targetClass.Cases[i]
+				break
+			}
+		}
+		if targetCase == nil {
+			return fmt.Errorf("unknown enum case '%s.%s'", target.Name, caseName.Lexeme)
+		}
+	}
+	if _, err := p.consume(TokenLBrace, "expected '{' after impl target"); err != nil {
+		return err
+	}
+	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		private := p.match(TokenPrivate)
+		if !p.check(TokenDef) && !p.check(TokenImpl) {
+			return fmt.Errorf("expected method declaration in impl block, got %s", p.peek().String())
+		}
+		method, err := p.parseMethodLike(private, false)
+		if err != nil {
+			return err
+		}
+		if targetCase != nil {
+			targetCase.Methods = append(targetCase.Methods, method)
+		} else {
+			targetClass.Methods = append(targetClass.Methods, method)
+		}
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after impl body")
+	if err != nil {
+		return err
+	}
+	if targetCase != nil {
+		targetCase.Span = mergeSpans(targetCase.Span, tokenSpan(end))
+	} else {
+		targetClass.Span = mergeSpans(targetClass.Span, tokenSpan(end))
+	}
+	_ = start
+	return nil
+}

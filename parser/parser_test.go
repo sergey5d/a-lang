@@ -2287,6 +2287,42 @@ def run(b Option[Int], d Option[Int]) Result[Int, Str] {
 	}
 }
 
+func TestParseTopLevelEnumImpls(t *testing.T) {
+	src := `
+enum Either[L, R] {
+	case Left {
+		value L
+	}
+	case Right {
+		value R
+	}
+}
+
+impl Either[L, R] {
+	def isLeft() Bool = false
+}
+
+impl Either[L, R].Left {
+	def isLeft() Bool = true
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Classes) != 1 {
+		t.Fatalf("expected 1 class, got %d", len(program.Classes))
+	}
+	enumDecl := program.Classes[0]
+	if len(enumDecl.Methods) != 1 {
+		t.Fatalf("expected 1 enum-wide method, got %d", len(enumDecl.Methods))
+	}
+	if len(enumDecl.Cases) != 2 || len(enumDecl.Cases[0].Methods) != 1 {
+		t.Fatalf("expected first case to have 1 method, got %#v", enumDecl.Cases)
+	}
+}
+
 func TestAttachSourceSpans(t *testing.T) {
 	src := `
 def sample(a Int) Bool {

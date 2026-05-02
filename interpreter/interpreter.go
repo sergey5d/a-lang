@@ -312,6 +312,24 @@ func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl,
 	return in.coerceValueForTypeRef(method.ReturnType, value), nil
 }
 
+func enumCaseMethods(class *parser.ClassDecl, caseName string) []*parser.MethodDecl {
+	if !class.Enum || caseName == "" {
+		return nil
+	}
+	for i := range class.Cases {
+		if class.Cases[i].Name == caseName {
+			return class.Cases[i].Methods
+		}
+	}
+	return nil
+}
+
+func instanceMethods(obj *instance) []*parser.MethodDecl {
+	methods := append([]*parser.MethodDecl{}, enumCaseMethods(obj.class, obj.caseName)...)
+	methods = append(methods, obj.class.Methods...)
+	return methods
+}
+
 func implicitConstructorFields(class *parser.ClassDecl) []parser.FieldDecl {
 	fields := make([]parser.FieldDecl, 0, len(class.Fields))
 	for _, field := range class.Fields {
@@ -1989,9 +2007,10 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 	if !ok {
 		return nil, RuntimeError{Message: "member call requires class instance", Span: member.Span}
 	}
-	if len(obj.class.Methods) > 0 {
+	methods := instanceMethods(obj)
+	if len(methods) > 0 {
 		var candidates []*parser.MethodDecl
-		for _, method := range obj.class.Methods {
+		for _, method := range methods {
 			if method.Name == member.Name {
 				candidates = append(candidates, method)
 			}
@@ -2006,7 +2025,7 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 	}
 	if hasNamedParserArgs(argExprs) {
 		var candidates []*parser.MethodDecl
-		for _, method := range obj.class.Methods {
+		for _, method := range methods {
 			if method.Name == member.Name {
 				candidates = append(candidates, method)
 			}
@@ -2022,7 +2041,7 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 	var firstErr error
 	var fallbackMethod *parser.MethodDecl
 	var fallbackArgs []Value
-	for _, method := range obj.class.Methods {
+	for _, method := range methods {
 		if method.Name != member.Name {
 			continue
 		}
@@ -2082,7 +2101,7 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 			}
 			return field, nil
 		}
-		for _, method := range value.class.Methods {
+		for _, method := range instanceMethods(value) {
 			if method.Name == expr.Name {
 				return nil, RuntimeError{Message: "method '" + expr.Name + "' must be called with ()", Span: expr.Span}
 			}
@@ -3256,7 +3275,7 @@ func (in *Interpreter) invokeMethod(receiver Value, name string, args []Value, l
 	if !ok {
 		return nil, RuntimeError{Message: "member call requires class instance", Span: span}
 	}
-	for _, method := range obj.class.Methods {
+	for _, method := range instanceMethods(obj) {
 		if method.Name != name {
 			continue
 		}

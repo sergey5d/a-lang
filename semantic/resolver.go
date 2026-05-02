@@ -310,6 +310,16 @@ func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
 			for _, assignment := range enumCase.Assignments {
 				r.resolveExpr(assignment.Value)
 			}
+			if len(enumCase.Methods) > 0 {
+				r.pushScope()
+				for _, field := range enumCase.Fields {
+					r.defineMutable(field.Name, field.Span, field.Mutable, "duplicate_binding", "duplicate binding '"+field.Name+"'")
+				}
+				for _, method := range enumCase.Methods {
+					r.resolveMethod(method)
+				}
+				r.popScope()
+			}
 		}
 	}
 	for _, method := range decl.Methods {

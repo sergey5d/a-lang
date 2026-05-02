@@ -115,6 +115,7 @@ type EnumCaseDecl struct {
 	Name        string               `json:"name"`
 	Fields      []FieldDecl          `json:"fields,omitempty"`
 	Assignments []EnumCaseAssignment `json:"assignments,omitempty"`
+	Methods     []*MethodDecl        `json:"methods,omitempty"`
 	Span        Span                 `json:"span"`
 }
 

@@ -1996,6 +1996,51 @@ def run() Str {
 	}
 }
 
+func TestEnumImplMethods(t *testing.T) {
+	src := `
+enum Outcome {
+	tag Str
+
+	case Left {
+		value Str
+		tag = "left"
+	}
+
+	case Right {
+		value Int
+		tag = "right"
+	}
+}
+
+impl Outcome {
+	def describe() Str = tag
+}
+
+impl Outcome.Left {
+	def describe() Str = value
+}
+
+impl Outcome.Right {
+	def describe() Str = "num " + value
+}
+
+def run() Str {
+	left Outcome = Outcome.Left("bad")
+	right Outcome = Outcome.Right(7)
+	return left.describe() + "-" + right.describe() + "-" + left.tag + "-" + right.tag
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "bad-num 7-left-right" {
+		t.Fatalf("expected %q, got %#v", "bad-num 7-left-right", value)
+	}
+}
+
 func TestMapIndexReturnsOption(t *testing.T) {
 	src := `
 def run() Str {

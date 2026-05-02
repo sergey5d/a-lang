@@ -2364,6 +2364,47 @@ def run(left Option[Int]) Result[Int, Str] {
 	}
 }
 
+func TestAnalyzeEnumImplMethods(t *testing.T) {
+	src := `
+enum Outcome {
+	tag Str
+
+	case Left {
+		value Str
+		tag = "left"
+	}
+
+	case Right {
+		value Int
+		tag = "right"
+	}
+}
+
+impl Outcome {
+	def describe() Str = tag
+}
+
+impl Outcome.Left {
+	def describe() Str = value
+}
+
+impl Outcome.Right {
+	def describe() Str = "num " + value
+}
+
+def run() Str {
+	left Outcome = Outcome.Left("bad")
+	right Outcome = Outcome.Right(7)
+	return left.describe() + "-" + right.describe()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeMapIndexReturnsOption(t *testing.T) {
 	src := `
 def run() Bool {

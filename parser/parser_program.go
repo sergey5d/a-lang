@@ -63,6 +63,10 @@ func (p *Parser) parseProgram() (*Program, error) {
 				return nil, err
 			}
 			program.Classes = append(program.Classes, decl)
+		case TokenImpl:
+			if err := p.parseTopLevelImpl(program); err != nil {
+				return nil, err
+			}
 		case TokenPrivate:
 			p.advance()
 			switch p.peek().Type {
