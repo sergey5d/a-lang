@@ -25,7 +25,7 @@ enum Either[L, R] {
 
     def orElse(f () -> Either[L, R]) Either[L, R]
 
-    case Left[L] {
+    case Left {
 
         private val L
 
@@ -59,7 +59,7 @@ enum Either[L, R] {
         def orElse(f () -> Either[L, R]) Either[L, R] = f()
     }
 
-    case Right[R] {
+    case Right {
 
         private val R
 
