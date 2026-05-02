@@ -338,12 +338,14 @@ Generic bounds:
 def sort[T with Ordering[T]](value T) T = value
 ```
 
-Methods look the same inside classes, records, objects, and enums:
+Objects and enums can declare methods inline. Classes and records attach behavior through top-level `impl` blocks:
 
 ```txt
 class Counter {
     value Int
+}
 
+impl Counter {
     def inc() Int = value + 1
 }
 ```
@@ -354,7 +356,9 @@ Constructors currently use `def this(...)`:
 class Person {
     age Int
     name Str
+}
 
+impl Person {
     def this(age Int, name Str) {
         this.age = age
         this.name = name
@@ -449,7 +453,9 @@ Class:
 ```txt
 class Box[T] with Named {
     value T
+}
 
+impl Box[T] {
     impl def label() Str = "box"
 }
 ```
@@ -471,6 +477,10 @@ record Amount with Named {
     value Int
     label Str
 }
+
+impl Amount {
+    impl def label() Str = label
+}
 ```
 
 Interfaces:
@@ -488,6 +498,9 @@ interface Named {
 }
 
 class Box with Named {
+}
+
+impl Box {
     impl def label() Str = "box"
 }
 ```

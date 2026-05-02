@@ -6,7 +6,9 @@
 
 class Vec {
     private items Array[Int] := ?
+}
 
+impl Vec {
     def this(left Int, right Int) {
         this.items := Array(2)
         this.items[0] := left

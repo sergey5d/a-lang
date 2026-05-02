@@ -7,7 +7,9 @@ class ArrayListIterator[T] with Iterator[T] {
     private items Array[T] := ?
     private limit Int := ?
     private index Int := 0
+}
 
+impl ArrayListIterator[T] {
     def this(items Array[T], limit Int) {
         this.items := items
         this.limit := limit
@@ -25,7 +27,9 @@ class ArrayListIterator[T] with Iterator[T] {
 class ArrayList[T] with Iterable[T] {
     private items Array[T] := ?
     private count Int := 0
+}
 
+impl ArrayList[T] {
     def this(capacity Int) {
         this.items := Array(capacity)
     }

@@ -3,27 +3,27 @@ package parser
 import "fmt"
 
 func (p *Parser) parseClass() (*ClassDecl, error) {
-	return p.parseClassLike(TokenClass, false, false, "class")
+	return p.parseClassLike(TokenClass, false, false, "class", false)
 }
 
 func (p *Parser) parseObject() (*ClassDecl, error) {
-	return p.parseClassLike(TokenObject, false, false, "object")
+	return p.parseClassLike(TokenObject, false, false, "object", true)
 }
 
 func (p *Parser) parseRecord() (*ClassDecl, error) {
-	return p.parseClassLike(TokenRecord, true, false, "record")
+	return p.parseClassLike(TokenRecord, true, false, "record", false)
 }
 
 func (p *Parser) parsePrivateClass() (*ClassDecl, error) {
-	return p.parseClassLike(TokenClass, false, true, "class")
+	return p.parseClassLike(TokenClass, false, true, "class", false)
 }
 
 func (p *Parser) parsePrivateObject() (*ClassDecl, error) {
-	return p.parseClassLike(TokenObject, false, true, "object")
+	return p.parseClassLike(TokenObject, false, true, "object", true)
 }
 
 func (p *Parser) parsePrivateRecord() (*ClassDecl, error) {
-	return p.parseClassLike(TokenRecord, true, true, "record")
+	return p.parseClassLike(TokenRecord, true, true, "record", false)
 }
 
 func (p *Parser) parseEnum() (*ClassDecl, error) {
@@ -91,7 +91,7 @@ func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 	return decl, nil
 }
 
-func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun string) (*ClassDecl, error) {
+func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun string, allowInlineMethods bool) (*ClassDecl, error) {
 	start, err := p.consume(kind, "expected '"+noun+"'")
 	if err != nil {
 		return nil, err
@@ -134,6 +134,9 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 			}
 			decl.Fields = append(decl.Fields, field)
 		case TokenDef, TokenImpl:
+			if !allowInlineMethods {
+				return nil, fmt.Errorf("%s methods must be declared in top-level impl blocks", noun)
+			}
 			sawMethod = true
 			method, err := p.parseMethodLike(private, false)
 			if err != nil {

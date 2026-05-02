@@ -2,7 +2,9 @@ record IntRange with Iterable[Int] {
     start Int
     end Int
     step Int
+}
 
+impl IntRange {
     impl def iterator() Iterator[Int] = RangeIterator(start = start, end = end, step = step)
 
     def zip[X](other List[X]) List[(Int, X)] {
@@ -32,7 +34,9 @@ private class RangeIterator with Iterator[Int] {
     current Int := ?
     end Int := ?
     step Int := ?
+}
 
+impl RangeIterator {
     def this(start Int, end Int, step Int) {
         this.current := start
         this.end := end

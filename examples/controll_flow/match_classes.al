@@ -7,10 +7,16 @@ interface WorkerLike {
 }
 
 class Worker with WorkerLike {
+}
+
+impl Worker {
     impl def doWork() Int = 7
 }
 
 class Other with WorkerLike {
+}
+
+impl Other {
     impl def doWork() Int = 3
 }
 

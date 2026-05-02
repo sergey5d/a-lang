@@ -764,6 +764,9 @@ func TestParseExtendedImportForms(t *testing.T) {
 func TestParseMethodWithoutReturnType(t *testing.T) {
 	src := `
 class Counter {
+}
+
+impl Counter {
 	def touch() {
 		1
 	}
@@ -787,7 +790,9 @@ func TestParseThisConstructorAndFieldOrder(t *testing.T) {
 	src := `
 class Counter {
 	count Int
+}
 
+impl Counter {
 	def this(seed Int) {
 		this(count = seed)
 	}
@@ -805,13 +810,16 @@ class Counter {
 
 	bad := `
 class Broken {
-	def run() Unit {
-	}
 	count Int
 }
+
+impl Broken {
+	def run() Unit {
+	}
+}
 `
-	if _, err := Parse(bad); err == nil {
-		t.Fatalf("expected parse error for field after method")
+	if _, err := Parse(bad); err != nil {
+		t.Fatalf("expected impl form to parse, got %v", err)
 	}
 }
 
@@ -820,6 +828,9 @@ func TestParseExpressionBodiedDefs(t *testing.T) {
 def suffix(value Str) Str = value + "!"
 
 class Counter {
+}
+
+impl Counter {
 	def value() Int = 1
 }
 `
@@ -851,6 +862,9 @@ func TestParseExplicitUnitDefs(t *testing.T) {
 def printIt() Unit = OS.println("x")
 
 class Counter {
+}
+
+impl Counter {
 	def print() Unit = OS.println("y")
 }
 `
@@ -916,6 +930,9 @@ def top() = {
 }
 
 class Counter {
+}
+
+impl Counter {
 	def method() = {
 		1
 	}
@@ -1184,7 +1201,9 @@ interface Stringable {
 
 class Box[T] with Mapper[T, Stringable] {
 	private value T
+}
 
+impl Box[T] {
 	def this(value T) {
 		this.value = value
 	}
@@ -1197,7 +1216,9 @@ class Box[T] with Mapper[T, Stringable] {
 class SolidWork with Stringable {
 	private a List[Int]
 	private b Map[Str, Bool] := ?
+}
 
+impl SolidWork {
 	def this(a Int, b Bool) {
 		this.a = a
 		this.b = b
@@ -1280,7 +1301,9 @@ func TestParseRecordDecl(t *testing.T) {
 record Amount {
 	amount Int
 	description Str
+}
 
+impl Amount {
 	def label() Str = description
 }
 `
@@ -1325,6 +1348,9 @@ func TestParseGenericFunctionAndMethodDecl(t *testing.T) {
 def id[T](value T) T = value
 
 class Mapper {
+}
+
+impl Mapper {
 	def map[X](value Int, fn Int -> X) X {
 		fn(value)
 	}
@@ -1356,7 +1382,9 @@ def sort[T with Ordering[T]](value T) T = value
 
 class Box[T with Ordering[T]] {
 	value T
+}
 
+impl Box[T] {
 	def map[X with Eq[X]](fn T -> X) X = fn(value)
 }
 `
@@ -1402,6 +1430,9 @@ interface Addable[T] {
 }
 
 class Vec {
+}
+
+impl Vec {
 	def [](index Int) Int = 0
 	impl def +(other Vec) Vec = this
 	def -() Vec = this
@@ -1439,6 +1470,9 @@ class Vec {
 func TestParsePrivateClassDecl(t *testing.T) {
 	src := `
 private class Hidden {
+}
+
+impl Hidden {
 	def value() Int = 1
 }
 `
@@ -2061,7 +2095,9 @@ interface Pairer[K, V] {
 
 class Store[T] {
 	values List[T]
+}
 
+impl Store[T] {
 	def init(values List[T]) {
 	}
 }

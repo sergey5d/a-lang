@@ -4,7 +4,9 @@
 
 class Adder {
     amount Int
+}
 
+impl Adder {
     def apply(value Int) Int = amount + value
 }
 

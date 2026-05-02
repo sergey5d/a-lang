@@ -8,6 +8,9 @@
 # 0
 
 class Formatter {
+}
+
+impl Formatter {
 	def format(prefix Str, value Int) Str {
 		return prefix + value
 	}

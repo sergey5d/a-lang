@@ -2,7 +2,9 @@ class Result[T, E] with Unwrappable[T] {
     private ok Bool := ?
     private value T := ?
     private error E := ?
+}
 
+impl Result[T, E] {
     def isOk() Bool = ok
 
     def isErr() Bool = !ok

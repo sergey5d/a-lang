@@ -46,7 +46,9 @@ Before running, the CLI always:
 ```txt
 class Counter {
 	private count Int := ?
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}

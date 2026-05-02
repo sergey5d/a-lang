@@ -2,7 +2,9 @@ class Either[L, R] with Unwrappable[R] {
     private rightSet Bool := ?
     private left L := ?
     private right R := ?
+}
 
+impl Either[L, R] {
     def isLeft() Bool = !rightSet
     def isRight() Bool = rightSet
     impl def isFailure() Bool = !rightSet

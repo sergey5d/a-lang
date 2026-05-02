@@ -12,6 +12,9 @@ interface Jumper {
 }
 
 class Rabbit with Hopper, Jumper {
+}
+
+impl Rabbit {
     impl def hop() Str = "hop"
 
     impl def jump(steps Int) Str = "jump " + steps

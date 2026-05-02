@@ -337,7 +337,9 @@ func TestAnalyzeConstructorFieldAssignmentAllowsEquals(t *testing.T) {
 	src := `
 class Box {
 	value Int
+}
 
+impl Box {
 	def this(value Int) {
 		this.value = value
 	}
@@ -434,7 +436,9 @@ func TestAnalyzeClassMembersAndConstructors(t *testing.T) {
 	src := `
 class Counter {
 	private count Int := ?
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -463,7 +467,9 @@ class Counter {
 	count Int
 	label Str
 	private seen Bool := false
+}
 
+impl Counter {
 	def this(seed Int) {
 		this(count = seed, label = "ok")
 	}
@@ -704,7 +710,9 @@ func TestAnalyzeClassApplyCall(t *testing.T) {
 	src := `
 class Adder {
 	amount Int
+}
 
+impl Adder {
 	def apply(value Int) Int = amount + value
 }
 
@@ -724,7 +732,9 @@ func TestAnalyzeRecordApplyCall(t *testing.T) {
 	src := `
 record Adder {
 	amount Int
+}
 
+impl Adder {
 	def apply(value Int) Int = amount + value
 }
 
@@ -746,6 +756,9 @@ func TestAnalyzeModuleAllowsPrivateClassWithinSamePackage(t *testing.T) {
 package app
 
 private class Hidden {
+}
+
+impl Hidden {
 	def value() Int = 7
 }
 `)
@@ -776,6 +789,9 @@ func TestAnalyzeModuleRejectsPrivateClassAcrossPackages(t *testing.T) {
 package lib
 
 private class Hidden {
+}
+
+impl Hidden {
 	def value() Int = 7
 }
 `)
@@ -884,10 +900,16 @@ interface Named {
 }
 
 class A with Named {
+}
+
+impl A {
 	impl def label() Str = "A"
 }
 
 class B with Named {
+}
+
+impl B {
 	impl def label() Str = "B"
 }
 
@@ -931,6 +953,9 @@ interface Stringable {
 }
 
 class Good with Stringable {
+}
+
+impl Good {
 	def init() {
 	}
 
@@ -940,6 +965,9 @@ class Good with Stringable {
 }
 
 class Bad with Stringable {
+}
+
+impl Bad {
 	def init() {
 	}
 }
@@ -961,6 +989,9 @@ interface Stringable {
 }
 
 class Bad with Stringable {
+}
+
+impl Bad {
 	def show() Str {
 		return "ok"
 	}
@@ -990,6 +1021,9 @@ interface Acrobat with Hopper, Jumper {
 }
 
 class Rabbit with Acrobat {
+}
+
+impl Rabbit {
 	impl def hop() Str = "hop"
 	impl def jump(steps Int) Str = "jump " + steps
 }
@@ -1010,7 +1044,9 @@ func TestAnalyzeImmutableFieldAssignmentInConstructor(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -1031,7 +1067,9 @@ func TestAnalyzeImmutableFieldAssignmentInInitMethodFails(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
+}
 
+impl Counter {
 	def init(count Int) {
 		this.count = count
 	}
@@ -1054,7 +1092,9 @@ func TestAnalyzeImmutableFieldAssignmentOutsideConstructor(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -1079,7 +1119,9 @@ func TestAnalyzePrivateAccessOutsideClass(t *testing.T) {
 	src := `
 class SecretBox {
 	private value Int
+}
 
+impl SecretBox {
 	def this(value Int) {
 		this.value = value
 	}
@@ -1112,7 +1154,9 @@ func TestAnalyzePrivateAccessInsideClass(t *testing.T) {
 	src := `
 class SecretBox {
 	private value Int
+}
 
+impl SecretBox {
 	def this(value Int) {
 		this.value = value
 	}
@@ -1137,7 +1181,9 @@ func TestAnalyzeMethodOverloadResolution(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -1171,7 +1217,9 @@ func TestAnalyzeNoMatchingMethodOverload(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -1200,7 +1248,9 @@ func TestAnalyzeMethodReferenceWithoutCall(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -1230,7 +1280,9 @@ func TestAnalyzeDuplicateConstructorOverload(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -1271,7 +1323,9 @@ func TestAnalyzeConstructorMustInitializeImmutableFields(t *testing.T) {
 class Counter {
 	private count Int
 	private seen Bool := ?
+}
 
+impl Counter {
 	def this() {
 		this.seen = false
 	}
@@ -1340,7 +1394,9 @@ func TestAnalyzeLambdaCanUseEnclosingGenericType(t *testing.T) {
 	src := `
 class Box[T] {
 	private value T
+}
 
+impl Box[T] {
 	def this(value T) {
 		this.value = value
 	}
@@ -1394,6 +1450,9 @@ func TestAnalyzeGenericFunctionAndMethodCalls(t *testing.T) {
 def id[T](value T) T = value
 
 class Mapper {
+}
+
+impl Mapper {
 	def map[X](value Int, fn Int -> X) X {
 		fn(value)
 	}
@@ -1433,7 +1492,9 @@ func TestAnalyzeEqSupportsClassEquality(t *testing.T) {
 	src := `
 class Counter with Eq[Counter] {
 	private count Int
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -1460,7 +1521,9 @@ func TestAnalyzeClassEqualityRequiresEq(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -1713,7 +1776,9 @@ func TestAnalyzeCustomAndCollectionOperators(t *testing.T) {
 	src := `
 class Vec {
 	private items Array[Int] := ?
+}
 
+impl Vec {
 	def this(left Int, right Int) {
 		this.items := Array(2)
 		this.items[0] := left
@@ -1763,6 +1828,9 @@ class Box[T with Ordering[T]] {
 }
 
 class Mapper {
+}
+
+impl Mapper {
 	def pick[X with Ordering[X]](value X) X = value
 }
 
@@ -2009,6 +2077,9 @@ def run() Bool {
 func TestAnalyzeNamedCallArguments(t *testing.T) {
 	src := `
 class Counter {
+}
+
+impl Counter {
 	def set(value Int, label Str) Int {
 		return value
 	}

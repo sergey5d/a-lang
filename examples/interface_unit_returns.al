@@ -11,6 +11,9 @@ interface ImplicitPrinter {
 }
 
 class Printer with ExplicitPrinter, ImplicitPrinter {
+}
+
+impl Printer {
     impl def printExplicit() {
         OS.println("explicit")
     }

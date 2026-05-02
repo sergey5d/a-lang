@@ -3,7 +3,9 @@
 
 record Bad {
     value Int
+}
 
+impl Bad {
     def this(value Int) {
         this(value = value)
     }

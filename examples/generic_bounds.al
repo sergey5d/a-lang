@@ -11,6 +11,9 @@ class Box[T with Ordering[T]] {
 }
 
 class Mapper {
+}
+
+impl Mapper {
     def pick[X with Ordering[X]](value X) X = value
 }
 

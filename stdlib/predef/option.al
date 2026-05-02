@@ -1,7 +1,9 @@
 class Option[T] with Unwrappable[T] {
     private set Bool := ?
     private value T := ?
+}
 
+impl Option[T] {
     def this() {
         this.set = false
     }

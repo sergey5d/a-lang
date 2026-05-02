@@ -7,7 +7,9 @@ package user
 class Person {
     name Str
     age Int
+}
 
+impl Person {
     def name() Str = name
 
     def age() Int = age

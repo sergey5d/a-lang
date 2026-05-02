@@ -25,7 +25,9 @@ record Amount with Hopper, Jumper {
     amount Int
     description Str
     count Int
+}
 
+impl Amount {
     def multiple(other Amount) Amount = Amount(
         amount = this.amount * other.amount,
         description = this.description + " " + other.description,

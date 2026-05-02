@@ -288,7 +288,9 @@ func TestClassesAndMethods(t *testing.T) {
 	src := `
 class Counter {
 	private count Int := ?
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -319,6 +321,9 @@ def run() Int {
 func TestMethodOverloadDispatch(t *testing.T) {
 	src := `
 class Adder {
+}
+
+impl Adder {
 	def add(value Int) Int {
 		return value + 1
 	}
@@ -348,7 +353,9 @@ func TestMethodWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
 	src := `
 class Counter {
 	private count Int := ?
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -377,6 +384,9 @@ def run() Bool {
 func TestExpressionBodiedMethod(t *testing.T) {
 	src := `
 class Counter {
+}
+
+impl Counter {
 	def value() Int = 7
 }
 
@@ -471,10 +481,16 @@ interface WorkerLike {
 }
 
 class Worker with WorkerLike {
+}
+
+impl Worker {
 	impl def doWork() Int = 7
 }
 
 class Other with WorkerLike {
+}
+
+impl Other {
 	impl def doWork() Int = 3
 }
 
@@ -720,6 +736,9 @@ def run() Int {
 func TestVariadicFunctionAndMethod(t *testing.T) {
 	src := `
 class Printer {
+}
+
+impl Printer {
 	def count(values Str...) Int = values.size()
 }
 
@@ -792,6 +811,9 @@ def run() Int {
 func TestTupleDestructuringAfterMethodReturn(t *testing.T) {
 	src := `
 class Counter {
+}
+
+impl Counter {
 	def pair() (Int, Int) = (2, 3)
 }
 
@@ -816,7 +838,9 @@ func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {
 	private count Int := ?
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -887,7 +911,9 @@ func TestClassEqualityUsesEquals(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
+}
 
+impl Counter {
 	def this(count Int) {
 		this.count = count
 	}
@@ -1014,7 +1040,9 @@ func TestCustomAndCollectionOperators(t *testing.T) {
 	src := `
 class Vec {
 	private items Array[Int] := ?
+}
 
+impl Vec {
 	def this(left Int, right Int) {
 		this.items := Array(2)
 		this.items[0] := left
@@ -1395,6 +1423,9 @@ interface Acrobat with Hopper, Jumper {
 }
 
 class Rabbit with Acrobat {
+}
+
+impl Rabbit {
 	impl def hop() Str = "hop"
 	impl def jump(steps Int) Str = "jump " + steps
 }
@@ -1571,6 +1602,9 @@ def run() Str {
 func TestNamedCallArguments(t *testing.T) {
 	src := `
 class Counter {
+}
+
+impl Counter {
 	def set(value Int, label Str) Int {
 		return value
 	}
@@ -1671,7 +1705,9 @@ func TestClassApplyCall(t *testing.T) {
 	src := `
 class Adder {
 	amount Int
+}
 
+impl Adder {
 	def apply(value Int) Int = amount + value
 }
 
@@ -1695,7 +1731,9 @@ func TestRecordApplyCall(t *testing.T) {
 	src := `
 record Adder {
 	amount Int
+}
 
+impl Adder {
 	def apply(value Int) Int = amount + value
 }
 
@@ -1721,7 +1759,9 @@ class Counter {
 	count Int
 	label Str
 	private seen Bool := false
+}
 
+impl Counter {
 	def this(seed Int) {
 		this(count = seed, label = "ok")
 	}

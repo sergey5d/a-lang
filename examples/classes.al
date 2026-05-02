@@ -9,7 +9,9 @@ class A {
     name Str
 
     private malnutritioned Bool := false
+}
 
+impl A {
     # explicit call to primary constructor
     def this(maturity Int) = this(maturity - 15, "5")
 
@@ -34,7 +36,9 @@ class B {
     private unassigned Float := ?
     # not yet initialized immutable variable (syntax is for consistency only)
     private questionable Int = ?
+}
 
+impl B {
     def this(age Int, name Str) {
         this.age = age
         this.name = name

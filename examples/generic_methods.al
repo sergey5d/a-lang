@@ -6,6 +6,9 @@
 def id[T](value T) T = value
 
 class Mapper {
+}
+
+impl Mapper {
     def map[X](value Int, fn Int -> X) X {
         fn(value)
     }
