@@ -26,14 +26,19 @@ Examples:
 
 This would let `match` express more of the current destructuring story directly inside patterns.
 
-## 3. Generic-Aware Extraction
+## 3. Generic-Aware Type Patterns
 
-Matching should become smarter when generic types are involved, especially for:
+Constructor and extractor patterns already carry substituted field types correctly, but type-pattern matching still needs a clearer generic story, especially for:
 
-- enum cases with type parameters
-- records/classes carrying generic fields
+- generic classes behind interface-typed values
+- generic enums behind wider typed values
+- distinguishing `Box[Int]` from `Box[Str]` when the runtime currently does not preserve explicit type arguments on instances
 
-This is mostly about making the existing pattern model work correctly and predictably with richer type information.
+This is now mostly about deciding whether generic type patterns should:
+
+- behave with erased runtime semantics
+- inspect payload or field values structurally where possible
+- or preserve concrete type arguments on runtime instances
 
 ## 4. Unreachable-Case Detection
 

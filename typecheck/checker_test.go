@@ -277,6 +277,37 @@ def run(value PairBox) Int {
 	}
 }
 
+func TestAnalyzeMatchGenericEnumAndClassExtractor(t *testing.T) {
+	src := `
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+class Box[T] {
+	value T
+}
+
+def unwrapSome(value OptionX[Int]) Int =
+	match value {
+		SomeX(x) => x + 1
+		OptionX.NoneX => 0
+	}
+
+def unwrapBox(value Box[Int]) Int =
+	match value {
+		Box(x) => x + 2
+	}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeMatchRecordExtractor(t *testing.T) {
 	src := `
 record Amount {

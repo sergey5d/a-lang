@@ -571,6 +571,45 @@ def run() Int {
 	}
 }
 
+func TestMatchGenericEnumAndClassExtractor(t *testing.T) {
+	src := `
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+class Box[T] {
+	value T
+}
+
+def unwrapSome(value OptionX[Int]) Int =
+	match value {
+		SomeX(x) => x + 1
+		OptionX.NoneX => 0
+	}
+
+def unwrapBox(value Box[Int]) Int =
+	match value {
+		Box(x) => x + 2
+	}
+
+def run() Int {
+	return unwrapSome(OptionX.SomeX(7)) * 10 + unwrapBox(Box(5))
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(87) {
+		t.Fatalf("expected 87, got %#v", value)
+	}
+}
+
 func TestMatchRecordExtractor(t *testing.T) {
 	src := `
 record Amount {

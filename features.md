@@ -14,7 +14,7 @@ This file captures the main language gaps and near-term design directions.
 - simple type patterns
 
 Still missing:
-- generic type-aware matching / extraction
+- generic type-aware type patterns at runtime
 - guards
 - nested patterns
 - unreachable-case detection
@@ -25,9 +25,9 @@ Still missing:
 ### 2. Enum Ergonomics
 
 Enums exist, but they still want:
-- better generic pattern ergonomics
+- better generic type-pattern ergonomics
 
-Now that `match` exists and enum exhaustiveness is checked, the biggest remaining enum work is more expressive generic-pattern support.
+Now that `match` exists and enum exhaustiveness is checked, the biggest remaining enum work is more expressive generic type-pattern support.
 
 ### 3. Derived Protocols
 
