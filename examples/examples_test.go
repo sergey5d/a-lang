@@ -49,29 +49,27 @@ func TestExamples(t *testing.T) {
 			continue
 		}
 		t.Run(name, func(t *testing.T) {
-			t.Logf("running %s", name)
 			expectedOutput, outputErr := parseExpectedOutput(src)
 			expectedFailure, failureErr := parseExpectedFailure(src)
 			expectedFailureRegex, failureRegexErr := parseExpectedFailureRegex(src)
 			switch {
 			case countDefined(outputErr == nil, failureErr == nil, failureRegexErr == nil) > 1:
-				t.Fatalf("example %s cannot declare more than one of # EXPECT, # FAIL, or # FAIL_REGEX", name)
+				t.Fatalf("FAILURE in %s\nexample cannot declare more than one of # EXPECT, # FAIL, or # FAIL_REGEX", name)
 			case outputErr == errMissingExpectedHeader && failureErr == errMissingFailureHeader && failureRegexErr == errMissingFailureRegexHeader:
 				t.Skipf("skipping %s: no # EXPECT, # FAIL, or # FAIL_REGEX header", name)
 			case outputErr != nil && outputErr != errMissingExpectedHeader:
-				t.Fatalf("parseExpectedOutput returned error: %v", outputErr)
+				t.Fatalf("FAILURE in %s\nparseExpectedOutput returned error: %v", name, outputErr)
 			case failureErr != nil && failureErr != errMissingFailureHeader:
-				t.Fatalf("parseExpectedFailure returned error: %v", failureErr)
+				t.Fatalf("FAILURE in %s\nparseExpectedFailure returned error: %v", name, failureErr)
 			case failureRegexErr != nil && failureRegexErr != errMissingFailureRegexHeader:
-				t.Fatalf("parseExpectedFailureRegex returned error: %v", failureRegexErr)
+				t.Fatalf("FAILURE in %s\nparseExpectedFailureRegex returned error: %v", name, failureRegexErr)
 			}
 
 			if failureErr == nil {
 				actualFailure := runExampleFailure(path)
 				if normalizeExampleOutput(actualFailure) != normalizeExampleOutput(expectedFailure) {
-					t.Fatalf("example %s failed differently than expected\nexpected failure:\n%s\nactual failure:\n%s", name, expectedFailure, actualFailure)
+					t.Fatalf("FAILURE in %s\nexpected failure:\n%s\nactual failure:\n%s", name, expectedFailure, actualFailure)
 				}
-				t.Logf("passed %s", name)
 				return
 			}
 			if failureRegexErr == nil {
@@ -79,12 +77,11 @@ func TestExamples(t *testing.T) {
 				pattern := "(?s)^" + expectedFailureRegex + "$"
 				matched, err := regexp.MatchString(pattern, actualFailure)
 				if err != nil {
-					t.Fatalf("invalid failure regex: %v", err)
+					t.Fatalf("FAILURE in %s\ninvalid failure regex: %v", name, err)
 				}
 				if !matched {
-					t.Fatalf("example %s failed differently than expected\nexpected failure regex:\n%s\nactual failure:\n%s", name, expectedFailureRegex, actualFailure)
+					t.Fatalf("FAILURE in %s\nexpected failure regex:\n%s\nactual failure:\n%s", name, expectedFailureRegex, actualFailure)
 				}
-				t.Logf("passed %s", name)
 				return
 			}
 
@@ -93,12 +90,12 @@ func TestExamples(t *testing.T) {
 				if outputErr == errMissingExpectedHeader {
 					t.Skipf("skipping %s: no # EXPECT header", name)
 				}
-				t.Fatalf("parseExpectedOutput returned error: %v", outputErr)
+				t.Fatalf("FAILURE in %s\nparseExpectedOutput returned error: %v", name, outputErr)
 			}
 
 			loaded, err := module.Load(path)
 			if err != nil {
-				t.Fatalf("example %s failed to load: %v", name, err)
+				t.Fatalf("FAILURE in %s\nload error: %v", name, err)
 			}
 			diagnostics := semantic.AnalyzeModule(loaded)
 			typeResult := typecheck.AnalyzeModule(loaded)
@@ -108,7 +105,7 @@ func TestExamples(t *testing.T) {
 				for _, diagnostic := range diagnostics {
 					messages = append(messages, diagnostic.Error())
 				}
-				t.Fatalf("example %s produced diagnostics:\n%s", name, strings.Join(messages, "\n"))
+				t.Fatalf("FAILURE in %s\ndiagnostics:\n%s", name, strings.Join(messages, "\n"))
 			}
 
 			oldStdout := os.Stdout
@@ -136,9 +133,8 @@ func TestExamples(t *testing.T) {
 			}
 
 			if normalizeExampleOutput(actual) != normalizeExampleOutput(expected) {
-				t.Fatalf("example %s produced unexpected output\nexpected:\n%s\nactual:\n%s", name, expected, actual)
+				t.Fatalf("FAILURE in %s\nunexpected output\nexpected:\n%s\nactual:\n%s", name, expected, actual)
 			}
-			t.Logf("passed %s", name)
 		})
 	}
 }
