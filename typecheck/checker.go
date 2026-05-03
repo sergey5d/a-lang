@@ -1228,22 +1228,22 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		}
 	case *parser.GuardStmt:
 		if len(c.returnTypes) == 0 {
-			c.addDiagnostic("invalid_guard", "guard used outside callable body", s.Span)
+			c.addDiagnostic("invalid_unwrap", "unwrap used outside callable body", s.Span)
 			return
 		}
-		c.checkUnwrapBindings(s.Bindings, s.Value, s.Span, false, nil, "invalid_guard", "guard binding")
+		c.checkUnwrapBindings(s.Bindings, s.Value, s.Span, false, nil, "invalid_unwrap", "unwrap binding")
 		c.checkGuardFallbackBlock(s.Fallback, c.returnTypes[len(c.returnTypes)-1])
 	case *parser.GuardBlockStmt:
 		if len(c.returnTypes) == 0 {
-			c.addDiagnostic("invalid_guard", "guard used outside callable body", s.Span)
+			c.addDiagnostic("invalid_unwrap", "unwrap used outside callable body", s.Span)
 			return
 		}
 		c.checkGuardFallbackBlock(s.Fallback, c.returnTypes[len(c.returnTypes)-1])
 		if len(s.Clauses) == 0 {
-			c.addDiagnostic("invalid_guard", "guard block must contain at least one '<-' binding", s.Span)
+			c.addDiagnostic("invalid_unwrap", "unwrap block must contain at least one '<-' binding", s.Span)
 		}
 		for _, clause := range s.Clauses {
-			c.checkUnwrapBindings(clause.Bindings, clause.Value, clause.Span, false, nil, "invalid_guard", "guard binding")
+			c.checkUnwrapBindings(clause.Bindings, clause.Value, clause.Span, false, nil, "invalid_unwrap", "unwrap binding")
 		}
 	case *parser.LocalFunctionStmt:
 		sig := Signature{Parameters: make([]*Type, len(s.Function.Parameters)), ReturnType: fromTypeRef(s.Function.ReturnType, c), Variadic: len(s.Function.Parameters) > 0 && s.Function.Parameters[len(s.Function.Parameters)-1].Variadic}
@@ -1728,7 +1728,7 @@ func (c *Checker) checkBlockResult(block *parser.BlockStmt, code, message string
 
 func (c *Checker) checkGuardFallbackBlock(block *parser.BlockStmt, expected *Type) {
 	if block == nil || len(block.Statements) == 0 {
-		c.addDiagnostic("invalid_guard", "guard block must return a value", blockSpan(block))
+		c.addDiagnostic("invalid_unwrap", "unwrap else block must return a value", blockSpan(block))
 		return
 	}
 	for i := 0; i < len(block.Statements)-1; i++ {
@@ -1739,9 +1739,9 @@ func (c *Checker) checkGuardFallbackBlock(block *parser.BlockStmt, expected *Typ
 		c.checkStmt(ret)
 		return
 	}
-	valueType := c.checkStmtResultWithExpected(last, expected, "invalid_guard", "guard block must end with a value-producing statement")
+	valueType := c.checkStmtResultWithExpected(last, expected, "invalid_unwrap", "unwrap else block must end with a value-producing statement")
 	if !isUnknown(expected) && !isUnknown(valueType) {
-		c.requireAssignable(valueType, expected, stmtSpan(last), "invalid_guard", "guard block value must be assignable to "+expected.String())
+		c.requireAssignable(valueType, expected, stmtSpan(last), "invalid_unwrap", "unwrap else block value must be assignable to "+expected.String())
 	}
 }
 

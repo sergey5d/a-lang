@@ -2348,17 +2348,17 @@ def run(value Option[Int]) Result[Int, Str] {
 	fn := program.Functions[0]
 	stmt, ok := fn.Body.Statements[0].(*GuardStmt)
 	if !ok {
-		t.Fatalf("expected first statement to be guard, got %T", fn.Body.Statements[0])
+		t.Fatalf("expected first statement to be unwrap-with-else, got %T", fn.Body.Statements[0])
 	}
 	if stmt.Fallback == nil || len(stmt.Fallback.Statements) != 1 {
-		t.Fatalf("expected fallback block on guard statement")
+		t.Fatalf("expected fallback block on unwrap statement")
 	}
 }
 
-func TestParseGuardBlockStmt(t *testing.T) {
+func TestParseUnwrapBlockElseStmt(t *testing.T) {
 	src := `
 def run(b Option[Int], d Option[Int]) Result[Int, Str] {
-	guard {
+	unwrap {
 		a <- b
 		c <- d
 	} else {
@@ -2376,10 +2376,10 @@ def run(b Option[Int], d Option[Int]) Result[Int, Str] {
 	fn := program.Functions[0]
 	stmt, ok := fn.Body.Statements[0].(*GuardBlockStmt)
 	if !ok {
-		t.Fatalf("expected first statement to be guard block, got %T", fn.Body.Statements[0])
+		t.Fatalf("expected first statement to be unwrap-else block, got %T", fn.Body.Statements[0])
 	}
 	if len(stmt.Clauses) != 2 {
-		t.Fatalf("expected 2 guard clauses, got %d", len(stmt.Clauses))
+		t.Fatalf("expected 2 unwrap clauses, got %d", len(stmt.Clauses))
 	}
 }
 

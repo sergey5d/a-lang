@@ -536,7 +536,7 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			return nil, nil, err
 		}
 		if !ok {
-			value, signal, err := in.evalBlockValue(s.Fallback, local, self, "guard block must end with a value-producing statement")
+			value, signal, err := in.evalBlockValue(s.Fallback, local, self, "unwrap else block must end with a value-producing statement")
 			if err != nil || signal != nil {
 				return nil, signal, err
 			}
@@ -551,7 +551,7 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 				return nil, nil, err
 			}
 			if !ok {
-				value, signal, err := in.evalBlockValue(s.Fallback, fallbackEnv, self, "guard block must end with a value-producing statement")
+				value, signal, err := in.evalBlockValue(s.Fallback, fallbackEnv, self, "unwrap else block must end with a value-producing statement")
 				if err != nil || signal != nil {
 					return nil, signal, err
 				}

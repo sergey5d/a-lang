@@ -2481,7 +2481,7 @@ def run(value Option[Int]) Result[Int, Str] {
 	if len(result.Diagnostics) == 0 {
 		t.Fatalf("expected diagnostics, got none")
 	}
-	if result.Diagnostics[0].Code != "invalid_guard" {
+	if result.Diagnostics[0].Code != "invalid_unwrap" {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }
@@ -2489,7 +2489,7 @@ def run(value Option[Int]) Result[Int, Str] {
 func TestAnalyzeGuardBlockStmt(t *testing.T) {
 	src := `
 def run(left Option[Int], right Option[Int]) Result[Int, Str] {
-	guard {
+	unwrap {
 		a <- left
 		b <- right
 	} else {
@@ -2525,7 +2525,7 @@ def run(left Option[Int], right Option[Int]) Option[Int] {
 func TestAnalyzeGuardBlockStmtRejectsWrongElseType(t *testing.T) {
 	src := `
 def run(left Option[Int]) Result[Int, Str] {
-	guard {
+	unwrap {
 		a <- left
 	} else {
 		Some(0)
@@ -2538,7 +2538,7 @@ def run(left Option[Int]) Result[Int, Str] {
 	if len(result.Diagnostics) == 0 {
 		t.Fatalf("expected diagnostics, got none")
 	}
-	if result.Diagnostics[0].Code != "invalid_guard" {
+	if result.Diagnostics[0].Code != "invalid_unwrap" {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }

@@ -697,7 +697,7 @@ else 0
 
 `else` does not require `:`. It accepts either a block or a single-line body.
 
-## `guard`
+## `unwrap`
 
 Single-binding unwrap:
 
@@ -719,10 +719,10 @@ Propagation form:
 unwrap item <- maybeValue
 ```
 
-Multi-binding guard:
+Multi-binding fallback:
 
 ```txt
-guard {
+unwrap {
     left <- maybeLeft
     right <- maybeRight
 } else {
@@ -744,9 +744,9 @@ Rules:
 - `unwrap` is available on unwrap bindings
 - single-binding `unwrap item <- value`, `unwrap item <- value else { ... }`, and `unwrap item <- value else expr` are supported
 - block `unwrap { ... }` runs unwrap bindings in order and returns early on the first failure
-- block `guard { ... } else { ... }` runs unwrap bindings in order
-- if any guard binding fails, the fallback block is evaluated and its final value is implicitly returned from the current callable
-- successful bindings from the block form remain visible after the guard statement
+- block `unwrap { ... } else { ... }` runs unwrap bindings in order
+- if any unwrap binding fails, the fallback block is evaluated and its final value is implicitly returned from the current callable
+- successful bindings from the block form remain visible after the unwrap statement
 
 ## `for`
 

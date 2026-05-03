@@ -94,12 +94,12 @@ Still open:
 - whether there should also be a Rust-style `?`-like propagation form
 - whether failure conversion between result families should ever be supported
 - whether the current `Unwrappable[T]` surface is enough, or needs a richer protocol later
-- whether custom-shape early exit should move from single-binding `guard` syntax toward a block form such as:
-  - `guard { a <- b; c <- d } else { ... }`
-  - `guard { a <- b; c <- d } else match { ... }`
-  - `guard { a <- b; c <- d } fail { ... }`
-- if a block-style `guard` is added:
-  - whether successful `<-` bindings stay visible after the guard block
+- whether custom-shape early exit should use a block form such as:
+  - `unwrap { a <- b; c <- d } else { ... }`
+  - `unwrap { a <- b; c <- d } else match { ... }`
+  - `unwrap { a <- b; c <- d } fail { ... }`
+- if a block-style `unwrap` fallback is added:
+  - whether successful `<-` bindings stay visible after the unwrap block
   - whether only `<-` failures should trigger the fallback block
   - whether the fallback block should implicitly return its final value
   - whether `else match` should bind the failure value explicitly (for example `failure Err[Int] => ...`) and how that should interact across `Option`, `Result`, `Either`, and custom `Unwrappable` types
@@ -107,7 +107,7 @@ Still open:
 Possible shape to revisit:
 
 ```txt
-#guard {
+#unwrap {
 #    current <- node
 #    simple <- current
 #} else match {

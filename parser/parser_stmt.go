@@ -31,8 +31,6 @@ func (p *Parser) parseBlockAfterStart(start Token) (*BlockStmt, error) {
 
 func (p *Parser) parseStatement() (Statement, error) {
 	switch p.peek().Type {
-	case TokenGuard:
-		return p.parseGuardStmt()
 	case TokenIf:
 		return p.parseIfStmt()
 	case TokenTry:
@@ -96,7 +94,7 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 	p.advance()
 	if operator == TokenLeftArrow {
 		if p.unwrapBlockDepth == 0 {
-			return nil, fmt.Errorf("unwrap binding requires 'unwrap', 'guard', 'if', or 'for' context")
+			return nil, fmt.Errorf("unwrap binding requires 'unwrap', 'if', or 'for' context")
 		}
 		if err := p.requireSameLineExpressionStart(p.previous()); err != nil {
 			return nil, err
@@ -145,14 +143,6 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 		}
 	}
 	return stmt, nil
-}
-
-func (p *Parser) parseGuardStmt() (Statement, error) {
-	start := p.advance()
-	if !p.check(TokenLBrace) {
-		return nil, fmt.Errorf("expected '{' after 'guard'")
-	}
-	return p.parseGuardBlockStmt(start)
 }
 
 func (p *Parser) parseUnwrapStmt() (Statement, error) {
@@ -221,55 +211,6 @@ func (p *Parser) isUnwrapStmtStart() bool {
 		return true
 	}
 	return false
-}
-
-func (p *Parser) parseGuardBlockStmt(start Token) (Statement, error) {
-	open, err := p.consume(TokenLBrace, "expected '{' after 'guard'")
-	if err != nil {
-		return nil, err
-	}
-	p.unwrapBlockDepth++
-	defer func() { p.unwrapBlockDepth-- }()
-	var clauses []*UnwrapStmt
-	var declared []string
-	for !p.check(TokenRBrace) && !p.isAtEnd() {
-		stmt, err := p.parseStatement()
-		if err != nil {
-			return nil, err
-		}
-		clause, ok := stmt.(*UnwrapStmt)
-		if !ok {
-			return nil, fmt.Errorf("guard body supports only '<-' unwrap bindings, got %T", stmt)
-		}
-		clauses = append(clauses, clause)
-		for _, binding := range clause.Bindings {
-			if binding.Name != "_" {
-				declared = append(declared, binding.Name)
-			}
-		}
-	}
-	close, err := p.consume(TokenRBrace, "expected '}' after guard body")
-	if err != nil {
-		return nil, err
-	}
-	elseToken, err := p.consume(TokenElse, "expected 'else' after guard body")
-	if err != nil {
-		return nil, err
-	}
-	fallback, err := p.parseOptionalColonStmtBodyBlock(elseToken, "guard else")
-	if err != nil {
-		return nil, err
-	}
-	for _, name := range declared {
-		p.declare(name)
-	}
-	span := mergeSpans(tokenSpan(start), fallback.Span)
-	span = mergeSpans(span, mergeSpans(tokenSpan(open), tokenSpan(close)))
-	return &GuardBlockStmt{
-		Clauses:  clauses,
-		Fallback: fallback,
-		Span:     span,
-	}, nil
 }
 
 func (p *Parser) parseUnwrapBlockStmt(start Token) (Statement, error) {

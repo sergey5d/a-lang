@@ -2075,7 +2075,7 @@ def run() Str {
 func TestGuardBlockStmt(t *testing.T) {
 	src := `
 def runSome(left Option[Int], right Option[Int]) Result[Int, Str] {
-	guard {
+	unwrap {
 		a <- left
 		b <- right
 	} else {
@@ -2085,7 +2085,7 @@ def runSome(left Option[Int], right Option[Int]) Result[Int, Str] {
 }
 
 def runNone(left Option[Int], right Option[Int]) Result[Int, Str] {
-	guard {
+	unwrap {
 		a <- left
 		b <- right
 	} else {

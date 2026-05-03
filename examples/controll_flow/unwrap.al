@@ -21,7 +21,7 @@ def pairwise(left Option[Int], right Option[Str]) { count Int, label Str } = {
 }
 
 def sumBoth(left Option[Int], right Option[Int]) Result[Int, Str] {
-    guard {
+    unwrap {
         a <- left
         b <- right
     } else {
