@@ -2637,6 +2637,30 @@ def run() Bool {
 	}
 }
 
+func TestAnalyzeAnnotatedPartialMatchMap(t *testing.T) {
+	src := `
+enum MaybeInt {
+	case NoneX
+	case SomeX {
+		value Int
+	}
+}
+
+def run() Bool {
+	options List[MaybeInt] = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
+	partialMapped List[Option[Int]] = options.map(try match {
+		SomeX(x) => x + 1
+	})
+	return partialMapped.get(1).getOr(None()).isEmpty()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeUnwrapStmtRejectsNonUnwrappable(t *testing.T) {
 	src := `
 def run(value Int) Option[Int] {

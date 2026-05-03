@@ -1884,7 +1884,7 @@ func (c *Checker) checkMatchStmtResult(s *parser.MatchStmt, code, message string
 		return unknownType
 	}
 	if s.Partial {
-		return &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{resultType}}
+		return c.optionType(resultType)
 	}
 	return resultType
 }
@@ -2089,7 +2089,7 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			break
 		}
 		if e.Partial {
-			result = &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{resultType}}
+			result = c.optionType(resultType)
 		} else {
 			result = resultType
 		}

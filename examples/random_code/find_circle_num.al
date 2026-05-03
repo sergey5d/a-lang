@@ -1,0 +1,144 @@
+# EXPECT:
+# uf 2
+# dfs 2
+# same true
+# uf2 3
+# dfs2 3
+# same2 true
+# 0
+
+class DisjointSet {
+    private arr Array[Int] := ?
+}
+
+impl DisjointSet {
+
+    def this(size Int) {
+        this.arr := Array(size)
+        for i <- Range(0, size) {
+            this.arr[i] := i
+        }
+    }
+
+    def findParent(v Int) Int {
+        current Int := v
+        loop {
+            if arr[current] == current {
+                break
+            }
+            current := arr[current]
+        }
+        return current
+    }
+
+    def union(v1 Int, v2 Int) {
+        v1SelfParent = arr[v1] == v1
+        v2SelfParent = arr[v2] == v2
+
+        if v1SelfParent && v2SelfParent {
+            arr[v2] := v1
+        } else if v1SelfParent {
+            arr[v1] := arr[v2]
+        } else if v2SelfParent {
+            arr[v2] := arr[v1]
+        } else {
+            v1Parent = this.findParent(v1)
+            v2Parent = this.findParent(v2)
+            if v1Parent != v2Parent {
+                arr[v1Parent] := v2Parent
+            }
+        }
+    }
+}
+
+def findCircleNumUnion(isConnected List[List[Int]]) Int {
+    set DisjointSet = DisjointSet(isConnected.size())
+
+    for i <- Range(0, isConnected.size()) {
+        guard row <- isConnected.get(i) else {
+            -1
+        }
+
+        for j <- Range(0, row.size()) {
+            if i != j && row[j] != 0 {
+                set.union(i, j)
+            }
+        }
+    }
+
+    parentSet Set[Int] = Set()
+
+    for i <- Range(0, isConnected.size()) {
+        parentSet.add(set.findParent(i))
+    }
+
+    return parentSet.size()
+}
+
+def findCircleNumTraversal(isConnected List[List[Int]]) Int {
+    directConns Array[Set[Int]] = Array(isConnected.size())
+    for i <- Range(0, directConns.size()) {
+        directConns[i] := Set()
+    }
+
+    for i <- Range(0, isConnected.size()) {
+        guard row <- isConnected.get(i) else {
+            -1
+        }
+
+        for j <- Range(0, row.size()) {
+            if i != j && row[j] != 0 {
+                directConns[i].add(j)
+                directConns[j].add(i)
+            }
+        }
+    }
+
+    areaCount Int := 0
+    visitedAll Set[Int] = Set()
+
+    for i <- Range(0, isConnected.size()) {
+        if !visitedAll.contains(i) {
+            areaCount += 1
+
+            stack List[Int] = List(i)
+
+            for stack.size() != 0 {
+                idx = stack.remove(stack.size() - 1).getOr(-1)
+                if !visitedAll.contains(idx) {
+                    visitedAll.add(idx)
+                    directConns[idx].forEach(next -> stack.append(next))
+                }
+            }
+        }
+    }
+
+    return areaCount
+}
+
+def main() Int {
+    connected1 List[List[Int]] = List(
+        List(1, 1, 0),
+        List(1, 1, 0),
+        List(0, 0, 1)
+    )
+
+    connected2 List[List[Int]] = List(
+        List(1, 0, 0),
+        List(0, 1, 0),
+        List(0, 0, 1)
+    )
+
+    uf1 = findCircleNumUnion(connected1)
+    dfs1 = findCircleNumTraversal(connected1)
+    uf2 = findCircleNumUnion(connected2)
+    dfs2 = findCircleNumTraversal(connected2)
+
+    OS.println("uf " + uf1)
+    OS.println("dfs " + dfs1)
+    OS.println("same " + (uf1 == dfs1))
+    OS.println("uf2 " + uf2)
+    OS.println("dfs2 " + dfs2)
+    OS.println("same2 " + (uf2 == dfs2))
+    0
+}
