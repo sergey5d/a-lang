@@ -171,6 +171,18 @@ Current leaning:
 - keep `impl def` for now because it makes interface implementation explicit
 - but this is still a language-design decision, not fully settled
 
+### `impl` Blocks For Methods
+
+Top-level `impl Type { ... }` blocks exist now for attaching methods to classes, records, and enums, but the language still needs a final decision on whether `impl` should remain required for ordinary methods.
+
+Open question:
+- keep `impl Type { ... }` as the required home for methods on classes/records/enums
+- or allow methods inline in the original type declaration and treat `impl` as optional extra syntax
+
+Current leaning:
+- `impl` looks cleaner for medium and large types because it separates shape from behavior
+- but it should probably remain optional rather than mandatory, because small types often read better when fields and methods stay together
+
 ### Match Totality / Partial Match Behavior
 
 `match` now exists, but the language still needs a clear rule for what happens when no case matches.
