@@ -364,6 +364,66 @@ def run(value WorkerLike) Int {
 	}
 }
 
+func TestAnalyzeMatchErasedGenericTypePattern(t *testing.T) {
+	src := `
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+class Box[T] {
+	value T
+}
+
+def describe(value OptionX[Int]) Int =
+	match value {
+		some OptionX => 1
+	}
+
+def describeBox(value Box[Int]) Int =
+	match value {
+		box Box => 2
+		_ => 0
+	}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeMatchTypePatternRejectsGenericArgs(t *testing.T) {
+	src := `
+class Box[T] {
+	value T
+}
+
+def describe(value Box[Int]) Int =
+	match value {
+		_ Box[Int] => 1
+		_ => 0
+	}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	found := false
+	for _, diag := range result.Diagnostics {
+		if diag.Code == "invalid_match_pattern" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected invalid_match_pattern diagnostic, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeConstructorFieldAssignmentAllowsEquals(t *testing.T) {
 	src := `
 class Box {

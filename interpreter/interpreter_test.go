@@ -515,6 +515,45 @@ def run() Int {
 	}
 }
 
+func TestMatchErasedGenericTypePattern(t *testing.T) {
+	src := `
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+class Box[T] {
+	value T
+}
+
+def describe(value OptionX[Int]) Int =
+	match value {
+		some OptionX => 1
+	}
+
+def describeBox(value Box[Int]) Int =
+	match value {
+		box Box => 2
+		_ => 0
+	}
+
+def run() Int {
+	return describe(OptionX.SomeX(7)) * 10 + describeBox(Box(5))
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(12) {
+		t.Fatalf("expected 12, got %#v", value)
+	}
+}
+
 func TestMatchGuard(t *testing.T) {
 	src := `
 enum OptionX[T] {

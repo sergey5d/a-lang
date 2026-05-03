@@ -812,6 +812,17 @@ Supported pattern families:
 - class/record extractor patterns: `PairBox(left, right)`
 - type patterns: `item Worker`, `_ Other`
 
+Type patterns use erased outer-type matching at runtime. For generic declared types, match on the outer name only:
+
+```txt
+match value {
+    _ Box => ...
+    _ Bag => ...
+}
+```
+
+Generic arguments inside runtime type patterns are intentionally rejected for now, so use `_ Box` rather than `_ Box[Int]`.
+
 Current notes:
 
 - enum exhaustiveness is checked

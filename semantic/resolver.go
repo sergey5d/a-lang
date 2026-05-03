@@ -662,7 +662,7 @@ func (r *Resolver) resolveMatchPattern(pattern parser.Pattern) {
 	case *parser.BindingPattern:
 		r.defineMutable(p.Name, p.Span, false, "duplicate_binding", "duplicate binding '"+p.Name+"'")
 	case *parser.TypePattern:
-		r.resolveTypeRef(p.Target)
+		r.resolveTypePatternRef(p.Target)
 		if p.Name != "" && p.Name != "_" {
 			r.defineMutable(p.Name, p.Span, false, "duplicate_binding", "duplicate binding '"+p.Name+"'")
 		}
@@ -760,6 +760,42 @@ func (r *Resolver) resolveTypeRef(ref *parser.TypeRef) {
 		return
 	}
 	r.addDiagnostic("undefined_type", "undefined type '"+ref.Name+"'", ref.Span)
+}
+
+func (r *Resolver) resolveTypePatternRef(ref *parser.TypeRef) {
+	if ref == nil {
+		return
+	}
+	if len(ref.RecordFields) > 0 || ref.ReturnType != nil || len(ref.TupleElements) > 0 {
+		r.resolveTypeRef(ref)
+		return
+	}
+	for _, arg := range ref.Arguments {
+		r.resolveTypeRef(arg)
+	}
+	if r.typePatternUsesErasedGeneric(ref) {
+		if len(ref.Arguments) != 0 {
+			r.addDiagnostic("invalid_match_pattern", "runtime type patterns cannot specify generic arguments; use the erased outer type", ref.Span)
+		}
+		return
+	}
+	r.resolveTypeRef(ref)
+}
+
+func (r *Resolver) typePatternUsesErasedGeneric(ref *parser.TypeRef) bool {
+	if ref == nil || ref.Name == "" {
+		return false
+	}
+	if arity, ok := builtinTypeArity(ref.Name); ok {
+		return arity > 0
+	}
+	if decl, ok := r.classTypes[ref.Name]; ok {
+		return decl.arity > 0
+	}
+	if decl, ok := r.ifaceTypes[ref.Name]; ok {
+		return decl.arity > 0
+	}
+	return false
 }
 
 func (r *Resolver) resolveTypeParameterBounds(params []parser.TypeParameter) {

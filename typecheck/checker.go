@@ -1414,12 +1414,16 @@ func (c *Checker) checkMatchPattern(pattern parser.Pattern, valueType *Type) {
 	case *parser.BindingPattern:
 		c.define(p.Name, valueType, false)
 	case *parser.TypePattern:
-		targetType := c.resolveDeclaredType(p.Target)
+		targetType := c.resolveTypePatternTarget(p.Target, p.Span)
 		if !isUnknown(valueType) && !c.patternTypeCouldMatch(valueType, targetType) {
 			c.addDiagnostic("invalid_match_pattern", "type pattern does not match value type", p.Span)
 		}
 		if p.Name != "" && p.Name != "_" {
-			c.define(p.Name, targetType, false)
+			bindingType := targetType
+			if c.sameErasedNamedType(valueType, targetType) && len(targetType.Args) == 0 && len(valueType.Args) > 0 {
+				bindingType = valueType
+			}
+			c.define(p.Name, bindingType, false)
 		}
 	case *parser.LiteralPattern:
 		patternType := c.checkExpr(p.Value)
@@ -1479,8 +1483,8 @@ func (c *Checker) patternIsCatchAll(pattern parser.Pattern, valueType *Type) boo
 	case *parser.BindingPattern:
 		return true
 	case *parser.TypePattern:
-		targetType := c.resolveDeclaredType(p.Target)
-		return c.isAssignable(valueType, targetType)
+		targetType := c.resolveTypePatternTarget(p.Target, p.Span)
+		return c.sameErasedNamedType(valueType, targetType) || c.isAssignable(valueType, targetType)
 	default:
 		return false
 	}
@@ -1518,6 +1522,9 @@ func (c *Checker) patternTypeCouldMatch(valueType, targetType *Type) bool {
 	if sameType(valueType, targetType) {
 		return true
 	}
+	if c.sameErasedNamedType(valueType, targetType) {
+		return true
+	}
 	if valueType.Kind == TypeClass && targetType.Kind == TypeClass {
 		if c.isAssignable(valueType, targetType) || c.isAssignable(targetType, valueType) {
 			return true
@@ -1534,6 +1541,87 @@ func (c *Checker) patternTypeCouldMatch(valueType, targetType *Type) bool {
 		}
 	}
 	return false
+}
+
+func (c *Checker) sameErasedNamedType(left, right *Type) bool {
+	if left == nil || right == nil {
+		return false
+	}
+	if left.Kind != right.Kind {
+		return false
+	}
+	switch left.Kind {
+	case TypeClass, TypeInterface:
+		return left.Name == right.Name
+	default:
+		return false
+	}
+}
+
+func (c *Checker) typePatternHasErasedGenericTarget(ref *parser.TypeRef) bool {
+	if ref == nil || ref.Name == "" || len(ref.Arguments) == 0 {
+		return false
+	}
+	if params, ok := c.typeParametersForName(ref.Name); ok {
+		return len(params) > 0
+	}
+	if arity, ok := builtinGenericTypeArity(ref.Name); ok {
+		return arity > 0
+	}
+	return false
+}
+
+func (c *Checker) typePatternUsesErasedGeneric(ref *parser.TypeRef) bool {
+	if ref == nil || ref.Name == "" || len(ref.Arguments) != 0 {
+		return false
+	}
+	if params, ok := c.typeParametersForName(ref.Name); ok {
+		return len(params) > 0
+	}
+	if arity, ok := builtinGenericTypeArity(ref.Name); ok {
+		return arity > 0
+	}
+	return false
+}
+
+func (c *Checker) resolveTypePatternTarget(ref *parser.TypeRef, span parser.Span) *Type {
+	if ref == nil {
+		return unknownType
+	}
+	if c.typePatternHasErasedGenericTarget(ref) {
+		c.addDiagnostic("invalid_match_pattern", "runtime type patterns cannot specify generic arguments; use the erased outer type", span)
+		if erased, ok := erasedNamedPatternType(ref.Name); ok {
+			return erased
+		}
+	}
+	if c.typePatternUsesErasedGeneric(ref) {
+		if erased, ok := erasedNamedPatternType(ref.Name); ok {
+			return erased
+		}
+	}
+	return c.resolveDeclaredType(ref)
+}
+
+func erasedNamedPatternType(name string) (*Type, bool) {
+	switch name {
+	case "List", "Iterable", "Iterator", "Set", "Map", "Option", "Result", "Either", "Unwrappable":
+		return &Type{Kind: TypeInterface, Name: name}, true
+	case "Array":
+		return &Type{Kind: TypeBuiltin, Name: name}, true
+	default:
+		return &Type{Kind: TypeClass, Name: name}, true
+	}
+}
+
+func builtinGenericTypeArity(name string) (int, bool) {
+	switch name {
+	case "List", "Iterable", "Iterator", "Set", "Option", "Array", "Unwrappable":
+		return 1, true
+	case "Map", "Result", "Either":
+		return 2, true
+	default:
+		return 0, false
+	}
 }
 
 func (c *Checker) checkConstructorPattern(pattern *parser.ConstructorPattern, valueType *Type) {
