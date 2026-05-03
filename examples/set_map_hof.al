@@ -66,7 +66,7 @@ def main() {
 
     reducedPairOpt = values.reduce((leftKey, leftVal, rightKey, rightVal) -> (rightKey, rightVal))
 
-    guard reducedPair <- reducedPairOpt else: ()
+    guard reducedPair <- reducedPairOpt else ()
 
     reducedKey, reducedValue = reducedPair
     OS.println("mapReduce " + reducedKey + " " + reducedValue)

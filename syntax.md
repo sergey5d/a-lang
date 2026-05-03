@@ -386,7 +386,7 @@ Rules:
 - if an expression containing `_` appears where a one-argument function is expected, it expands to a lambda
 - `_ + 1` becomes `x -> x + 1`
 - the shorthand is contextual; outside a lambda-expected position, `_` is not a normal value
-- this also works with larger expressions such as `items.map(if _ > 5: 10 else: 8)` or `items.map(match _ { ... })`
+- this also works with larger expressions such as `items.map(if _ > 5: 10 else 8)` or `items.map(match _ { ... })`
 
 Explicitly typed lambda:
 
@@ -677,14 +677,14 @@ result = if value > 0 {
 Shorthand expression form:
 
 ```txt
-result = if value > 0: 1 else: 0
+result = if value > 0: 1 else 0
 ```
 
 Multiline shorthand is also valid:
 
 ```txt
 result = if value > 0: 1
-else: 0
+else 0
 ```
 
 This also extends through `else if` chains:
@@ -692,8 +692,10 @@ This also extends through `else if` chains:
 ```txt
 result = if value > 0: 1
 else if value < 0: -1
-else: 0
+else 0
 ```
+
+`else` does not require `:`. It accepts either a block or a single-line body.
 
 ## `guard`
 
@@ -703,6 +705,12 @@ Single-binding guard:
 guard item <- maybeValue else {
     Err("missing")
 }
+```
+
+Single-line fallback:
+
+```txt
+guard item <- maybeValue else Err("missing")
 ```
 
 Multi-binding guard:
@@ -719,7 +727,7 @@ guard {
 Rules:
 
 - `guard` is only available on unwrap bindings
-- single-binding `guard item <- value else { ... }` and `guard item <- value else: expr` are supported
+- single-binding `guard item <- value else { ... }` and `guard item <- value else expr` are supported
 - block `guard { ... } else { ... }` runs unwrap bindings in order
 - if any guard binding fails, the fallback block is evaluated and its final value is implicitly returned from the current callable
 - successful bindings from the block form remain visible after the guard statement
@@ -732,6 +740,12 @@ Simple loop:
 for item <- [1, 2, 3] {
     OS.println(item)
 }
+```
+
+`loop` also accepts a same-line body without `:`:
+
+```txt
+loop break
 ```
 
 Destructuring loop:

@@ -595,7 +595,7 @@ func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
 			Span:       mergeSpans(tokenSpan(elseToken), exprSpan(nestedExpr)),
 		}
 	} else {
-		elseBlock, err = p.parseYieldBodyBlock("else")
+		elseBlock, err = p.parseOptionalColonExprBodyBlock(elseToken, "else")
 		if err != nil {
 			return nil, err
 		}
@@ -605,6 +605,47 @@ func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
 		Then:      thenBlock,
 		Else:      elseBlock,
 		Span:      mergeSpans(tokenSpan(start), elseBlock.Span),
+	}, nil
+}
+
+func (p *Parser) parseOptionalColonExprBodyBlock(introducer Token, owner string, stopTypes ...TokenType) (*BlockStmt, error) {
+	if p.check(TokenLBrace) {
+		return p.parseBlock()
+	}
+	if p.match(TokenColon) {
+		colon := p.previous()
+		if p.isAtEnd() {
+			return nil, fmt.Errorf("expected expression after ':'")
+		}
+		var (
+			expr Expr
+			err  error
+		)
+		if sameLine(colon, p.peek()) && len(stopTypes) > 0 {
+			expr, err = p.parseInlineExpression(stopTypes...)
+		} else {
+			expr, err = p.parseExpression(0)
+		}
+		if err != nil {
+			return nil, err
+		}
+		stmt := &ExprStmt{Expr: expr, Span: exprSpan(expr)}
+		return &BlockStmt{
+			Statements: []Statement{stmt},
+			Span:       mergeSpans(tokenSpan(colon), exprSpan(expr)),
+		}, nil
+	}
+	if p.isAtEnd() || !sameLine(introducer, p.peek()) {
+		return nil, fmt.Errorf("expected '{' or inline expression after %s", owner)
+	}
+	expr, err := p.parseExpression(0)
+	if err != nil {
+		return nil, err
+	}
+	stmt := &ExprStmt{Expr: expr, Span: exprSpan(expr)}
+	return &BlockStmt{
+		Statements: []Statement{stmt},
+		Span:       mergeSpans(tokenSpan(introducer), exprSpan(expr)),
 	}, nil
 }
 

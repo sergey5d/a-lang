@@ -5,7 +5,7 @@
 
 def canVisitAllRooms(rooms List[List[Int]]) Bool {
 
-    guard startKeys <- rooms.get(0) else: true
+    guard startKeys <- rooms.get(0) else true
 
     seen = Set(0)
     keys List[Int] = List()
@@ -22,7 +22,7 @@ def canVisitAllRooms(rooms List[List[Int]]) Bool {
         key = keys.remove(0).getOr(-1)
 
         if !seen.contains(key) {
-            guard roomKeys <- rooms.get(key) else: false
+            guard roomKeys <- rooms.get(key) else false
 
             for roomKey <- roomKeys {
                 keys.append(roomKey)

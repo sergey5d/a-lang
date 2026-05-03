@@ -11,7 +11,7 @@ class TreeNode {
 }
 
 def chooseNode(left Option[TreeNode], right Option[TreeNode]) Option[TreeNode] =
-    if !left.isEmpty(): left else: right
+    if !left.isEmpty(): left else right
 
 def find(
     node Option[TreeNode],
@@ -80,9 +80,9 @@ def main() Unit {
     result = find(Some(root), 5, 1, None(), None())
     missing = lowestCommonAncestor(root, 10, 42)
 
-    guard ancestor <- result.ancestor else: OS.panic("missing ancestor")
-    guard foundP <- result.foundP else: OS.panic("missing foundP")
-    guard foundQ <- result.foundQ else: OS.panic("missing foundQ")
+    guard ancestor <- result.ancestor else OS.panic("missing ancestor")
+    guard foundP <- result.foundP else OS.panic("missing foundP")
+    guard foundQ <- result.foundQ else OS.panic("missing foundQ")
     OS.println("lca ${ancestor.val}")
     OS.println("found p ${foundP.val}")
     OS.println("found q ${foundQ.val}")

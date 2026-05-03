@@ -446,9 +446,9 @@ def run(values List[Int], flag Bool) Int {
 func TestParseColonShorthandStatements(t *testing.T) {
 	src := `
 def run(values List[Int], flag Bool, maybe MaybeInt) Int {
-	if flag: return 1 else: return 2
+	if flag: return 1 else return 2
 	for value <- values: OS.println(value)
-	loop: break
+	loop break
 	match maybe: SomeX(x) => return x
 }
 
@@ -505,12 +505,12 @@ enum MaybeInt {
 func TestParseColonShorthandExpressions(t *testing.T) {
 	src := `
 def run(values List[Int], flag Bool, maybe MaybeInt) Int {
-	label = if flag: 1 else: 2
+	label = if flag: 1 else 2
 	label2 = if flag: 3
-	else: 4
+	else 4
 	label3 = if flag: 5
 	else if false: 6
-	else: 7
+	else 7
 	items = for value <- values yield: value + 1
 	picked = match maybe: SomeX(x) => x
 	return label + picked
@@ -2335,7 +2335,7 @@ def run(value Result[Int, Str]) Result[Int, Str] {
 func TestParseGuardStmt(t *testing.T) {
 	src := `
 def run(value Option[Int]) Result[Int, Str] {
-	guard item <- value else: Err("missing")
+	guard item <- value else Err("missing")
 	return Ok(item + 1)
 }
 `

@@ -6,7 +6,7 @@
 # sumFail sum-missing
 
 def plusOne(value Option[Int]) Result[Int, Str] {
-    guard item <- value else: Err("missing")
+    guard item <- value else Err("missing")
     Ok(item + 1)
 }
 

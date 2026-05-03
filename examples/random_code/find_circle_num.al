@@ -52,7 +52,7 @@ impl DisjointSet {
 }
 
 def findCircleNumUnion(isConnected List[List[Int]]) Int {
-    set DisjointSet = DisjointSet(isConnected.size())
+    set = DisjointSet(isConnected.size())
 
     for i <- Range(0, isConnected.size()) {
         guard row <- isConnected.get(i) else {

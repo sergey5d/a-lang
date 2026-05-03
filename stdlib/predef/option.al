@@ -21,7 +21,7 @@ impl Option[T] {
     def getOr(defaultValue T) T =
         if set:
             value
-        else:
+        else
             defaultValue
 
     def getOrElse(defaultValue T) T = this.getOr(defaultValue)

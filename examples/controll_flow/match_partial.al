@@ -15,7 +15,7 @@ enum MaybeInt {
 
 def main() Unit {
     values = List(1, 6, 3)
-    ifMapped = values.map(if _ > 5: 10 else: 8)
+    ifMapped = values.map(if _ > 5: 10 else 8)
 
     options = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
     matchMapped = options.map(match {
@@ -30,8 +30,8 @@ def main() Unit {
     OS.println(ifMapped.get(1).getOr(0))
     OS.println(matchMapped.get(0).getOr(0))
     OS.println(matchMapped.get(1).getOr(0))
-    guard firstPartial <- partialMapped.get(0) else: ()
-    guard secondPartial <- partialMapped.get(1) else: ()
+    guard firstPartial <- partialMapped.get(0) else ()
+    guard secondPartial <- partialMapped.get(1) else ()
     OS.println(firstPartial.getOr(0))
     OS.println(secondPartial.isEmpty())
 }

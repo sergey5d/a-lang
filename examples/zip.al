@@ -20,9 +20,9 @@ def main() Unit {
     guard firstPair <- listPairs.get(0) else {
         ()
     }
-    guard secondPair <- listPairs.get(1) else: ()
+    guard secondPair <- listPairs.get(1) else ()
 
-    guard indexedPair <- listIndexed.get(2) else: ()
+    guard indexedPair <- listIndexed.get(2) else ()
 
     firstLeft, firstRight = firstPair
     secondLeft, secondRight = secondPair

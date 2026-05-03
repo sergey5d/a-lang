@@ -170,10 +170,11 @@ func (p *Parser) parseGuardStmt() (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := p.consume(TokenElse, "expected 'else' after guard unwrap expression"); err != nil {
+	elseToken, err := p.consume(TokenElse, "expected 'else' after guard unwrap expression")
+	if err != nil {
 		return nil, err
 	}
-	fallback, err := p.parseStmtBodyBlock("guard else")
+	fallback, err := p.parseOptionalColonStmtBodyBlock(elseToken, "guard else")
 	if err != nil {
 		return nil, err
 	}
@@ -212,10 +213,11 @@ func (p *Parser) parseGuardBlockStmt(start Token) (Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := p.consume(TokenElse, "expected 'else' after guard body"); err != nil {
+	elseToken, err := p.consume(TokenElse, "expected 'else' after guard body")
+	if err != nil {
 		return nil, err
 	}
-	fallback, err := p.parseStmtBodyBlock("guard else")
+	fallback, err := p.parseOptionalColonStmtBodyBlock(elseToken, "guard else")
 	if err != nil {
 		return nil, err
 	}
@@ -434,6 +436,7 @@ func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
 	}
 	stmt.Then = thenBlock
 	if p.match(TokenElse) {
+		elseToken := p.previous()
 		if p.check(TokenIf) {
 			elseIfStmt, err := p.parseIfStmt()
 			if err != nil {
@@ -443,7 +446,7 @@ func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
 			stmt.Span = mergeSpans(tokenSpan(start), stmt.ElseIf.Span)
 			return stmt, nil
 		}
-		elseBlock, err := p.parseStmtBodyBlock("else")
+		elseBlock, err := p.parseOptionalColonStmtBodyBlock(elseToken, "else")
 		if err != nil {
 			return nil, err
 		}
@@ -708,7 +711,7 @@ func (p *Parser) parseForStmt() (Statement, error) {
 
 func (p *Parser) parseLoopStmt() (Statement, error) {
 	start := p.advance()
-	body, err := p.parseStmtBodyBlock("loop")
+	body, err := p.parseOptionalColonStmtBodyBlock(start, "loop")
 	if err != nil {
 		return nil, err
 	}
@@ -889,6 +892,47 @@ func (p *Parser) parseInlineMatchCases(statementMode bool) ([]MatchCase, Token, 
 		matchCase.Span = mergeSpans(patternSpan(pattern), exprSpan(expr))
 	}
 	return []MatchCase{matchCase}, p.previous(), nil
+}
+
+func (p *Parser) parseOptionalColonStmtBodyBlock(introducer Token, owner string, stopTypes ...TokenType) (*BlockStmt, error) {
+	if p.check(TokenLBrace) {
+		return p.parseBlock()
+	}
+	if p.match(TokenColon) {
+		colon := p.previous()
+		if p.isAtEnd() {
+			return nil, fmt.Errorf("expected statement after ':'")
+		}
+		p.beginScope()
+		defer p.endScope()
+		var stmt Statement
+		var err error
+		if sameLine(colon, p.peek()) {
+			stmt, err = p.parseInlineStatement(stopTypes...)
+		} else {
+			stmt, err = p.parseStatement()
+		}
+		if err != nil {
+			return nil, err
+		}
+		return &BlockStmt{
+			Statements: []Statement{stmt},
+			Span:       mergeSpans(tokenSpan(colon), stmtSpan(stmt)),
+		}, nil
+	}
+	if p.isAtEnd() || !sameLine(introducer, p.peek()) {
+		return nil, fmt.Errorf("expected '{' or inline statement after %s", owner)
+	}
+	p.beginScope()
+	defer p.endScope()
+	stmt, err := p.parseStatement()
+	if err != nil {
+		return nil, err
+	}
+	return &BlockStmt{
+		Statements: []Statement{stmt},
+		Span:       mergeSpans(tokenSpan(introducer), stmtSpan(stmt)),
+	}, nil
 }
 
 func (p *Parser) parseInlineStatement(stopTypes ...TokenType) (Statement, error) {

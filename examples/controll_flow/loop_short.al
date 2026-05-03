@@ -3,7 +3,7 @@
 # 0
 
 def main() Int {
-    loop: break
+    loop break
     OS.println("after loop")
     0
 }
