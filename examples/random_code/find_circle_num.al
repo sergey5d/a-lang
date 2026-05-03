@@ -81,17 +81,15 @@ def findCircleNumTraversal(isConnected List[List[Int]]) Int {
         directConns[i] := Set()
     }
 
-    for i <- Range(0, isConnected.size()) {
-        unwrap row <- isConnected.get(i) else {
-            -1
-        }
-
+    i := 0
+    for row <- isConnected {
         for j <- Range(0, row.size()) {
             if i != j && row[j] != 0 {
                 directConns[i].add(j)
                 directConns[j].add(i)
             }
         }
+        i += 1
     }
 
     areaCount Int := 0
