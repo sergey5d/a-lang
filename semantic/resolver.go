@@ -395,6 +395,17 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 			}
 			r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
 		}
+	case *parser.UnwrapBlockStmt:
+		for _, clause := range s.Clauses {
+			r.resolveExpr(clause.Value)
+			for _, binding := range clause.Bindings {
+				r.resolveTypeRef(binding.Type)
+				if binding.Name == "_" {
+					continue
+				}
+				r.defineMutable(binding.Name, binding.Span, false, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
+			}
+		}
 	case *parser.GuardStmt:
 		r.resolveExpr(s.Value)
 		for _, binding := range s.Bindings {

@@ -20,6 +20,13 @@ type guardStmtBuilder struct {
 	types  *typeRefBuilder
 }
 
+// unwrapBlockStmtBuilder builds typed block unwrap statements.
+type unwrapBlockStmtBuilder struct {
+	ctx   *buildContext
+	exprs Builder[parser.Expr, Expr]
+	types *typeRefBuilder
+}
+
 // guardBlockStmtBuilder builds typed block guard statements.
 type guardBlockStmtBuilder struct {
 	ctx    *buildContext
@@ -36,6 +43,20 @@ func (b *unwrapStmtBuilder) Build(stmt *parser.UnwrapStmt) (Stmt, error) {
 	}
 	bindings := buildBindingDecls(b.ctx, b.types, stmt.Bindings)
 	return &UnwrapStmt{Bindings: bindings, Value: value, Span: stmt.Span}, nil
+}
+
+// Build converts a parser block unwrap statement into a typed block unwrap statement.
+func (b *unwrapBlockStmtBuilder) Build(stmt *parser.UnwrapBlockStmt) (Stmt, error) {
+	clauses := make([]*UnwrapStmt, 0, len(stmt.Clauses))
+	for _, clause := range stmt.Clauses {
+		bindings := buildBindingDecls(b.ctx, b.types, clause.Bindings)
+		value, err := b.exprs.Build(clause.Value)
+		if err != nil {
+			return nil, err
+		}
+		clauses = append(clauses, &UnwrapStmt{Bindings: bindings, Value: value, Span: clause.Span})
+	}
+	return &UnwrapBlockStmt{Clauses: clauses, Span: stmt.Span}, nil
 }
 
 // Build converts a parser guard statement into a typed guarded unwrap statement.

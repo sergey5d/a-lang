@@ -1727,10 +1727,10 @@ def run() Int {
 	valuePairs Array[(Int, Str)] = values.zip(other)
 	valueIndexed Array[(Int, Int)] = values.zipWithIndex()
 
-	guard firstPair <- pairs.get(0) else {
+	unwrap firstPair <- pairs.get(0) else {
 		0
 	}
-	guard indexedPair <- indexed.get(2) else {
+	unwrap indexedPair <- indexed.get(2) else {
 		0
 	}
 	firstLeft Int, firstRight Str = firstPair
@@ -1829,7 +1829,7 @@ def run() Int {
 		total += value
 	}
 
-	guard reducedPair <- mapReduced else {
+	unwrap reducedPair <- mapReduced else {
 		0
 	}
 	reducedKey Str, reducedValue Int = reducedPair
@@ -2005,7 +2005,7 @@ func TestAnalyzeOptionConstructorsAndMethods(t *testing.T) {
 def run() Int {
 	found Option[Int] = Some(5)
 	missing Option[Int] = None()
-	guard value <- found else: return missing.getOr(7)
+	unwrap value <- found else: return missing.getOr(7)
 	return value
 }
 `
@@ -2407,23 +2407,23 @@ def run(value Option[(Int, Str, Bool)]) Str {
 func TestAnalyzeUnwrapStmtOptionResultEither(t *testing.T) {
 	src := `
 def plusOneOption(value Option[Int]) Option[Int] {
-	item <- value
+	unwrap item <- value
 	return Some(item + 1)
 }
 
 def plusOneResult(value Result[Int, Str]) Result[Int, Str] {
-	item <- value
+	unwrap item <- value
 	return Ok(item + 1)
 }
 
 def plusOneEither(value Either[Str, Int]) Either[Str, Int] {
-	item <- value
+	unwrap item <- value
 	return Right(item + 1)
 }
 
 def twoEithers(value Either[Str, Int], value2 Either[Str, Str]) Either[Str, Int] {
-	item <- value
-	size <- value2.map((s Str) -> s.size())
+	unwrap item <- value
+	unwrap size <- value2.map((s Str) -> s.size())
 	return Right(item + size)
 }
 `
@@ -2437,7 +2437,7 @@ def twoEithers(value Either[Str, Int], value2 Either[Str, Str]) Either[Str, Int]
 func TestAnalyzeUnwrapStmtRejectsIncompatibleReturn(t *testing.T) {
 	src := `
 def run(value Result[Int, Str]) Option[Int] {
-	item <- value
+	unwrap item <- value
 	return Some(item)
 }
 `
@@ -2454,7 +2454,7 @@ def run(value Result[Int, Str]) Option[Int] {
 func TestAnalyzeGuardStmt(t *testing.T) {
 	src := `
 def run(value Option[Int]) Result[Int, Str] {
-	guard item <- value else {
+	unwrap item <- value else {
 		Err("missing")
 	}
 	return Ok(item + 1)
@@ -2470,7 +2470,7 @@ def run(value Option[Int]) Result[Int, Str] {
 func TestAnalyzeGuardStmtRejectsWrongGuardType(t *testing.T) {
 	src := `
 def run(value Option[Int]) Result[Int, Str] {
-	guard item <- value else {
+	unwrap item <- value else {
 		Some(0)
 	}
 	return Ok(item + 1)
@@ -2496,6 +2496,23 @@ def run(left Option[Int], right Option[Int]) Result[Int, Str] {
 		Err("missing")
 	}
 	return Ok(a + b)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeUnwrapBlockStmt(t *testing.T) {
+	src := `
+def run(left Option[Int], right Option[Int]) Option[Int] {
+	unwrap {
+		a <- left
+		b <- right
+	}
+	return Some(a + b)
 }
 `
 
@@ -2603,10 +2620,10 @@ def run() Bool {
 	partialMapped = options.map(try match {
 		SomeX(x) => x + 1
 	})
-	guard firstPartial <- partialMapped.get(0) else {
+	unwrap firstPartial <- partialMapped.get(0) else {
 		false
 	}
-	guard secondPartial <- partialMapped.get(1) else {
+	unwrap secondPartial <- partialMapped.get(1) else {
 		false
 	}
 	return ifMapped.get(1).getOr(0) == 10 &&
@@ -2664,7 +2681,7 @@ def run() Bool {
 func TestAnalyzeUnwrapStmtRejectsNonUnwrappable(t *testing.T) {
 	src := `
 def run(value Int) Option[Int] {
-	item <- value
+	unwrap item <- value
 	return Some(item)
 }
 `

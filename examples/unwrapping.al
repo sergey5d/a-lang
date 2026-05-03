@@ -9,24 +9,24 @@
 # either combo left size bad
 
 def plusOneOption(value Option[Int]) Option[Int] {
-    item <- value
+    unwrap item <- value
     return Some(item + 1)
 }
 
 def plusOneResult(value Result[Int, Str]) Result[Int, Str] {
-    item <- value
+    unwrap item <- value
     return Ok(item + 1)
 }
 
 def plusOneEither(value Either[Str, Int]) Either[Str, Int] {
-    item <- value
+    unwrap item <- value
     return Right(item + 1)
 }
 
 def twoEithers(value Either[Str, Int], value2 Either[Str, Str]) Either[Str, Int] {
-    item <- value
-    str <- value2
-    size <- value2.map((s Str) -> s.size())
+    unwrap item <- value
+    unwrap str <- value2
+    unwrap size <- value2.map((s Str) -> s.size())
     return Right(item + str.size() / 2 + size)
 }
 

@@ -1215,6 +1215,17 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			return
 		}
 		c.checkUnwrapBindings(s.Bindings, s.Value, s.Span, true, c.returnTypes[len(c.returnTypes)-1], "invalid_unwrap", "unwrap binding")
+	case *parser.UnwrapBlockStmt:
+		if len(c.returnTypes) == 0 {
+			c.addDiagnostic("invalid_unwrap", "unwrap used outside callable body", s.Span)
+			return
+		}
+		if len(s.Clauses) == 0 {
+			c.addDiagnostic("invalid_unwrap", "unwrap block must contain at least one '<-' binding", s.Span)
+		}
+		for _, clause := range s.Clauses {
+			c.checkUnwrapBindings(clause.Bindings, clause.Value, clause.Span, true, c.returnTypes[len(c.returnTypes)-1], "invalid_unwrap", "unwrap binding")
+		}
 	case *parser.GuardStmt:
 		if len(c.returnTypes) == 0 {
 			c.addDiagnostic("invalid_guard", "guard used outside callable body", s.Span)

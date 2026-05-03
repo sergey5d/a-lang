@@ -20,6 +20,7 @@ type Parser struct {
 	pos                int
 	scopes             []map[string]struct{}
 	multilineExprDepth int
+	unwrapBlockDepth   int
 }
 
 func tokenSpan(token Token) Span {

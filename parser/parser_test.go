@@ -2309,7 +2309,7 @@ def run(value Option[(Int, Str, Bool)]) Unit {
 func TestParseUnwrapStmt(t *testing.T) {
 	src := `
 def run(value Result[Int, Str]) Result[Int, Str] {
-	item <- value
+	unwrap item <- value
 	return Ok(item + 1)
 }
 `
@@ -2335,7 +2335,7 @@ def run(value Result[Int, Str]) Result[Int, Str] {
 func TestParseGuardStmt(t *testing.T) {
 	src := `
 def run(value Option[Int]) Result[Int, Str] {
-	guard item <- value else Err("missing")
+	unwrap item <- value else Err("missing")
 	return Ok(item + 1)
 }
 `
@@ -2381,8 +2381,44 @@ def run(b Option[Int], d Option[Int]) Result[Int, Str] {
 	if len(stmt.Clauses) != 2 {
 		t.Fatalf("expected 2 guard clauses, got %d", len(stmt.Clauses))
 	}
-	if stmt.Fallback == nil || len(stmt.Fallback.Statements) != 1 {
-		t.Fatalf("expected fallback block on guard block statement")
+}
+
+func TestParseUnwrapBlockStmt(t *testing.T) {
+	src := `
+def run(b Option[Int], d Option[Int]) Option[Int] {
+	unwrap {
+		a <- b
+		c <- d
+	}
+	return Some(a + c)
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	stmt, ok := fn.Body.Statements[0].(*UnwrapBlockStmt)
+	if !ok {
+		t.Fatalf("expected first statement to be unwrap block, got %T", fn.Body.Statements[0])
+	}
+	if len(stmt.Clauses) != 2 {
+		t.Fatalf("expected 2 unwrap clauses, got %d", len(stmt.Clauses))
+	}
+}
+
+func TestParseBareUnwrapStmtRejected(t *testing.T) {
+	src := `
+def run(value Option[Int]) Option[Int] {
+	item <- value
+	return Some(item)
+}
+`
+
+	if _, err := Parse(src); err == nil {
+		t.Fatalf("expected parse error for bare unwrap binding")
 	}
 }
 

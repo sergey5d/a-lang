@@ -196,6 +196,15 @@ type UnwrapStmt struct {
 func (*UnwrapStmt) stmtNode()              {}
 func (s *UnwrapStmt) GetSpan() parser.Span { return s.Span }
 
+// UnwrapBlockStmt is a typed block unwrap with sequential short-circuit clauses.
+type UnwrapBlockStmt struct {
+	Clauses []*UnwrapStmt
+	Span    parser.Span
+}
+
+func (*UnwrapBlockStmt) stmtNode()              {}
+func (s *UnwrapBlockStmt) GetSpan() parser.Span { return s.Span }
+
 // GuardStmt is a typed guarded unwrap statement with a fallback block.
 type GuardStmt struct {
 	Bindings []BindingDecl

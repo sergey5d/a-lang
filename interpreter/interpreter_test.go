@@ -206,10 +206,10 @@ def run() Int {
 	valuePairs = values.zip(other)
 	valueIndexed = values.zipWithIndex()
 
-	guard firstPair <- pairs.get(0) else {
+	unwrap firstPair <- pairs.get(0) else {
 		0
 	}
-	guard indexedPair <- indexed.get(2) else {
+	unwrap indexedPair <- indexed.get(2) else {
 		0
 	}
 	firstLeft, firstRight = firstPair
@@ -1234,7 +1234,7 @@ def run() Int {
 		total += value
 	}
 
-	guard reducedPair <- mapReduced else {
+	unwrap reducedPair <- mapReduced else {
 		0
 	}
 	reducedKey, reducedValue = reducedPair
@@ -1279,7 +1279,7 @@ func TestOptionRuntime(t *testing.T) {
 def run() Int {
 	found = Some(5)
 	missing = None()
-	guard value <- found else: return 0
+	unwrap value <- found else: return 0
 	return value + missing.getOr(2)
 }
 `
@@ -1874,9 +1874,9 @@ def run() Int {
 		next
 	}
 
-	guard first <- items.get(0) else: return 0
-	guard second <- items.get(1) else: return 0
-	guard third <- items.get(2) else: return 0
+	unwrap first <- items.get(0) else: return 0
+	unwrap second <- items.get(1) else: return 0
+	unwrap third <- items.get(2) else: return 0
 	return first + second + third
 }
 `
@@ -1923,9 +1923,9 @@ def run() Int {
 		total
 	}
 
-	guard first <- items.get(0) else: return 0
-	guard second <- items.get(1) else: return 0
-	guard third <- items.get(2) else: return 0
+	unwrap first <- items.get(0) else: return 0
+	unwrap second <- items.get(1) else: return 0
+	unwrap third <- items.get(2) else: return 0
 	return first + second + third
 }
 `
@@ -1990,23 +1990,23 @@ def run() Str {
 func TestUnwrapStmtOptionResultEither(t *testing.T) {
 	src := `
 def plusOneOption(value Option[Int]) Option[Int] {
-	item <- value
+	unwrap item <- value
 	return Some(item + 1)
 }
 
 def plusOneResult(value Result[Int, Str]) Result[Int, Str] {
-	item <- value
+	unwrap item <- value
 	return Ok(item + 1)
 }
 
 def plusOneEither(value Either[Str, Int]) Either[Str, Int] {
-	item <- value
+	unwrap item <- value
 	return Right(item + 1)
 }
 
 def twoEithers(value Either[Str, Int], value2 Either[Str, Str]) Either[Str, Int] {
-	item <- value
-	size <- value2.map((s Str) -> s.size())
+	unwrap item <- value
+	unwrap size <- value2.map((s Str) -> s.size())
 	return Right(item + size)
 }
 
@@ -2039,14 +2039,14 @@ def run() Str {
 func TestGuardStmt(t *testing.T) {
 	src := `
 def runSome(value Option[Int]) Result[Int, Str] {
-	guard item <- value else {
+	unwrap item <- value else {
 		Err("missing")
 	}
 	return Ok(item + 1)
 }
 
 def runNone(value Option[Int]) Result[Int, Str] {
-	guard item <- value else {
+	unwrap item <- value else {
 		Err("missing")
 	}
 	return Ok(item + 1)
@@ -2114,6 +2114,40 @@ def run() Str {
 	}
 }
 
+func TestUnwrapBlockStmt(t *testing.T) {
+	src := `
+def runSome(left Option[Int], right Option[Int]) Option[Int] {
+	unwrap {
+		a <- left
+		b <- right
+	}
+	return Some(a + b)
+}
+
+def runNone(left Option[Int], right Option[Int]) Option[Int] {
+	unwrap {
+		a <- left
+		b <- right
+	}
+	return Some(a + b)
+}
+
+def run() Str {
+	someValue = runSome(Some(4), Some(5))
+	noneValue = runNone(Some(4), None())
+	return "${someValue.getOr(0)}-${noneValue.isEmpty()}"
+}
+`
+
+	in := New(parseProgram(t, src))
+	out, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if out != "9-true" {
+		t.Fatalf("expected output %q, got %#v", "9-true", out)
+	}
+}
 func TestEnumImplMethods(t *testing.T) {
 	src := `
 enum Outcome {
@@ -2202,10 +2236,10 @@ def run() Str {
 	partialMapped = options.map(try match {
 		SomeX(x) => x + 1
 	})
-	guard firstPartial <- partialMapped.get(0) else {
+	unwrap firstPartial <- partialMapped.get(0) else {
 		""
 	}
-	guard secondPartial <- partialMapped.get(1) else {
+	unwrap secondPartial <- partialMapped.get(1) else {
 		""
 	}
 	return "${ifMapped.get(0).getOr(0)}-${ifMapped.get(1).getOr(0)}-${matchMapped.get(2).getOr(0)}-${firstPartial.getOr(0)}-${secondPartial.isEmpty()}"

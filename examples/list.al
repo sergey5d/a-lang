@@ -46,10 +46,10 @@ def main() Unit {
     indexed = items.zipWithIndex()
     tailItems = items.tail()
 
-    guard zippedPair <- zipped.get(1) else ()
-    guard indexedPair <- indexed.get(3) else ()
-    guard head <- items.head() else ()
-    guard removed <- items.remove(1) else ()
+    unwrap zippedPair <- zipped.get(1) else ()
+    unwrap indexedPair <- indexed.get(3) else ()
+    unwrap head <- items.head() else ()
+    unwrap removed <- items.remove(1) else ()
 
     zipValue, zipLabel = zippedPair
     indexedValue, indexedPos = indexedPair

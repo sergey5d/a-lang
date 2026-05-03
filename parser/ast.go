@@ -222,6 +222,14 @@ type UnwrapStmt struct {
 
 func (*UnwrapStmt) statementNode() {}
 
+// UnwrapBlockStmt evaluates a sequence of unwrap bindings and returns early on the first failure.
+type UnwrapBlockStmt struct {
+	Clauses []*UnwrapStmt `json:"clauses"`
+	Span    Span          `json:"span"`
+}
+
+func (*UnwrapBlockStmt) statementNode() {}
+
 // GuardStmt extracts a success value from an unwrappable value or evaluates a fallback block on failure.
 type GuardStmt struct {
 	Bindings []Binding  `json:"bindings"`

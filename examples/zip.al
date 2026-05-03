@@ -17,12 +17,12 @@ def main() Unit {
     listPairs = items.zip(List("a", "b"))
     listIndexed = items.zipWithIndex()
 
-    guard firstPair <- listPairs.get(0) else {
+    unwrap firstPair <- listPairs.get(0) else {
         ()
     }
-    guard secondPair <- listPairs.get(1) else ()
+    unwrap secondPair <- listPairs.get(1) else ()
 
-    guard indexedPair <- listIndexed.get(2) else ()
+    unwrap indexedPair <- listIndexed.get(2) else ()
 
     firstLeft, firstRight = firstPair
     secondLeft, secondRight = secondPair
@@ -51,10 +51,10 @@ def main() Unit {
     rangePairs = Range(10, 13).zip(List("p", "q"))
     rangeIndexed = Range(7, 9).zipWithIndex()
 
-    guard rangePair <- rangePairs.get(1) else {
+    unwrap rangePair <- rangePairs.get(1) else {
         ()
     }
-    guard rangeIndexedPair <- rangeIndexed.get(1) else {
+    unwrap rangeIndexedPair <- rangeIndexed.get(1) else {
         ()
     }
     rangeLeft, rangeRight = rangePair

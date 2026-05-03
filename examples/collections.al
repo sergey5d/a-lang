@@ -8,7 +8,7 @@ def main() Int {
 	items = for item <- values yield {
 		item + 1
 	}
-	guard first <- items.get(0) else return 0
+	unwrap first <- items.get(0) else return 0
 	OS.println("found " + first)
 
 	total Int := 0

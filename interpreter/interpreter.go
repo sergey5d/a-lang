@@ -519,6 +519,17 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			return nil, returnSignal{value: sourceValue}, nil
 		}
 		return nil, nil, nil
+	case *parser.UnwrapBlockStmt:
+		for _, clause := range s.Clauses {
+			ok, sourceValue, err := in.execUnwrapBinding(clause.Bindings, clause.Value, clause.Span, local)
+			if err != nil {
+				return nil, nil, err
+			}
+			if !ok {
+				return nil, returnSignal{value: sourceValue}, nil
+			}
+		}
+		return nil, nil, nil
 	case *parser.GuardStmt:
 		ok, _, err := in.execUnwrapBinding(s.Bindings, s.Value, s.Span, local)
 		if err != nil {
