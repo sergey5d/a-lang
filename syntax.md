@@ -423,6 +423,23 @@ Block lambda:
 }
 ```
 
+Trailing block-lambda call syntax is also allowed when passing a lambda as an argument:
+
+```txt
+items.map { x -> x + 1 }
+```
+
+Contextual `match` lambda sugar is also allowed in a unary-function context:
+
+```txt
+options.map(match {
+    SomeX(x) => x + 1
+    NoneX => 0
+})
+```
+
+`match { ... }` in that position desugars to `match _ { ... }`. The same also works for `try match { ... }`.
+
 Nested blocks are also valid expressions:
 
 ```txt

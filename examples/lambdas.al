@@ -10,6 +10,7 @@
 # map 3 true 3
 # map 4 true 3
 # map 5 true 3
+# map 6 true 3
 # 0
 
 class Adder {
@@ -56,11 +57,15 @@ def main() Int {
     doubledV5 = seen.map(item ->
         item * 2
     )
+    doubledV6 = seen.map {
+        item -> item * 2
+    }
 
     OS.println("map 1 " + doubled.contains(4) + " " + doubled.size())
     OS.println("map 2 " + doubledV2.contains(4) + " " + doubledV2.size())
     OS.println("map 3 " + doubledV3.contains(4) + " " + doubledV3.size())
     OS.println("map 4 " + doubledV4.contains(4) + " " + doubledV4.size())
     OS.println("map 5 " + doubledV5.contains(4) + " " + doubledV5.size())
+    OS.println("map 6 " + doubledV6.contains(4) + " " + doubledV6.size())
     0
 }

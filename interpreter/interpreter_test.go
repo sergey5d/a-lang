@@ -2195,11 +2195,11 @@ def run() Str {
 	values = List(1, 6, 3)
 	ifMapped = values.map(if _ > 5: 10 else: 8)
 	options = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
-	matchMapped = options.map(match _ {
+	matchMapped = options.map(match {
 		SomeX(x) => x + 1
 		NoneX => 0
 	})
-	partialMapped = options.map(try match _ {
+	partialMapped = options.map(try match {
 		SomeX(x) => x + 1
 	})
 	guard firstPartial <- partialMapped.get(0) else {
@@ -2219,6 +2219,25 @@ def run() Str {
 	}
 	if value != "8-10-4-2-true" {
 		t.Fatalf("expected %q, got %#v", "8-10-4-2-true", value)
+	}
+}
+
+func TestTrailingBlockLambda(t *testing.T) {
+	src := `
+def run() Int {
+	values = [1, 2, 3]
+	mapped = values.map { x -> x + 1 }
+	return mapped.get(2).getOr(0)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(4) {
+		t.Fatalf("expected 4, got %#v", value)
 	}
 }
 

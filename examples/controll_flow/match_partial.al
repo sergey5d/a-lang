@@ -18,11 +18,11 @@ def main() Unit {
     ifMapped = values.map(if _ > 5: 10 else: 8)
 
     options = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
-    matchMapped = options.map(match _ {
+    matchMapped = options.map(match {
         SomeX(x) => x + 1
         NoneX => 0
     })
-    partialMapped = options.map(try match _ {
+    partialMapped = options.map(try match {
         SomeX(x) => x + 1
     })
 

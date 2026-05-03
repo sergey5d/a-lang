@@ -54,6 +54,25 @@ func (p *Parser) parseExpressionWithOptions(minPrec int, allowRecordUpdate bool)
 			left = call
 			continue
 		}
+		if p.isBraceLambdaStart() {
+			lambda, err := p.parseBraceLambdaExpr()
+			if err != nil {
+				return nil, err
+			}
+			if call, ok := left.(*CallExpr); ok {
+				arg := CallArg{Value: lambda, Span: exprSpan(lambda)}
+				call.Args = append(call.Args, arg)
+				call.Span = mergeSpans(exprSpan(call.Callee), exprSpan(lambda))
+				left = call
+			} else {
+				left = &CallExpr{
+					Callee: left,
+					Args:   []CallArg{{Value: lambda, Span: exprSpan(lambda)}},
+					Span:   mergeSpans(exprSpan(left), exprSpan(lambda)),
+				}
+			}
+			continue
+		}
 		if p.match(TokenDot) {
 			name, err := p.consume(TokenIdentifier, "expected member name after '.'")
 			if err != nil {
@@ -601,9 +620,17 @@ func (p *Parser) parseTryMatchExprAfterStart(start Token) (Expr, error) {
 }
 
 func (p *Parser) parseMatchExprAfterKeyword(start Token, partial bool) (Expr, error) {
-	value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
-	if err != nil {
-		return nil, err
+	var (
+		value Expr
+		err error
+	)
+	if p.check(TokenLBrace) || p.check(TokenColon) {
+		value = &PlaceholderExpr{Span: tokenSpan(start)}
+	} else {
+		value, err = p.parseExpressionUntil(TokenLBrace, TokenColon)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var (
 		cases []MatchCase

@@ -2087,6 +2087,69 @@ def run() Unit {
 	}
 }
 
+func TestParseTrailingBlockLambda(t *testing.T) {
+	src := `
+def run() Unit {
+	items.map { x -> x + 1 }
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	stmt := fn.Body.Statements[0].(*ExprStmt)
+	call, ok := stmt.Expr.(*CallExpr)
+	if !ok {
+		t.Fatalf("expected call expression, got %T", stmt.Expr)
+	}
+	if len(call.Args) != 1 {
+		t.Fatalf("expected 1 call arg, got %d", len(call.Args))
+	}
+	lambda, ok := call.Args[0].Value.(*LambdaExpr)
+	if !ok {
+		t.Fatalf("expected trailing lambda arg, got %T", call.Args[0].Value)
+	}
+	if len(lambda.Parameters) != 1 || lambda.Parameters[0].Name != "x" {
+		t.Fatalf("unexpected trailing lambda params %#v", lambda.Parameters)
+	}
+	if lambda.BlockBody == nil || len(lambda.BlockBody.Statements) != 1 {
+		t.Fatalf("expected block-bodied trailing lambda, got %#v", lambda)
+	}
+}
+
+func TestParseContextualMatchLambda(t *testing.T) {
+	src := `
+def run() Unit {
+	options.map(match {
+		SomeX(x) => x + 1
+		NoneX => 0
+	})
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	fn := program.Functions[0]
+	stmt := fn.Body.Statements[0].(*ExprStmt)
+	call, ok := stmt.Expr.(*CallExpr)
+	if !ok {
+		t.Fatalf("expected call expression, got %T", stmt.Expr)
+	}
+	matchExpr, ok := call.Args[0].Value.(*MatchExpr)
+	if !ok {
+		t.Fatalf("expected match expr arg, got %T", call.Args[0].Value)
+	}
+	if _, ok := matchExpr.Value.(*PlaceholderExpr); !ok {
+		t.Fatalf("expected contextual match to use placeholder value, got %T", matchExpr.Value)
+	}
+}
+
 func TestParseGenericTypeRefs(t *testing.T) {
 	src := `
 interface Pairer[K, V] {

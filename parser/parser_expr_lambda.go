@@ -64,6 +64,78 @@ func (p *Parser) parseLambdaBody() (Expr, *BlockStmt, Span, error) {
 	return body, nil, exprSpan(body), nil
 }
 
+func (p *Parser) isBraceLambdaStart() bool {
+	if !p.check(TokenLBrace) {
+		return false
+	}
+	start := p.pos
+	p.advance()
+	defer func() { p.pos = start }()
+	return p.isLambdaIdentifierStart() || p.isLambdaParenStart()
+}
+
+func (p *Parser) parseBraceLambdaExpr() (Expr, error) {
+	start, err := p.consume(TokenLBrace, "expected '{'")
+	if err != nil {
+		return nil, err
+	}
+	var (
+		params []LambdaParameter
+		endSpan Span
+	)
+	switch {
+	case p.isLambdaIdentifierStart():
+		param, err := p.parseLambdaParameter()
+		if err != nil {
+			return nil, err
+		}
+		if p.check(TokenIdentifier) && p.simpleTypeRefFollowedBy(TokenArrow) {
+			typeRef, err := p.parseNamedTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			param.Type = typeRef
+			param.Span = mergeSpans(param.Span, typeSpan(typeRef))
+		}
+		params = []LambdaParameter{param}
+	case p.isLambdaParenStart():
+		params, err = p.parseLambdaParams()
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("expected lambda parameters after '{' at %d:%d", start.Line, start.Column)
+	}
+	if _, err := p.consume(TokenArrow, "expected '->' after lambda parameters"); err != nil {
+		return nil, err
+	}
+	p.beginScope()
+	defer p.endScope()
+	block := &BlockStmt{}
+	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+		block.Statements = append(block.Statements, stmt)
+	}
+	end, err := p.consume(TokenRBrace, "expected '}' after lambda block")
+	if err != nil {
+		return nil, err
+	}
+	block.Span = mergeSpans(tokenSpan(start), tokenSpan(end))
+	endSpan = tokenSpan(end)
+	startSpan := tokenSpan(start)
+	if len(params) > 0 {
+		startSpan = params[0].Span
+	}
+	return &LambdaExpr{
+		Parameters: params,
+		BlockBody:  block,
+		Span:       mergeSpans(startSpan, endSpan),
+	}, nil
+}
+
 func (p *Parser) parseLambdaParams() ([]LambdaParameter, error) {
 	if _, err := p.consume(TokenLParen, "expected '('"); err != nil {
 		return nil, err
