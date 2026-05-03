@@ -55,10 +55,7 @@ def findCircleNumUnion(isConnected List[List[Int]]) Int {
     set = DisjointSet(isConnected.size())
 
     for i <- Range(0, isConnected.size()) {
-        unwrap row <- isConnected.get(i) else {
-            -1
-        }
-
+        row = isConnected[i]
         for j <- Range(0, row.size()) {
             if i != j && row[j] != 0 {
                 set.union(i, j)
@@ -81,15 +78,14 @@ def findCircleNumTraversal(isConnected List[List[Int]]) Int {
         directConns[i] := Set()
     }
 
-    i := 0
-    for row <- isConnected {
+    for i <- Range(0, isConnected.size()) {
+        row = isConnected[i]
         for j <- Range(0, row.size()) {
             if i != j && row[j] != 0 {
                 directConns[i].add(j)
                 directConns[j].add(i)
             }
         }
-        i += 1
     }
 
     areaCount Int := 0
