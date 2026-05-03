@@ -183,6 +183,25 @@ Current leaning:
 - `impl` looks cleaner for medium and large types because it separates shape from behavior
 - but it should probably remain optional rather than mandatory, because small types often read better when fields and methods stay together
 
+### Single-Line Body Syntax
+
+The language also needs a final cleanup pass on shorthand single-line bodies.
+
+Current tension:
+- `if`, `else if`, `for`, `yield`, and inline `match` still use `:` as a separator
+- plain `else`, `loop`, and `guard ... else` can now work without `:`
+- newline handling is not fully settled for the no-colon forms, and today a bare `else` followed by a newline does not read the same way as `else:`
+
+Open question:
+- how much newline tolerance should the language allow for shorthand bodies
+- whether single-line no-colon forms should stay same-line only
+- whether the language should keep both `else expr` and `else: expr`, or eventually prefer just one surface
+
+Current leaning:
+- keep `:` only where it is doing real separator work
+- prefer `else expr`, `guard ... else expr`, and `loop expr` over punctuation-heavy variants
+- think more about the newline story before freezing the shorthand syntax surface
+
 ### Match Totality / Partial Match Behavior
 
 `match` now exists, but the language still needs a clear rule for what happens when no case matches.
