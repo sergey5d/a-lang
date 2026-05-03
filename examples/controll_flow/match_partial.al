@@ -22,7 +22,7 @@ def main() Unit {
         SomeX(x) => x + 1
         NoneX => 0
     })
-    partialMapped = options.map(try match {
+    partialMapped List[Option[Int]] = options.map(try match {
         SomeX(x) => x + 1
     })
 

@@ -1,3 +1,5 @@
+# IGNORE
+
 package things
 
 interface Named {

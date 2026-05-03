@@ -69,7 +69,7 @@ func TestExamples(t *testing.T) {
 			if failureErr == nil {
 				actualFailure := runExampleFailure(path)
 				if normalizeExampleOutput(actualFailure) != normalizeExampleOutput(expectedFailure) {
-					t.Fatalf("unexpected failure\nexpected:\n%s\nactual:\n%s", expectedFailure, actualFailure)
+					t.Fatalf("example %s failed differently than expected\nexpected failure:\n%s\nactual failure:\n%s", name, expectedFailure, actualFailure)
 				}
 				t.Logf("passed %s", name)
 				return
@@ -82,7 +82,7 @@ func TestExamples(t *testing.T) {
 					t.Fatalf("invalid failure regex: %v", err)
 				}
 				if !matched {
-					t.Fatalf("unexpected failure\nexpected regex:\n%s\nactual:\n%s", expectedFailureRegex, actualFailure)
+					t.Fatalf("example %s failed differently than expected\nexpected failure regex:\n%s\nactual failure:\n%s", name, expectedFailureRegex, actualFailure)
 				}
 				t.Logf("passed %s", name)
 				return
@@ -98,7 +98,7 @@ func TestExamples(t *testing.T) {
 
 			loaded, err := module.Load(path)
 			if err != nil {
-				t.Fatalf("Load returned error: %v", err)
+				t.Fatalf("example %s failed to load: %v", name, err)
 			}
 			diagnostics := semantic.AnalyzeModule(loaded)
 			typeResult := typecheck.AnalyzeModule(loaded)
@@ -108,7 +108,7 @@ func TestExamples(t *testing.T) {
 				for _, diagnostic := range diagnostics {
 					messages = append(messages, diagnostic.Error())
 				}
-				t.Fatalf("expected no diagnostics, got:\n%s", strings.Join(messages, "\n"))
+				t.Fatalf("example %s produced diagnostics:\n%s", name, strings.Join(messages, "\n"))
 			}
 
 			oldStdout := os.Stdout
@@ -127,7 +127,7 @@ func TestExamples(t *testing.T) {
 			_ = reader.Close()
 
 			if callErr != nil {
-				t.Fatalf("Call returned error: %v", callErr)
+				t.Fatalf("example %s runtime failure: %v", name, callErr)
 			}
 
 			actual := string(output)
@@ -136,7 +136,7 @@ func TestExamples(t *testing.T) {
 			}
 
 			if normalizeExampleOutput(actual) != normalizeExampleOutput(expected) {
-				t.Fatalf("unexpected output\nexpected:\n%s\nactual:\n%s", expected, actual)
+				t.Fatalf("example %s produced unexpected output\nexpected:\n%s\nactual:\n%s", name, expected, actual)
 			}
 			t.Logf("passed %s", name)
 		})

@@ -4,6 +4,7 @@
 # a separate `impl` block.
 
 class Person with Named, Aged {
+
     firstName Str
     lastName Str
     age Int
@@ -19,6 +20,8 @@ class Person with Named, Aged {
 }
 
 impl Person {
+
+    #replace this to self?
 
     def this(firstName Str, lastName Str) {
         this.firstName = firstName

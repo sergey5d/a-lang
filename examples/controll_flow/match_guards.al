@@ -1,19 +1,28 @@
-enum OptionX[T] {
+# EXPECT:
+# 12
+# 10
+# 0
+
+enum MaybeInt {
     case NoneX
     case SomeX {
-        value T
+        value Int
     }
 }
 
-def describe(value OptionX[Int]) Int =
+def describe(value MaybeInt) Int =
     match value {
         SomeX(x) if x > 10 => x
         SomeX(_) => 10
-        OptionX.NoneX => 0
+        MaybeInt.NoneX => 0
     }
 
-def run() Unit {
-    OS.println(describe(OptionX.SomeX(12)))
-    OS.println(describe(OptionX.SomeX(3)))
-    OS.println(describe(OptionX.NoneX()))
+def main() Unit {
+    large MaybeInt = MaybeInt.SomeX(12)
+    small MaybeInt = MaybeInt.SomeX(3)
+    empty MaybeInt = MaybeInt.NoneX()
+
+    OS.println(describe(large))
+    OS.println(describe(small))
+    OS.println(describe(empty))
 }
