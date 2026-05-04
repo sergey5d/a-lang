@@ -942,7 +942,8 @@ Examples:
 
 ```txt
 counter is Counter
-value <- maybe
+for item <- items {
+}
 (Int) -> Str
 SomeX(x) => x
 class Box[T] with Named
