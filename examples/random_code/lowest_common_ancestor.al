@@ -4,7 +4,7 @@
 # found q 1
 # missing true
 
-class TreeNode {
+record TreeNode {
     val Int
     left Option[TreeNode]
     right Option[TreeNode]
