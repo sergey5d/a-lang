@@ -31,7 +31,7 @@ def expandPage(page List[MaybeInt]) List[Int] {
 
 def main() Unit {
     pages List[List[MaybeInt]] = [
-        [MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3)],
+        [ MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3) ],
         List(MaybeInt.NoneX, MaybeInt.SomeX(5))
     ]
 
