@@ -511,7 +511,7 @@ def run(values List[Int], flag Bool, maybe MaybeInt) Int {
 	label3 = if flag: 5
 	else if false: 6
 	else 7
-	items = for value <- values yield: value + 1
+	items = for value <- values yield value + 1
 	picked = match maybe: SomeX(x) => x
 	return label + picked
 }

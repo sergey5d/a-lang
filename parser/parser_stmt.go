@@ -839,18 +839,41 @@ func (p *Parser) parseStmtBodyBlock(owner string, stopTypes ...TokenType) (*Bloc
 }
 
 func (p *Parser) parseYieldBodyBlock(owner string, stopTypes ...TokenType) (*BlockStmt, error) {
+	introducer := p.previous()
 	if p.check(TokenLBrace) {
 		return p.parseBlock()
 	}
-	colon, err := p.consume(TokenColon, "expected '{' or ':' after "+owner)
-	if err != nil {
-		return nil, err
+	if p.match(TokenColon) {
+		colon := p.previous()
+		if p.isAtEnd() {
+			return nil, fmt.Errorf("expected expression after ':'")
+		}
+		var (
+			expr Expr
+			err  error
+		)
+		if sameLine(colon, p.peek()) && len(stopTypes) > 0 {
+			expr, err = p.parseInlineExpression(stopTypes...)
+		} else {
+			expr, err = p.parseExpression(0)
+		}
+		if err != nil {
+			return nil, err
+		}
+		stmt := &ExprStmt{Expr: expr, Span: exprSpan(expr)}
+		return &BlockStmt{
+			Statements: []Statement{stmt},
+			Span:       mergeSpans(tokenSpan(colon), exprSpan(expr)),
+		}, nil
 	}
 	if p.isAtEnd() {
-		return nil, fmt.Errorf("expected expression after ':'")
+		return nil, fmt.Errorf("expected '{' or expression after %s", owner)
 	}
-	var expr Expr
-	if sameLine(colon, p.peek()) && len(stopTypes) > 0 {
+	var (
+		expr Expr
+		err  error
+	)
+	if sameLine(introducer, p.peek()) && len(stopTypes) > 0 {
 		expr, err = p.parseInlineExpression(stopTypes...)
 	} else {
 		expr, err = p.parseExpression(0)
@@ -861,7 +884,7 @@ func (p *Parser) parseYieldBodyBlock(owner string, stopTypes ...TokenType) (*Blo
 	stmt := &ExprStmt{Expr: expr, Span: exprSpan(expr)}
 	return &BlockStmt{
 		Statements: []Statement{stmt},
-		Span:       mergeSpans(tokenSpan(colon), exprSpan(expr)),
+		Span:       mergeSpans(tokenSpan(introducer), exprSpan(expr)),
 	}, nil
 }
 

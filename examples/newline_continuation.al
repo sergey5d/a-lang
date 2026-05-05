@@ -46,7 +46,7 @@ def main() Unit {
     else:
         0
 
-    collected = for item <- [2, 3] yield:
+    collected = for item <- [2, 3] yield
         item
 
     fromFor Int = collected.get(0).getOr(0) +

@@ -791,6 +791,12 @@ items = for {
 }
 ```
 
+`yield` also accepts a same-line expression without `:`:
+
+```txt
+items = for item <- [1, 2, 3] yield item * 2
+```
+
 `for` clauses in the block form may also include local `=` and `:=` bindings.
 
 ## `loop`
@@ -991,7 +997,7 @@ Newline continuation:
   - `<-`
 - Body-introducing forms are intentionally looser:
   - `def ... =` may start its body on the next line
-  - `if:`, `else:`, `for:`, `yield:`, and `match:` may also start their single statement / expression body on the next line
+  - `if:`, `else:`, `for:`, `yield`, and `match:` may also start their single statement / expression body on the next line
 - So this is invalid:
 
 ```txt
