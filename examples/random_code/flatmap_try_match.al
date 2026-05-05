@@ -30,10 +30,10 @@ def expandPage(page List[MaybeInt]) List[Int] {
 }
 
 def main() Unit {
-    pages List[List[MaybeInt]] = List(
-        List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3)),
+    pages List[List[MaybeInt]] = [
+        [MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3)],
         List(MaybeInt.NoneX, MaybeInt.SomeX(5))
-    )
+    ]
 
     extracted List[Int] = pages.flatMap(page -> expandPage(page))
 
