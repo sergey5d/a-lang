@@ -16,9 +16,9 @@ class Rabbit with Hopper, Jumper {
 }
 
 impl Rabbit {
-    impl def hop() Str = "hop"
+    def hop() Str = "hop"
 
-    impl def jump(steps Int) Str = "jump " + steps
+    def jump(steps Int) Str = "jump " + steps
 }
 
 def main() Unit {

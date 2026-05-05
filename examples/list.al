@@ -21,7 +21,7 @@
 # size 3
 
 object Descending with Ordering[Int] {
-    impl def compare(left Int, right Int) Int = right - left
+    def compare(left Int, right Int) Int = right - left
 }
 
 def main() Unit {

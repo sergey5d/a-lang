@@ -27,7 +27,6 @@ type MethodDescriptor struct {
 	Parameters     []parser.Parameter
 	ReturnType     *parser.TypeRef
 	Private        bool
-	Impl           bool
 	Operator       bool
 	Constructor    bool
 }
@@ -130,7 +129,6 @@ func load() (*Registry, error) {
 					Parameters:     append([]parser.Parameter(nil), method.Parameters...),
 					ReturnType:     method.ReturnType,
 					Private:        method.Private,
-					Impl:           method.Impl,
 					Operator:       method.Operator,
 					Constructor:    method.Constructor,
 				}

@@ -15,9 +15,9 @@ impl Option[T] {
 
     def isSet() Bool = set
     def isEmpty() Bool = !set
-    impl def isFailure() Bool = !set
+    def isFailure() Bool = !set
     def get() T = value
-    impl def unwrap() T = value
+    def unwrap() T = value
     def getOr(defaultValue T) T =
         if set: value else defaultValue
 

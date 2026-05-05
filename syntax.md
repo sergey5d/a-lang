@@ -473,11 +473,11 @@ class Box[T] with Named {
 }
 
 impl Box[T] {
-    impl def label() Str = "box"
+    def label() Str = "box"
 }
 ```
 
-When a class, record, or object implements an interface method, that method must be written with `impl def` instead of plain `def`.
+When a class, record, or object implements an interface method inside an `impl Type { ... }` block, it uses ordinary `def`.
 
 Object:
 
@@ -496,7 +496,7 @@ record Amount with Named {
 }
 
 impl Amount {
-    impl def label() Str = label
+    def label() Str = label
 }
 ```
 
@@ -507,7 +507,7 @@ interface Named {
     def label() Str
 }
 
-Methods that satisfy an interface must use `impl def`:
+Methods that satisfy an interface just use ordinary `def`:
 
 ```txt
 interface Named {
@@ -518,7 +518,7 @@ class Box with Named {
 }
 
 impl Box {
-    impl def label() Str = "box"
+    def label() Str = "box"
 }
 ```
 
@@ -526,8 +526,8 @@ Anonymous interface implementation expressions:
 
 ```txt
 handler = Reader with Closer {
-    impl def read() Str = "x"
-    impl def close() Unit = ()
+    def read() Str = "x"
+    def close() Unit = ()
 }
 ```
 
@@ -936,7 +936,6 @@ Other operators / constructs:
 - `->` for function types and lambdas
 - `=>` for match cases
 - `with` for interface implementation, generic bounds, and record update
-- `impl def` for interface method implementations
 
 Examples:
 
@@ -949,7 +948,7 @@ SomeX(x) => x
 class Box[T] with Named
 ```
 
-Operator declarations use symbolic `def` / `impl def` forms on interfaces, classes, records, and enums:
+Operator declarations use symbolic `def` forms on interfaces, classes, records, and enums:
 
 ```txt
 def +(other Vec) Vec = Vec(this[0] + other[0], this[1] + other[1])

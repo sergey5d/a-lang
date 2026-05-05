@@ -4,11 +4,11 @@
 # 0
 
 object Ascending with Ordering[Int] {
-    impl def compare(left Int, right Int) Int = left - right
+    def compare(left Int, right Int) Int = left - right
 }
 
 object Descending with Ordering[Int] {
-    impl def compare(left Int, right Int) Int = right - left
+    def compare(left Int, right Int) Int = right - left
 }
 
 def main() Int {

@@ -10,14 +10,14 @@ class A with Named {
 }
 
 impl A {
-    impl def label() Str = "A"
+    def label() Str = "A"
 }
 
 class B with Named {
 }
 
 impl B {
-    impl def label() Str = "B"
+    def label() Str = "B"
 }
 
 object C {

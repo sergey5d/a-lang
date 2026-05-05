@@ -484,14 +484,14 @@ class Worker with WorkerLike {
 }
 
 impl Worker {
-	impl def doWork() Int = 7
+	def doWork() Int = 7
 }
 
 class Other with WorkerLike {
 }
 
 impl Other {
-	impl def doWork() Int = 3
+	def doWork() Int = 3
 }
 
 def run() Int {
@@ -1021,7 +1021,7 @@ def run() Bool {
 func TestBuiltinCollectionsAndTerm(t *testing.T) {
 	src := `
 object Ascending with Ordering[Int] {
-	impl def compare(left Int, right Int) Int = left - right
+	def compare(left Int, right Int) Int = left - right
 }
 
 def run() Int {
@@ -1094,7 +1094,7 @@ def run() Int {
 func TestListSortWithOrdering(t *testing.T) {
 	src := `
 object Descending with Ordering[Int] {
-	impl def compare(left Int, right Int) Int = right - left
+	def compare(left Int, right Int) Int = right - left
 }
 
 def run() Int {
@@ -1504,8 +1504,8 @@ class Rabbit with Acrobat {
 }
 
 impl Rabbit {
-	impl def hop() Str = "hop"
-	impl def jump(steps Int) Str = "jump " + steps
+	def hop() Str = "hop"
+	def jump(steps Int) Str = "jump " + steps
 }
 
 def run() Bool {
@@ -1560,8 +1560,8 @@ interface Closer {
 
 def run() Bool {
 	handler = Reader with Closer {
-		impl def read() Str = "x"
-		impl def close() Unit = ()
+		def read() Str = "x"
+		def close() Unit = ()
 	}
 	handler.close()
 	return handler.read() == "x"

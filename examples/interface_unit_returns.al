@@ -14,11 +14,11 @@ class Printer with ExplicitPrinter, ImplicitPrinter {
 }
 
 impl Printer {
-    impl def printExplicit() {
+    def printExplicit() {
         OS.println("explicit")
     }
 
-    impl def printImplicit() {
+    def printImplicit() {
         OS.println("implicit")
     }
 }

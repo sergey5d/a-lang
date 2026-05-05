@@ -12,21 +12,21 @@ class Worker with WorkerLike {
 }
 
 impl Worker {
-    impl def doWork() Int = 7
+    def doWork() Int = 7
 }
 
 class Other with WorkerLike {
 }
 
 impl Other {
-    impl def doWork() Int = 3
+    def doWork() Int = 3
 }
 
 class Slacker with WorkerLike {
 }
 
 impl Slacker {
-    impl def doWork() Int = -1
+    def doWork() Int = -1
 }
 
 def describe(value WorkerLike) {

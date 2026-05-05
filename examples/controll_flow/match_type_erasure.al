@@ -15,7 +15,7 @@ class Worker with Named {
 }
 
 impl Worker {
-    impl def label() Str = name
+    def label() Str = name
 }
 
 record Amount {

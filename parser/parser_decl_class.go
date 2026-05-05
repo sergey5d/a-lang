@@ -63,7 +63,7 @@ func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 				return nil, err
 			}
 			decl.Fields = append(decl.Fields, field)
-		case TokenDef, TokenImpl:
+		case TokenDef:
 			sawNonField = true
 			method, err := p.parseMethodLike(false, false)
 			if err != nil {
@@ -133,7 +133,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 				return nil, err
 			}
 			decl.Fields = append(decl.Fields, field)
-		case TokenDef, TokenImpl:
+		case TokenDef:
 			if !allowInlineMethods {
 				return nil, fmt.Errorf("%s methods must be declared in top-level impl blocks", noun)
 			}
@@ -202,19 +202,11 @@ func (p *Parser) parseMethodLike(private bool, allowShortApply bool) (*MethodDec
 }
 
 func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, error) {
-	impl := p.match(TokenImpl)
 	start := p.peek()
 	if _, err := p.consume(TokenDef, "expected 'def'"); err != nil {
-		if impl {
-			return nil, err
-		}
 		return nil, err
 	}
-	if impl {
-		start = p.tokens[p.pos-2]
-	} else {
-		start = p.previous()
-	}
+	start = p.previous()
 	nameLexeme, isOperator, err := p.parseDeclaredMethodName(allowShortApply, "expected method name")
 	if err != nil {
 		return nil, err
@@ -249,7 +241,6 @@ func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, e
 		Parameters:     params,
 		ReturnType:     returnType,
 		Body:           body,
-		Impl:           impl,
 		Operator:       isOperator,
 		Private:        private,
 		Constructor:    constructor,
@@ -432,7 +423,7 @@ func (p *Parser) parseTopLevelImpl(program *Program) error {
 	}
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		private := p.match(TokenPrivate)
-		if !p.check(TokenDef) && !p.check(TokenImpl) {
+		if !p.check(TokenDef) {
 			return fmt.Errorf("expected method declaration in impl block, got %s", p.peek().String())
 		}
 		method, err := p.parseMethodLike(private, false)

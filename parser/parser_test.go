@@ -1208,7 +1208,7 @@ impl Box[T] {
 		this.value = value
 	}
 
-	impl def map(key T) Stringable {
+	def map(key T) Stringable {
 		return this
 	}
 }
@@ -1224,7 +1224,7 @@ impl SolidWork {
 		this.b = b
 	}
 
-	impl def show() Str {
+	def show() Str {
 	}
 
 	def addOne(one Int) Int {
@@ -1287,9 +1287,6 @@ solidWork = SolidWork(1, false)
 	}
 	if !cls.Methods[3].Private {
 		t.Fatalf("expected helper method to be private")
-	}
-	if !box.Methods[1].Impl || !cls.Methods[1].Impl {
-		t.Fatalf("expected implemented methods to be marked impl")
 	}
 	if !cls.Methods[0].Constructor {
 		t.Fatalf("expected this to be marked as constructor")
@@ -1434,7 +1431,7 @@ class Vec {
 
 impl Vec {
 	def [](index Int) Int = 0
-	impl def +(other Vec) Vec = this
+	def +(other Vec) Vec = this
 	def -() Vec = this
 	def :+(value Int) Vec = this
 	def :-(value Int) Vec = this
@@ -1625,8 +1622,8 @@ interface Closer {
 
 def run() Str {
 	handler = Reader with Closer {
-		impl def read() Str = "x"
-		impl def close() Unit = ()
+		def read() Str = "x"
+		def close() Unit = ()
 	}
 	return handler.read()
 }

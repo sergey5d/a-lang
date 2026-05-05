@@ -38,9 +38,9 @@ impl Amount {
         OS.println("amount:", amount)
     }
 
-    impl def hop() Str = "Hop-hop"
+    def hop() Str = "Hop-hop"
 
-    impl def jump(steps Int) Str = "Jump " + steps + " steps"
+    def jump(steps Int) Str = "Jump " + steps + " steps"
 }
 
 a1 = Amount(10, "description", 5)

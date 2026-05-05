@@ -69,7 +69,6 @@ func (b *classBuilder) Build(class *parser.ClassDecl) (*ClassDecl, error) {
 			Parameters:     params,
 			ReturnType:     b.types.BuildType(method.ReturnType),
 			Body:           body,
-			Impl:           method.Impl,
 			Operator:       method.Operator,
 			Private:        method.Private,
 			Constructor:    method.Constructor,

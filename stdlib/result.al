@@ -9,9 +9,9 @@ impl Result[T, E] {
 
     def isErr() Bool = !ok
 
-    impl def isFailure() Bool = !ok
+    def isFailure() Bool = !ok
 
-    impl def unwrap() T = value
+    def unwrap() T = value
 
     def getError() E = error
 

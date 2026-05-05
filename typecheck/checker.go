@@ -526,7 +526,6 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 		c.checkMethod(method, decl)
 	}
 	c.checkOperatorMethods(info)
-	c.checkImplMethodMarkers(info)
 	if decl.Enum {
 		c.checkEnumCases(info)
 	}
@@ -635,34 +634,8 @@ func (c *Checker) checkInterfaceImplementation(class classInfo, impl *parser.Typ
 			c.addDiagnostic("interface_not_implemented", "class '"+class.decl.Name+"' does not implement method '"+method.Name+"' with matching signature", class.decl.Span)
 			continue
 		}
-		if !classMethod.decl.Impl {
-			c.addDiagnostic("interface_method_requires_impl", "method '"+class.decl.Name+"."+classMethod.decl.Name+"' must use 'impl def' because it implements interface '"+iface.decl.Name+"'", classMethod.decl.Span)
-		}
 		actual := c.instantiateMethodSignature(classMethod.decl, class.decl, nil)
 		c.compareSignatures(actual, expected, classMethod.decl.Span, method.Name)
-	}
-}
-
-func (c *Checker) checkImplMethodMarkers(class classInfo) {
-	if len(class.decl.Implements) == 0 {
-		for _, methods := range class.methods {
-			for _, method := range methods {
-				if method.decl.Impl {
-					c.addDiagnostic("invalid_impl_method", "method '"+class.decl.Name+"."+method.decl.Name+"' uses 'impl def' but class '"+class.decl.Name+"' does not implement any interfaces", method.decl.Span)
-				}
-			}
-		}
-		return
-	}
-	for _, methods := range class.methods {
-		for _, method := range methods {
-			if !method.decl.Impl {
-				continue
-			}
-			if !c.methodMatchesDeclaredInterface(class, method.decl) && !c.methodMatchesEqInterface(class, method.decl) {
-				c.addDiagnostic("invalid_impl_method", "method '"+class.decl.Name+"."+method.decl.Name+"' uses 'impl def' but does not match any declared interface method", method.decl.Span)
-			}
-		}
 	}
 }
 
@@ -705,53 +678,6 @@ func isAllowedOperatorName(name string) bool {
 	default:
 		return false
 	}
-}
-
-func (c *Checker) methodMatchesDeclaredInterface(class classInfo, method *parser.MethodDecl) bool {
-	for _, impl := range class.decl.Implements {
-		if impl == nil {
-			continue
-		}
-		iface, ok := c.interfaces[impl.Name]
-		if !ok {
-			continue
-		}
-		subst := map[string]*Type{}
-		for i, param := range iface.decl.TypeParameters {
-			if i < len(impl.Arguments) {
-				subst[param.Name] = c.instantiateTypeRef(impl.Arguments[i], nil)
-			}
-		}
-		for _, ifaceMethod := range c.interfaceMethods(iface.decl, map[string]bool{}) {
-			if ifaceMethod.Name != method.Name {
-				continue
-			}
-			expected := c.instantiateInterfaceMethodSignature(ifaceMethod, subst)
-			actual := c.instantiateMethodSignature(method, class.decl, nil)
-			if signaturesCompatible(actual, expected) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (c *Checker) methodMatchesEqInterface(class classInfo, method *parser.MethodDecl) bool {
-	if method.Name != "equals" {
-		return false
-	}
-	for _, impl := range class.decl.Implements {
-		if impl == nil || impl.Name != "Eq" || len(impl.Arguments) != 1 {
-			continue
-		}
-		expectedSelf := c.instantiateTypeRef(impl.Arguments[0], c.substForDecl(class.decl.TypeParameters, nil))
-		expected := Signature{Parameters: []*Type{expectedSelf}, ReturnType: builtin("Bool")}
-		actual := c.instantiateMethodSignature(method, class.decl, nil)
-		if signaturesCompatible(actual, expected) {
-			return true
-		}
-	}
-	return false
 }
 
 func signaturesCompatible(actual Signature, expected Signature) bool {
@@ -977,9 +903,6 @@ func (c *Checker) checkEqImplementation(class classInfo, impl *parser.TypeRef) {
 	if !ok {
 		c.addDiagnostic("interface_not_implemented", "class '"+class.decl.Name+"' does not implement method 'equals' with signature required by Eq", class.decl.Span)
 		return
-	}
-	if !method.decl.Impl {
-		c.addDiagnostic("interface_method_requires_impl", "method '"+class.decl.Name+"."+method.decl.Name+"' must use 'impl def' because it implements interface 'Eq'", method.decl.Span)
 	}
 	actual := c.instantiateMethodSignature(method.decl, class.decl, nil)
 	expected := Signature{Parameters: []*Type{expectedSelf}, ReturnType: builtin("Bool")}
@@ -2831,7 +2754,6 @@ func (c *Checker) checkAnonymousInterfaceExpr(expr *parser.AnonymousInterfaceExp
 		c.checkMethod(method, decl)
 	}
 	c.checkOperatorMethods(info)
-	c.checkImplMethodMarkers(info)
 	for _, impl := range expr.Interfaces {
 		c.checkInterfaceImplementation(info, impl)
 	}

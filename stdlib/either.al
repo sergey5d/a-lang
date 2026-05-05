@@ -7,8 +7,8 @@ class Either[L, R] with Unwrappable[R] {
 impl Either[L, R] {
     def isLeft() Bool = !rightSet
     def isRight() Bool = rightSet
-    impl def isFailure() Bool = !rightSet
-    impl def unwrap() R = right
+    def isFailure() Bool = !rightSet
+    def unwrap() R = right
     def getLeft() L = left
     def getOr(defaultValue R) R =
         if rightSet {

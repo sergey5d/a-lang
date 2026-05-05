@@ -2,9 +2,9 @@ object OS with Printer {
     out Printer = ?
     err Printer = ?
 
-    impl def print(value Str...) Unit = ()
-    impl def println(value Str...) Unit = ()
-    impl def printf(format Str, value Str...) Unit = ()
-    impl def panic(value Str...) Unit = ()
+    def print(value Str...) Unit = ()
+    def println(value Str...) Unit = ()
+    def printf(format Str, value Str...) Unit = ()
+    def panic(value Str...) Unit = ()
 }
 

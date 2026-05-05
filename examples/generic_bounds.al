@@ -3,7 +3,7 @@
 # 0
 
 object Ascending with Ordering[Int] {
-    impl def compare(left Int, right Int) Int = left - right
+    def compare(left Int, right Int) Int = left - right
 }
 
 class Box[T with Ordering[T]] {

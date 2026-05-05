@@ -5,7 +5,7 @@ record IntRange with Iterable[Int] {
 }
 
 impl IntRange {
-    impl def iterator() Iterator[Int] = RangeIterator(start = start, end = end, step = step)
+    def iterator() Iterator[Int] = RangeIterator(start = start, end = end, step = step)
 
     def zip[X](other List[X]) List[(Int, X)] {
         out List[(Int, X)] = []
@@ -43,14 +43,14 @@ impl RangeIterator {
         this.step := step
     }
 
-    impl def hasNext() Bool {
+    def hasNext() Bool {
         if this.step > 0 {
             return this.current < this.end
         }
         return this.current > this.end
     }
 
-    impl def next() Int {
+    def next() Int {
         value Int = this.current
         this.current := this.current + this.step
         value

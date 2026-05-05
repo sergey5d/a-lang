@@ -144,7 +144,6 @@ type MethodDecl struct {
 	Parameters     []Parameter     `json:"parameters"`
 	ReturnType     *TypeRef        `json:"returnType,omitempty"`
 	Body           *BlockStmt      `json:"body"`
-	Impl           bool            `json:"impl,omitempty"`
 	Operator       bool            `json:"operator,omitempty"`
 	Private        bool            `json:"private,omitempty"`
 	Constructor    bool            `json:"constructor,omitempty"`
