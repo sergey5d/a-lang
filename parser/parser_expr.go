@@ -570,11 +570,11 @@ func findInterpolatedExprEnd(runes []rune, start int) (int, error) {
 }
 
 func (p *Parser) parseIfExprAfterStart(start Token) (Expr, error) {
-	condition, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
+	condition, err := p.parseExpressionUntil(TokenLBrace, TokenThen)
 	if err != nil {
 		return nil, err
 	}
-	thenBlock, err := p.parseYieldBodyBlock("if", TokenElse)
+	thenBlock, err := p.parseThenExprBodyBlock("if", TokenElse)
 	if err != nil {
 		return nil, err
 	}
@@ -635,10 +635,46 @@ func (p *Parser) parseOptionalColonExprBodyBlock(introducer Token, owner string,
 			Span:       mergeSpans(tokenSpan(colon), exprSpan(expr)),
 		}, nil
 	}
-	if p.isAtEnd() || !sameLine(introducer, p.peek()) {
+	if p.isAtEnd() {
 		return nil, fmt.Errorf("expected '{' or inline expression after %s", owner)
 	}
-	expr, err := p.parseExpression(0)
+	var (
+		expr Expr
+		err  error
+	)
+	if sameLine(introducer, p.peek()) && len(stopTypes) > 0 {
+		expr, err = p.parseInlineExpression(stopTypes...)
+	} else {
+		expr, err = p.parseExpression(0)
+	}
+	if err != nil {
+		return nil, err
+	}
+	stmt := &ExprStmt{Expr: expr, Span: exprSpan(expr)}
+	return &BlockStmt{
+		Statements: []Statement{stmt},
+		Span:       mergeSpans(tokenSpan(introducer), exprSpan(expr)),
+	}, nil
+}
+
+func (p *Parser) parseThenExprBodyBlock(owner string, stopTypes ...TokenType) (*BlockStmt, error) {
+	introducer := p.previous()
+	if p.check(TokenLBrace) {
+		return p.parseBlock()
+	}
+	then, err := p.consume(TokenThen, "expected '{' or 'then' after "+owner)
+	if err != nil {
+		return nil, err
+	}
+	if p.isAtEnd() {
+		return nil, fmt.Errorf("expected expression after 'then'")
+	}
+	var expr Expr
+	if sameLine(then, p.peek()) && len(stopTypes) > 0 {
+		expr, err = p.parseInlineExpression(stopTypes...)
+	} else {
+		expr, err = p.parseExpression(0)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -665,28 +701,24 @@ func (p *Parser) parseMatchExprAfterKeyword(start Token, partial bool) (Expr, er
 		value Expr
 		err error
 	)
-	if p.check(TokenLBrace) || p.check(TokenColon) {
+	if p.check(TokenLBrace) {
 		value = &PlaceholderExpr{Span: tokenSpan(start)}
 	} else {
-		value, err = p.parseExpressionUntil(TokenLBrace, TokenColon)
+		value, err = p.parseExpressionUntil(TokenLBrace)
 		if err != nil {
 			return nil, err
 		}
+	}
+	if !p.check(TokenLBrace) {
+		return nil, fmt.Errorf("match requires a block of cases")
 	}
 	var (
 		cases []MatchCase
 		end   Token
 	)
-	if p.check(TokenLBrace) {
-		cases, end, err = p.parseMatchCases()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		cases, end, err = p.parseInlineMatchCases(false)
-		if err != nil {
-			return nil, err
-		}
+	cases, end, err = p.parseMatchCases()
+	if err != nil {
+		return nil, err
 	}
 	return &MatchExpr{
 		Partial: partial,

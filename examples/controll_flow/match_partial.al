@@ -15,7 +15,7 @@ enum MaybeInt {
 
 def main() Unit {
     values = List(1, 6, 3)
-    ifMapped = values.map(if _ > 5: 10 else 8)
+    ifMapped = values.map(if _ > 5 then 10 else 8)
 
     options = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
     matchMapped = options.map(match {

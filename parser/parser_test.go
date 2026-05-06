@@ -523,10 +523,14 @@ def run(values List[Int], flag Bool) Int {
 func TestParseColonShorthandStatements(t *testing.T) {
 	src := `
 def run(values List[Int], flag Bool, maybe MaybeInt) Int {
-	if flag: return 1 else return 2
+	if flag then return 1 else return 2
 	for value <- values: OS.println(value)
 	loop break
-	match maybe: SomeX(x) => return x
+	match maybe {
+		SomeX(x) => {
+			return x
+		}
+	}
 }
 
 enum MaybeInt {
@@ -572,24 +576,27 @@ enum MaybeInt {
 		t.Fatalf("expected fourth statement to be match, got %T", fn.Body.Statements[3])
 	}
 	if len(matchStmt.Cases) != 1 {
-		t.Fatalf("expected 1 inline match case, got %d", len(matchStmt.Cases))
+		t.Fatalf("expected 1 match case, got %d", len(matchStmt.Cases))
 	}
 	if matchStmt.Cases[0].Body == nil {
-		t.Fatalf("expected shorthand match statement cases to have bodies, got %#v", matchStmt.Cases)
+		t.Fatalf("expected match statement case to have body, got %#v", matchStmt.Cases)
 	}
 }
 
 func TestParseColonShorthandExpressions(t *testing.T) {
 	src := `
 def run(values List[Int], flag Bool, maybe MaybeInt) Int {
-	label = if flag: 1 else 2
-	label2 = if flag: 3
+	label = if flag then 1 else 2
+	label2 = if flag then 3
 	else 4
-	label3 = if flag: 5
-	else if false: 6
+	label3 = if flag then 5
+	else if false then 6
 	else 7
 	items = for value <- values yield value + 1
-	picked = match maybe: SomeX(x) => x
+	picked = match maybe {
+		SomeX(x) => x
+		MaybeInt.NoneX => 0
+	}
 	return label + picked
 }
 
@@ -650,11 +657,11 @@ enum MaybeInt {
 	if !ok {
 		t.Fatalf("expected fifth binding value to be match expression, got %T", fifth.Values[0])
 	}
-	if len(matchExpr.Cases) != 1 {
-		t.Fatalf("expected 1 inline match expression case, got %d", len(matchExpr.Cases))
+	if len(matchExpr.Cases) != 2 {
+		t.Fatalf("expected 2 match expression cases, got %d", len(matchExpr.Cases))
 	}
-	if matchExpr.Cases[0].Expr == nil {
-		t.Fatalf("expected shorthand match expression cases to have expressions, got %#v", matchExpr.Cases)
+	if matchExpr.Cases[0].Expr == nil || matchExpr.Cases[1].Expr == nil {
+		t.Fatalf("expected match expression cases to have expressions, got %#v", matchExpr.Cases)
 	}
 	if matchExpr.Partial {
 		t.Fatalf("expected plain match expression to be exhaustive by default")
@@ -688,10 +695,10 @@ def run(value MaybeInt) Option[Int] =
 	}
 }
 
-func TestParseColonShorthandAllowsNewlineBody(t *testing.T) {
+func TestParseThenShorthandAllowsNewlineBody(t *testing.T) {
 	src := `
 def run(flag Bool) Int {
-	if flag:
+	if flag then
 		return 1
 	return 0
 }
@@ -702,10 +709,10 @@ def run(flag Bool) Int {
 	}
 }
 
-func TestParseColonShorthandAllowsMultilineRecordLiteral(t *testing.T) {
+func TestParseThenShorthandAllowsMultilineRecordLiteral(t *testing.T) {
 	src := `
 def run(flag Bool) { value Int } {
-	if flag: return record {
+	if flag then return record {
 		value = 1
 	}
 	return record { value = 0 }

@@ -11,7 +11,7 @@ record TreeNode {
 }
 
 def chooseNode(left Option[TreeNode], right Option[TreeNode]) Option[TreeNode] =
-    if !left.isEmpty(): left else right
+    if !left.isEmpty() then left else right
 
 def find(
     node Option[TreeNode],
@@ -32,7 +32,7 @@ def find(
         currentFoundP := Some(current)
     }
 
-    if currentFoundQ.isEmpty() && current.val == valQ: currentFoundQ := Some(current)
+    if currentFoundQ.isEmpty() && current.val == valQ then currentFoundQ := Some(current)
 
     foundPCount = currentFoundP.map(_ -> 1).getOrElse(0)
     foundQCount = currentFoundQ.map(_ -> 1).getOrElse(0)

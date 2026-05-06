@@ -2709,7 +2709,7 @@ enum MaybeInt {
 
 def run() Bool {
 	values List[Int] = List(1, 6, 3)
-	ifMapped List[Int] = values.map(if _ > 5: 10 else: 8)
+	ifMapped List[Int] = values.map(if _ > 5 then 10 else 8)
 	options List[MaybeInt] = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
 	matchMapped List[Int] = options.map(match {
 		SomeX(x) => x + 1

@@ -386,7 +386,7 @@ Rules:
 - if an expression containing `_` appears where a one-argument function is expected, it expands to a lambda
 - `_ + 1` becomes `x -> x + 1`
 - the shorthand is contextual; outside a lambda-expected position, `_` is not a normal value
-- this also works with larger expressions such as `items.map(if _ > 5: 10 else 8)` or `items.map(match _ { ... })`
+- this also works with larger expressions such as `items.map(if _ > 5 then 10 else 8)` or `items.map(match _ { ... })`
 
 Explicitly typed lambda:
 
@@ -677,21 +677,21 @@ result = if value > 0 {
 Shorthand expression form:
 
 ```txt
-result = if value > 0: 1 else 0
+result = if value > 0 then 1 else 0
 ```
 
 Multiline shorthand is also valid:
 
 ```txt
-result = if value > 0: 1
+result = if value > 0 then 1
 else 0
 ```
 
 This also extends through `else if` chains:
 
 ```txt
-result = if value > 0: 1
-else if value < 0: -1
+result = if value > 0 then 1
+else if value < 0 then -1
 else 0
 ```
 
@@ -853,6 +853,8 @@ result Option[Int] = try match value {
 }
 ```
 
+`match` and `try match` always require a block of cases. Inline `match value: ...` shorthand is not supported.
+
 If no case matches, `try match` returns `None`.
 
 Supported pattern families:
@@ -997,7 +999,7 @@ Newline continuation:
   - `<-`
 - Body-introducing forms are intentionally looser:
   - `def ... =` may start its body on the next line
-  - `if:`, `else:`, `for:`, `yield`, and `match:` may also start their single statement / expression body on the next line
+  - `if ... then`, `else`, `for:`, `yield`, and `unwrap ... else` may also start their single statement / expression body on the next line
 - So this is invalid:
 
 ```txt
@@ -1018,7 +1020,7 @@ a = 1 +
 def value() Int =
     1 + 2
 
-if flag:
+if flag then
     return 1
 ```
 

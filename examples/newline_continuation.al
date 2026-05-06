@@ -41,9 +41,9 @@ def main() Unit {
             0
     }
 
-    fromIf Int = if true:
+    fromIf Int = if true then
         11
-    else:
+    else
         0
 
     collected = for item <- [2, 3] yield
@@ -53,12 +53,17 @@ def main() Unit {
         collected.get(1).getOr(0)
 
     fromMatchStmt := 0
-    match 2:
-        1 => fromMatchStmt := 1
+    match 2 {
+        1 => {
+            fromMatchStmt := 1
+        }
+    }
 
-    match 3:
-        3 =>
+    match 3 {
+        3 => {
             fromMatchStmt := 9
+        }
+    }
 
     helperValue Int = helper()
 

@@ -443,20 +443,20 @@ func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
 		if err := p.requireSameLineExpressionStart(p.previous()); err != nil {
 			return nil, err
 		}
-		value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
+		value, err := p.parseExpressionUntil(TokenLBrace, TokenThen)
 		if err != nil {
 			return nil, err
 		}
 		stmt.Bindings = bindings
 		stmt.BindingValue = value
 	} else {
-		condition, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
+		condition, err := p.parseExpressionUntil(TokenLBrace, TokenThen)
 		if err != nil {
 			return nil, err
 		}
 		stmt.Condition = condition
 	}
-	thenBlock, err := p.parseStmtBodyBlock("if", TokenElse)
+	thenBlock, err := p.parseThenStmtBodyBlock("if", TokenElse)
 	if err != nil {
 		return nil, err
 	}
@@ -504,17 +504,16 @@ func (p *Parser) parseTryMatchStmt() (Statement, error) {
 }
 
 func (p *Parser) parseMatchStmtAfterStart(start Token, partial bool) (Statement, error) {
-	value, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
+	value, err := p.parseExpressionUntil(TokenLBrace)
 	if err != nil {
 		return nil, err
 	}
+	if !p.check(TokenLBrace) {
+		return nil, fmt.Errorf("match requires a block of cases")
+	}
 	var cases []MatchCase
 	var end Token
-	if p.check(TokenLBrace) {
-		cases, end, err = p.parseMatchCases()
-	} else {
-		cases, end, err = p.parseInlineMatchCases(true)
-	}
+	cases, end, err = p.parseMatchCases()
 	if err != nil {
 		return nil, err
 	}
@@ -851,6 +850,34 @@ func (p *Parser) parseStmtBodyBlock(owner string, stopTypes ...TokenType) (*Bloc
 	return &BlockStmt{
 		Statements: []Statement{stmt},
 		Span:       mergeSpans(tokenSpan(colon), stmtSpan(stmt)),
+	}, nil
+}
+
+func (p *Parser) parseThenStmtBodyBlock(owner string, stopTypes ...TokenType) (*BlockStmt, error) {
+	if p.check(TokenLBrace) {
+		return p.parseBlock()
+	}
+	then, err := p.consume(TokenThen, "expected '{' or 'then' after "+owner)
+	if err != nil {
+		return nil, err
+	}
+	if p.isAtEnd() {
+		return nil, fmt.Errorf("expected statement after 'then'")
+	}
+	p.beginScope()
+	defer p.endScope()
+	var stmt Statement
+	if sameLine(then, p.peek()) {
+		stmt, err = p.parseInlineStatement(stopTypes...)
+	} else {
+		stmt, err = p.parseStatement()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &BlockStmt{
+		Statements: []Statement{stmt},
+		Span:       mergeSpans(tokenSpan(then), stmtSpan(stmt)),
 	}, nil
 }
 

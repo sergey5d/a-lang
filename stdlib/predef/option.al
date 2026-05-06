@@ -19,7 +19,7 @@ impl Option[T] {
     def get() T = value
     def unwrap() T = value
     def getOr(defaultValue T) T =
-        if set: value else defaultValue
+        if set then value else defaultValue
 
     def getOrElse(defaultValue T) T = this.getOr(defaultValue)
 
