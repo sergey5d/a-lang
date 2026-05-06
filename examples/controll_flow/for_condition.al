@@ -20,7 +20,9 @@ def main() Int {
     }
 
     shortCount Int := 0
-    for shortCount < 3: shortCount := next("short", shortCount)
+    for shortCount < 3 {
+        shortCount := next("short", shortCount)
+    }
 
     0
 }

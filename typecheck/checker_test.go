@@ -2103,7 +2103,7 @@ func TestAnalyzeOptionConstructorsAndMethods(t *testing.T) {
 def run() Int {
 	found Option[Int] = Some(5)
 	missing Option[Int] = None()
-	unwrap value <- found else: return missing.getOr(7)
+	unwrap value <- found else return missing.getOr(7)
 	return value
 }
 `

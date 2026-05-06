@@ -1,6 +1,9 @@
 package parser
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func (p *Parser) parseBlock() (*BlockStmt, error) {
 	start, err := p.consume(TokenLBrace, "expected '{'")
@@ -181,7 +184,7 @@ func (p *Parser) parseUnwrapStmt() (Statement, error) {
 	}
 	if p.match(TokenElse) {
 		elseToken := p.previous()
-		fallback, err := p.parseOptionalColonStmtBodyBlock(elseToken, "unwrap else")
+		fallback, err := p.parseBlockOrInlineStmtBody(elseToken, "unwrap else")
 		if err != nil {
 			return nil, err
 		}
@@ -247,7 +250,7 @@ func (p *Parser) parseUnwrapBlockStmt(start Token) (Statement, error) {
 	}
 	if p.match(TokenElse) {
 		elseToken := p.previous()
-		fallback, err := p.parseOptionalColonStmtBodyBlock(elseToken, "unwrap else")
+		fallback, err := p.parseBlockOrInlineStmtBody(elseToken, "unwrap else")
 		if err != nil {
 			return nil, err
 		}
@@ -472,7 +475,7 @@ func (p *Parser) parseIfStmtAfterStart(start Token) (Statement, error) {
 			stmt.Span = mergeSpans(tokenSpan(start), stmt.ElseIf.Span)
 			return stmt, nil
 		}
-		elseBlock, err := p.parseOptionalColonStmtBodyBlock(elseToken, "else")
+		elseBlock, err := p.parseBlockOrInlineStmtBody(elseToken, "else")
 		if err != nil {
 			return nil, err
 		}
@@ -752,7 +755,7 @@ func (p *Parser) parseForStmt() (Statement, error) {
 
 func (p *Parser) parseLoopStmt() (Statement, error) {
 	start := p.advance()
-	body, err := p.parseOptionalColonStmtBodyBlock(start, "loop")
+	body, err := p.parseBlockOrInlineStmtBody(start, "loop")
 	if err != nil {
 		return nil, err
 	}
@@ -782,7 +785,10 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 				Span:      mergeSpans(tokenSpan(start), yieldBody.Span),
 			}, nil
 		}
-		body, err := p.parseStmtBodyBlock("for")
+		if !p.check(TokenLBrace) && !p.isAtEnd() && sameLine(start, p.peek()) {
+			return nil, fmt.Errorf("for requires a '{ ... }' block body; one-line for forms are not supported")
+		}
+		body, err := p.parseRequiredBlock("for")
 		if err != nil {
 			return nil, err
 		}
@@ -810,11 +816,17 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 			Span:      mergeSpans(tokenSpan(start), yieldBody.Span),
 		}, nil
 	}
-	condition, err := p.parseExpressionUntil(TokenLBrace, TokenColon)
+	condition, err := p.parseExpressionUntil(TokenLBrace)
 	if err != nil {
+		if isForInlineBodyParseError(err) {
+			return nil, fmt.Errorf("for requires a '{ ... }' block body; one-line for forms are not supported")
+		}
 		return nil, err
 	}
-	body, err := p.parseStmtBodyBlock("for")
+	if !p.check(TokenLBrace) && !p.isAtEnd() && sameLine(start, p.peek()) {
+		return nil, fmt.Errorf("for requires a '{ ... }' block body; one-line for forms are not supported")
+	}
+	body, err := p.parseRequiredBlock("for")
 	if err != nil {
 		return nil, err
 	}
@@ -825,32 +837,14 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 	}, nil
 }
 
-func (p *Parser) parseStmtBodyBlock(owner string, stopTypes ...TokenType) (*BlockStmt, error) {
-	if p.check(TokenLBrace) {
-		return p.parseBlock()
+func (p *Parser) parseRequiredBlock(owner string) (*BlockStmt, error) {
+	if !p.check(TokenLBrace) {
+		if owner == "for" {
+			return nil, fmt.Errorf("for requires a '{ ... }' block body; one-line for forms are not supported")
+		}
+		return nil, fmt.Errorf("expected '{' after %s", owner)
 	}
-	colon, err := p.consume(TokenColon, "expected '{' or ':' after "+owner)
-	if err != nil {
-		return nil, err
-	}
-	if p.isAtEnd() {
-		return nil, fmt.Errorf("expected statement after ':'")
-	}
-	p.beginScope()
-	defer p.endScope()
-	var stmt Statement
-	if sameLine(colon, p.peek()) {
-		stmt, err = p.parseInlineStatement(stopTypes...)
-	} else {
-		stmt, err = p.parseStatement()
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &BlockStmt{
-		Statements: []Statement{stmt},
-		Span:       mergeSpans(tokenSpan(colon), stmtSpan(stmt)),
-	}, nil
+	return p.parseBlock()
 }
 
 func (p *Parser) parseThenStmtBodyBlock(owner string, stopTypes ...TokenType) (*BlockStmt, error) {
@@ -885,29 +879,6 @@ func (p *Parser) parseYieldBodyBlock(owner string, stopTypes ...TokenType) (*Blo
 	introducer := p.previous()
 	if p.check(TokenLBrace) {
 		return p.parseBlock()
-	}
-	if p.match(TokenColon) {
-		colon := p.previous()
-		if p.isAtEnd() {
-			return nil, fmt.Errorf("expected expression after ':'")
-		}
-		var (
-			expr Expr
-			err  error
-		)
-		if sameLine(colon, p.peek()) && len(stopTypes) > 0 {
-			expr, err = p.parseInlineExpression(stopTypes...)
-		} else {
-			expr, err = p.parseExpression(0)
-		}
-		if err != nil {
-			return nil, err
-		}
-		stmt := &ExprStmt{Expr: expr, Span: exprSpan(expr)}
-		return &BlockStmt{
-			Statements: []Statement{stmt},
-			Span:       mergeSpans(tokenSpan(colon), exprSpan(expr)),
-		}, nil
 	}
 	if p.isAtEnd() {
 		return nil, fmt.Errorf("expected '{' or expression after %s", owner)
@@ -986,38 +957,24 @@ func (p *Parser) parseInlineMatchCases(statementMode bool) ([]MatchCase, Token, 
 	return []MatchCase{matchCase}, p.previous(), nil
 }
 
-func (p *Parser) parseOptionalColonStmtBodyBlock(introducer Token, owner string, stopTypes ...TokenType) (*BlockStmt, error) {
+func (p *Parser) parseBlockOrInlineStmtBody(introducer Token, owner string, stopTypes ...TokenType) (*BlockStmt, error) {
 	if p.check(TokenLBrace) {
 		return p.parseBlock()
 	}
-	if p.match(TokenColon) {
-		colon := p.previous()
-		if p.isAtEnd() {
-			return nil, fmt.Errorf("expected statement after ':'")
-		}
-		p.beginScope()
-		defer p.endScope()
-		var stmt Statement
-		var err error
-		if sameLine(colon, p.peek()) {
-			stmt, err = p.parseInlineStatement(stopTypes...)
-		} else {
-			stmt, err = p.parseStatement()
-		}
-		if err != nil {
-			return nil, err
-		}
-		return &BlockStmt{
-			Statements: []Statement{stmt},
-			Span:       mergeSpans(tokenSpan(colon), stmtSpan(stmt)),
-		}, nil
-	}
-	if p.isAtEnd() || !sameLine(introducer, p.peek()) {
+	if p.isAtEnd() {
 		return nil, fmt.Errorf("expected '{' or inline statement after %s", owner)
 	}
 	p.beginScope()
 	defer p.endScope()
-	stmt, err := p.parseStatement()
+	var (
+		stmt Statement
+		err error
+	)
+	if sameLine(introducer, p.peek()) {
+		stmt, err = p.parseInlineStatement(stopTypes...)
+	} else {
+		stmt, err = p.parseStatement()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1218,6 +1175,9 @@ func (p *Parser) parseForClause() (ForBinding, error) {
 		}
 		iterable, err := p.parseInlineExpression(TokenComma, TokenRBrace, TokenYield, TokenLBrace, TokenColon)
 		if err != nil {
+			if isForInlineBodyParseError(err) {
+				return ForBinding{}, fmt.Errorf("for requires a '{ ... }' block body; one-line for forms are not supported")
+			}
 			return ForBinding{}, err
 		}
 		return ForBinding{
@@ -1258,6 +1218,15 @@ func (p *Parser) parseForClause() (ForBinding, error) {
 	default:
 		return ForBinding{}, fmt.Errorf("expected '<-' or '=' after for bindings, got %s", p.peek().String())
 	}
+}
+
+func isForInlineBodyParseError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.HasPrefix(msg, "expected end of inline expression, got ") ||
+		strings.HasPrefix(msg, "expected end of expression, got ")
 }
 
 func (p *Parser) parseForBindingsBlock() ([]ForBinding, error) {

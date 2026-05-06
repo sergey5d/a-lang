@@ -520,11 +520,13 @@ def run(values List[Int], flag Bool) Int {
 	}
 }
 
-func TestParseColonShorthandStatements(t *testing.T) {
+func TestParseShortStatements(t *testing.T) {
 	src := `
 def run(values List[Int], flag Bool, maybe MaybeInt) Int {
 	if flag then return 1 else return 2
-	for value <- values: OS.println(value)
+	for value <- values {
+		OS.println(value)
+	}
 	loop break
 	match maybe {
 		SomeX(x) => {
@@ -760,6 +762,22 @@ def run() Int {
 
 	if _, err := Parse(src); err == nil {
 		t.Fatalf("expected parse error for newline rhs after '='")
+	}
+}
+
+func TestParseForRejectsOneLineBody(t *testing.T) {
+	src := `
+def run(values List[Int]) Unit {
+	for value <- values OS.println(value)
+}
+`
+
+	_, err := Parse(src)
+	if err == nil {
+		t.Fatalf("expected parse error for one-line for body")
+	}
+	if got := err.Error(); got != "for requires a '{ ... }' block body; one-line for forms are not supported" {
+		t.Fatalf("unexpected parse error: %v", err)
 	}
 }
 

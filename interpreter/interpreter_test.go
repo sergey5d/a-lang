@@ -1322,7 +1322,7 @@ func TestOptionRuntime(t *testing.T) {
 def run() Int {
 	found = Some(5)
 	missing = None()
-	unwrap value <- found else: return 0
+	unwrap value <- found else return 0
 	return value + missing.getOr(2)
 }
 `
@@ -1917,9 +1917,9 @@ def run() Int {
 		next
 	}
 
-	unwrap first <- items.get(0) else: return 0
-	unwrap second <- items.get(1) else: return 0
-	unwrap third <- items.get(2) else: return 0
+	unwrap first <- items.get(0) else return 0
+	unwrap second <- items.get(1) else return 0
+	unwrap third <- items.get(2) else return 0
 	return first + second + third
 }
 `
@@ -1966,9 +1966,9 @@ def run() Int {
 		total
 	}
 
-	unwrap first <- items.get(0) else: return 0
-	unwrap second <- items.get(1) else: return 0
-	unwrap third <- items.get(2) else: return 0
+	unwrap first <- items.get(0) else return 0
+	unwrap second <- items.get(1) else return 0
+	unwrap third <- items.get(2) else return 0
 	return first + second + third
 }
 `

@@ -999,7 +999,7 @@ Newline continuation:
   - `<-`
 - Body-introducing forms are intentionally looser:
   - `def ... =` may start its body on the next line
-  - `if ... then`, `else`, `for:`, `yield`, and `unwrap ... else` may also start their single statement / expression body on the next line
+  - `if ... then`, `else`, `loop`, `yield`, and `unwrap ... else` may also start their single statement / expression body on the next line
 - So this is invalid:
 
 ```txt

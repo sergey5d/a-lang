@@ -8,8 +8,12 @@
 def main() Int {
     total Int := 0
 
-    for item <- [1, 2, 3]: OS.println("item " + item)
-    for item <- [1, 2, 3]: total += item
+    for item <- [1, 2, 3] {
+        OS.println("item " + item)
+    }
+    for item <- [1, 2, 3] {
+        total += item
+    }
 
     OS.println("total " + total)
     0
