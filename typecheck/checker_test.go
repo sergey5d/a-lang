@@ -413,6 +413,26 @@ def run(value BoolBox) Int =
 	}
 }
 
+func TestAnalyzeNestedMatchExhaustivenessFallsBackPastDomainCap(t *testing.T) {
+	src := `
+enum BigBox {
+	case Wrap {
+		value (Bool, Bool, Bool, Bool, Bool, Bool)
+	}
+}
+
+def run(value BigBox) Int =
+	match value {
+		Wrap((true, true, true, true, true, true)) => 1
+	}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeMatchTypePattern(t *testing.T) {
 	src := `
 interface WorkerLike {

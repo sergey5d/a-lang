@@ -15,6 +15,11 @@ The current intended scope for nested pattern support is intentionally limited:
 - type-pattern reasoning/checking stays top-level only
 - do not support destructuring classes/records into tuples
 - do not support destructuring classes/records into anonymous-record shapes yet
+- deeper exhaustiveness only applies to enums, `Bool`, and tuples built from finite domains
+- class/record extractor patterns do not create deep exhaustiveness guarantees
+- guards do not contribute coverage
+- nested singleton enum cases stay qualified, for example `Wrap(InnerFlag.On)`
+- finite-domain expansion is capped at 32 combinations; above that the checker falls back to shallow coverage
 
 Examples of intended supported shapes:
 

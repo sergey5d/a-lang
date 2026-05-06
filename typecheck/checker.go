@@ -10,6 +10,8 @@ import (
 	"a-lang/semantic"
 )
 
+const maxFiniteMatchDomainSize = 32
+
 type Signature struct {
 	Parameters []*Type
 	ReturnType *Type
@@ -1618,6 +1620,9 @@ func (c *Checker) enumerateMatchDomain(valueType *Type) ([]matchDomainValue, boo
 		}
 		for _, combo := range caseValues {
 			out = append(out, matchDomainValue{kind: "constructor", name: enumCase.Name, args: combo.args})
+			if len(out) > maxFiniteMatchDomainSize {
+				return nil, false
+			}
 		}
 	}
 	return out, true
@@ -1643,6 +1648,12 @@ func (c *Checker) enumerateTupleLikeMatchDomain(elements []*Type) ([]matchDomain
 	for _, elemType := range elements {
 		domain, ok := c.enumerateMatchDomain(elemType)
 		if !ok {
+			return nil, false
+		}
+		if len(domain) == 0 {
+			return nil, false
+		}
+		if len(acc)*len(domain) > maxFiniteMatchDomainSize {
 			return nil, false
 		}
 		var next [][]matchDomainValue
