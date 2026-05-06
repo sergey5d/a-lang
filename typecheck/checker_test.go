@@ -331,6 +331,88 @@ def run(value Amount) Int {
 	}
 }
 
+func TestAnalyzeMatchTuplePatternDoesNotDestructureClass(t *testing.T) {
+	src := `
+class PairBox {
+	left Int
+	right Int
+}
+
+def run(value PairBox) Int =
+	match value {
+		(left, right) => left + right
+	}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	found := false
+	for _, diag := range result.Diagnostics {
+		if diag.Code == "invalid_match_pattern" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected invalid_match_pattern, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeNestedMatchExhaustiveness(t *testing.T) {
+	src := `
+enum BoolBox {
+	case Wrap {
+		value Bool
+	}
+	case Empty
+}
+
+def run(value BoolBox) Int =
+	match value {
+		Wrap(true) => 1
+		Wrap(false) => 0
+		BoolBox.Empty => 2
+	}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeUnreachableNestedMatchCase(t *testing.T) {
+	src := `
+enum BoolBox {
+	case Wrap {
+		value Bool
+	}
+	case Empty
+}
+
+def run(value BoolBox) Int =
+	match value {
+		Wrap(_) => 1
+		Wrap(true) => 2
+		BoolBox.Empty => 0
+	}
+`
+
+	result := Analyze(parseProgram(t, src))
+	found := false
+	for _, diag := range result.Diagnostics {
+		if diag.Code == "unreachable_match_case" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected unreachable_match_case, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeMatchTypePattern(t *testing.T) {
 	src := `
 interface WorkerLike {
@@ -385,7 +467,6 @@ def describe(value OptionX[Int]) Int =
 def describeBox(value Box[Int]) Int =
 	match value {
 		box Box => 2
-		_ => 0
 	}
 `
 

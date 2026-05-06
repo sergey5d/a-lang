@@ -181,6 +181,83 @@ def run(value Worker) Int {
 	}
 }
 
+func TestParseNestedMatchPatterns(t *testing.T) {
+	program, err := Parse(`
+enum AppleBox {
+	case Empty
+	case Full {
+		value (Int, Int)
+	}
+}
+
+def run(value AppleBox) Int =
+	match value {
+		Full((left, right)) => left + right
+		AppleBox.Empty => 0
+	}
+`)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	fn := program.Functions[0]
+	exprStmt := fn.Body.Statements[0].(*ExprStmt)
+	matchExpr := exprStmt.Expr.(*MatchExpr)
+	constructor, ok := matchExpr.Cases[0].Pattern.(*ConstructorPattern)
+	if !ok {
+		t.Fatalf("expected constructor pattern, got %T", matchExpr.Cases[0].Pattern)
+	}
+	if _, ok := constructor.Args[0].(*TuplePattern); !ok {
+		t.Fatalf("expected nested tuple pattern, got %T", constructor.Args[0])
+	}
+}
+
+func TestParseRejectsDeepNestedMatchPatterns(t *testing.T) {
+	_, err := Parse(`
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+class Box {
+	value Int
+}
+
+def run(value OptionX[(Box, Int)]) Int =
+	match value {
+		SomeX((Box(x), y)) => x + y
+		OptionX.NoneX => 0
+	}
+`)
+	if err == nil {
+		t.Fatalf("expected parse error for deep nested pattern")
+	}
+}
+
+func TestParseRejectsNestedTypePatterns(t *testing.T) {
+	_, err := Parse(`
+class Worker {
+}
+
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+
+def run(value OptionX[Worker]) Int =
+	match value {
+		SomeX(item Worker) => 1
+		OptionX.NoneX => 0
+	}
+`)
+	if err == nil {
+		t.Fatalf("expected parse error for nested type pattern")
+	}
+}
+
 func TestParseStringInterpolation(t *testing.T) {
 	program, err := Parse(`
 def run(name Str, count Int) Str {

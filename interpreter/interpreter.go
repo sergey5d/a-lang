@@ -696,7 +696,7 @@ func (in *Interpreter) matchPattern(pattern parser.Pattern, value Value, local *
 		}
 		return nil, equal, nil
 	case *parser.TuplePattern:
-		items, _, ok := destructurableValues(value)
+		items, ok := tuplePatternValues(value)
 		if !ok || len(items) != len(p.Elements) {
 			return nil, false, nil
 		}
@@ -792,6 +792,14 @@ func (in *Interpreter) matchLiteralValue(expr parser.Expr) (Value, error) {
 	default:
 		return nil, RuntimeError{Message: "unsupported literal pattern", Span: exprSpan(expr)}
 	}
+}
+
+func tuplePatternValues(value Value) ([]Value, bool) {
+	tuple, ok := value.(*nativeTuple)
+	if !ok {
+		return nil, false
+	}
+	return tuple.items, true
 }
 
 func decodeRuneLiteral(raw string) (rune, error) {

@@ -536,7 +536,6 @@ def describe(value OptionX[Int]) Int =
 def describeBox(value Box[Int]) Int =
 	match value {
 		box Box => 2
-		_ => 0
 	}
 
 def run() Int {
@@ -671,6 +670,50 @@ def run() Int {
 	}
 	if value != int64(42) {
 		t.Fatalf("expected 42, got %#v", value)
+	}
+}
+
+func TestMatchNestedPatterns(t *testing.T) {
+	src := `
+enum BoolBox {
+	case Wrap {
+		value Bool
+	}
+	case Empty
+}
+
+enum PairBox {
+	case Full {
+		value (Int, Int)
+	}
+	case NoneX
+}
+
+def describeFlag(value BoolBox) Int =
+	match value {
+		Wrap(true) => 1
+		Wrap(false) => 2
+		BoolBox.Empty => 3
+	}
+
+def describePair(value PairBox) Int =
+	match value {
+		Full((left, right)) => left + right
+		PairBox.NoneX => 0
+	}
+
+def run() Int {
+	return describeFlag(BoolBox.Wrap(false)) * 10 + describePair(PairBox.Full((4, 5)))
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(29) {
+		t.Fatalf("expected 29, got %#v", value)
 	}
 }
 

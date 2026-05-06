@@ -2,6 +2,46 @@
 
 This note captures the main remaining directions for improving `match`.
 
+## Current Target
+
+The current intended scope for nested pattern support is intentionally limited:
+
+- allow up to 2 levels of nesting
+- allow nested enum constructor patterns
+- allow nested tuple patterns
+- allow nested class/record extractor patterns
+- allow `_` in any nested position to omit fields
+- do not allow nested guards; guards stay attached only to the top-level case
+- type-pattern reasoning/checking stays top-level only
+- do not support destructuring classes/records into tuples
+- do not support destructuring classes/records into anonymous-record shapes yet
+
+Examples of intended supported shapes:
+
+```txt
+match value {
+    Some((x, y)) => ...
+    Box(Apple(a)) => ...
+    Pair(_, y) => ...
+}
+```
+
+Examples that are intentionally out of scope for now:
+
+```txt
+match value {
+    Some(x if x > 0) => ...        # nested guard
+    Person(name, age) as (x, y) => ...
+    Person({ name = x, age = y }) => ...
+}
+```
+
+Future feature to discuss later:
+
+- allow anonymous records to participate in destructuring patterns
+  - for example matching a class/record against an anonymous-record-shaped pattern
+  - this is explicitly not part of the first nested-pattern implementation
+
 ## Main Improvement Areas
 
 ### 1. Guards
@@ -26,6 +66,13 @@ Examples:
 
 This would let `match` express more of the current destructuring story directly inside patterns.
 
+Current target:
+
+- maximum nesting depth: 2
+- no nested guards
+- no class/record-to-tuple destructuring
+- no class/record-to-anonymous-record destructuring yet
+
 ## 3. Generic-Aware Type Patterns
 
 Constructor and extractor patterns already carry substituted field types correctly, but type-pattern matching still needs a clearer generic story, especially for:
@@ -48,6 +95,11 @@ Examples:
 - later specific case that can never run
 
 This would improve diagnostics and make `match` feel more complete as a checked language feature.
+
+Current target:
+
+- obvious structural unreachable detection first
+- no deep guard reasoning initially
 
 ## 5. Partial-Match Story
 
@@ -94,6 +146,11 @@ Possible next improvements:
 - better reporting
 - support with nested patterns
 - more complete analysis across richer pattern shapes
+
+Current target:
+
+- deeper exhaustiveness only within the same 2-level nested-pattern limit
+- top-level type-pattern rules stay as they are now
 
 ## Suggested Priority
 

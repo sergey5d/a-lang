@@ -13,13 +13,13 @@ def main() Int {
     OS.println(exactPair)
 
     exactPair2 = match (2, 3) {
-        (a Int, b Int) => "exact tuple " + a + "-" + b
+        (a, b) => "exact tuple " + a + "-" + b
         _ => "miss"
     }
     OS.println(exactPair2)
 
     exactPair3 = match (4, 5) {
-        (a, b Int) => "exact tuple " + a + "-" + b
+        (a, b) => "exact tuple " + a + "-" + b
         _ => "miss"
     }
     OS.println(exactPair3)

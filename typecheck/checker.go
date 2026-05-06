@@ -2,6 +2,7 @@ package typecheck
 
 import (
 	"fmt"
+	"strings"
 
 	"a-lang/module"
 	"a-lang/parser"
@@ -1288,6 +1289,7 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			}
 			c.popScope()
 		}
+		c.checkMatchUnreachableCases(valueType, s.Cases)
 		if !s.Partial {
 			c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
 		}
@@ -1365,7 +1367,7 @@ func (c *Checker) checkMatchPattern(pattern parser.Pattern, valueType *Type) {
 			c.addDiagnostic("invalid_match_pattern", "pattern does not match value type", p.Span)
 		}
 	case *parser.TuplePattern:
-		partTypes := c.destructureValueTypes(len(p.Elements), valueType, p.Span, "invalid_match_pattern", "match pattern")
+		partTypes := c.tuplePatternElementTypes(len(p.Elements), valueType, p.Span)
 		for i, elem := range p.Elements {
 			elemType := unknownType
 			if i < len(partTypes) && partTypes[i] != nil {
@@ -1378,7 +1380,21 @@ func (c *Checker) checkMatchPattern(pattern parser.Pattern, valueType *Type) {
 	}
 }
 
+func (c *Checker) tuplePatternElementTypes(count int, valueType *Type, span parser.Span) []*Type {
+	if valueType == nil || isUnknown(valueType) || valueType.Kind != TypeTuple {
+		c.addDiagnostic("invalid_match_pattern", fmt.Sprintf("match pattern expects %d tuple values, got 1", count), span)
+		return []*Type{valueType}
+	}
+	if len(valueType.Args) != count {
+		c.addDiagnostic("invalid_match_pattern", fmt.Sprintf("match pattern expects %d tuple values, got %d", count, len(valueType.Args)), span)
+	}
+	return valueType.Args
+}
+
 func (c *Checker) checkMatchExhaustiveness(valueType *Type, cases []parser.MatchCase, span parser.Span) {
+	if c.checkFiniteMatchExhaustiveness(valueType, cases, span) {
+		return
+	}
 	if valueType == nil || isUnknown(valueType) || valueType.Kind != TypeClass {
 		return
 	}
@@ -1408,6 +1424,318 @@ func (c *Checker) checkMatchExhaustiveness(valueType *Type, cases []parser.Match
 		return
 	}
 	c.addDiagnostic("non_exhaustive_match", "match does not cover enum cases: "+joinNames(missing), span)
+}
+
+type matchDomainValue struct {
+	kind    string
+	name    string
+	literal string
+	args    []matchDomainValue
+}
+
+func (c *Checker) checkMatchUnreachableCases(valueType *Type, cases []parser.MatchCase) {
+	domain, finite := c.enumerateMatchDomain(valueType)
+	if finite {
+		remaining := append([]matchDomainValue(nil), domain...)
+		for _, matchCase := range cases {
+			if len(remaining) == 0 {
+				c.addDiagnostic("unreachable_match_case", "match case is unreachable", matchCase.Span)
+				continue
+			}
+			covered := c.coveredDomainValues(matchCase.Pattern, valueType, domain)
+			if matchCase.Guard == nil {
+				fresh := intersectDomainValues(covered, remaining)
+				if len(covered) > 0 && len(fresh) == 0 {
+					c.addDiagnostic("unreachable_match_case", "match case is unreachable", matchCase.Span)
+					continue
+				}
+				remaining = subtractDomainValues(remaining, covered)
+			}
+		}
+		return
+	}
+	coveredAll := false
+	for _, matchCase := range cases {
+		if coveredAll {
+			c.addDiagnostic("unreachable_match_case", "match case is unreachable", matchCase.Span)
+			continue
+		}
+		if matchCase.Guard == nil && c.patternIsCatchAll(matchCase.Pattern, valueType) {
+			coveredAll = true
+		}
+	}
+}
+
+func (c *Checker) checkFiniteMatchExhaustiveness(valueType *Type, cases []parser.MatchCase, span parser.Span) bool {
+	domain, ok := c.enumerateMatchDomain(valueType)
+	if !ok {
+		return false
+	}
+	remaining := append([]matchDomainValue(nil), domain...)
+	for _, matchCase := range cases {
+		if matchCase.Guard != nil {
+			continue
+		}
+		covered := c.coveredDomainValues(matchCase.Pattern, valueType, domain)
+		remaining = subtractDomainValues(remaining, covered)
+	}
+	if len(remaining) == 0 {
+		return true
+	}
+	names := make([]string, 0, len(remaining))
+	seen := map[string]bool{}
+	for _, value := range remaining {
+		name := value.summary()
+		if !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	c.addDiagnostic("non_exhaustive_match", "match does not cover cases: "+joinNames(names), span)
+	return true
+}
+
+func (c *Checker) coveredDomainValues(pattern parser.Pattern, valueType *Type, domain []matchDomainValue) []matchDomainValue {
+	var out []matchDomainValue
+	for _, value := range domain {
+		if c.patternMatchesDomainValue(pattern, valueType, value) {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func intersectDomainValues(left, right []matchDomainValue) []matchDomainValue {
+	rightSet := map[string]bool{}
+	for _, value := range right {
+		rightSet[value.signature()] = true
+	}
+	var out []matchDomainValue
+	for _, value := range left {
+		if rightSet[value.signature()] {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func subtractDomainValues(left, covered []matchDomainValue) []matchDomainValue {
+	coveredSet := map[string]bool{}
+	for _, value := range covered {
+		coveredSet[value.signature()] = true
+	}
+	out := make([]matchDomainValue, 0, len(left))
+	for _, value := range left {
+		if !coveredSet[value.signature()] {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func (v matchDomainValue) signature() string {
+	switch v.kind {
+	case "literal":
+		return "lit:" + v.literal
+	case "tuple":
+		parts := make([]string, len(v.args))
+		for i, arg := range v.args {
+			parts[i] = arg.signature()
+		}
+		return "tuple(" + strings.Join(parts, ",") + ")"
+	case "constructor":
+		parts := make([]string, len(v.args))
+		for i, arg := range v.args {
+			parts[i] = arg.signature()
+		}
+		if len(parts) == 0 {
+			return "ctor:" + v.name
+		}
+		return "ctor:" + v.name + "(" + strings.Join(parts, ",") + ")"
+	default:
+		return ""
+	}
+}
+
+func (v matchDomainValue) summary() string {
+	switch v.kind {
+	case "literal":
+		return v.literal
+	case "tuple":
+		parts := make([]string, len(v.args))
+		for i, arg := range v.args {
+			parts[i] = arg.summary()
+		}
+		return "(" + strings.Join(parts, ", ") + ")"
+	case "constructor":
+		if len(v.args) == 0 {
+			return v.name
+		}
+		parts := make([]string, len(v.args))
+		for i, arg := range v.args {
+			parts[i] = arg.summary()
+		}
+		return v.name + "(" + strings.Join(parts, ", ") + ")"
+	default:
+		return ""
+	}
+}
+
+func (c *Checker) enumerateMatchDomain(valueType *Type) ([]matchDomainValue, bool) {
+	if valueType == nil || isUnknown(valueType) {
+		return nil, false
+	}
+	if valueType.Kind == TypeBuiltin && valueType.Name == "Bool" {
+		return []matchDomainValue{
+			{kind: "literal", literal: "true"},
+			{kind: "literal", literal: "false"},
+		}, true
+	}
+	if valueType.Kind == TypeTuple {
+		return c.enumerateTupleMatchDomain(valueType.Args)
+	}
+	if valueType.Kind != TypeClass {
+		return nil, false
+	}
+	info, ok := c.classes[valueType.Name]
+	if !ok || !info.decl.Enum {
+		return nil, false
+	}
+	subst := c.substForDecl(info.decl.TypeParameters, valueType.Args)
+	var out []matchDomainValue
+	for _, enumCase := range info.decl.Cases {
+		fieldTypes := make([]*Type, len(enumCase.Fields))
+		for i, field := range enumCase.Fields {
+			fieldTypes[i] = c.instantiateTypeRef(field.Type, subst)
+		}
+		caseValues, ok := c.enumerateTupleLikeMatchDomain(fieldTypes)
+		if !ok {
+			return nil, false
+		}
+		if len(caseValues) == 0 {
+			out = append(out, matchDomainValue{kind: "constructor", name: enumCase.Name})
+			continue
+		}
+		for _, combo := range caseValues {
+			out = append(out, matchDomainValue{kind: "constructor", name: enumCase.Name, args: combo.args})
+		}
+	}
+	return out, true
+}
+
+func (c *Checker) enumerateTupleMatchDomain(elements []*Type) ([]matchDomainValue, bool) {
+	values, ok := c.enumerateTupleLikeMatchDomain(elements)
+	if !ok {
+		return nil, false
+	}
+	out := make([]matchDomainValue, 0, len(values))
+	for _, value := range values {
+		out = append(out, matchDomainValue{kind: "tuple", args: value.args})
+	}
+	return out, true
+}
+
+func (c *Checker) enumerateTupleLikeMatchDomain(elements []*Type) ([]matchDomainValue, bool) {
+	if len(elements) == 0 {
+		return []matchDomainValue{{kind: "tuple", args: nil}}, true
+	}
+	acc := [][]matchDomainValue{{}}
+	for _, elemType := range elements {
+		domain, ok := c.enumerateMatchDomain(elemType)
+		if !ok {
+			return nil, false
+		}
+		var next [][]matchDomainValue
+		for _, prefix := range acc {
+			for _, value := range domain {
+				combined := append(append([]matchDomainValue(nil), prefix...), value)
+				next = append(next, combined)
+			}
+		}
+		acc = next
+	}
+	out := make([]matchDomainValue, 0, len(acc))
+	for _, values := range acc {
+		out = append(out, matchDomainValue{kind: "tuple", args: values})
+	}
+	return out, true
+}
+
+func (c *Checker) patternMatchesDomainValue(pattern parser.Pattern, valueType *Type, value matchDomainValue) bool {
+	switch p := pattern.(type) {
+	case *parser.WildcardPattern, *parser.BindingPattern:
+		return true
+	case *parser.TypePattern:
+		targetType := c.resolveDeclaredType(p.Target)
+		return c.patternTypeCouldMatch(valueType, targetType)
+	case *parser.LiteralPattern:
+		return domainLiteralMatchesPattern(p.Value, value)
+	case *parser.TuplePattern:
+		if value.kind != "tuple" || len(value.args) != len(p.Elements) || valueType == nil || valueType.Kind != TypeTuple {
+			return false
+		}
+		for i, elem := range p.Elements {
+			if !c.patternMatchesDomainValue(elem, valueType.Args[i], value.args[i]) {
+				return false
+			}
+		}
+		return true
+	case *parser.ConstructorPattern:
+		if value.kind != "constructor" || valueType == nil || valueType.Kind != TypeClass {
+			return false
+		}
+		caseName, ok := c.enumCaseNameForPattern(p, valueType)
+		if ok {
+			if value.name != caseName {
+				return false
+			}
+			info := c.classes[valueType.Name]
+			var enumCase *parser.EnumCaseDecl
+			for i := range info.decl.Cases {
+				if info.decl.Cases[i].Name == caseName {
+					enumCase = &info.decl.Cases[i]
+					break
+				}
+			}
+			if enumCase == nil || len(enumCase.Fields) != len(p.Args) || len(value.args) != len(p.Args) {
+				return false
+			}
+			subst := c.substForDecl(info.decl.TypeParameters, valueType.Args)
+			for i, arg := range p.Args {
+				fieldType := c.instantiateTypeRef(enumCase.Fields[i].Type, subst)
+				if !c.patternMatchesDomainValue(arg, fieldType, value.args[i]) {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	default:
+		return false
+	}
+}
+
+func domainLiteralMatchesPattern(expr parser.Expr, value matchDomainValue) bool {
+	if value.kind != "literal" {
+		return false
+	}
+	switch lit := expr.(type) {
+	case *parser.BoolLiteral:
+		if lit.Value {
+			return value.literal == "true"
+		}
+		return value.literal == "false"
+	case *parser.IntegerLiteral:
+		return value.literal == lit.Value
+	case *parser.FloatLiteral:
+		return value.literal == lit.Value
+	case *parser.RuneLiteral:
+		return value.literal == lit.Value
+	case *parser.StringLiteral:
+		return value.literal == lit.Value
+	default:
+		return false
+	}
 }
 
 func (c *Checker) patternIsCatchAll(pattern parser.Pattern, valueType *Type) bool {
@@ -1811,7 +2139,8 @@ func (c *Checker) checkMatchStmtResult(s *parser.MatchStmt, code, message string
 		}
 	}
 	if !s.Partial {
-		c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
+			c.checkMatchUnreachableCases(valueType, s.Cases)
+			c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
 	}
 	if resultType == nil {
 		c.addDiagnostic(code, message, s.Span)
@@ -2016,6 +2345,7 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			}
 		}
 		if !e.Partial {
+			c.checkMatchUnreachableCases(valueType, e.Cases)
 			c.checkMatchExhaustiveness(valueType, e.Cases, e.Span)
 		}
 		if resultType == nil {

@@ -579,10 +579,17 @@ func (p *Parser) parseOptionalMatchGuard() (Expr, error) {
 }
 
 func (p *Parser) parsePattern() (Pattern, error) {
+	return p.parsePatternAtDepth(0)
+}
+
+func (p *Parser) parsePatternAtDepth(depth int) (Pattern, error) {
 	token := p.advance()
 	switch token.Type {
 	case TokenUnder:
 		if p.bindingTypeStartsOnSameLine(token) && (p.check(TokenIdentifier) || p.check(TokenLBrace)) {
+			if depth > 0 {
+				return nil, fmt.Errorf("nested type patterns are not supported")
+			}
 			target, err := p.parseTypeRef()
 			if err != nil {
 				return nil, err
@@ -603,6 +610,9 @@ func (p *Parser) parsePattern() (Pattern, error) {
 	case TokenMultilineString:
 		return &LiteralPattern{Value: &StringLiteral{Value: token.Lexeme, Span: tokenSpan(token)}, Span: tokenSpan(token)}, nil
 	case TokenLParen:
+		if depth > 1 {
+			return nil, fmt.Errorf("match patterns support at most 2 levels of nesting")
+		}
 		if p.check(TokenRParen) {
 			end, err := p.consume(TokenRParen, "expected ')'")
 			if err != nil {
@@ -611,7 +621,7 @@ func (p *Parser) parsePattern() (Pattern, error) {
 			span := mergeSpans(tokenSpan(token), tokenSpan(end))
 			return &LiteralPattern{Value: &UnitLiteral{Span: span}, Span: span}, nil
 		}
-		first, err := p.parsePattern()
+		first, err := p.parsePatternAtDepth(depth + 1)
 		if err != nil {
 			return nil, err
 		}
@@ -623,7 +633,7 @@ func (p *Parser) parsePattern() (Pattern, error) {
 		}
 		elements := []Pattern{first}
 		for {
-			next, err := p.parsePattern()
+			next, err := p.parsePatternAtDepth(depth + 1)
 			if err != nil {
 				return nil, err
 			}
@@ -639,6 +649,9 @@ func (p *Parser) parsePattern() (Pattern, error) {
 		return &TuplePattern{Elements: elements, Span: mergeSpans(tokenSpan(token), tokenSpan(end))}, nil
 	case TokenIdentifier:
 		if p.bindingTypeStartsOnSameLine(token) && (p.check(TokenIdentifier) || p.check(TokenLBrace)) {
+			if depth > 0 {
+				return nil, fmt.Errorf("nested type patterns are not supported")
+			}
 			target, err := p.parseTypeRef()
 			if err != nil {
 				return nil, err
@@ -656,10 +669,13 @@ func (p *Parser) parsePattern() (Pattern, error) {
 			endSpan = tokenSpan(next)
 		}
 		if p.match(TokenLParen) {
+			if depth > 1 {
+				return nil, fmt.Errorf("match patterns support at most 2 levels of nesting")
+			}
 			var args []Pattern
 			if !p.check(TokenRParen) {
 				for {
-					arg, err := p.parsePattern()
+					arg, err := p.parsePatternAtDepth(depth + 1)
 					if err != nil {
 						return nil, err
 					}

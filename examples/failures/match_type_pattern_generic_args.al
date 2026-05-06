@@ -5,8 +5,7 @@ class Box[T] {
     value T
 }
 
-def main() Int =
-    match Box(7) {
+def main() Option[Int] =
+    try match Box(7) {
         _ Box[Int] => 1
-        _ => 0
     }
