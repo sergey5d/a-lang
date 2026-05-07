@@ -1343,13 +1343,17 @@ def run() Int {
 	items = List(10, 20, 30)
 	head = items.head().getOr(0)
 	rest = items.tail()
+	wasEmpty = items.isEmpty()
 	removed = items.remove(1)
+	last = items.removeLast()
+	emptyItems = []
+	nowEmpty = emptyItems.isEmpty()
 	empty = None()
 
 	OS.print("left", "-", "right")
 
-	if empty.isEmpty() {
-		return head * 1000 + rest.size() * 100 + removed.getOr(0)
+	if empty.isEmpty() && !wasEmpty && nowEmpty {
+		return head * 100000 + rest.size() * 10000 + removed.getOr(0) * 100 + last.getOr(0)
 	}
 	return 0
 }
@@ -1374,8 +1378,8 @@ def run() Int {
 	if callErr != nil {
 		t.Fatalf("Call returned error: %v", callErr)
 	}
-	if value != int64(10220) {
-		t.Fatalf("expected 10220, got %#v", value)
+	if value != int64(1022030) {
+		t.Fatalf("expected 1022030, got %#v", value)
 	}
 	if string(output) != "left-right" {
 		t.Fatalf("unexpected output %q", string(output))

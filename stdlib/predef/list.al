@@ -13,7 +13,9 @@ interface List[T] with Iterable[T] {
     def get(index Int) Option[T]
     def head() Option[T]
     def tail() List[T]
+    def isEmpty() Bool
     def remove(index Int) Option[T]
+    def removeLast() Option[T]
     def size() Int
     def forEach(f T -> Unit)
 }

@@ -306,6 +306,17 @@ func nativeListTail(_ *Interpreter, receiver Value, args []Value, _ *env, span p
 	return &nativeList{items: append([]Value(nil), value.items[1:]...)}, nil
 }
 
+func nativeListIsEmpty(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
+	value, ok := asNativeList(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native List.isEmpty receiver mismatch", Span: span}
+	}
+	if len(args) != 0 {
+		return nil, RuntimeError{Message: "isEmpty expects 0 arguments", Span: span}
+	}
+	return len(value.items) == 0, nil
+}
+
 func nativeListRemove(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
 	value, ok := asNativeList(receiver)
 	if !ok {
@@ -324,6 +335,22 @@ func nativeListRemove(in *Interpreter, receiver Value, args []Value, local *env,
 	removed := value.items[index]
 	value.items = append(value.items[:index], value.items[index+1:]...)
 	return in.constructStdlibOption(removed, true, local, span)
+}
+
+func nativeListRemoveLast(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeList(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native List.removeLast receiver mismatch", Span: span}
+	}
+	if len(args) != 0 {
+		return nil, RuntimeError{Message: "removeLast expects 0 arguments", Span: span}
+	}
+	if len(value.items) == 0 {
+		return in.constructStdlibOption(nil, false, local, span)
+	}
+	last := value.items[len(value.items)-1]
+	value.items = value.items[:len(value.items)-1]
+	return in.constructStdlibOption(last, true, local, span)
 }
 
 func nativeListSize(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {

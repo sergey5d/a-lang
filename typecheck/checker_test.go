@@ -1782,6 +1782,25 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeListIsEmptyAndRemoveLast(t *testing.T) {
+	src := `
+def run() Bool {
+	items List[Int] = List(1, 2, 3)
+	first Bool = items.isEmpty()
+	last Option[Int] = items.removeLast()
+	nowTwo Int = items.size()
+	empty List[Int] = []
+	missing Option[Int] = empty.removeLast()
+	return !first && last.getOr(0) == 3 && nowTwo == 2 && missing.isEmpty() && empty.isEmpty()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeListMapFlatMapForEach(t *testing.T) {
 	src := `
 def run() Int {
