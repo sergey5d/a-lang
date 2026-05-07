@@ -41,13 +41,9 @@ def main() Unit {
             0
     }
 
-    fromIf Int = if true then
-        11
-    else
-        0
+    fromIf Int = if true then 11 else 0
 
-    collected = for item <- [2, 3] yield
-        item
+    collected = for item <- [2, 3] yield item
 
     fromFor Int = collected.get(0).getOr(0) +
         collected.get(1).getOr(0)

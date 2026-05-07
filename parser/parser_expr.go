@@ -615,11 +615,14 @@ func (p *Parser) parseBlockOrInlineExprBody(introducer Token, owner string, stop
 	if p.isAtEnd() {
 		return nil, fmt.Errorf("expected '{' or inline expression after %s", owner)
 	}
+	if !sameLine(introducer, p.peek()) {
+		return nil, fmt.Errorf("%s body must stay on the same line unless it uses '{ ... }'", owner)
+	}
 	var (
 		expr Expr
 		err  error
 	)
-	if sameLine(introducer, p.peek()) && len(stopTypes) > 0 {
+	if len(stopTypes) > 0 {
 		expr, err = p.parseInlineExpression(stopTypes...)
 	} else {
 		expr, err = p.parseExpression(0)
@@ -646,8 +649,11 @@ func (p *Parser) parseThenExprBodyBlock(owner string, stopTypes ...TokenType) (*
 	if p.isAtEnd() {
 		return nil, fmt.Errorf("expected expression after 'then'")
 	}
+	if !sameLine(then, p.peek()) {
+		return nil, fmt.Errorf("%s then-body must stay on the same line unless it uses '{ ... }'", owner)
+	}
 	var expr Expr
-	if sameLine(then, p.peek()) && len(stopTypes) > 0 {
+	if len(stopTypes) > 0 {
 		expr, err = p.parseInlineExpression(stopTypes...)
 	} else {
 		expr, err = p.parseExpression(0)

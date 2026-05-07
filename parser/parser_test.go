@@ -697,7 +697,7 @@ def run(value MaybeInt) Option[Int] =
 	}
 }
 
-func TestParseThenShorthandAllowsNewlineBody(t *testing.T) {
+func TestParseThenShorthandRejectsNewlineBody(t *testing.T) {
 	src := `
 def run(flag Bool) Int {
 	if flag then
@@ -706,8 +706,8 @@ def run(flag Bool) Int {
 }
 `
 
-	if _, err := Parse(src); err != nil {
-		t.Fatalf("Parse returned error: %v", err)
+	if _, err := Parse(src); err == nil {
+		t.Fatalf("expected parse error for newline body after then")
 	}
 }
 

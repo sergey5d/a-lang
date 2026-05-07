@@ -999,7 +999,8 @@ Newline continuation:
   - `<-`
 - Body-introducing forms are intentionally looser:
   - `def ... =` may start its body on the next line
-  - `if ... then`, `else`, `loop`, `yield`, and `unwrap ... else` may also start their single statement / expression body on the next line
+  - inline-body introducers such as `then`, `else`, `loop`, `yield`, and `unwrap ... else` may take a same-line body without braces
+  - if that body moves to the next line, a `{ ... }` block is required
 - So this is invalid:
 
 ```txt
@@ -1020,8 +1021,7 @@ a = 1 +
 def value() Int =
     1 + 2
 
-if flag then
-    return 1
+if flag then return 1
 ```
 
 - For dot chaining, the rule is stricter than Scala:

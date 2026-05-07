@@ -858,14 +858,12 @@ func (p *Parser) parseThenStmtBodyBlock(owner string, stopTypes ...TokenType) (*
 	if p.isAtEnd() {
 		return nil, fmt.Errorf("expected statement after 'then'")
 	}
+	if !sameLine(then, p.peek()) {
+		return nil, fmt.Errorf("%s then-body must stay on the same line unless it uses '{ ... }'", owner)
+	}
 	p.beginScope()
 	defer p.endScope()
-	var stmt Statement
-	if sameLine(then, p.peek()) {
-		stmt, err = p.parseInlineStatement(stopTypes...)
-	} else {
-		stmt, err = p.parseStatement()
-	}
+	stmt, err := p.parseInlineStatement(stopTypes...)
 	if err != nil {
 		return nil, err
 	}
@@ -883,11 +881,14 @@ func (p *Parser) parseYieldBodyBlock(owner string, stopTypes ...TokenType) (*Blo
 	if p.isAtEnd() {
 		return nil, fmt.Errorf("expected '{' or expression after %s", owner)
 	}
+	if !sameLine(introducer, p.peek()) {
+		return nil, fmt.Errorf("%s body must stay on the same line unless it uses '{ ... }'", owner)
+	}
 	var (
 		expr Expr
 		err  error
 	)
-	if sameLine(introducer, p.peek()) && len(stopTypes) > 0 {
+	if len(stopTypes) > 0 {
 		expr, err = p.parseInlineExpression(stopTypes...)
 	} else {
 		expr, err = p.parseExpression(0)
@@ -964,17 +965,12 @@ func (p *Parser) parseBlockOrInlineStmtBody(introducer Token, owner string, stop
 	if p.isAtEnd() {
 		return nil, fmt.Errorf("expected '{' or inline statement after %s", owner)
 	}
+	if !sameLine(introducer, p.peek()) {
+		return nil, fmt.Errorf("%s body must stay on the same line unless it uses '{ ... }'", owner)
+	}
 	p.beginScope()
 	defer p.endScope()
-	var (
-		stmt Statement
-		err error
-	)
-	if sameLine(introducer, p.peek()) {
-		stmt, err = p.parseInlineStatement(stopTypes...)
-	} else {
-		stmt, err = p.parseStatement()
-	}
+	stmt, err := p.parseInlineStatement(stopTypes...)
 	if err != nil {
 		return nil, err
 	}
