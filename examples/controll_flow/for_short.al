@@ -6,7 +6,7 @@
 # 0
 
 def main() Int {
-    total Int := 0
+    var total Int = 0
 
     for item <- [1, 2, 3] {
         OS.println("item " + item)

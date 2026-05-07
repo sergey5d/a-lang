@@ -34,9 +34,9 @@ object RowOrdering with Ordering[(Int, Int, Str)] {
 }
 
 def syntax1(rows List[(Int, Int, Str)]) Unit {
-    lastX := 0
+    var lastX = 0
     if _, initialY, _ <- rows.get(0) {
-        lastY := initialY
+        var lastY = initialY
         for x Int, y Int, char Str <- rows {
             for lineStep <- Range.apply(y, lastY) {
                 OS.println()
@@ -56,9 +56,9 @@ def syntax1(rows List[(Int, Int, Str)]) Unit {
 }
 
 def syntax2(rows List[(Int, Int, Str)]) Unit {
-    lastX := 0
+    var lastX = 0
     if _, initialY Int, _ <- rows.get(0) {
-        lastY := initialY
+        var lastY = initialY
         for x, y, char <- rows {
             for lineStep <- Range.apply(y, lastY) {
                 OS.println()
@@ -78,11 +78,11 @@ def syntax2(rows List[(Int, Int, Str)]) Unit {
 }
 
 def syntax3(rows List[(Int, Int, Str)]) Unit {
-    lastX := 0
+    var lastX = 0
 
     if first <- rows.get(0) {
         _, initialY Int, _ = first
-        lastY := initialY
+        var lastY = initialY
         for row <- rows {
             x, y, char Str = row
             for lineStep <- Range.apply(y, lastY) {
@@ -103,10 +103,10 @@ def syntax3(rows List[(Int, Int, Str)]) Unit {
 }
 
 def syntax4(rows List[(Int, Int, Str)]) Unit {
-    lastX := 0
+    var lastX = 0
     for {
         _, initialY Int, _ <- rows.get(0)
-        lastY := initialY
+        var lastY = initialY
         x, y, char Str <- rows
         # just as an example
         xImmutable = x

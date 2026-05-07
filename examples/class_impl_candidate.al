@@ -11,7 +11,7 @@ class Person with Named, Aged {
     city Str
 
     private archived Bool : = false
-    private internalScore Int := 1
+    private var internalScore Int = 1
 
     #private {
     #    archived2 Bool

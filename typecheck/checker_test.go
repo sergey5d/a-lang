@@ -36,7 +36,7 @@ def add(a Int, b Int) Int {
 
 def run(input Int) Bool {
 	total Int = add(input, 1)
-	copy Int := total
+	var copy Int = total
 	copy += 1
 
 	if copy > input {
@@ -627,7 +627,7 @@ def fromArray(values Array[Int]) Int {
 func TestAnalyzeClassMembersAndConstructors(t *testing.T) {
 	src := `
 class Counter {
-	private count Int := ?
+	private var count Int
 }
 
 impl Counter {
@@ -658,7 +658,7 @@ func TestAnalyzeImplicitPrimaryConstructorAndThisDelegation(t *testing.T) {
 class Counter {
 	count Int
 	label Str
-	private seen Bool := false
+	private var seen Bool = false
 }
 
 impl Counter {
@@ -683,7 +683,7 @@ def run() Int {
 func TestAnalyzeRecordRejectsMutableFields(t *testing.T) {
 	src := `
 record Amount {
-	amount Int := 1
+	var amount Int = 1
 }
 `
 
@@ -1511,7 +1511,7 @@ func TestAnalyzeConstructorMustInitializeImmutableFields(t *testing.T) {
 	src := `
 class Counter {
 	private count Int
-	private seen Bool := ?
+	private seen Bool = ?
 }
 
 impl Counter {
@@ -1564,7 +1564,7 @@ def run() Int {
 func TestAnalyzeLambdaCannotCaptureVar(t *testing.T) {
 	src := `
 def run() Int {
-	total Int := 1
+	var total Int = 1
 	add = (x Int) -> x + total
 	return add(2)
 }
@@ -1854,7 +1854,7 @@ def run() Int {
 	indexedValue Int, indexedPos Int = indexedPair
 	arrayLeft Int, arrayRight Str = valuePairs[1]
 	arrayIndexedValue Int, arrayIndexedPos Int = valueIndexed[2]
-	total Int := 0
+	var total Int = 0
 
 	for left Int, right Str <- pairs {
 		if right == "b" {
@@ -1938,7 +1938,7 @@ def run() Int {
 	mapAllSmall Bool = values.forAll((key Str, value Int) -> value < 3)
 	values.forEach((key Str, value Int) -> OS.println(key))
 
-	total Int := 0
+	var total Int = 0
 	for item Int <- seen {
 		total += item
 	}
@@ -1983,7 +1983,7 @@ def run() Int {
 func TestAnalyzeCustomAndCollectionOperators(t *testing.T) {
 	src := `
 class Vec {
-	private items Array[Int] := ?
+	private var items Array[Int]
 }
 
 impl Vec {
@@ -2068,7 +2068,7 @@ def pick[T with Ordering[T]](value T) T = value
 def badBox(value Box[Str]) Int = 0
 
 def run() Int {
-	value Str = pick("x")
+value Str = pick("x")
 	return 0
 }
 `
@@ -2087,7 +2087,7 @@ func TestAnalyzeRejectDeferredBindingsOutsideClasses(t *testing.T) {
 value Int = ?
 
 def run() Int {
-	local Int := ?
+	local Int = ?
 	return 0
 }
 `
@@ -2177,7 +2177,7 @@ def run(values List[Int], flag Bool) Int {
 func TestAnalyzeForDestructuring(t *testing.T) {
 	src := `
 def run(rows List[(Int, Str)]) Int {
-	total Int := 0
+	var total Int = 0
 	for left Int, right Str <- rows {
 		if right == "x" {
 			total += left
@@ -2196,7 +2196,7 @@ def run(rows List[(Int, Str)]) Int {
 func TestAnalyzeWhileLoop(t *testing.T) {
 	src := `
 def run(limit Int) Int {
-	total Int := 0
+	var total Int = 0
 	while total < limit {
 		total += 1
 	}
@@ -2233,7 +2233,7 @@ func TestAnalyzeForYieldMutableBindings(t *testing.T) {
 def run(values List[Int]) List[Int] {
 	return for {
 		item <- values
-		total := item
+		var total = item
 	} yield {
 		total += 1
 		total
@@ -2406,7 +2406,7 @@ def run() Int {
 func TestAnalyzeVariadicFunction(t *testing.T) {
 	src := `
 def sum(values Int...) Int {
-	total Int := 0
+	var total Int = 0
 	for value <- values {
 		total += value
 	}
@@ -2427,8 +2427,8 @@ def run() Int {
 func TestAnalyzeMultiAssignmentStmt(t *testing.T) {
 	src := `
 def run() Int {
-	a Int := 0
-	b Str := ""
+	var a Int = 0
+	var b Str = ""
 	a, b := 1, "ok"
 	a
 }
@@ -2874,7 +2874,7 @@ def run() Int {
 	{
 		OS.println("xxx")
 	}
-	v Int := {
+	var v Int = {
 		a Int = 5
 		{
 			a + 1

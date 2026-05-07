@@ -157,7 +157,7 @@ class Box[T] {
 }
 
 object Counter {
-    count Int := 0
+    var count Int = 0
 }
 
 record Amount {
@@ -185,22 +185,22 @@ name Str = "Ada"
 Mutable local binding:
 
 ```txt
-count := 0
-total Int := 10
+var count = 0
+var total Int = 10
 ```
 
 Top-level bindings are also supported:
 
 ```txt
 seed Int = 1
-counter Int := 0
+var counter Int = 0
 ```
 
 Deferred / uninitialized fields are only valid in class-like field declarations:
 
 ```txt
 class Box {
-    private cached Int := ?
+    private var cached Int
     private label Str = ?
 }
 ```

@@ -45,7 +45,7 @@ Before running, the CLI always:
 
 ```txt
 class Counter {
-	private count Int := ?
+	private var count Int
 }
 
 impl Counter {
@@ -75,7 +75,7 @@ def main(input Int) Int {
 The syntax is still evolving, but the current codebase supports a meaningful subset:
 
 - immutable bindings with `=`
-- mutable bindings with `:=`
+- mutable bindings with `var ... =`
 - compound assignment like `+=`
 - deferred initialization with `?`
 - functions with `def`
@@ -95,7 +95,7 @@ Some representative forms:
 
 ```txt
 count Int = 1
-total Int := 0
+var total Int = 0
 
 addOne Int -> Int = x -> x + 1
 

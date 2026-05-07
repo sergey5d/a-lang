@@ -4,9 +4,9 @@
 # ArrayList[Int](5) and ArrayListIterator[T](...) are supported.
 
 class ArrayListIterator[T] with Iterator[T] {
-    private items Array[T] := ?
-    private limit Int := ?
-    private index Int := 0
+    private var items Array[T]
+    private var limit Int
+    private var index Int = 0
 }
 
 impl ArrayListIterator[T] {
@@ -25,8 +25,8 @@ impl ArrayListIterator[T] {
 }
 
 class ArrayList[T] with Iterable[T] {
-    private items Array[T] := ?
-    private count Int := 0
+    private var items Array[T]
+    private var count Int = 0
 }
 
 impl ArrayList[T] {
@@ -57,7 +57,7 @@ def main() Int {
     values.append(20)
     values.append(30)
 
-    sum := 0
+    var sum = 0
     for item <- values {
         sum := sum + item
     }

@@ -1,7 +1,7 @@
 class Result[T, E] with Unwrappable[T] {
-    private ok Bool := ?
-    private value T := ?
-    private error E := ?
+    private var ok Bool
+    private var value T
+    private var error E
 }
 
 impl Result[T, E] {

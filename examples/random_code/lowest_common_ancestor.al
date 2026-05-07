@@ -25,8 +25,8 @@ def find(
         record { foundP = foundPNode, foundQ = foundQNode, ancestor = None() }
     }
 
-    currentFoundP := foundPNode
-    currentFoundQ := foundQNode
+    var currentFoundP = foundPNode
+    var currentFoundQ = foundQNode
 
     if currentFoundP.isEmpty() && current.val == valP {
         currentFoundP := Some(current)
@@ -41,7 +41,7 @@ def find(
         leftResult = find(current.left, valP, valQ, currentFoundP, currentFoundQ)
         rightResult = find(current.right, valP, valQ, currentFoundP, currentFoundQ)
 
-        mergedAncestor := chooseNode(leftResult.ancestor, rightResult.ancestor)
+        var mergedAncestor = chooseNode(leftResult.ancestor, rightResult.ancestor)
         mergedP = chooseNode(leftResult.foundP, rightResult.foundP)
         mergedQ = chooseNode(leftResult.foundQ, rightResult.foundQ)
 

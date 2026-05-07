@@ -21,13 +21,13 @@ def main() Unit {
     {
         OS.println("xxx")
     }
-    v := {
+    var v = {
         a = 5
         {
             a + 1
         }
     }
-    branch := {
+    var branch = {
         {
             if false {
                 10

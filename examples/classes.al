@@ -8,7 +8,7 @@ class A {
     age Int
     name Str
 
-    private malnutritioned Bool := false
+    private var malnutritioned Bool = false
 }
 
 impl A {
@@ -31,9 +31,9 @@ class B {
     private age Int
     private name Str
     # initialized mutable variable
-    private malnutritioned Bool := false
+    private var malnutritioned Bool = false
     # not yet initialized mutable variable
-    private unassigned Float := ?
+    private var unassigned Float
     # not yet initialized immutable variable (syntax is for consistency only)
     private questionable Int = ?
 }

@@ -8,7 +8,7 @@
 # 0
 
 class DisjointSet {
-    private arr Array[Int] := ?
+    private var arr Array[Int]
 }
 
 impl DisjointSet {
@@ -21,7 +21,7 @@ impl DisjointSet {
     }
 
     def findParent(v Int) Int {
-        current Int := v
+        var current Int = v
         while arr[current] != current {
             current := arr[current]
         }
@@ -85,7 +85,7 @@ def findCircleNumTraversal(isConnected List[List[Int]]) Int {
         }
     }
 
-    areaCount Int := 0
+    var areaCount Int = 0
     visitedAll Set[Int] = Set()
 
     for i <- Range(0, isConnected.size()) {

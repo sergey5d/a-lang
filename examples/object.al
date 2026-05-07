@@ -10,7 +10,7 @@ class B {
 }
 
 object A {
-    count Int := 2
+    var count Int = 2
 
     # explicit apply declaration
     def apply(sizeValue Int) B = B(size = sizeValue)

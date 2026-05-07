@@ -649,11 +649,15 @@ func (r *Resolver) resolveAssignment(stmt *parser.AssignmentStmt) {
 	case *parser.Identifier:
 		symbol, ok := r.lookup(target.Name)
 		if !ok {
-			r.addDiagnostic("undefined_name", "undefined name '"+target.Name+"'", target.Span)
+			if stmt.Operator == ":=" {
+				r.addDiagnostic("invalid_assignment_operator", "cannot use ':=' in a declaration; use 'var "+target.Name+" = ...' for mutable bindings", target.Span)
+			} else {
+				r.addDiagnostic("undefined_name", "undefined name '"+target.Name+"'", target.Span)
+			}
 		} else if !symbol.mutable {
 			r.addDiagnostic("assign_immutable", "cannot assign to immutable binding '"+target.Name+"'", target.Span)
 		} else if stmt.Operator == "=" {
-			r.addDiagnostic("invalid_assignment_operator", "use ':=' for mutable reassignment of '"+target.Name+"'", target.Span)
+			r.addDiagnostic("invalid_assignment_operator", "cannot use '=' for reassignment of mutable binding '"+target.Name+"'; use ':='", target.Span)
 		}
 	case *parser.MemberExpr:
 		r.resolveExpr(target.Receiver)

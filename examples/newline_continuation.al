@@ -48,7 +48,7 @@ def main() Unit {
     fromFor Int = collected.get(0).getOr(0) +
         collected.get(1).getOr(0)
 
-    fromMatchStmt := 0
+    var fromMatchStmt = 0
     match 2 {
         1 => {
             fromMatchStmt := 1

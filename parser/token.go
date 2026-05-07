@@ -30,6 +30,7 @@ const (
 	TokenCase      TokenType = "CASE"
 	TokenWith      TokenType = "WITH"
 	TokenPrivate   TokenType = "PRIVATE"
+	TokenVar       TokenType = "VAR"
 	TokenIf        TokenType = "IF"
 	TokenThen      TokenType = "THEN"
 	TokenPartial   TokenType = "PARTIAL"
@@ -111,6 +112,7 @@ var keywords = map[string]TokenType{
 	"case":      TokenCase,
 	"with":      TokenWith,
 	"private":   TokenPrivate,
+	"var":       TokenVar,
 	"if":        TokenIf,
 	"then":      TokenThen,
 	"partial":   TokenPartial,

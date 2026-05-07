@@ -11,7 +11,7 @@ def main() Int {
 	unwrap first <- items.get(0) else return 0
 	OS.println("found " + first)
 
-	total Int := 0
+	var total Int = 0
 	for item <- items {
 		total += item
 	}

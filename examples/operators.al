@@ -5,7 +5,7 @@
 # 3
 
 class Vec {
-    private items Array[Int] := ?
+    private var items Array[Int]
 }
 
 impl Vec {

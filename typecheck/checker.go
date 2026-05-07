@@ -1200,7 +1200,7 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 			return
 		}
 		if s.Operator == "=" && !c.allowEqualsAssignment(s.Target) {
-			c.addDiagnostic("invalid_assignment_operator", "use ':=' for mutable reassignment", s.Span)
+			c.addDiagnostic("invalid_assignment_operator", "cannot use '=' for reassignment of a mutable variable; use ':='", s.Span)
 			return
 		}
 		if s.Operator != "=" && s.Operator != ":=" {
@@ -1221,7 +1221,7 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 				continue
 			}
 			if s.Operator == "=" && !c.allowEqualsAssignment(s.Targets[i]) {
-				c.addDiagnostic("invalid_assignment_operator", "use ':=' for mutable reassignment", s.Span)
+				c.addDiagnostic("invalid_assignment_operator", "cannot use '=' for reassignment of a mutable variable; use ':='", s.Span)
 				continue
 			}
 			if s.Operator != "=" && s.Operator != ":=" {

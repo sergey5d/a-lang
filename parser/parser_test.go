@@ -321,7 +321,7 @@ def run() Int {
 	{
 		OS.println("xxx")
 	}
-	v := {
+	var v = {
 		a = 5
 		{
 			a + 1
@@ -1137,8 +1137,8 @@ def printAll(values Str...) {
 func TestParseMultiAssignmentStmt(t *testing.T) {
 	src := `
 def run() Int {
-	a Int := 0
-	b Int := 0
+	var a Int = 0
+	var b Int = 0
 	a, b := 1, 2
 	a
 }
@@ -1158,8 +1158,8 @@ def run() Int {
 func TestParseDeclaredNamesWithEqualsAsBindings(t *testing.T) {
 	src := `
 def run() Int {
-	a Int := 0
-	b Int := 0
+	var a Int = 0
+	var b Int = 0
 	a, b = 1, 2
 	a
 }
@@ -1364,7 +1364,7 @@ impl Box[T] {
 
 class SolidWork with Stringable {
 	private a List[Int]
-	private b Map[Str, Bool] := ?
+	private var b Map[Str, Bool]
 }
 
 impl SolidWork {
@@ -1874,8 +1874,8 @@ func TestRejectInvalidRuneLiterals(t *testing.T) {
 func TestParseMutableBindings(t *testing.T) {
 	src := `
 def vars() Bool {
-	count Int := 1
-	left Int, right Int := 1, 2
+	var count Int = 1
+	var left Int, right Int = 1, 2
 	count := count + 1
 	return count == right
 }
@@ -1910,7 +1910,7 @@ def vars() Bool {
 func TestParseAssignmentStatement(t *testing.T) {
 	src := `
 def vars() Bool {
-	counter := 0
+	var counter = 0
 	counter := counter + 1
 	counter += 2
 	counter -= 1
@@ -2013,7 +2013,7 @@ func TestParseUntypedBindings(t *testing.T) {
 	src := `
 def vars() Bool {
 	a = "some string"
-	counter := 0
+	var counter = 0
 	return counter == 0
 }
 `

@@ -32,8 +32,8 @@ record Location {
 class Cursor {
     private term Str
     private documents List[Str]
-    private current Location := ?
-    private valid Bool := false
+    private var current Location
+    private var valid Bool = false
 }
 
 impl Cursor {
@@ -56,8 +56,8 @@ impl Cursor {
     }
 
     def seek(location Location) Unit {
-        docId Int := 0
-        found Bool := false
+        var docId Int = 0
+        var found Bool = false
 
         if location.docId >= 0 {
             docId := location.docId
@@ -65,7 +65,7 @@ impl Cursor {
 
         while docId < documents.size() && !found {
             docTerms = documents[docId].split(" ")
-            pos Int := 0
+            var pos Int = 0
 
             if docId == location.docId && location.position >= 0 {
                 pos := location.position
@@ -109,8 +109,8 @@ def toBeOrNotToBe() Unit {
     c1 = Cursor("to", documents)
     c2 = Cursor("be", documents)
     
-    loc1 := c1.get()
-    loc2 := c2.get()
+    var loc1 = c1.get()
+    var loc2 = c2.get()
 
     result List[Int] = []
 
@@ -134,9 +134,9 @@ def toBeOrNotToBe() Unit {
                 loc2 := c2.get()
             }
 
-            c1Orig := loc1
+            c1Orig = loc1
 
-            failed := false
+            var failed = false
 
             while c1.isValid() && loc1.docId == currDocId && !c2Stack.isEmpty() {
                 unwrap c2Loc <- c2Stack.removeLast() else ()
@@ -180,11 +180,11 @@ def toBeOrNotToBe2() Unit {
     c2 = Cursor("be", documents)
     
     def advanceContiniously(c Cursor) { begin Int, count Int, docId Int } = {
-        counter := 1
-        loc := c.get()
+        var counter = 1
+        var loc = c.get()
         begin = loc.position
         docId = loc.docId
-        prev := loc.position
+        var prev = loc.position
 
         c.advance()
         loc := c.get()
@@ -208,8 +208,8 @@ def toBeOrNotToBe2() Unit {
 
     result List[Int] = []
 
-    advance1 := advanceContiniously(c1)
-    advance2 := advanceContiniously(c2)
+    var advance1 = advanceContiniously(c1)
+    var advance2 = advanceContiniously(c2)
 
     alignDocs(advance1.docId, advance2.docId)
 
@@ -285,8 +285,8 @@ def toBeOrNotToBe3() Unit {
     }
 
     def hasBeRun(bePositions List[Int], begin Int, count Int) Bool {
-        startIndex Int := 0
-        found := false
+        var startIndex Int = 0
+        var found = false
 
         while startIndex < bePositions.size() && !found {
             if bePositions[startIndex] == begin {
@@ -300,7 +300,7 @@ def toBeOrNotToBe3() Unit {
             return false
         }
 
-        offset Int := 0
+        var offset Int = 0
         while offset < count {
             currentIndex = startIndex + offset
             if currentIndex >= bePositions.size() || bePositions[currentIndex] != begin + offset {
@@ -313,18 +313,18 @@ def toBeOrNotToBe3() Unit {
     }
 
     def containsPattern(toPositions List[Int], bePositions List[Int]) Bool {
-        toStart Int := 0
+        var toStart Int = 0
 
         while toStart < toPositions.size() {
             startPos = toPositions[toStart]
             if !(toStart > 0 && toPositions[toStart - 1] == startPos - 1) {
-                runLen Int := 0
+                var runLen Int = 0
 
                 while toStart + runLen < toPositions.size() && toPositions[toStart + runLen] == startPos + runLen {
                     runLen += 1
                 }
 
-                count Int := 1
+                var count Int = 1
                 while count <= runLen {
                     if hasBeRun(bePositions, startPos + count, count) {
                         return true
@@ -342,7 +342,7 @@ def toBeOrNotToBe3() Unit {
     result List[Int] = []
 
     while toCursor.isValid() || beCursor.isValid() {
-        docId Int := -1
+        var docId Int = -1
 
         if toCursor.isValid() && beCursor.isValid() {
             if toCursor.get().docId < beCursor.get().docId {
@@ -356,12 +356,12 @@ def toBeOrNotToBe3() Unit {
             docId := beCursor.get().docId
         }
 
-        toPositions List[Int] := []
+        var toPositions List[Int] = []
         if toCursor.isValid() && toCursor.get().docId == docId {
             toPositions := collectPositions(toCursor, docId)
         }
 
-        bePositions List[Int] := []
+        var bePositions List[Int] = []
         if beCursor.isValid() && beCursor.get().docId == docId {
             bePositions := collectPositions(beCursor, docId)
         }

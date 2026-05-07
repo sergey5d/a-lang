@@ -9,8 +9,8 @@ class Person with Named, Aged {
     age Int
     city Str
 
-    private archived Bool := false
-    private internalScore Int := 0
+    private var archived Bool = false
+    private var internalScore Int = 0
 
     def this(fullName Str, age Int, city Str) {
         parts = fullName.split(" ")

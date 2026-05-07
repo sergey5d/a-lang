@@ -46,6 +46,8 @@ func (p *Parser) parseStatement() (Statement, error) {
 		return p.parseForStmt()
 	case TokenDef:
 		return p.parseLocalFunctionStmt()
+	case TokenVar:
+		return p.parseVarBindingStmt()
 	case TokenReturn:
 		return p.parseReturnStmt()
 	case TokenBreak:
@@ -84,6 +86,57 @@ func (p *Parser) parseBareBindingStmt() (Statement, error) {
 	return p.parseBindingStmtWithStart(start, true)
 }
 
+func (p *Parser) parseVarBindingStmt() (Statement, error) {
+	if _, err := p.consume(TokenVar, "expected 'var'"); err != nil {
+		return nil, err
+	}
+	var start Token
+	var err error
+	if p.check(TokenIdentifier) {
+		start, err = p.consume(TokenIdentifier, "expected binding name after 'var'")
+	} else {
+		start, err = p.consume(TokenUnder, "expected binding name after 'var'")
+	}
+	if err != nil {
+		return nil, err
+	}
+	bindings, err := p.parseBindingsWithStart(start, true)
+	if err != nil {
+		return nil, err
+	}
+	if !p.check(TokenAssign) {
+		if p.check(TokenColonAssign) {
+			return nil, fmt.Errorf("cannot use ':=' in a declaration; use 'var' with '=' for mutable bindings")
+		}
+		return nil, fmt.Errorf("expected '=' after 'var' bindings, got %s", p.peek().String())
+	}
+	operator := p.advance()
+	for i := range bindings {
+		bindings[i].Mutable = true
+	}
+	values, err := p.parseBindingInitializers(len(bindings), operator)
+	if err != nil {
+		return nil, err
+	}
+	for i := range bindings {
+		if i >= len(values) || values[i] == nil {
+			return nil, fmt.Errorf("mutable declarations must initialize with '='; deferred '?' initializers are not supported")
+		}
+		values[i] = wrapThunkExpr(bindings[i].Type, values[i])
+	}
+	stmt := &ValStmt{Bindings: bindings, Values: values}
+	stmt.Span = tokenSpan(start)
+	for i := range bindings {
+		stmt.Span = mergeSpans(stmt.Span, exprSpan(values[i]))
+	}
+	for _, binding := range bindings {
+		if binding.Name != "_" {
+			p.declare(binding.Name)
+		}
+	}
+	return stmt, nil
+}
+
 func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (Statement, error) {
 	bindings, err := p.parseBindingsWithStart(start, firstIsName)
 	if err != nil {
@@ -93,6 +146,9 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 	operator := p.peek().Type
 	if operator != TokenAssign && operator != TokenColonAssign && operator != TokenLeftArrow {
 		return nil, fmt.Errorf("expected '=', ':=', or '<-' after bindings, got %s", p.peek().String())
+	}
+	if operator == TokenColonAssign {
+		return nil, fmt.Errorf("cannot use ':=' in a declaration; use 'var' with '=' for mutable bindings")
 	}
 	p.advance()
 	if operator == TokenLeftArrow {
@@ -110,11 +166,6 @@ func (p *Parser) parseBindingStmtWithStart(start Token, firstIsName bool) (State
 		stmt.Span = mergeSpans(tokenSpan(start), exprSpan(value))
 		return stmt, nil
 	}
-	mutable := operator == TokenColonAssign
-	for i := range bindings {
-		bindings[i].Mutable = mutable
-	}
-
 	values, err := p.parseBindingInitializers(len(bindings), p.previous())
 	if err != nil {
 		return nil, err
@@ -302,6 +353,9 @@ func (p *Parser) parseBindingsWithStart(start Token, firstIsName bool) ([]Bindin
 }
 
 func (p *Parser) isBareBindingStart() bool {
+	if p.check(TokenVar) {
+		return true
+	}
 	if !p.check(TokenIdentifier) && !p.check(TokenUnder) {
 		return false
 	}
@@ -314,10 +368,6 @@ func (p *Parser) isBareBindingStart() bool {
 		return true
 	}
 
-	if p.checkNext(TokenColonAssign) {
-		return !p.isDeclared(p.peek().Lexeme)
-	}
-
 	if p.checkNext(TokenIdentifier) || p.checkNext(TokenLParen) || p.checkNext(TokenLBrace) || p.checkNext(TokenComma) {
 		return p.bindingListFollowedByAssign(p.pos)
 	}
@@ -327,14 +377,12 @@ func (p *Parser) isBareBindingStart() bool {
 
 func (p *Parser) bindingListFollowedByAssign(start int) bool {
 	i := start
-	sawType := false
-	sawUndeclared := false
+	if i < len(p.tokens) && p.tokens[i].Type == TokenVar {
+		i++
+	}
 	for {
 		if i >= len(p.tokens) || (p.tokens[i].Type != TokenIdentifier && p.tokens[i].Type != TokenUnder) {
 			return false
-		}
-		if p.tokens[i].Type == TokenIdentifier && !p.isDeclared(p.tokens[i].Lexeme) {
-			sawUndeclared = true
 		}
 		i++
 		if i < len(p.tokens) && p.sameLineTokens(i-1, i) && (p.tokens[i].Type == TokenIdentifier || p.tokens[i].Type == TokenLParen || p.tokens[i].Type == TokenLBrace) {
@@ -342,7 +390,6 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 			if !ok {
 				return false
 			}
-			sawType = true
 			i = end
 		}
 		if i >= len(p.tokens) {
@@ -350,9 +397,6 @@ func (p *Parser) bindingListFollowedByAssign(start int) bool {
 		}
 		if p.tokens[i].Type == TokenAssign || p.tokens[i].Type == TokenLeftArrow {
 			return true
-		}
-		if p.tokens[i].Type == TokenColonAssign {
-			return sawType || sawUndeclared
 		}
 		if p.tokens[i].Type != TokenComma {
 			return false
@@ -773,7 +817,8 @@ func (p *Parser) parseWhileStmt() (Statement, error) {
 func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 	p.beginScope()
 	defer p.endScope()
-	if (p.check(TokenIdentifier) || p.check(TokenUnder)) && p.bindingListFollowedByArrow(p.pos) {
+	if ((p.check(TokenIdentifier) || p.check(TokenUnder)) && p.bindingListFollowedByArrow(p.pos)) ||
+		(p.check(TokenVar) && p.bindingListFollowedByAssign(p.pos)) {
 		binding, err := p.parseForClause()
 		if err != nil {
 			return nil, err
@@ -1139,6 +1184,10 @@ func (p *Parser) subparserUntil(stopTypes ...TokenType) (*Parser, int, error) {
 }
 
 func (p *Parser) parseForClause() (ForBinding, error) {
+	mutableDecl := false
+	if p.match(TokenVar) {
+		mutableDecl = true
+	}
 	var name Token
 	var err error
 	if p.check(TokenIdentifier) {
@@ -1155,6 +1204,9 @@ func (p *Parser) parseForClause() (ForBinding, error) {
 	}
 	switch p.peek().Type {
 	case TokenLeftArrow:
+		if mutableDecl {
+			return ForBinding{}, fmt.Errorf("for generators cannot use 'var'; use 'var name = ...' only for local mutable bindings")
+		}
 		p.advance()
 		if err := p.requireSameLineExpressionStart(p.previous()); err != nil {
 			return ForBinding{}, err
@@ -1173,13 +1225,22 @@ func (p *Parser) parseForClause() (ForBinding, error) {
 		}, nil
 	case TokenAssign, TokenColonAssign:
 		operator := p.advance()
-		mutable := operator.Type == TokenColonAssign
+		if operator.Type == TokenColonAssign {
+			return ForBinding{}, fmt.Errorf("cannot use ':=' in a declaration; use 'var' with '=' for mutable bindings")
+		}
 		for i := range bindings {
-			bindings[i].Mutable = mutable
+			bindings[i].Mutable = mutableDecl
 		}
 		values, err := p.parseBindingInitializers(len(bindings), operator)
 		if err != nil {
 			return ForBinding{}, err
+		}
+		if mutableDecl {
+			for i := range values {
+				if values[i] == nil {
+					return ForBinding{}, fmt.Errorf("mutable declarations must initialize with '='; deferred '?' initializers are not supported")
+				}
+			}
 		}
 		for i := range bindings {
 			if i < len(values) && values[i] != nil {
@@ -1231,7 +1292,7 @@ func (p *Parser) parseForBindingsBlock() ([]ForBinding, error) {
 			if p.match(TokenComma) {
 				continue
 			}
-			if (p.check(TokenIdentifier) || p.check(TokenUnder)) &&
+			if (p.check(TokenVar) || p.check(TokenIdentifier) || p.check(TokenUnder)) &&
 				(p.bindingListFollowedByArrow(p.pos) || p.bindingListFollowedByAssign(p.pos)) {
 				continue
 			}

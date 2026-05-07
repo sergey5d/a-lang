@@ -19,28 +19,28 @@
 # stepped total 24
 
 def main() Unit {
-    total Int := 0
+    var total Int = 0
     for item <- Range(1, 4) {
         OS.println("range", item)
         total := total + item
     }
     OS.println("total", total)
 
-    multiplied := 1
+    var multiplied = 1
     for item <- Range.apply(10, 14) {
         OS.println("another range", item)
         multiplied *= item
     }
     OS.println("another multiplied", multiplied)
 
-    descendingTotal := 0
+    var descendingTotal = 0
     for item <- Range.apply(5, 1) {
         OS.println("descending", item)
         descendingTotal += item
     }
     OS.println("descending total", descendingTotal)
 
-    steppedTotal := 0
+    var steppedTotal = 0
     for item <- Range.apply(10, 4, -2) {
         OS.println("stepped", item)
         steppedTotal += item

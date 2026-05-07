@@ -54,7 +54,7 @@ func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 	sawNonField := false
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		switch p.peek().Type {
-		case TokenIdentifier:
+		case TokenIdentifier, TokenVar:
 			if sawNonField {
 				return nil, fmt.Errorf("enum fields must appear before method or case declarations")
 			}
@@ -124,7 +124,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		private := p.match(TokenPrivate)
 		switch p.peek().Type {
-		case TokenIdentifier:
+		case TokenIdentifier, TokenVar:
 			if sawMethod {
 				return nil, fmt.Errorf("class fields must appear before method declarations")
 			}
@@ -158,6 +158,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 }
 
 func (p *Parser) parseField(private bool) (FieldDecl, error) {
+	mutable := p.match(TokenVar)
 	start, err := p.consume(TokenIdentifier, "expected field name")
 	if err != nil {
 		return FieldDecl{}, err
@@ -170,6 +171,7 @@ func (p *Parser) parseField(private bool) (FieldDecl, error) {
 	field := FieldDecl{
 		Name:     name.Lexeme,
 		Type:     typ,
+		Mutable:  mutable,
 		Deferred: true,
 		Private:  private,
 		Span:     mergeSpans(tokenSpan(start), typeSpan(typ)),
@@ -177,11 +179,16 @@ func (p *Parser) parseField(private bool) (FieldDecl, error) {
 	switch p.peek().Type {
 	case TokenAssign, TokenColonAssign:
 		operator := p.advance()
+		if operator.Type == TokenColonAssign {
+			return FieldDecl{}, fmt.Errorf("cannot use ':=' in a field declaration; use 'var' with '=' for mutable fields")
+		}
 		if err := p.requireSameLineExpressionStart(operator); err != nil {
 			return FieldDecl{}, err
 		}
-		field.Mutable = operator.Type == TokenColonAssign
 		if p.match(TokenQuestion) {
+			if field.Mutable {
+				return FieldDecl{}, fmt.Errorf("mutable fields do not support '= ?'; omit the initializer instead")
+			}
 			field.Deferred = true
 			field.Span = mergeSpans(field.Span, tokenSpan(p.previous()))
 			return field, nil

@@ -5,7 +5,7 @@
 # 0
 
 def main() Int {
-	counter Int := 0
+	var counter Int = 0
 
 	while true {
 		OS.println("loop " + counter)

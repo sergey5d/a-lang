@@ -21,7 +21,7 @@ impl IntRange {
 
     def zipWithIndex() List[(Int, Int)] {
         out List[(Int, Int)] = []
-        index := 0
+        var index = 0
         for item <- this {
             out.append((item, index))
             index += 1
@@ -31,9 +31,9 @@ impl IntRange {
 }
 
 private class RangeIterator with Iterator[Int] {
-    current Int := ?
-    end Int := ?
-    step Int := ?
+    var current Int
+    var end Int
+    var step Int
 }
 
 impl RangeIterator {

@@ -79,7 +79,7 @@ def main() {
 
     values.forEach((key, value) -> OS.println("pair " + key + " " + value))
 
-    total := 0
+    var total = 0
 
     for item Int <- seen {
         total += item

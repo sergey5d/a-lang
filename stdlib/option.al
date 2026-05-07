@@ -1,6 +1,6 @@
 class Option[T] with Unwrappable[T] {
-    private set Bool := ?
-    private value T := ?
+    private var set Bool
+    private var value T
 }
 
 impl Option[T] {

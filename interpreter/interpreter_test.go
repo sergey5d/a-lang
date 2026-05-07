@@ -26,7 +26,7 @@ def add(a Int, b Int) Int {
 
 def run(input Int) Int {
 	total Int = add(input, 2)
-	copy Int := total
+	var copy Int = total
 	copy += 3
 
 	if copy > 10 {
@@ -119,7 +119,7 @@ def run() Unit {
 func TestForLoops(t *testing.T) {
 	src := `
 def run() Int {
-	total Int := 0
+	var total Int = 0
 
 	for item <- [1, 2, 3] {
 		total += item
@@ -146,7 +146,7 @@ def run() Int {
 func TestYieldLoops(t *testing.T) {
 	src := `
 def run() Int {
-	total Int := 0
+	var total Int = 0
 
 	for {
 		left <- [1, 2],
@@ -216,7 +216,7 @@ def run() Int {
 	indexedValue, indexedPos = indexedPair
 	arrayLeft, arrayRight = valuePairs[1]
 	arrayIndexedValue, arrayIndexedPos = valueIndexed[2]
-	total := 0
+	var total = 0
 
 	for left, right <- pairs {
 		if right == "b" {
@@ -287,7 +287,7 @@ def run() Int {
 func TestClassesAndMethods(t *testing.T) {
 	src := `
 class Counter {
-	private count Int := ?
+	private var count Int
 }
 
 impl Counter {
@@ -352,7 +352,7 @@ def run() Int {
 func TestMethodWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
 	src := `
 class Counter {
-	private count Int := ?
+	private var count Int
 }
 
 impl Counter {
@@ -409,7 +409,7 @@ def run() Int {
 func TestForDestructuring(t *testing.T) {
 	src := `
 def run() Int {
-	total Int := 0
+	var total Int = 0
 
 	for left Int, right Str <- [(1, "x"), (2, "y"), (3, "x")] {
 		if right == "x" {
@@ -442,7 +442,7 @@ enum OptionX[T] {
 
 def run() Int {
 	value OptionX[Int] = OptionX.SomeX(7)
-	total Int := 0
+	var total Int = 0
 
 	match value {
 		SomeX(item) => {
@@ -864,7 +864,7 @@ impl Printer {
 }
 
 def sum(values Int...) Int {
-	total Int := 0
+	var total Int = 0
 	for value <- values {
 		total += value
 	}
@@ -890,8 +890,8 @@ def run() Int {
 func TestMultiAssignmentStmt(t *testing.T) {
 	src := `
 def run() Int {
-	a Int := 1
-	b Int := 2
+	var a Int = 1
+	var b Int = 2
 	a, b := b, a + b
 	a + b
 }
@@ -958,7 +958,7 @@ def run() Int {
 func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {
-	private count Int := ?
+	private var count Int
 }
 
 impl Counter {
@@ -1160,7 +1160,7 @@ def run() Int {
 func TestCustomAndCollectionOperators(t *testing.T) {
 	src := `
 class Vec {
-	private items Array[Int] := ?
+	private var items Array[Int]
 }
 
 impl Vec {
@@ -1269,7 +1269,7 @@ def run() Int {
 	mapAllSmall = values.forAll((key Str, value Int) -> value < 3)
 	values.forEach((key Str, value Int) -> OS.println("pair " + key + " " + value))
 
-	total := 0
+	var total = 0
 	for item Int <- seen {
 		total += item
 	}
@@ -1760,7 +1760,7 @@ def run() Int {
 func TestObjectSingletonAccess(t *testing.T) {
 	src := `
 object A {
-	count Int := 2
+	var count Int = 2
 
 	def value() Int = count
 
@@ -1883,7 +1883,7 @@ func TestImplicitPrimaryConstructorAndThisDelegation(t *testing.T) {
 class Counter {
 	count Int
 	label Str
-	private seen Bool := false
+	private var seen Bool = false
 }
 
 impl Counter {
@@ -1941,7 +1941,7 @@ def run() Int {
 func TestWhileLoop(t *testing.T) {
 	src := `
 def run() Int {
-	total Int := 0
+	var total Int = 0
 	while total < 3 {
 		total += 1
 	}
@@ -1964,7 +1964,7 @@ func TestYieldLoopsWithMutableBindings(t *testing.T) {
 def run() Int {
 	items = for {
 		item <- [1, 2, 3]
-		total := item
+		var total = item
 	} yield {
 		total += 1
 		total
@@ -1992,7 +1992,7 @@ func TestIfOptionBinding(t *testing.T) {
 def run() Int {
 	found Option[Int] = Some(5)
 	missing Option[Int] = None()
-	total Int := 0
+	var total Int = 0
 	if item <- found {
 		total := total + item
 	}
@@ -2396,7 +2396,7 @@ def run() Int {
 	{
 		OS.println("xxx")
 	}
-	v := {
+	var v = {
 		a = 5
 		{
 			a + 1

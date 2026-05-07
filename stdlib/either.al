@@ -1,7 +1,7 @@
 class Either[L, R] with Unwrappable[R] {
-    private rightSet Bool := ?
-    private left L := ?
-    private right R := ?
+    private var rightSet Bool
+    private var left L
+    private var right R
 }
 
 impl Either[L, R] {
