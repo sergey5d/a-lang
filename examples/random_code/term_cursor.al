@@ -90,7 +90,8 @@ def toBeOrNotToBe() Unit {
         "this is to be",
         "method to to be be haha",
         "this is to cat",
-        "method to to be haha"
+        "method to to be haha",
+        "things can't be to"
     )
 
     c1 = Cursor("to", documents)
