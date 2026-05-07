@@ -94,6 +94,8 @@ def toBeOrNotToBe() Unit {
         "things can't be to"
     )
 
+    OS.println("to be or not to be:")
+
     c1 = Cursor("to", documents)
     c2 = Cursor("be", documents)
     
@@ -147,7 +149,82 @@ def toBeOrNotToBe() Unit {
     for res <- result {
         OS.println("document: " + res)
     }
+}
 
+def toBeOrNotToBe2() Unit {
+
+    documents List[Str] = List(
+        "this is to be",
+        "method to to be be haha",
+        "this is to cat",
+        "method to to be haha",
+        "things can't be to"
+    )
+
+    OS.println("to be or not to be v2:")
+
+    c1 = Cursor("to", documents)
+    c2 = Cursor("be", documents)
+    
+    loc1 := c1.get()
+    loc2 := c2.get()
+
+    result List[Int] = []
+
+    while c1.isValid() && c2.isValid() {
+
+        loc1 := c1.get()
+        loc2 := c2.get()
+
+        if loc1.docId > loc2.docId {
+            c2.seek(Location(loc1.docId, 0))
+        } else if loc1.docId < loc2.docId {
+            c1.seek(Location(loc2.docId, 0))
+        } else {
+
+            docId = loc1.docId
+
+            c1Counter := 1
+            c1RangeBegin = loc1.position
+
+            c1.advance()
+            loc1 := c1.get()
+
+            while (c1.isValid() && c1RangeBegin + 1 == loc1.position && docId == loc1.docId) {
+                c1Counter += 1
+                c1.advance()
+                loc1 := c1.get()
+            }
+
+            c2Counter := 1
+            c2RangeBegin = loc2.position
+
+            c2.advance()
+            loc2 := c2.get()
+
+            while (c2.isValid() && c2RangeBegin + 1 == loc2.position && docId == loc2.docId) {
+                c2Counter += 1
+                c2.advance()
+                loc2 := c2.get()
+            }
+
+            if c1RangeBegin + c1Counter + 1 == c2RangeBegin {
+                result.append(docId)
+
+                if loc1.docId == docId {
+                    c1.seek(Location(loc1.docId + 1, 0))
+                }
+
+                if loc2.docId == docId {
+                    c2.seek(Location(loc2.docId + 1, 0))
+                }
+            }
+        }
+    }
+
+    for res <- result {
+        OS.println("document: " + res)
+    }
 }
 
 def main() Int {
@@ -183,7 +260,6 @@ def main() Int {
     loc4 = cursor.get()
     OS.println("loc4 " + loc4.docId + ":" + loc4.position)
 
-    OS.println("to be or not to be:")
     toBeOrNotToBe()
 
     0
