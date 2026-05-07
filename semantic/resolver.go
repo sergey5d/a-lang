@@ -224,7 +224,6 @@ func (r *Resolver) resolveGlobals(statements []parser.Statement) {
 				continue
 			}
 			r.globals[binding.Name] = symbol{span: binding.Span, mutable: binding.Mutable}
-			r.defineMutable(binding.Name, binding.Span, binding.Mutable, "duplicate_binding", "duplicate binding '"+binding.Name+"'")
 		}
 	}
 }
@@ -242,7 +241,7 @@ func (r *Resolver) resolveFunction(fn *parser.FunctionDecl) {
 
 	for _, param := range fn.Parameters {
 		r.resolveTypeRef(param.Type)
-		r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
+		r.defineMutableAllowShadow(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'", true)
 	}
 	r.resolveBlock(fn.Body)
 }
@@ -290,9 +289,9 @@ func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
 
 	r.pushScope()
 	defer r.popScope()
-	r.defineMutable("this", decl.Span, false, "duplicate_binding", "duplicate binding 'this'")
+	r.defineMutableAllowShadow("this", decl.Span, false, "duplicate_binding", "duplicate binding 'this'", true)
 	for _, field := range decl.Fields {
-		r.defineMutable(field.Name, field.Span, field.Mutable, "duplicate_binding", "duplicate binding '"+field.Name+"'")
+		r.defineMutableAllowShadow(field.Name, field.Span, field.Mutable, "duplicate_binding", "duplicate binding '"+field.Name+"'", true)
 	}
 	if decl.Enum {
 		for _, enumCase := range decl.Cases {
@@ -313,7 +312,7 @@ func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
 			if len(enumCase.Methods) > 0 {
 				r.pushScope()
 				for _, field := range enumCase.Fields {
-					r.defineMutable(field.Name, field.Span, field.Mutable, "duplicate_binding", "duplicate binding '"+field.Name+"'")
+					r.defineMutableAllowShadow(field.Name, field.Span, field.Mutable, "duplicate_binding", "duplicate binding '"+field.Name+"'", true)
 				}
 				for _, method := range enumCase.Methods {
 					r.resolveMethod(method)
@@ -337,10 +336,10 @@ func (r *Resolver) resolveMethod(method *parser.MethodDecl) {
 	r.resolveTypeRef(method.ReturnType)
 	r.pushScope()
 	defer r.popScope()
-	r.defineMutable("this", method.Span, false, "duplicate_binding", "duplicate binding 'this'")
+	r.defineMutableAllowShadow("this", method.Span, false, "duplicate_binding", "duplicate binding 'this'", true)
 	for _, param := range method.Parameters {
 		r.resolveTypeRef(param.Type)
-		r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
+		r.defineMutableAllowShadow(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'", method.Constructor)
 	}
 	r.resolveBlockStatements(method.Body.Statements)
 }
@@ -370,10 +369,10 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		r.defineMutable(s.Function.Name, s.Span, false, "duplicate_binding", "duplicate binding '"+s.Function.Name+"'")
 		r.resolveTypeRef(s.Function.ReturnType)
 		r.pushScope()
-		for _, param := range s.Function.Parameters {
-			r.resolveTypeRef(param.Type)
-			r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
-		}
+			for _, param := range s.Function.Parameters {
+				r.resolveTypeRef(param.Type)
+				r.defineMutable(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'")
+			}
 		r.resolveBlockStatements(s.Function.Body.Statements)
 		r.popScope()
 	case *parser.AssignmentStmt:
@@ -692,14 +691,30 @@ func (r *Resolver) resolveMatchPattern(pattern parser.Pattern) {
 }
 
 func (r *Resolver) defineMutable(name string, span parser.Span, mutable bool, code, message string) {
+	r.defineMutableAllowShadow(name, span, mutable, code, message, false)
+}
+
+func (r *Resolver) defineMutableAllowShadow(name string, span parser.Span, mutable bool, code, message string, allowOuterShadow bool) {
 	if name == "_" {
 		return
 	}
 	current := r.currentScope()
 	if previous, exists := current[name]; exists {
-		r.addDiagnostic(code, message, span)
-		r.addDiagnostic(code, "previous declaration of '"+name+"'", previous.span)
+		if code == "duplicate_binding" {
+			r.addDiagnostic("shadowing_binding", "binding '"+name+"' shadows an existing variable; use a different name", span)
+			r.addDiagnostic("shadowing_binding", "previous declaration of '"+name+"'", previous.span)
+		} else {
+			r.addDiagnostic(code, message, span)
+			r.addDiagnostic(code, "previous declaration of '"+name+"'", previous.span)
+		}
 		return
+	}
+	if !allowOuterShadow {
+		if previous, exists := r.lookupOuter(name); exists {
+			r.addDiagnostic("shadowing_binding", "binding '"+name+"' shadows an existing variable; use a different name", span)
+			r.addDiagnostic("shadowing_binding", "previous declaration of '"+name+"'", previous.span)
+			return
+		}
 	}
 	current[name] = symbol{span: span, mutable: mutable}
 }
@@ -864,6 +879,20 @@ func (r *Resolver) lookup(name string) (symbol, bool) {
 	for i := len(r.scopes) - 1; i >= 0; i-- {
 		if sym, ok := r.scopes[i][name]; ok {
 			return sym, true
+		}
+	}
+	if sym, ok := r.globals[name]; ok {
+		return sym, true
+	}
+	return symbol{}, false
+}
+
+func (r *Resolver) lookupOuter(name string) (symbol, bool) {
+	if len(r.scopes) > 1 {
+		for i := len(r.scopes) - 2; i >= 0; i-- {
+			if sym, ok := r.scopes[i][name]; ok {
+				return sym, true
+			}
 		}
 	}
 	if sym, ok := r.globals[name]; ok {

@@ -189,7 +189,7 @@ def toBeOrNotToBe2() Unit {
         c.advance()
         loc := c.get()
 
-         while (c.isValid() && prev + 1 == loc.position && docId == loc.docId) {
+         while c.isValid() && prev + 1 == loc.position && docId == loc.docId {
             counter += 1
             prev := loc.position
             c.advance()
@@ -212,9 +212,6 @@ def toBeOrNotToBe2() Unit {
     advance2 := advanceContiniously(c2)
 
     alignDocs(advance1.docId, advance2.docId)
-
-    # todo prohibit scope conflicts
-    #docId = advance1.docId
 
     while c1.isValid() || c2.isValid() {
 

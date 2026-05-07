@@ -18,7 +18,7 @@ impl A {
     def this(name Str) {
         # no need to call primary constructor if we init all fields in secondary constructor
         this.name = name
-        age = 15
+        this.age = 15
     }
 
     def trueAge() Int = age

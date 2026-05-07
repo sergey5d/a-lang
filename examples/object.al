@@ -13,7 +13,7 @@ object A {
     count Int := 2
 
     # explicit apply declaration
-    def apply(count Int) B = B(size = count)
+    def apply(sizeValue Int) B = B(size = sizeValue)
 
     # explicit apply declaration
     def apply(str Str) B = B(size = 1)

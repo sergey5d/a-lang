@@ -23,14 +23,14 @@ def run(input Int) Bool {
 	acc := acc + 1
 	item = input
 
-	for item <- [1, 2, 3] {
-		if item == input {
+	for current <- [1, 2, 3] {
+		if current == input {
 			break
 		}
 	}
 
-	for item <- [1, 3] {
-		if item == input {
+	for another <- [1, 3] {
+		if another == input {
 			break
 		}
 	}
@@ -48,12 +48,150 @@ def run(input Int) Bool {
 		x + y
 	}
 
-	mapper = (x Int) -> x + value
+	mapper = (mapped Int) -> mapped + value
 	return mapper(input) == helper(value)
 }
 
 def helper(x Int) Int {
 	return x
+}
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", diagnostics)
+	}
+}
+
+func TestAnalyzeShadowingBindingInBlock(t *testing.T) {
+	src := `
+def run() Int {
+	value = 1
+	if true {
+		value2 = value
+		value Int = value2
+	}
+	return value
+}
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics for shadowing binding, got %#v", diagnostics)
+	}
+	if diagnostics[0].Code != "shadowing_binding" {
+		t.Fatalf("unexpected first diagnostic %#v", diagnostics[0])
+	}
+}
+
+func TestAnalyzeShadowingPatternBinding(t *testing.T) {
+	src := `
+enum MaybeInt {
+    case SomeX {
+        value Int
+    }
+
+    case NoneX
+}
+
+def run(value Int, maybe MaybeInt) Int {
+	match maybe {
+		SomeX(value) => value
+		NoneX => value
+	}
+}
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics for shadowing pattern binding, got %#v", diagnostics)
+	}
+	if diagnostics[0].Code != "shadowing_binding" {
+		t.Fatalf("unexpected first diagnostic %#v", diagnostics[0])
+	}
+}
+
+func TestAnalyzeShadowingForBinding(t *testing.T) {
+	src := `
+def run() Int {
+	item = 1
+	for item <- [1, 2, 3] {
+		OS.println(item)
+	}
+	return item
+}
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics for shadowing for binding, got %#v", diagnostics)
+	}
+	if diagnostics[0].Code != "shadowing_binding" {
+		t.Fatalf("unexpected first diagnostic %#v", diagnostics[0])
+	}
+}
+
+func TestAnalyzeShadowingUnwrapBinding(t *testing.T) {
+	src := `
+def run() Int {
+	item = 1
+	unwrap item <- Some(2) else return item
+	return item
+}
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics for shadowing unwrap binding, got %#v", diagnostics)
+	}
+	if diagnostics[0].Code != "shadowing_binding" {
+		t.Fatalf("unexpected first diagnostic %#v", diagnostics[0])
+	}
+}
+
+func TestAnalyzeShadowingLambdaParameter(t *testing.T) {
+	src := `
+def run() Int {
+	value = 1
+	mapper = (value Int) -> value + 1
+	return mapper(2)
+}
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 2 {
+		t.Fatalf("expected 2 diagnostics for shadowing lambda parameter, got %#v", diagnostics)
+	}
+	if diagnostics[0].Code != "shadowing_binding" {
+		t.Fatalf("unexpected first diagnostic %#v", diagnostics[0])
+	}
+}
+
+func TestAnalyzeTopLevelFunctionParameterMayShadowGlobal(t *testing.T) {
+	src := `
+value = 1
+
+def run(value Int) Int {
+	return value
+}
+`
+
+	diagnostics := Analyze(parseProgram(t, src))
+	if len(diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", diagnostics)
+	}
+}
+
+func TestAnalyzeConstructorParameterMayShadowField(t *testing.T) {
+	src := `
+class Box {
+	private value Int
+}
+
+impl Box {
+	def this(value Int) {
+		this.value = value
+	}
 }
 `
 
@@ -92,7 +230,7 @@ def run() Bool {
 	if len(diagnostics) != 2 {
 		t.Fatalf("expected 2 diagnostics for duplicate binding, got %#v", diagnostics)
 	}
-	if diagnostics[0].Code != "duplicate_binding" {
+	if diagnostics[0].Code != "shadowing_binding" {
 		t.Fatalf("unexpected first diagnostic %#v", diagnostics[0])
 	}
 }
@@ -163,7 +301,7 @@ def run() Bool {
 	if len(diagnostics) != 2 {
 		t.Fatalf("expected 2 diagnostics, got %#v", diagnostics)
 	}
-	if diagnostics[0].Code != "duplicate_binding" {
+	if diagnostics[0].Code != "shadowing_binding" {
 		t.Fatalf("unexpected diagnostic %#v", diagnostics[0])
 	}
 }
@@ -222,7 +360,7 @@ impl Box[T] {
 		this.value = value
 	}
 
-	def map(value T) Stringable {
+	def map(mapped T) Stringable {
 		return this
 	}
 }
