@@ -12,6 +12,10 @@
 # to be or not to be:
 # document: 0
 # document: 1
+# to be or not to be v2:
+# document: 0
+# document: 1
+# document: 5
 # 0
 
 record Location {
@@ -158,7 +162,9 @@ def toBeOrNotToBe2() Unit {
         "method to to be be haha",
         "this is to cat",
         "method to to be haha",
-        "things can't be to"
+        "things can't be to",
+        "to equasion has to be",
+        "to equasion is not be"
     )
 
     OS.println("to be or not to be v2:")
@@ -199,14 +205,14 @@ def toBeOrNotToBe2() Unit {
 
     alignDocs()
 
-    docId = c1.get().docId
-
     advance1 := advanceContiniously(c1)
     advance2 := advanceContiniously(c2)
 
-    while (c1.isValid() && c2.isValid()) {
+    docId = advance1.docId
 
-        docId = c1.get().docId
+    while (c1.isValid() || c2.isValid()) {
+
+        docId = advance1.docId
 
         if (advance1.docId > advance2.docId) {
             alignDocs()
@@ -225,14 +231,15 @@ def toBeOrNotToBe2() Unit {
                         result.append(docId)
                     }
                 } else {
-                    c1.seek(Location(advance1.docId + 1, 0))
                     advance1 := advanceContiniously(c1)
                     advance2 := advanceContiniously(c2)
                 }
             } else {
-                c1.seek(Location(advance1.docId + 1, 0))
-                advance1 := advanceContiniously(c1)
-                advance2 := advanceContiniously(c2)
+                if advance1.begin > advance2.begin {
+                    advance2 := advanceContiniously(c2)
+                } else {
+                    advance1 := advanceContiniously(c1)
+                }
             }
         }
     }
@@ -276,6 +283,7 @@ def main() Int {
     OS.println("loc4 " + loc4.docId + ":" + loc4.position)
 
     toBeOrNotToBe()
+    toBeOrNotToBe2()
 
     0
 }
