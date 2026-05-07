@@ -32,7 +32,7 @@ const (
 	TokenPrivate   TokenType = "PRIVATE"
 	TokenIf        TokenType = "IF"
 	TokenThen      TokenType = "THEN"
-	TokenTry       TokenType = "TRY"
+	TokenPartial   TokenType = "PARTIAL"
 	TokenMatch     TokenType = "MATCH"
 	TokenIs        TokenType = "IS"
 	TokenElse      TokenType = "ELSE"
@@ -113,7 +113,7 @@ var keywords = map[string]TokenType{
 	"private":   TokenPrivate,
 	"if":        TokenIf,
 	"then":      TokenThen,
-	"try":       TokenTry,
+	"partial":   TokenPartial,
 	"match":     TokenMatch,
 	"is":        TokenIs,
 	"else":      TokenElse,

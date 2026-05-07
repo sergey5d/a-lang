@@ -108,11 +108,11 @@ Current target:
 
 ## 5. Partial-Match Story
 
-`try match` already exists, so the main open question is whether that is the final shape.
+`partial` now exists, so the main open question is whether that is the final shape.
 
 Open questions:
 
-- is `try match` the final partial-match syntax?
+- is `partial` the final partial-match syntax?
 - should there ever be something like `try match` instead?
 - should partial matching get better fallback ergonomics?
 

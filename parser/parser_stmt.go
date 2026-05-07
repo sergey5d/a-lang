@@ -36,8 +36,8 @@ func (p *Parser) parseStatement() (Statement, error) {
 	switch p.peek().Type {
 	case TokenIf:
 		return p.parseIfStmt()
-	case TokenTry:
-		return p.parseTryMatchStmt()
+	case TokenPartial:
+		return p.parsePartialStmt()
 	case TokenMatch:
 		return p.parseMatchStmt()
 	case TokenLoop:
@@ -495,12 +495,9 @@ func (p *Parser) parseMatchStmt() (Statement, error) {
 	return p.parseMatchStmtAfterStart(start, false)
 }
 
-func (p *Parser) parseTryMatchStmt() (Statement, error) {
-	start, err := p.consume(TokenTry, "expected 'try'")
+func (p *Parser) parsePartialStmt() (Statement, error) {
+	start, err := p.consume(TokenPartial, "expected 'partial'")
 	if err != nil {
-		return nil, err
-	}
-	if _, err := p.consume(TokenMatch, "expected 'match' after 'try'"); err != nil {
 		return nil, err
 	}
 	return p.parseMatchStmtAfterStart(start, true)

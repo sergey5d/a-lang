@@ -63,7 +63,7 @@ func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 				return nil, err
 			}
 			decl.Fields = append(decl.Fields, field)
-		case TokenDef:
+		case TokenDef, TokenPartial:
 			sawNonField = true
 			method, err := p.parseMethodLike(false, false)
 			if err != nil {
@@ -133,7 +133,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 				return nil, err
 			}
 			decl.Fields = append(decl.Fields, field)
-		case TokenDef:
+		case TokenDef, TokenPartial:
 			if !allowInlineMethods {
 				return nil, fmt.Errorf("%s methods must be declared in top-level impl blocks", noun)
 			}
@@ -203,8 +203,19 @@ func (p *Parser) parseMethodLike(private bool, allowShortApply bool) (*MethodDec
 
 func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, error) {
 	start := p.peek()
-	if _, err := p.consume(TokenDef, "expected 'def'"); err != nil {
-		return nil, err
+	partial := false
+	switch p.peek().Type {
+	case TokenDef:
+		if _, err := p.consume(TokenDef, "expected 'def'"); err != nil {
+			return nil, err
+		}
+	case TokenPartial:
+		if _, err := p.consume(TokenPartial, "expected 'partial'"); err != nil {
+			return nil, err
+		}
+		partial = true
+	default:
+		return nil, fmt.Errorf("expected 'def' or 'partial'")
 	}
 	start = p.previous()
 	nameLexeme, isOperator, err := p.parseDeclaredMethodName(allowShortApply, "expected method name")
@@ -228,9 +239,24 @@ func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, e
 		}
 		returnType = typ
 	}
-	body, err := p.parseCallableBody()
-	if err != nil {
-		return nil, err
+	var body *BlockStmt
+	if partial {
+		if constructor {
+			return nil, fmt.Errorf("constructors cannot be declared as partial")
+		}
+		if returnType == nil {
+			return nil, fmt.Errorf("partial methods require an explicit return type")
+		}
+		body, err = p.parsePartialCallableBody(start, params)
+		if err != nil {
+			return nil, err
+		}
+		returnType = optionTypeRef(returnType)
+	} else {
+		body, err = p.parseCallableBody()
+		if err != nil {
+			return nil, err
+		}
 	}
 	if !constructor && returnType == nil {
 		returnType = implicitUnitType(body.Span)
@@ -241,11 +267,57 @@ func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, e
 		Parameters:     params,
 		ReturnType:     returnType,
 		Body:           body,
+		Partial:        partial,
 		Operator:       isOperator,
 		Private:        private,
 		Constructor:    constructor,
 		Span:           mergeSpans(tokenSpan(start), body.Span),
 	}, nil
+}
+
+func optionTypeRef(inner *TypeRef) *TypeRef {
+	if inner == nil {
+		return &TypeRef{Name: "Option"}
+	}
+	return &TypeRef{
+		Name:      "Option",
+		Arguments: []*TypeRef{inner},
+		Span:      inner.Span,
+	}
+}
+
+func (p *Parser) parsePartialCallableBody(start Token, params []Parameter) (*BlockStmt, error) {
+	if len(params) == 0 {
+		return nil, fmt.Errorf("partial methods require at least one parameter")
+	}
+	cases, end, err := p.parseMatchCases()
+	if err != nil {
+		return nil, err
+	}
+	matchExpr := &MatchExpr{
+		Partial: true,
+		Value:   partialCallableValueExpr(params),
+		Cases:   cases,
+		Span:    mergeSpans(tokenSpan(start), tokenSpan(end)),
+	}
+	stmt := &ExprStmt{Expr: matchExpr, Span: exprSpan(matchExpr)}
+	return &BlockStmt{
+		Statements: []Statement{stmt},
+		Span:       exprSpan(matchExpr),
+	}, nil
+}
+
+func partialCallableValueExpr(params []Parameter) Expr {
+	if len(params) == 1 {
+		return &Identifier{Name: params[0].Name, Span: params[0].Span}
+	}
+	elements := make([]Expr, len(params))
+	span := params[0].Span
+	for i, param := range params {
+		elements[i] = &Identifier{Name: param.Name, Span: param.Span}
+		span = mergeSpans(span, param.Span)
+	}
+	return &TupleLiteral{Elements: elements, Span: span}
 }
 
 func (p *Parser) parseOperatorName() (string, Span, error) {
@@ -423,7 +495,7 @@ func (p *Parser) parseTopLevelImpl(program *Program) error {
 	}
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		private := p.match(TokenPrivate)
-		if !p.check(TokenDef) {
+		if !p.check(TokenDef) && !p.check(TokenPartial) {
 			return fmt.Errorf("expected method declaration in impl block, got %s", p.peek().String())
 		}
 		method, err := p.parseMethodLike(private, false)

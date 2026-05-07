@@ -2715,7 +2715,7 @@ def run() Bool {
 		SomeX(x) => x + 1
 		NoneX => 0
 	})
-	partialMapped = options.map(try match {
+	partialMapped = options.map(partial {
 		SomeX(x) => x + 1
 	})
 	unwrap firstPartial <- partialMapped.get(0) else {
@@ -2763,10 +2763,36 @@ enum MaybeInt {
 
 def run() Bool {
 	options List[MaybeInt] = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
-	partialMapped List[Option[Int]] = options.map(try match {
+	partialMapped List[Option[Int]] = options.map(partial {
 		SomeX(x) => x + 1
 	})
 	return partialMapped.get(1).getOr(None()).isEmpty()
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzePartialMethod(t *testing.T) {
+	src := `
+class Classifier {
+}
+
+impl Classifier {
+	partial classify(value Int) Int {
+		3 => 5
+		4 => 0
+	}
+}
+
+def run() Bool {
+	classifier = Classifier()
+	first Option[Int] = classifier.classify(3)
+	second Option[Int] = classifier.classify(8)
+	return first.getOr(0) == 5 && second.isEmpty()
 }
 `
 

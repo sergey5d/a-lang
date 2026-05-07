@@ -2276,7 +2276,7 @@ def run() Str {
 		SomeX(x) => x + 1
 		NoneX => 0
 	})
-	partialMapped = options.map(try match {
+	partialMapped = options.map(partial {
 		SomeX(x) => x + 1
 	})
 	unwrap firstPartial <- partialMapped.get(0) else {
@@ -2296,6 +2296,36 @@ def run() Str {
 	}
 	if value != "8-10-4-2-true" {
 		t.Fatalf("expected %q, got %#v", "8-10-4-2-true", value)
+	}
+}
+
+func TestPartialMethod(t *testing.T) {
+	src := `
+class Classifier {
+}
+
+impl Classifier {
+	partial classify(value Int) Int {
+		3 => 5
+		4 => 0
+	}
+}
+
+def run() Str {
+	classifier = Classifier()
+	first = classifier.classify(3)
+	second = classifier.classify(8)
+	return "${first.getOr(0)}-${second.isEmpty()}"
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "5-true" {
+		t.Fatalf("expected %q, got %#v", "5-true", value)
 	}
 }
 

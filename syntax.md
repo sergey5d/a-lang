@@ -438,7 +438,7 @@ options.map(match {
 })
 ```
 
-`match { ... }` in that position desugars to `match _ { ... }`. The same also works for `try match { ... }`.
+`match { ... }` in that position desugars to `match _ { ... }`. The same also works for `partial { ... }`.
 
 Nested blocks are also valid expressions:
 
@@ -848,14 +848,14 @@ result = match value {
 Partial expression form:
 
 ```txt
-result Option[Int] = try match value {
+result Option[Int] = partial value {
     SomeX(x) => x
 }
 ```
 
-`match` and `try match` always require a block of cases. Inline `match value: ...` shorthand is not supported.
+`match` and `partial` always require a block of cases. Inline `match value: ...` shorthand is not supported.
 
-If no case matches, `try match` returns `None`.
+If no case matches, `partial` returns `None`.
 
 Supported pattern families:
 
@@ -881,7 +881,7 @@ Generic arguments inside runtime type patterns are intentionally rejected for no
 Current notes:
 
 - enum exhaustiveness is checked
-- `try match` skips exhaustiveness checking and wraps the result in `Option[...]`
+- `partial` skips exhaustiveness checking and wraps the result in `Option[...]`
 - bare singleton enum cases should still be written in qualified form when needed, for example `MaybeInt.NoneX`
 
 ## Destructuring

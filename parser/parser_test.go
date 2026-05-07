@@ -673,7 +673,7 @@ enum MaybeInt {
 func TestParsePartialMatchExpr(t *testing.T) {
 	src := `
 def run(value MaybeInt) Option[Int] =
-	try match value {
+	partial value {
 		SomeX(x) => x + 1
 	}
 `
@@ -694,6 +694,32 @@ def run(value MaybeInt) Option[Int] =
 	}
 	if !expr.Partial {
 		t.Fatalf("expected partial match expression")
+	}
+}
+
+func TestParsePartialMethodInImpl(t *testing.T) {
+	src := `
+class Classifier {
+}
+
+impl Classifier {
+	partial classify(value Int) Int {
+		3 => 5
+		4 => 0
+	}
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	method := program.Classes[0].Methods[0]
+	if !method.Partial {
+		t.Fatalf("expected method to be partial")
+	}
+	if method.ReturnType == nil || method.ReturnType.Name != "Option" || len(method.ReturnType.Arguments) != 1 || method.ReturnType.Arguments[0].Name != "Int" {
+		t.Fatalf("expected partial method return type to be Option[Int], got %#v", method.ReturnType)
 	}
 }
 

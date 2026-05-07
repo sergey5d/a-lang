@@ -183,19 +183,19 @@ Open options under discussion:
    - strongest enum / `Option` ergonomics
    - needs exhaustiveness checking
 
-2. Add `try match` as the partial form
+2. Add `partial` as the partial form
    Possible shapes:
    - `match value { ... }` returns `T`
-   - `try match value { ... }` returns `Option[T]`
+   - `partial value { ... }` returns `Option[T]`
    Good fit:
    - explicit
    - very compact
    - keeps plain `match` as the total form
 
-3. Add `try match` as the partial form
+3. Add `partial` as the partial form
    Possible shapes:
    - `match value { ... }` returns `T`
-   - `try match value { ... }` returns `Option[T]`
+   - `partial value { ... }` returns `Option[T]`
    Good fit:
    - explicit
    - keyword-only
@@ -204,7 +204,7 @@ Open options under discussion:
 Current leaning:
 - avoid runtime "no match" exceptions as a normal language outcome
 - keep `match` as the exhaustive / total form
-- partial matching now uses `try match`
+- partial matching now uses `partial`
 
 Related lambda-syntax discussion:
 - today placeholder-based forms like `list.map(match _ { ... })` work
