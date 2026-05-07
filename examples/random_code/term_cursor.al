@@ -116,8 +116,6 @@ def toBeOrNotToBe() Unit {
             currDocId = loc1.docId
             c2Stack List[Int] = []
 
-            #c2.seek(loc1 with { pos = loc1.pos + 1})
-
             while c2.isValid() && loc2.docId == currDocId {
                 c2Stack.append(loc2.position)
                 c2.advance()
