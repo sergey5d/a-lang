@@ -126,7 +126,7 @@ def toBeOrNotToBe() Unit {
 
             failed := false
 
-            while c1.isValid() && loc1.docId == currDocId && c2Stack.size() != 0 {
+            while c1.isValid() && loc1.docId == currDocId && !c2Stack.isEmpty() {
                 unwrap c2Loc <- c2Stack.removeLast() else ()
                 if c2Loc < loc1.position {
                     failed := true
