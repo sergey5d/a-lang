@@ -174,7 +174,7 @@ def toBeOrNotToBe2() Unit {
         prev := loc.position
 
         c.advance()
-        loc := c1.get()
+        loc := c.get()
 
          while (c.isValid() && prev + 1 == loc.position && docId == loc.docId) {
             counter += 1
@@ -220,7 +220,8 @@ def toBeOrNotToBe2() Unit {
                     advance1 := advanceContiniously(c1)
                     advance2 := advanceContiniously(c2)
 
-                    if (advance1.docId > docId && advance2.docId > docId || !c1.isValid() && !c2.isValid()) {
+                    if (advance1.docId > docId ||  !c1.isValid()) && 
+                            (advance2.docId > docId || !c2.isValid()) {
                         result.append(docId)
                     }
                 } else {
