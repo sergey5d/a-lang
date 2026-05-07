@@ -16,6 +16,7 @@
 # document: 0
 # document: 1
 # document: 5
+# document: 7
 # 0
 
 record Location {
@@ -164,7 +165,8 @@ def toBeOrNotToBe2() Unit {
         "method to to be haha",
         "things can't be to",
         "to equasion has to be",
-        "to equasion is not be"
+        "to equasion is not be",
+        "to second equasion has to be"
     )
 
     OS.println("to be or not to be v2:")
@@ -191,38 +193,36 @@ def toBeOrNotToBe2() Unit {
         record(begin, counter, docId)
     }
 
-    def alignDocs() {
-        loc1 = c1.get()
-        loc2 = c2.get()
-        if loc1.docId > loc2.docId {
-            c2.seek(Location(loc1.docId, 0))
-        } else if loc1.docId < loc2.docId {
-            c1.seek(Location(loc2.docId, 0))
+    def alignDocs(doc1 Int, doc2 Int) {
+        if doc1 > doc2 {
+            c2.seek(Location(doc1, 0))
+        } else if doc1 < doc2 {
+            c1.seek(Location(doc2, 0))
         }
     }
 
     result List[Int] = []
 
-    alignDocs()
-
     advance1 := advanceContiniously(c1)
     advance2 := advanceContiniously(c2)
 
-    docId = advance1.docId
+    alignDocs(advance1.docId, advance2.docId)
+
+    #docId = advance1.docId
 
     while (c1.isValid() || c2.isValid()) {
 
-        docId = advance1.docId
-
         if (advance1.docId > advance2.docId) {
-            alignDocs()
+            alignDocs(advance1.docId, advance2.docId)
             advance2 := advanceContiniously(c2)
         } else if (advance1.docId < advance2.docId) {
-            alignDocs()
+            alignDocs(advance1.docId, advance2.docId)
             advance1 := advanceContiniously(c1)
         } else {
             if advance1.begin + advance1.count == advance2.begin {
                 if advance1.count == advance2.count {
+                    docId = advance1.docId
+
                     advance1 := advanceContiniously(c1)
                     advance2 := advanceContiniously(c2)
 
@@ -242,6 +242,11 @@ def toBeOrNotToBe2() Unit {
                 }
             }
         }
+    }
+
+    if advance1.docId == advance2.docId && 
+            advance1.begin + advance1.count == advance2.begin && advance1.count == advance2.count {
+        result.append(advance1.docId)
     }
 
     for res <- result {
