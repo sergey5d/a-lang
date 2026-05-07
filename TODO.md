@@ -91,15 +91,6 @@ fun { x, y ->
 
   - Main question: whether this reads as a natural extension of the current lambda syntax, or adds too much overlap with block expressions and existing `fun(x -> ...)` / `fun((x, y) -> ...)` call forms.
 
-- Revisit single-line shortcut extension with `:`.
-  - Current surface is mixed:
-    - `if`, `else if`, `for`, `yield`, and inline `match` still use `:`
-    - plain `else` and `unwrap ... else` can work without it
-  - Open questions:
-    - whether `:` should stay only where it is acting as a real separator
-    - whether the language should eventually prefer a single shorthand style
-    - how much newline tolerance the no-colon forms should have before the shorthand rules feel too magical
-
 - Decide whether anonymous records should auto-convert to other known shapes.
   - Main cases to think through:
     - anonymous record -> specific class instance when field names/types line up
