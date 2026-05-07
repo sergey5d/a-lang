@@ -17,6 +17,11 @@
 # document: 1
 # document: 5
 # document: 7
+# to be or not to be v3:
+# document: 0
+# document: 1
+# document: 5
+# document: 7
 # 0
 
 record Location {
@@ -208,14 +213,15 @@ def toBeOrNotToBe2() Unit {
 
     alignDocs(advance1.docId, advance2.docId)
 
+    # todo prohibit scope conflicts
     #docId = advance1.docId
 
-    while (c1.isValid() || c2.isValid()) {
+    while c1.isValid() || c2.isValid() {
 
-        if (advance1.docId > advance2.docId) {
+        if advance1.docId > advance2.docId {
             alignDocs(advance1.docId, advance2.docId)
             advance2 := advanceContiniously(c2)
-        } else if (advance1.docId < advance2.docId) {
+        } else if advance1.docId < advance2.docId {
             alignDocs(advance1.docId, advance2.docId)
             advance1 := advanceContiniously(c1)
         } else {
@@ -247,6 +253,125 @@ def toBeOrNotToBe2() Unit {
     if advance1.docId == advance2.docId && 
             advance1.begin + advance1.count == advance2.begin && advance1.count == advance2.count {
         result.append(advance1.docId)
+    }
+
+    for res <- result {
+        OS.println("document: " + res)
+    }
+}
+
+def toBeOrNotToBe3() Unit {
+
+    documents List[Str] = List(
+        "this is to be",
+        "method to to be be haha",
+        "this is to cat",
+        "method to to be haha",
+        "things can't be to",
+        "to equasion has to be",
+        "to equasion is not be",
+        "to second equasion has to be"
+    )
+
+    OS.println("to be or not to be v3:")
+
+    toCursor = Cursor("to", documents)
+    beCursor = Cursor("be", documents)
+
+    def collectPositions(cursor Cursor, docId Int) List[Int] {
+        positions List[Int] = []
+        while cursor.isValid() && cursor.get().docId == docId {
+            positions.append(cursor.get().position)
+            cursor.advance()
+        }
+        positions
+    }
+
+    def hasBeRun(bePositions List[Int], begin Int, count Int) Bool {
+        startIndex Int := 0
+        found := false
+
+        while startIndex < bePositions.size() && !found {
+            if bePositions[startIndex] == begin {
+                found := true
+            } else {
+                startIndex += 1
+            }
+        }
+
+        if !found {
+            return false
+        }
+
+        offset Int := 0
+        while offset < count {
+            currentIndex = startIndex + offset
+            if currentIndex >= bePositions.size() || bePositions[currentIndex] != begin + offset {
+                return false
+            }
+            offset += 1
+        }
+
+        true
+    }
+
+    def containsPattern(toPositions List[Int], bePositions List[Int]) Bool {
+        toStart Int := 0
+
+        while toStart < toPositions.size() {
+            startPos = toPositions[toStart]
+            if !(toStart > 0 && toPositions[toStart - 1] == startPos - 1) {
+                runLen Int := 0
+
+                while toStart + runLen < toPositions.size() && toPositions[toStart + runLen] == startPos + runLen {
+                    runLen += 1
+                }
+
+                count Int := 1
+                while count <= runLen {
+                    if hasBeRun(bePositions, startPos + count, count) {
+                        return true
+                    }
+                    count += 1
+                }
+            }
+
+            toStart += 1
+        }
+
+        false
+    }
+
+    result List[Int] = []
+
+    while toCursor.isValid() || beCursor.isValid() {
+        docId Int := -1
+
+        if toCursor.isValid() && beCursor.isValid() {
+            if toCursor.get().docId < beCursor.get().docId {
+                docId := toCursor.get().docId
+            } else {
+                docId := beCursor.get().docId
+            }
+        } else if toCursor.isValid() {
+            docId := toCursor.get().docId
+        } else {
+            docId := beCursor.get().docId
+        }
+
+        toPositions List[Int] := []
+        if toCursor.isValid() && toCursor.get().docId == docId {
+            toPositions := collectPositions(toCursor, docId)
+        }
+
+        bePositions List[Int] := []
+        if beCursor.isValid() && beCursor.get().docId == docId {
+            bePositions := collectPositions(beCursor, docId)
+        }
+
+        if containsPattern(toPositions, bePositions) {
+            result.append(docId)
+        }
     }
 
     for res <- result {
@@ -289,6 +414,7 @@ def main() Int {
 
     toBeOrNotToBe()
     toBeOrNotToBe2()
+    toBeOrNotToBe3()
 
     0
 }
