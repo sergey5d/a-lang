@@ -450,9 +450,6 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		if s.Else != nil {
 			r.resolveBlock(s.Else)
 		}
-	case *parser.WhileStmt:
-		r.resolveExpr(s.Condition)
-		r.resolveBlock(s.Body)
 	case *parser.MatchStmt:
 		r.resolveExpr(s.Value)
 		for _, matchCase := range s.Cases {
@@ -469,9 +466,10 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 			}
 			r.popScope()
 		}
-	case *parser.LoopStmt:
+	case *parser.WhileStmt:
 		r.pushScope()
 		r.loopDepth++
+		r.resolveExpr(s.Condition)
 		r.resolveBlockStatements(s.Body.Statements)
 		r.loopDepth--
 		r.popScope()

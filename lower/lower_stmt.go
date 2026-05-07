@@ -25,8 +25,6 @@ func (l *Lowerer) lowerStmt(stmt typed.Stmt) ([]Stmt, error) {
 		return l.lowerAssignmentStmt(s)
 	case *typed.IfStmt:
 		return l.lowerIfStmt(s)
-	case *typed.LoopStmt:
-		return l.lowerLoopStmt(s)
 	case *typed.WhileStmt:
 		return l.lowerWhileStmt(s)
 	case *typed.ForStmt:
@@ -118,14 +116,6 @@ func (l *Lowerer) lowerExprStmt(stmt *typed.ExprStmt) ([]Stmt, error) {
 		return nil, err
 	}
 	return []Stmt{&ExprStmt{Expr: expr}}, nil
-}
-
-func (l *Lowerer) lowerLoopStmt(stmt *typed.LoopStmt) ([]Stmt, error) {
-	body, err := l.lowerBlock(stmt.Body)
-	if err != nil {
-		return nil, err
-	}
-	return []Stmt{&Loop{Body: body}}, nil
 }
 
 func (l *Lowerer) lowerWhileStmt(stmt *typed.WhileStmt) ([]Stmt, error) {

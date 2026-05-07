@@ -87,7 +87,7 @@ The syntax is still evolving, but the current codebase supports a meaningful sub
 - function types like `Int -> Int`
 - tuples, including named tuple fields
 - indexing syntax `arr[i]`
-- `loop` for infinite loops
+- `while true` for infinite loops
 - `for` loops, including yield-style loops
 - typed equality rules via `Eq[T]`
 

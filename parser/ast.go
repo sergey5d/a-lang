@@ -301,14 +301,6 @@ type MatchCase struct {
 	Span    Span       `json:"span"`
 }
 
-// LoopStmt represents an infinite loop.
-type LoopStmt struct {
-	Body *BlockStmt `json:"body"`
-	Span Span       `json:"span"`
-}
-
-func (*LoopStmt) statementNode() {}
-
 // WhileStmt represents a conditional loop.
 type WhileStmt struct {
 	Condition Expr       `json:"condition"`

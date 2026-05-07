@@ -646,8 +646,6 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 			return nil, nil, nil
 		}
 		return nil, nil, nil
-	case *parser.LoopStmt:
-		return in.execLoop(s, local, self)
 	case *parser.WhileStmt:
 		return in.execWhile(s, local, self)
 	case *parser.ForStmt:
@@ -964,22 +962,6 @@ func (in *Interpreter) execWhile(stmt *parser.WhileStmt, local *env, self *insta
 		if !cond {
 			return nil, nil, nil
 		}
-		_, signal, err := in.execBlock(stmt.Body, local, self)
-		if err != nil {
-			return nil, nil, err
-		}
-		switch signal.(type) {
-		case nil:
-		case breakSignal:
-			return nil, nil, nil
-		default:
-			return nil, signal, nil
-		}
-	}
-}
-
-func (in *Interpreter) execLoop(stmt *parser.LoopStmt, local *env, self *instance) (Value, any, error) {
-	for {
 		_, signal, err := in.execBlock(stmt.Body, local, self)
 		if err != nil {
 			return nil, nil, err
@@ -3711,8 +3693,6 @@ func stmtSpan(stmt parser.Statement) parser.Span {
 	case *parser.MultiAssignmentStmt:
 		return s.Span
 	case *parser.IfStmt:
-		return s.Span
-	case *parser.LoopStmt:
 		return s.Span
 	case *parser.WhileStmt:
 		return s.Span

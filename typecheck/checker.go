@@ -461,7 +461,7 @@ func (c *Checker) checkGlobals(statements []parser.Statement) {
 					c.define(bindingDecl.Name, declType, bindingDecl.Mutable)
 				}
 			}
-		case *parser.ExprStmt, *parser.AssignmentStmt, *parser.MultiAssignmentStmt, *parser.IfStmt, *parser.LoopStmt, *parser.WhileStmt, *parser.ForStmt:
+		case *parser.ExprStmt, *parser.AssignmentStmt, *parser.MultiAssignmentStmt, *parser.IfStmt, *parser.WhileStmt, *parser.ForStmt:
 			c.checkStmt(stmt)
 		default:
 			c.addDiagnostic("unsupported_top_level", "unsupported top-level statement for type checking", stmtSpan(stmt))
@@ -1295,12 +1295,6 @@ func (c *Checker) checkStmt(stmt parser.Statement) {
 		if !s.Partial {
 			c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
 		}
-	case *parser.LoopStmt:
-		c.pushScope()
-		if s.Body != nil {
-			c.checkBlockStatements(s.Body.Statements, false)
-		}
-		c.popScope()
 	case *parser.WhileStmt:
 		c.pushScope()
 		condType := c.checkExpr(s.Condition)
@@ -5277,8 +5271,6 @@ func stmtSpan(stmt parser.Statement) parser.Span {
 	case *parser.MultiAssignmentStmt:
 		return s.Span
 	case *parser.IfStmt:
-		return s.Span
-	case *parser.LoopStmt:
 		return s.Span
 	case *parser.WhileStmt:
 		return s.Span

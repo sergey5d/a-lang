@@ -7,7 +7,7 @@
 def main() Int {
 	counter Int := 0
 
-	loop {
+	while true {
 		OS.println("loop " + counter)
 		counter += 1
 		if counter == 3 {

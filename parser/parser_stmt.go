@@ -40,8 +40,6 @@ func (p *Parser) parseStatement() (Statement, error) {
 		return p.parsePartialStmt()
 	case TokenMatch:
 		return p.parseMatchStmt()
-	case TokenLoop:
-		return p.parseLoopStmt()
 	case TokenWhile:
 		return p.parseWhileStmt()
 	case TokenFor:
@@ -750,15 +748,6 @@ func sameLine(left Token, right Token) bool {
 func (p *Parser) parseForStmt() (Statement, error) {
 	start := p.advance()
 	return p.parseForStmtAfterStart(start)
-}
-
-func (p *Parser) parseLoopStmt() (Statement, error) {
-	start := p.advance()
-	body, err := p.parseBlockOrInlineStmtBody(start, "loop")
-	if err != nil {
-		return nil, err
-	}
-	return &LoopStmt{Body: body, Span: mergeSpans(tokenSpan(start), body.Span)}, nil
 }
 
 func (p *Parser) parseWhileStmt() (Statement, error) {

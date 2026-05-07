@@ -3,7 +3,9 @@
 # 0
 
 def main() Int {
-    loop break
+    while true {
+        break
+    }
     OS.println("after loop")
     0
 }

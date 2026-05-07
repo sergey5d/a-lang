@@ -94,7 +94,7 @@ fun { x, y ->
 - Revisit single-line shortcut extension with `:`.
   - Current surface is mixed:
     - `if`, `else if`, `for`, `yield`, and inline `match` still use `:`
-    - plain `else`, `loop`, and `unwrap ... else` can work without it
+    - plain `else` and `unwrap ... else` can work without it
   - Open questions:
     - whether `:` should stay only where it is acting as a real separator
     - whether the language should eventually prefer a single shorthand style

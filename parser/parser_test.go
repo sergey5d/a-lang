@@ -413,7 +413,7 @@ def loops(input Int, value Int) Bool {
 		}
 	}
 
-	loop {
+	while true {
 		break
 	}
 
@@ -450,9 +450,9 @@ def loops(input Int, value Int) Bool {
 		t.Fatalf("expected single-binding for loop, got %#v", first)
 	}
 
-	third := fn.Body.Statements[2].(*LoopStmt)
-	if third.Body == nil {
-		t.Fatalf("expected infinite loop, got %#v", third)
+	third := fn.Body.Statements[2].(*WhileStmt)
+	if third.Condition == nil || third.Body == nil {
+		t.Fatalf("expected infinite while loop, got %#v", third)
 	}
 
 	fourth := fn.Body.Statements[3].(*WhileStmt)
@@ -527,7 +527,9 @@ def run(values List[Int], flag Bool, maybe MaybeInt) Int {
 	for value <- values {
 		OS.println(value)
 	}
-	loop break
+	while true {
+		break
+	}
 	match maybe {
 		SomeX(x) => {
 			return x
@@ -565,12 +567,12 @@ enum MaybeInt {
 		t.Fatalf("expected shorthand for body to wrap one statement, got %#v", forStmt.Body)
 	}
 
-	loopStmt, ok := fn.Body.Statements[2].(*LoopStmt)
+	whileStmt, ok := fn.Body.Statements[2].(*WhileStmt)
 	if !ok {
-		t.Fatalf("expected third statement to be loop, got %T", fn.Body.Statements[2])
+		t.Fatalf("expected third statement to be while, got %T", fn.Body.Statements[2])
 	}
-	if len(loopStmt.Body.Statements) != 1 {
-		t.Fatalf("expected shorthand loop body to wrap one statement, got %#v", loopStmt.Body)
+	if len(whileStmt.Body.Statements) != 1 {
+		t.Fatalf("expected while body to wrap one statement, got %#v", whileStmt.Body)
 	}
 
 	matchStmt, ok := fn.Body.Statements[3].(*MatchStmt)

@@ -36,7 +36,6 @@ const (
 	TokenMatch     TokenType = "MATCH"
 	TokenIs        TokenType = "IS"
 	TokenElse      TokenType = "ELSE"
-	TokenLoop      TokenType = "LOOP"
 	TokenWhile     TokenType = "WHILE"
 	TokenFor       TokenType = "FOR"
 	TokenYield     TokenType = "YIELD"
@@ -118,7 +117,6 @@ var keywords = map[string]TokenType{
 	"match":     TokenMatch,
 	"is":        TokenIs,
 	"else":      TokenElse,
-	"loop":      TokenLoop,
 	"while":     TokenWhile,
 	"for":       TokenFor,
 	"yield":     TokenYield,

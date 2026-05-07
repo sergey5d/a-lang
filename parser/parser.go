@@ -130,8 +130,6 @@ func stmtSpan(stmt Statement) Span {
 		return s.Span
 	case *MatchStmt:
 		return s.Span
-	case *LoopStmt:
-		return s.Span
 	case *WhileStmt:
 		return s.Span
 	case *ForStmt:

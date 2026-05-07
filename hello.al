@@ -146,7 +146,7 @@ def main() Int {
 
 	OS.println("result " + result)
 
-	loop {
+	while true {
 	    if counter < 20 {
 	        OS.println("counter " + counter)
 	    } else {

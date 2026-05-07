@@ -620,7 +620,7 @@ Main statement forms:
 - `if`
 - `match`
 - `for`
-- `loop`
+- `while`
 - `return`
 - `break`
 - expression statement
@@ -758,12 +758,6 @@ for item <- [1, 2, 3] {
 }
 ```
 
-`loop` also accepts a same-line body without `:`:
-
-```txt
-loop break
-```
-
 Destructuring loop:
 
 ```txt
@@ -807,12 +801,10 @@ while current < 10 {
 }
 ```
 
-## `loop`
-
 Infinite loop:
 
 ```txt
-loop {
+while true {
     if done {
         break
     }
@@ -1007,7 +999,7 @@ Newline continuation:
   - `<-`
 - Body-introducing forms are intentionally looser:
   - `def ... =` may start its body on the next line
-  - inline-body introducers such as `then`, `else`, `loop`, `yield`, and `unwrap ... else` may take a same-line body without braces
+  - inline-body introducers such as `then`, `else`, `yield`, and `unwrap ... else` may take a same-line body without braces
   - if that body moves to the next line, a `{ ... }` block is required
 - So this is invalid:
 

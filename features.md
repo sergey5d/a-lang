@@ -155,7 +155,7 @@ The language also needs a final cleanup pass on shorthand single-line bodies.
 
 Current tension:
 - `if`, `else if`, `for`, `yield`, and inline `match` still use `:` as a separator
-- plain `else`, `loop`, and `unwrap ... else` can now work without `:`
+- plain `else` and `unwrap ... else` can now work without `:`
 - newline handling is not fully settled for the no-colon forms, and today a bare `else` followed by a newline does not read the same way as `else:`
 
 Open question:
@@ -165,7 +165,7 @@ Open question:
 
 Current leaning:
 - keep `:` only where it is doing real separator work
-- prefer `else expr`, `unwrap ... else expr`, and `loop expr` over punctuation-heavy variants
+- prefer `else expr` and `unwrap ... else expr` over punctuation-heavy variants
 - think more about the newline story before freezing the shorthand syntax surface
 
 ### Match Totality / Partial Match Behavior

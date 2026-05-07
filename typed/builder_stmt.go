@@ -16,7 +16,6 @@ type stmtBuilder struct {
 	assignments      Builder[*parser.AssignmentStmt, Stmt]
 	multiAssignments Builder[*parser.MultiAssignmentStmt, Stmt]
 	ifs              Builder[*parser.IfStmt, Stmt]
-	loops            Builder[*parser.LoopStmt, Stmt]
 	whiles           Builder[*parser.WhileStmt, Stmt]
 	fors             Builder[*parser.ForStmt, Stmt]
 	returns          Builder[*parser.ReturnStmt, Stmt]
@@ -43,8 +42,6 @@ func (b *stmtBuilder) Build(stmt parser.Statement) (Stmt, error) {
 		return b.multiAssignments.Build(s)
 	case *parser.IfStmt:
 		return b.ifs.Build(s)
-	case *parser.LoopStmt:
-		return b.loops.Build(s)
 	case *parser.WhileStmt:
 		return b.whiles.Build(s)
 	case *parser.ForStmt:

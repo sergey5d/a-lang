@@ -250,7 +250,7 @@ That means there are effectively two execution models in the repo:
 - lambdas
 - indexing
 - equality via `equals`
-- `loop`
+- `while`
 - ordinary `for`
 - yield-style `for`
 
