@@ -26,8 +26,8 @@ func TestLoadRegistry(t *testing.T) {
 	if array.Kind != KindInterface {
 		t.Fatalf("expected Array to be an interface, got %s", array.Kind)
 	}
-	if len(array.Methods) != 10 {
-		t.Fatalf("expected Array to expose 10 methods, got %#v", array)
+	if len(array.Methods) != 15 {
+		t.Fatalf("expected Array to expose 15 methods, got %#v", array)
 	}
 
 	option, ok := registry.Types["Option"]
@@ -61,7 +61,10 @@ func TestLoadRegistry(t *testing.T) {
 	if str.Kind != KindInterface {
 		t.Fatalf("expected Str to be an interface, got %s", str.Kind)
 	}
-	if len(str.Methods) != 1 || str.Methods[0].Name != "size" {
-		t.Fatalf("expected Str to expose size(), got %#v", str.Methods)
+	if len(str.Methods) != 3 {
+		t.Fatalf("expected Str to expose 3 methods, got %#v", str.Methods)
+	}
+	if str.Methods[0].Name != "size" || str.Methods[1].Name != "split" || str.Methods[2].Name != "indexOf" {
+		t.Fatalf("unexpected Str methods %#v", str.Methods)
 	}
 }

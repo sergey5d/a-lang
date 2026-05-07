@@ -2365,6 +2365,24 @@ def run() Int {
 	}
 }
 
+func TestStrSplitAndIndexOf(t *testing.T) {
+	src := `
+def run() Int {
+	parts = "cat dog cat".split(" ")
+	return parts.size() * 100 + "cat dog cat".indexOf("dog") * 10 + "cat dog cat".indexOf("bird")
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(339) {
+		t.Fatalf("expected 339, got %#v", value)
+	}
+}
+
 func TestNestedBlockExpressions(t *testing.T) {
 	src := `
 def run() Int {

@@ -2832,6 +2832,20 @@ def run(text Str) Int {
 	}
 }
 
+func TestAnalyzeStrSplitAndIndexOf(t *testing.T) {
+	src := `
+def run(text Str) Int {
+	parts Array[Str] = text.split(" ")
+	return parts.size() + text.indexOf("lo")
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeNestedBlockExpressions(t *testing.T) {
 	src := `
 def run() Int {

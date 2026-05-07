@@ -3378,6 +3378,20 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 0, len(argTypes)), member.Span)
 			}
 			return builtin("Int")
+		case "split":
+			if len(argTypes) != 1 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 1, len(argTypes)), member.Span)
+				return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{builtin("Str")}}
+			}
+			c.requireAssignable(argTypes[0], builtin("Str"), exprSpan(callArgValues(args)[0]), "invalid_argument_type", "split expects separator of type Str")
+			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{builtin("Str")}}
+		case "indexOf":
+			if len(argTypes) != 1 {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 1, len(argTypes)), member.Span)
+				return builtin("Int")
+			}
+			c.requireAssignable(argTypes[0], builtin("Str"), exprSpan(callArgValues(args)[0]), "invalid_argument_type", "indexOf expects substring of type Str")
+			return builtin("Int")
 		default:
 			c.addDiagnostic("unknown_member", "unknown member '"+member.Name+"'", member.Span)
 			return unknownType

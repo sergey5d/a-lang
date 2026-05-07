@@ -18,7 +18,9 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"panic":   nativeOSPanic,
 		},
 		"Str": {
-			"size": nativeStrSize,
+			"size":    nativeStrSize,
+			"split":   nativeStrSplit,
+			"indexOf": nativeStrIndexOf,
 		},
 		"Array": {
 			"get":          nativeArrayGet,
