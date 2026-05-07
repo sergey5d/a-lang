@@ -9,6 +9,9 @@
 # loc3 1:1
 # valid4 false
 # loc4 -1:-1
+# to be or not to be:
+# document: 0
+# document: 1
 # 0
 
 record Location {
@@ -84,7 +87,10 @@ impl Cursor {
 def toBeOrNotToBe() Unit {
 
     documents List[Str] = List(
-        "to be"
+        "this is to be",
+        "method to to be be haha",
+        "this is to cat",
+        "method to to be haha"
     )
 
     c1 = Cursor("to", documents)
@@ -95,7 +101,7 @@ def toBeOrNotToBe() Unit {
 
     result List[Int] = []
 
-    while true {
+    while c1.isValid() && c2.isValid() {
 
         loc1 := c1.get()
         loc2 := c2.get()
@@ -177,6 +183,9 @@ def main() Int {
     OS.println("valid4 " + cursor.isValid())
     loc4 = cursor.get()
     OS.println("loc4 " + loc4.docId + ":" + loc4.position)
+
+    OS.println("to be or not to be:")
+    toBeOrNotToBe()
 
     0
 }
