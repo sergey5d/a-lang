@@ -166,58 +166,72 @@ def toBeOrNotToBe2() Unit {
     c1 = Cursor("to", documents)
     c2 = Cursor("be", documents)
     
-    loc1 := c1.get()
-    loc2 := c2.get()
+    def advanceContiniously(c Cursor) { begin Int, count Int, docId Int } = {
+        counter := 1
+        loc := c.get()
+        begin = loc.position
+        docId = loc.docId
+        prev := loc.position
 
-    result List[Int] = []
+        c.advance()
+        loc := c1.get()
 
-    while c1.isValid() && c2.isValid() {
+         while (c.isValid() && prev + 1 == loc.position && docId == loc.docId) {
+            counter += 1
+            prev := loc.position
+            c.advance()
+            loc := c.get()
+        }
+        record(begin, counter, docId)
+    }
 
-        loc1 := c1.get()
-        loc2 := c2.get()
-
+    def alignDocs() {
+        loc1 = c1.get()
+        loc2 = c2.get()
         if loc1.docId > loc2.docId {
             c2.seek(Location(loc1.docId, 0))
         } else if loc1.docId < loc2.docId {
             c1.seek(Location(loc2.docId, 0))
+        }
+    }
+
+    result List[Int] = []
+
+    alignDocs()
+
+    docId = c1.get().docId
+
+    advance1 := advanceContiniously(c1)
+    advance2 := advanceContiniously(c2)
+
+    while (c1.isValid() && c2.isValid()) {
+
+        docId = c1.get().docId
+
+        if (advance1.docId > advance2.docId) {
+            alignDocs()
+            advance2 := advanceContiniously(c2)
+        } else if (advance1.docId < advance2.docId) {
+            alignDocs()
+            advance1 := advanceContiniously(c1)
         } else {
+            if advance1.begin + advance1.count == advance2.begin {
+                if advance1.count == advance2.count {
+                    advance1 := advanceContiniously(c1)
+                    advance2 := advanceContiniously(c2)
 
-            docId = loc1.docId
-
-            c1Counter := 1
-            c1RangeBegin = loc1.position
-
-            c1.advance()
-            loc1 := c1.get()
-
-            while (c1.isValid() && c1RangeBegin + 1 == loc1.position && docId == loc1.docId) {
-                c1Counter += 1
-                c1.advance()
-                loc1 := c1.get()
-            }
-
-            c2Counter := 1
-            c2RangeBegin = loc2.position
-
-            c2.advance()
-            loc2 := c2.get()
-
-            while (c2.isValid() && c2RangeBegin + 1 == loc2.position && docId == loc2.docId) {
-                c2Counter += 1
-                c2.advance()
-                loc2 := c2.get()
-            }
-
-            if c1RangeBegin + c1Counter + 1 == c2RangeBegin {
-                result.append(docId)
-
-                if loc1.docId == docId {
-                    c1.seek(Location(loc1.docId + 1, 0))
+                    if (advance1.docId > docId && advance2.docId > docId || !c1.isValid() && !c2.isValid()) {
+                        result.append(docId)
+                    }
+                } else {
+                    c1.seek(Location(advance1.docId + 1, 0))
+                    advance1 := advanceContiniously(c1)
+                    advance2 := advanceContiniously(c2)
                 }
-
-                if loc2.docId == docId {
-                    c2.seek(Location(loc2.docId + 1, 0))
-                }
+            } else {
+                c1.seek(Location(advance1.docId + 1, 0))
+                advance1 := advanceContiniously(c1)
+                advance2 := advanceContiniously(c2)
             }
         }
     }
