@@ -1934,11 +1934,11 @@ def run() Int {
 	}
 }
 
-func TestConditionalForLoop(t *testing.T) {
+func TestWhileLoop(t *testing.T) {
 	src := `
 def run() Int {
 	total Int := 0
-	for total < 3 {
+	while total < 3 {
 		total += 1
 	}
 	return total

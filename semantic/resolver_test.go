@@ -215,7 +215,9 @@ interface Stringable {
 
 class Box[T] with Mapper[T, Stringable] {
 	private value T
+}
 
+impl Box[T] {
 	def this(value T) {
 		this.value = value
 	}
@@ -228,7 +230,9 @@ class Box[T] with Mapper[T, Stringable] {
 class SolidWork with Stringable {
 	private a List[Int]
 	private b Map[Str, Bool] := ?
+}
 
+impl SolidWork {
 	def this(a Int, b Bool) {
 		this.a = a
 		this.b = b

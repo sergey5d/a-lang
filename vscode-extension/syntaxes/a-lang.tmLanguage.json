@@ -94,7 +94,7 @@
       "patterns": [
         {
           "name": "keyword.control.a-lang",
-          "match": "\\b(?:if|else|for|yield|loop|partial|match|unwrap|return|break|is)\\b"
+          "match": "\\b(?:if|else|for|while|yield|loop|partial|match|unwrap|return|break|is)\\b"
         },
         {
           "name": "keyword.declaration.a-lang",

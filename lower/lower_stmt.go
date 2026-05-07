@@ -27,6 +27,8 @@ func (l *Lowerer) lowerStmt(stmt typed.Stmt) ([]Stmt, error) {
 		return l.lowerIfStmt(s)
 	case *typed.LoopStmt:
 		return l.lowerLoopStmt(s)
+	case *typed.WhileStmt:
+		return l.lowerWhileStmt(s)
 	case *typed.ForStmt:
 		return l.lowerForStmt(s)
 	case *typed.ReturnStmt:
@@ -126,23 +128,28 @@ func (l *Lowerer) lowerLoopStmt(stmt *typed.LoopStmt) ([]Stmt, error) {
 	return []Stmt{&Loop{Body: body}}, nil
 }
 
-func (l *Lowerer) lowerForStmt(stmt *typed.ForStmt) ([]Stmt, error) {
+func (l *Lowerer) lowerWhileStmt(stmt *typed.WhileStmt) ([]Stmt, error) {
+	cond, err := l.lowerExpr(stmt.Condition)
+	if err != nil {
+		return nil, err
+	}
 	body, err := l.lowerBlock(stmt.Body)
 	if err != nil {
 		return nil, err
 	}
-	if stmt.Condition != nil {
-		cond, err := l.lowerExpr(stmt.Condition)
-		if err != nil {
-			return nil, err
-		}
-		return []Stmt{&Loop{Body: []Stmt{
-			&If{
-				Condition: cond,
-				Then:      body,
-				Else:      []Stmt{&Break{}},
-			},
-		}}}, nil
+	return []Stmt{&Loop{Body: []Stmt{
+		&If{
+			Condition: cond,
+			Then:      body,
+			Else:      []Stmt{&Break{}},
+		},
+	}}}, nil
+}
+
+func (l *Lowerer) lowerForStmt(stmt *typed.ForStmt) ([]Stmt, error) {
+	body, err := l.lowerBlock(stmt.Body)
+	if err != nil {
+		return nil, err
 	}
 	if stmt.YieldBody == nil {
 		return l.lowerForBindings(stmt.Bindings, body)

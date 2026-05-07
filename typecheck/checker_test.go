@@ -2174,11 +2174,11 @@ def run(rows List[(Int, Str)]) Int {
 	}
 }
 
-func TestAnalyzeConditionalForLoop(t *testing.T) {
+func TestAnalyzeWhileLoop(t *testing.T) {
 	src := `
 def run(limit Int) Int {
 	total Int := 0
-	for total < limit {
+	while total < limit {
 		total += 1
 	}
 	return total

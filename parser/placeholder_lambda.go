@@ -170,7 +170,7 @@ func stmtHasPlaceholder(stmt Statement) bool {
 			}
 		}
 	case *ForStmt:
-		if HasPlaceholderExpr(s.Condition) || blockHasPlaceholder(s.Body) || blockHasPlaceholder(s.YieldBody) {
+		if blockHasPlaceholder(s.Body) || blockHasPlaceholder(s.YieldBody) {
 			return true
 		}
 		for _, binding := range s.Bindings {
@@ -182,6 +182,10 @@ func stmtHasPlaceholder(stmt Statement) bool {
 					return true
 				}
 			}
+		}
+	case *WhileStmt:
+		if HasPlaceholderExpr(s.Condition) || blockHasPlaceholder(s.Body) {
+			return true
 		}
 	case *ReturnStmt:
 		return HasPlaceholderExpr(s.Value)
@@ -404,10 +408,15 @@ func replacePlaceholderStmt(stmt Statement, param string) Statement {
 			}
 		}
 		return &ForStmt{
-			Condition: replacePlaceholderExpr(s.Condition, param),
 			Bindings:  bindings,
 			Body:      replacePlaceholderBlock(s.Body, param),
 			YieldBody: replacePlaceholderBlock(s.YieldBody, param),
+			Span:      s.Span,
+		}
+	case *WhileStmt:
+		return &WhileStmt{
+			Condition: replacePlaceholderExpr(s.Condition, param),
+			Body:      replacePlaceholderBlock(s.Body, param),
 			Span:      s.Span,
 		}
 	case *ReturnStmt:

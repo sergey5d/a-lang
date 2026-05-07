@@ -42,6 +42,8 @@ func (p *Parser) parseStatement() (Statement, error) {
 		return p.parseMatchStmt()
 	case TokenLoop:
 		return p.parseLoopStmt()
+	case TokenWhile:
+		return p.parseWhileStmt()
 	case TokenFor:
 		return p.parseForStmt()
 	case TokenDef:
@@ -759,6 +761,26 @@ func (p *Parser) parseLoopStmt() (Statement, error) {
 	return &LoopStmt{Body: body, Span: mergeSpans(tokenSpan(start), body.Span)}, nil
 }
 
+func (p *Parser) parseWhileStmt() (Statement, error) {
+	start, err := p.consume(TokenWhile, "expected 'while'")
+	if err != nil {
+		return nil, err
+	}
+	condition, err := p.parseExpressionUntil(TokenLBrace)
+	if err != nil {
+		return nil, err
+	}
+	body, err := p.parseRequiredBlock("while")
+	if err != nil {
+		return nil, err
+	}
+	return &WhileStmt{
+		Condition: condition,
+		Body:      body,
+		Span:      mergeSpans(tokenSpan(start), body.Span),
+	}, nil
+}
+
 func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 	p.beginScope()
 	defer p.endScope()
@@ -813,25 +835,7 @@ func (p *Parser) parseForStmtAfterStart(start Token) (Statement, error) {
 			Span:      mergeSpans(tokenSpan(start), yieldBody.Span),
 		}, nil
 	}
-	condition, err := p.parseExpressionUntil(TokenLBrace)
-	if err != nil {
-		if isForInlineBodyParseError(err) {
-			return nil, fmt.Errorf("for requires a '{ ... }' block body; one-line for forms are not supported")
-		}
-		return nil, err
-	}
-	if !p.check(TokenLBrace) && !p.isAtEnd() && sameLine(start, p.peek()) {
-		return nil, fmt.Errorf("for requires a '{ ... }' block body; one-line for forms are not supported")
-	}
-	body, err := p.parseRequiredBlock("for")
-	if err != nil {
-		return nil, err
-	}
-	return &ForStmt{
-		Condition: condition,
-		Body:      body,
-		Span:      mergeSpans(tokenSpan(start), body.Span),
-	}, nil
+	return nil, fmt.Errorf("for requires '<-' bindings or 'yield'; use 'while' for condition loops")
 }
 
 func (p *Parser) parseRequiredBlock(owner string) (*BlockStmt, error) {

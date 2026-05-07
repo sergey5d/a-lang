@@ -14,10 +14,7 @@ def canVisitAllRooms(rooms List[List[Int]]) Bool {
         keys.append(key)
     }
 
-    loop {
-        if keys.size() == 0 {
-            break
-        }
+    while keys.size() != 0 {
 
         key = keys.remove(0).getOr(-1)
 

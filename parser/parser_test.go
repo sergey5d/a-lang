@@ -417,7 +417,7 @@ def loops(input Int, value Int) Bool {
 		break
 	}
 
-	for value < 3 {
+	while value < 3 {
 		break
 	}
 
@@ -455,9 +455,9 @@ def loops(input Int, value Int) Bool {
 		t.Fatalf("expected infinite loop, got %#v", third)
 	}
 
-	fourth := fn.Body.Statements[3].(*ForStmt)
+	fourth := fn.Body.Statements[3].(*WhileStmt)
 	if fourth.Condition == nil || fourth.Body == nil {
-		t.Fatalf("expected conditional for loop, got %#v", fourth)
+		t.Fatalf("expected while loop, got %#v", fourth)
 	}
 
 	fifth := fn.Body.Statements[4].(*ForStmt)
@@ -803,6 +803,25 @@ def run(values List[Int]) Unit {
 		t.Fatalf("expected parse error for one-line for body")
 	}
 	if got := err.Error(); got != "for requires a '{ ... }' block body; one-line for forms are not supported" {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+}
+
+func TestParseForRejectsConditionLoop(t *testing.T) {
+	src := `
+def run(limit Int) Int {
+	for limit < 3 {
+		return limit
+	}
+	return 0
+}
+`
+
+	_, err := Parse(src)
+	if err == nil {
+		t.Fatalf("expected parse error for conditional for loop")
+	}
+	if got := err.Error(); got != "for requires '<-' bindings or 'yield'; use 'while' for condition loops" {
 		t.Fatalf("unexpected parse error: %v", err)
 	}
 }

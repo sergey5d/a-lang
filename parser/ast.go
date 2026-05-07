@@ -309,9 +309,17 @@ type LoopStmt struct {
 
 func (*LoopStmt) statementNode() {}
 
+// WhileStmt represents a conditional loop.
+type WhileStmt struct {
+	Condition Expr       `json:"condition"`
+	Body      *BlockStmt `json:"body"`
+	Span      Span       `json:"span"`
+}
+
+func (*WhileStmt) statementNode() {}
+
 // ForStmt represents foreach and yield-style loops.
 type ForStmt struct {
-	Condition Expr         `json:"condition,omitempty"`
 	Bindings  []ForBinding `json:"bindings,omitempty"`
 	Body      *BlockStmt   `json:"body,omitempty"`
 	YieldBody *BlockStmt   `json:"yieldBody,omitempty"`

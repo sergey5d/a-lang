@@ -799,6 +799,14 @@ items = for item <- [1, 2, 3] yield item * 2
 
 `for` clauses in the block form may also include local `=` and `:=` bindings.
 
+Condition-controlled loops use `while`:
+
+```txt
+while current < 10 {
+    current += 1
+}
+```
+
 ## `loop`
 
 Infinite loop:

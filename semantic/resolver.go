@@ -450,6 +450,9 @@ func (r *Resolver) resolveStatement(stmt parser.Statement) {
 		if s.Else != nil {
 			r.resolveBlock(s.Else)
 		}
+	case *parser.WhileStmt:
+		r.resolveExpr(s.Condition)
+		r.resolveBlock(s.Body)
 	case *parser.MatchStmt:
 		r.resolveExpr(s.Value)
 		for _, matchCase := range s.Cases {

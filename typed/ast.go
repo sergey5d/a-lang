@@ -270,6 +270,16 @@ type LoopStmt struct {
 func (*LoopStmt) stmtNode()              {}
 func (s *LoopStmt) GetSpan() parser.Span { return s.Span }
 
+// WhileStmt is a typed conditional loop.
+type WhileStmt struct {
+	Condition Expr
+	Body      *BlockStmt
+	Span      parser.Span
+}
+
+func (*WhileStmt) stmtNode()              {}
+func (s *WhileStmt) GetSpan() parser.Span { return s.Span }
+
 // ForBinding is a typed loop binding with an inferred element type.
 type ForBinding struct {
 	Bindings []BindingDecl
@@ -280,7 +290,6 @@ type ForBinding struct {
 
 // ForStmt is a typed loop including optional yield-body form.
 type ForStmt struct {
-	Condition Expr
 	Bindings  []ForBinding
 	Body      *BlockStmt
 	YieldBody *BlockStmt

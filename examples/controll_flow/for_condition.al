@@ -14,13 +14,13 @@ def next(label Str, value Int) Int {
 
 def main() Int {
     count Int := 0
-    for count < 3 {
+    while count < 3 {
         OS.println("block " + count)
         count += 1
     }
 
     shortCount Int := 0
-    for shortCount < 3 {
+    while shortCount < 3 {
         shortCount := next("short", shortCount)
     }
 

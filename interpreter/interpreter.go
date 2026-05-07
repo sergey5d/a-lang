@@ -648,6 +648,8 @@ func (in *Interpreter) execStmt(stmt parser.Statement, local *env, self *instanc
 		return nil, nil, nil
 	case *parser.LoopStmt:
 		return in.execLoop(s, local, self)
+	case *parser.WhileStmt:
+		return in.execWhile(s, local, self)
 	case *parser.ForStmt:
 		return in.execFor(s, local, self)
 	case *parser.ReturnStmt:
@@ -934,32 +936,6 @@ func (in *Interpreter) execFor(stmt *parser.ForStmt, local *env, self *instance)
 			return nil, signal, nil
 		}
 	}
-	if stmt.Condition != nil {
-		for {
-			condValue, err := in.evalExpr(stmt.Condition, local)
-			if err != nil {
-				return nil, nil, err
-			}
-			cond, ok := condValue.(bool)
-			if !ok {
-				return nil, nil, RuntimeError{Message: "for condition must be Bool", Span: exprSpan(stmt.Condition)}
-			}
-			if !cond {
-				return nil, nil, nil
-			}
-			_, signal, err := in.execBlock(stmt.Body, local, self)
-			if err != nil {
-				return nil, nil, err
-			}
-			switch signal.(type) {
-			case nil:
-			case breakSignal:
-				return nil, nil, nil
-			default:
-				return nil, signal, nil
-			}
-		}
-	}
 	signal, err := in.execForBindings(stmt.Bindings, 0, local, self, func(loopEnv *env) (any, error) {
 		_, signal, err := in.execBlock(stmt.Body, loopEnv, self)
 		return signal, err
@@ -972,6 +948,33 @@ func (in *Interpreter) execFor(stmt *parser.ForStmt, local *env, self *instance)
 		return nil, nil, nil
 	default:
 		return nil, signal, nil
+	}
+}
+
+func (in *Interpreter) execWhile(stmt *parser.WhileStmt, local *env, self *instance) (Value, any, error) {
+	for {
+		condValue, err := in.evalExpr(stmt.Condition, local)
+		if err != nil {
+			return nil, nil, err
+		}
+		cond, ok := condValue.(bool)
+		if !ok {
+			return nil, nil, RuntimeError{Message: "while condition must be Bool", Span: exprSpan(stmt.Condition)}
+		}
+		if !cond {
+			return nil, nil, nil
+		}
+		_, signal, err := in.execBlock(stmt.Body, local, self)
+		if err != nil {
+			return nil, nil, err
+		}
+		switch signal.(type) {
+		case nil:
+		case breakSignal:
+			return nil, nil, nil
+		default:
+			return nil, signal, nil
+		}
 	}
 }
 
@@ -1087,6 +1090,8 @@ func (in *Interpreter) evalStmtValue(stmt parser.Statement, local *env, self *in
 		return in.evalIfStmtValue(s, local, self, message)
 	case *parser.MatchStmt:
 		return in.evalMatchStmtValue(s, local, self, message)
+	case *parser.WhileStmt:
+		return nil, nil, RuntimeError{Message: message, Span: stmtSpan(stmt)}
 	case *parser.ForStmt:
 		if s.YieldBody != nil {
 			return in.execFor(s, local, self)
@@ -3708,6 +3713,8 @@ func stmtSpan(stmt parser.Statement) parser.Span {
 	case *parser.IfStmt:
 		return s.Span
 	case *parser.LoopStmt:
+		return s.Span
+	case *parser.WhileStmt:
 		return s.Span
 	case *parser.ForStmt:
 		return s.Span

@@ -22,10 +22,7 @@ impl DisjointSet {
 
     def findParent(v Int) Int {
         current Int := v
-        loop {
-            if arr[current] == current {
-                break
-            }
+        while arr[current] != current {
             current := arr[current]
         }
         return current
@@ -97,7 +94,7 @@ def findCircleNumTraversal(isConnected List[List[Int]]) Int {
 
             stack List[Int] = List(i)
 
-            for stack.size() != 0 {
+            while stack.size() != 0 {
                 idx = stack.remove(stack.size() - 1).getOr(-1)
                 if !visitedAll.contains(idx) {
                     visitedAll.add(idx)
