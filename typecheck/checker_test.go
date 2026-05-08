@@ -567,6 +567,20 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeTupleMemberAccessIsRejected(t *testing.T) {
+	src := `
+def run() Int {
+	pair = (1, "x")
+	return pair._1
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 || result.Diagnostics[0].Code != "unknown_member" {
+		t.Fatalf("expected unknown_member diagnostic, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeArrayIndexing(t *testing.T) {
 	src := `
 def run(values Array[Int]) Int {

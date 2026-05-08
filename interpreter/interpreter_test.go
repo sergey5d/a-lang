@@ -929,6 +929,21 @@ def run() Int {
 	}
 }
 
+func TestTupleMemberAccessIsRejected(t *testing.T) {
+	src := `
+def run() Int {
+	pair = (1, "x")
+	return pair._1
+}
+`
+
+	in := New(parseProgram(t, src))
+	_, err := in.Call("run")
+	if err == nil || err.Error() != "unknown member '_1' at 4:9" {
+		t.Fatalf("expected unknown member error, got %#v", err)
+	}
+}
+
 func TestTupleDestructuringAfterMethodReturn(t *testing.T) {
 	src := `
 class Counter {
