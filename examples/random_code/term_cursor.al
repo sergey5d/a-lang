@@ -96,13 +96,13 @@ impl Cursor {
 
 def toBeOrNotToBe() Unit {
 
-    documents List[Str] = List(
+    documents List[Str] = [
         "this is to be",
         "method to to be be haha",
         "this is to cat",
         "method to to be haha",
         "things can't be to"
-    )
+    ]
 
     OS.println("to be or not to be:")
 
@@ -139,7 +139,7 @@ def toBeOrNotToBe() Unit {
             var failed = false
 
             while c1.isValid() && loc1.docId == currDocId && !c2Stack.isEmpty() {
-                unwrap c2Loc <- c2Stack.removeLast() else ()
+                unwrap c2Loc <- c2Stack.removeLast() else OS.panic()
                 if c2Loc < loc1.position {
                     failed := true
                     break

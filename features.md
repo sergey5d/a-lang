@@ -117,6 +117,36 @@ Later improvements could include:
 - exhaustiveness analysis
 - unreachable branch detection
 
+Concrete example of the kind of narrowing worth considering:
+
+```txt
+if (x is String) {
+    println(x.length)
+}
+```
+
+Meaning:
+- after the `is String` check succeeds, `x` would be treated as `String` inside the `if` body
+- the programmer would not need to write an explicit cast before using string-specific members
+
+Possible follow-up extensions if this direction is adopted:
+- narrowing in the `else` branch to mean "not that type"
+- preserving narrowing after early exits, for example:
+
+```txt
+if !(x is String) {
+    return
+}
+
+println(x.length)
+```
+
+- combining narrowing with boolean conditions when the flow stays obvious
+
+Main design question:
+- whether this should stay very local and conservative
+- or whether the checker should learn more control-flow-sensitive narrowing over time
+
 ### 11. Deferred Cleanup
 
 A Go-like `defer` construct is still a possible future feature.
@@ -159,6 +189,28 @@ The shorthand body rules are now intentionally narrow:
 - if a shorthand body moves to the next line, a `{ ... }` block is required
 
 This keeps the surface compact without turning newlines into implicit structure.
+
+### Lambda Surface
+
+The language currently uses arrow-based lambda syntax directly, for example:
+
+```txt
+x -> x + 1
+(x, y) -> x + y
+```
+
+Open question:
+- should lambda declarations stay keyword-free
+- or should the language grow an explicit `lambda` keyword for some or all lambda forms
+
+Possible motivations for revisiting this:
+- making lambdas more visually explicit to new readers
+- reducing ambiguity in more complex nested expressions
+- giving room for future lambda-surface variants if the arrow-only form starts feeling overloaded
+
+Current leaning:
+- keep the current keyword-free arrow form unless real readability problems show up
+- only add a `lambda` keyword if it solves a concrete ambiguity or makes larger expressions meaningfully clearer
 
 ### Match Totality / Partial Match Behavior
 
