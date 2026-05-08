@@ -3019,6 +3019,30 @@ func (c *Checker) checkRecordUpdateExpr(expr *parser.RecordUpdateExpr) *Type {
 
 func (c *Checker) checkAnonymousRecordExpr(expr *parser.AnonymousRecordExpr, expected *Type) *Type {
 	if len(expr.Values) > 0 {
+		if expected != nil && expected.Kind == TypeClass {
+			info, ok := c.classes[expected.Name]
+			if !ok {
+				for _, value := range expr.Values {
+					c.checkExpr(value)
+				}
+				return unknownType
+			}
+			argTypes := c.checkArgTypes(expr.Values)
+			if ctor, ok := c.resolveConstructorOverload(info, argTypes, expr.Span); ok {
+				sig := c.primaryConstructorSignature(info.decl)
+				if ctor != nil {
+					sig = c.instantiateMethodSignature(ctor, info.decl, c.substForDecl(info.decl.TypeParameters, expected.Args))
+				}
+				for i, value := range expr.Values {
+					if fieldType, ok := paramTypeForArg(sig, i); ok {
+						valueType := c.checkExprWithExpected(value, fieldType)
+						c.requireAssignable(valueType, fieldType, exprSpan(value), "type_mismatch", "cannot assign "+valueType.String()+" to "+fieldType.String())
+					}
+				}
+				return expected
+			}
+			return expected
+		}
 		if expected == nil || expected.Kind != TypeRecord {
 			for _, value := range expr.Values {
 				c.checkExpr(value)
@@ -3050,6 +3074,29 @@ func (c *Checker) checkAnonymousRecordExpr(expr *parser.AnonymousRecordExpr, exp
 		}
 		expr.Values = nil
 		return &Type{Kind: TypeRecord, Name: "Record", Fields: fields}
+	}
+	if expected != nil && expected.Kind == TypeClass {
+		info, ok := c.classes[expected.Name]
+		if !ok {
+			for _, field := range expr.Fields {
+				c.checkExpr(field.Value)
+			}
+			return unknownType
+		}
+		if ctor, ordered, ok := c.resolveNamedConstructorOverload(info, expr.Fields, expr.Span); ok {
+			sig := c.primaryConstructorSignature(info.decl)
+			if ctor != nil {
+				sig = c.instantiateMethodSignature(ctor, info.decl, c.substForDecl(info.decl.TypeParameters, expected.Args))
+			}
+			for i, value := range ordered {
+				if fieldType, ok := paramTypeForArg(sig, i); ok {
+					valueType := c.checkExprWithExpected(value, fieldType)
+					c.requireAssignable(valueType, fieldType, exprSpan(value), "type_mismatch", "cannot assign "+valueType.String()+" to "+fieldType.String())
+				}
+			}
+			return expected
+		}
+		return expected
 	}
 	fields := make([]RecordField, len(expr.Fields))
 	seen := map[string]bool{}
@@ -4954,6 +5001,31 @@ func (c *Checker) isAssignable(actual, expected *Type) bool {
 		}
 		return true
 	}
+	if expected.Kind == TypeClass && actual.Kind == TypeRecord {
+		info, ok := c.classes[expected.Name]
+		if !ok {
+			return false
+		}
+		subst := c.substForDecl(info.decl.TypeParameters, expected.Args)
+		for _, ctor := range info.constructors {
+			params := make([]RecordField, len(ctor.Parameters))
+			for i, param := range ctor.Parameters {
+				params[i] = RecordField{Name: param.Name, Type: c.instantiateTypeRef(param.Type, subst)}
+			}
+			if c.recordAssignableToFields(actual.Fields, params) {
+				return true
+			}
+		}
+		primary := make([]RecordField, len(info.decl.Fields))
+		visible := implicitVisibleRecordFields(info.decl)
+		for i, field := range visible {
+			primary[i] = RecordField{Name: field.Name, Type: c.instantiateTypeRef(field.Type, subst)}
+		}
+		if c.recordAssignableToFields(actual.Fields, primary[:len(visible)]) {
+			return true
+		}
+		return false
+	}
 	if expected.Kind != TypeInterface {
 		return false
 	}
@@ -4974,6 +5046,36 @@ func (c *Checker) isAssignable(actual, expected *Type) bool {
 		return c.interfaceAssignable(actual, expected, map[string]bool{})
 	}
 	return false
+}
+
+func (c *Checker) recordAssignableToFields(actualFields, expectedFields []RecordField) bool {
+	if len(actualFields) != len(expectedFields) {
+		return false
+	}
+	actualByName := make(map[string]*Type, len(actualFields))
+	for i := range actualFields {
+		actualByName[actualFields[i].Name] = actualFields[i].Type
+	}
+	for _, expectedField := range expectedFields {
+		actualType, ok := actualByName[expectedField.Name]
+		if !ok {
+			return false
+		}
+		if !c.isAssignable(actualType, expectedField.Type) {
+			return false
+		}
+	}
+	return true
+}
+
+func implicitVisibleRecordFields(class *parser.ClassDecl) []parser.FieldDecl {
+	fields := make([]parser.FieldDecl, 0, len(class.Fields))
+	for _, field := range class.Fields {
+		if constructorVisibleField(field) {
+			fields = append(fields, field)
+		}
+	}
+	return fields
 }
 
 func (c *Checker) interfaceAssignable(actual, expected *Type, seen map[string]bool) bool {

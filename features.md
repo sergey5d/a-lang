@@ -212,6 +212,32 @@ Current leaning:
 - keep the current keyword-free arrow form unless real readability problems show up
 - only add a `lambda` keyword if it solves a concrete ambiguity or makes larger expressions meaningfully clearer
 
+### Product Type Conversion Surface
+
+The language still needs a final policy for conversions between:
+- classes
+- records
+- anonymous records
+- tuples
+
+Current intended direction:
+- class/record -> anonymous record is allowed implicitly
+- tuple -> anonymous record is not allowed
+- anonymous record -> class/record should be allowed when the compiler can lower it into constructor-style code
+  - either a matching constructor exists
+  - or the target class has only public fields, with any private fields already initialized
+- class/record -> tuple should stay explicit, if added at all
+
+Important separation:
+- value conversion is a different design area from pattern destructuring
+- allowing class/record values to convert to anonymous records does not automatically mean `match` should destructure them using anonymous-record-shaped patterns
+
+Open questions:
+- whether anonymous record -> class/record should be contextual-only based on the expected type
+- how strict constructor matching should be
+- whether anonymous record -> tuple should exist at all
+- whether explicit tuple projection should use a builtin like `tuple(instance)`
+
 ### Match Totality / Partial Match Behavior
 
 `match` now exists, but the language still needs a clear rule for what happens when no case matches.

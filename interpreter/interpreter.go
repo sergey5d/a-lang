@@ -312,6 +312,25 @@ func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl,
 	return in.coerceValueForTypeRef(method.ReturnType, value), nil
 }
 
+func (in *Interpreter) coerceArgsForParams(params []parser.Parameter, args []Value, parent *env) ([]Value, error) {
+	if len(args) == 0 {
+		return []Value{}, nil
+	}
+	out := make([]Value, len(args))
+	for i, arg := range args {
+		if i < len(params) {
+			value, err := in.coerceValueForTypeRefWithEnv(params[i].Type, arg, parent)
+			if err != nil {
+				return nil, err
+			}
+			out[i] = value
+			continue
+		}
+		out[i] = arg
+	}
+	return out, nil
+}
+
 func enumCaseMethods(class *parser.ClassDecl, caseName string) []*parser.MethodDecl {
 	if !class.Enum || caseName == "" {
 		return nil
@@ -387,7 +406,11 @@ func reorderConstructorValueArgs(class *parser.ClassDecl, args []namedValueArg, 
 func (in *Interpreter) constructInto(receiver *instance, class *parser.ClassDecl, args []Value, parent *env, span parser.Span) error {
 	for _, method := range class.Methods {
 		if method.Constructor && in.runtimeMethodMatches(method, args) {
-			_, err := in.callMethod(receiver, method, args, parent)
+			coerced, err := in.coerceArgsForParams(method.Parameters, args, parent)
+			if err != nil {
+				return err
+			}
+			_, err = in.callMethod(receiver, method, coerced, parent)
 			return err
 		}
 	}
@@ -1844,11 +1867,19 @@ func (in *Interpreter) callApplyMethod(obj *instance, args []namedValueArg, pars
 			}
 		}
 		if in.runtimeMethodMatches(method, ordered) {
-			return in.callMethod(obj, method, ordered, local)
+			coerced, err := in.coerceArgsForParams(method.Parameters, ordered, local)
+			if err != nil {
+				return nil, err
+			}
+			return in.callMethod(obj, method, coerced, local)
 		}
 	}
 	if fallbackMethod != nil {
-		return in.callMethod(obj, fallbackMethod, fallbackArgs, local)
+		coerced, err := in.coerceArgsForParams(fallbackMethod.Parameters, fallbackArgs, local)
+		if err != nil {
+			return nil, err
+		}
+		return in.callMethod(obj, fallbackMethod, coerced, local)
 	}
 	if firstErr != nil {
 		return nil, firstErr
@@ -2041,7 +2072,11 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 			if err != nil {
 				return nil, err
 			}
-			return in.callMethod(obj, candidates[0], ordered, local)
+			coerced, err := in.coerceArgsForParams(candidates[0].Parameters, ordered, local)
+			if err != nil {
+				return nil, err
+			}
+			return in.callMethod(obj, candidates[0], coerced, local)
 		}
 	}
 	var firstErr error
@@ -2067,11 +2102,19 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 			}
 		}
 		if in.runtimeMethodMatches(method, ordered) {
-			return in.callMethod(obj, method, ordered, local)
+			coerced, err := in.coerceArgsForParams(method.Parameters, ordered, local)
+			if err != nil {
+				return nil, err
+			}
+			return in.callMethod(obj, method, coerced, local)
 		}
 	}
 	if fallbackMethod != nil {
-		return in.callMethod(obj, fallbackMethod, fallbackArgs, local)
+		coerced, err := in.coerceArgsForParams(fallbackMethod.Parameters, fallbackArgs, local)
+		if err != nil {
+			return nil, err
+		}
+		return in.callMethod(obj, fallbackMethod, coerced, local)
 	}
 	if firstErr != nil {
 		return nil, firstErr
@@ -2901,6 +2944,21 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 		}
 		return false
 	default:
+		if record, ok := value.(*nativeRecord); ok {
+			coerced, err := in.coerceValueForTypeRefWithEnv(ref, record, in.globals)
+			if err == nil {
+				if instanceValue, ok := coerced.(*instance); ok {
+					if instanceValue.class.Name == ref.Name {
+						return true
+					}
+					for _, impl := range instanceValue.class.Implements {
+						if impl.Name == ref.Name || in.interfaceExtends(impl.Name, ref.Name, map[string]bool{}) {
+							return true
+						}
+					}
+				}
+			}
+		}
 		if instanceValue, ok := value.(*instance); ok {
 			if instanceValue.class.Name == ref.Name {
 				return true
@@ -3440,6 +3498,32 @@ func (in *Interpreter) evalExprWithTypeRef(expr parser.Expr, expected *parser.Ty
 		}
 		return &nativeArray{items: items}, nil
 	}
+	if record, ok := expr.(*parser.AnonymousRecordExpr); ok && len(record.Values) > 0 && expected != nil {
+		if class, ok := in.lookupClassForTypeRef(expected); ok {
+			for _, params := range constructorParamOptions(class) {
+				if len(params) != len(record.Values) {
+					continue
+				}
+				args := make([]Value, len(record.Values))
+				matched := true
+				for i, valueExpr := range record.Values {
+					value, err := in.evalExprWithTypeRef(valueExpr, params[i].Type, local)
+					if err != nil {
+						matched = false
+						break
+					}
+					if !in.runtimeValueMatchesType(value, params[i].Type) {
+						matched = false
+						break
+					}
+					args[i] = value
+				}
+				if matched {
+					return in.construct(class, args, local)
+				}
+			}
+		}
+	}
 	if record, ok := expr.(*parser.AnonymousRecordExpr); ok && len(record.Values) > 0 && expected != nil && len(expected.RecordFields) > 0 {
 		if len(record.Values) != len(expected.RecordFields) {
 			return nil, RuntimeError{Message: fmt.Sprintf("record(...) expects %d values, got %d", len(expected.RecordFields), len(record.Values)), Span: record.Span}
@@ -3469,7 +3553,11 @@ func (in *Interpreter) evalExprWithTypeRef(expr parser.Expr, expected *parser.Ty
 			env:                local,
 		}, nil
 	}
-	return in.evalExpr(parser.WrapContextualFunctionExpr(expected, expr), local)
+	value, err := in.evalExpr(parser.WrapContextualFunctionExpr(expected, expr), local)
+	if err != nil {
+		return nil, err
+	}
+	return in.coerceValueForTypeRefWithEnv(expected, value, local)
 }
 
 func (in *Interpreter) evalArgsWithParams(params []parser.Parameter, argExprs []parser.CallArg, local *env, span parser.Span, callable string) ([]Value, error) {
@@ -3559,13 +3647,80 @@ func isUnitTypeRef(ref *parser.TypeRef) bool {
 }
 
 func (in *Interpreter) coerceValueForTypeRef(ref *parser.TypeRef, value Value) Value {
-	if ref == nil {
+	coerced, err := in.coerceValueForTypeRefWithEnv(ref, value, in.globals)
+	if err != nil {
 		return value
 	}
-	if isUnitTypeRef(ref) {
-		return nil
+	return coerced
+}
+
+func (in *Interpreter) coerceValueForTypeRefWithEnv(ref *parser.TypeRef, value Value, parent *env) (Value, error) {
+	if ref == nil {
+		return value, nil
 	}
-	return value
+	if isUnitTypeRef(ref) {
+		return nil, nil
+	}
+	record, ok := value.(*nativeRecord)
+	if !ok {
+		return value, nil
+	}
+	class, ok := in.lookupClassForTypeRef(ref)
+	if !ok {
+		return value, nil
+	}
+	args, ok := in.constructorArgsFromRecord(class, record)
+	if !ok {
+		return value, nil
+	}
+	return in.construct(class, args, parent)
+}
+
+func (in *Interpreter) lookupClassForTypeRef(ref *parser.TypeRef) (*parser.ClassDecl, bool) {
+	if ref == nil || ref.Name == "" || len(ref.RecordFields) > 0 || len(ref.TupleElements) > 0 || ref.ReturnType != nil {
+		return nil, false
+	}
+	if class, ok := in.classes[ref.Name]; ok {
+		return class, true
+	}
+	if symbol, ok := in.directImports[ref.Name]; ok && !symbol.isInterface {
+		class, ok := symbol.module.classes[symbol.original]
+		return class, ok
+	}
+	return nil, false
+}
+
+func (in *Interpreter) constructorArgsFromRecord(class *parser.ClassDecl, record *nativeRecord) ([]Value, bool) {
+	for _, method := range class.Methods {
+		if !method.Constructor {
+			continue
+		}
+		args, ok := in.recordArgsForParams(method.Parameters, record)
+		if ok {
+			return args, true
+		}
+	}
+	fields := implicitConstructorFields(class)
+	params := make([]parser.Parameter, len(fields))
+	for i, field := range fields {
+		params[i] = parser.Parameter{Name: field.Name, Type: field.Type, Span: field.Span}
+	}
+	return in.recordArgsForParams(params, record)
+}
+
+func (in *Interpreter) recordArgsForParams(params []parser.Parameter, record *nativeRecord) ([]Value, bool) {
+	if len(record.fields) != len(params) {
+		return nil, false
+	}
+	args := make([]Value, len(params))
+	for i, param := range params {
+		value, ok := record.fields[param.Name]
+		if !ok || !in.runtimeValueMatchesType(value, param.Type) {
+			return nil, false
+		}
+		args[i] = value
+	}
+	return args, true
 }
 
 func (in *Interpreter) assignmentValues(targetCount int, values []parser.Expr, local *env, span parser.Span) ([]Value, error) {

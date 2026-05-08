@@ -772,6 +772,54 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeAnonymousRecordToClassAndRecord(t *testing.T) {
+	src := `
+record User {
+	name Str
+	age Int
+}
+
+class Person {
+	name Str
+	age Int
+	city Str = "NYC"
+}
+
+class Team {
+	name Str
+	owner Person
+}
+
+impl Team {
+	def init(name Str, owner Person) {
+		this.name = name
+		this.owner = owner
+	}
+}
+
+def run() Int {
+	user User = record {
+		name = "Ana"
+		age = 10
+	}
+	person Person = record("Ben", 12)
+	team Team = record {
+		name = "Core"
+		owner = record {
+			name = "Cy"
+			age = 7
+		}
+	}
+	return user.age + person.age + team.owner.age
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeRecordAndClassDestructuring(t *testing.T) {
 	src := `
 record Pair {

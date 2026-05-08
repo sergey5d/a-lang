@@ -47,6 +47,12 @@ Future feature to discuss later:
   - for example matching a class/record against an anonymous-record-shaped pattern
   - this is explicitly not part of the first nested-pattern implementation
 
+Clarification:
+
+- this note is about pattern destructuring only
+- expression-level value conversion rules are separate
+- so even if class/record values later become implicitly convertible to anonymous records in ordinary expressions, that does not by itself imply anonymous-record-shaped `match` patterns should work
+
 ## Main Improvement Areas
 
 ### 1. Guards

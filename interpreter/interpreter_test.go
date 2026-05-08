@@ -1671,6 +1671,68 @@ def run() Bool {
 	}
 }
 
+func TestAnonymousRecordToClassAndRecord(t *testing.T) {
+	src := `
+record User {
+	name Str
+	age Int
+}
+
+class Person {
+	name Str
+	age Int
+	city Str = "NYC"
+}
+
+class Team {
+	name Str
+	owner Person
+}
+
+impl Team {
+	def init(name Str, owner Person) {
+		this.name = name
+		this.owner = owner
+	}
+}
+
+def makeTeam(owner Person) Team {
+	return record {
+		name = "Core"
+		owner = owner
+	}
+}
+
+def run() Bool {
+	user User = record {
+		name = "Ana"
+		age = 10
+	}
+	person Person = record("Ben", 12)
+	team = makeTeam(record {
+		name = "Cy"
+		age = 7
+	})
+	return user.name == "Ana" &&
+		user.age == 10 &&
+		person.name == "Ben" &&
+		person.age == 12 &&
+		person.city == "NYC" &&
+		team.owner.name == "Cy" &&
+		team.owner.age == 7
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != true {
+		t.Fatalf("expected true, got %#v", value)
+	}
+}
+
 func TestRecordAndClassDestructuring(t *testing.T) {
 	src := `
 record Pair {
