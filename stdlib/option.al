@@ -4,11 +4,11 @@ class Option[T] with Unwrappable[T] {
 }
 
 impl Option[T] {
-    def this() {
+    def init() {
         this.set = false
     }
 
-    def this(value T) {
+    def init(value T) {
         this.set = true
         this.value := value
     }

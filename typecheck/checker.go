@@ -415,7 +415,7 @@ func (c *Checker) checkInterface(decl *parser.InterfaceDecl) {
 	}
 	c.validateTypeParameterBounds(decl.TypeParameters)
 	for _, method := range decl.Methods {
-		if method.Name == "this" {
+		if method.Name == "init" {
 			c.addDiagnostic("invalid_interface_method", "interface '"+decl.Name+"': interfaces cannot declare constructors", method.Span)
 		}
 	}
@@ -2396,7 +2396,7 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 
 func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 	if ident, ok := call.Callee.(*parser.Identifier); ok {
-		if ident.Name == "this" && c.currentClass != nil && c.currentMethod != nil && c.currentMethod.Constructor {
+		if ident.Name == "init" && c.currentClass != nil && c.currentMethod != nil && c.currentMethod.Constructor {
 			info := c.classes[c.currentClass.Name]
 			classType := &Type{Kind: TypeClass, Name: c.currentClass.Name}
 			if hasNamedCallArgs(call.Args) {
@@ -4146,7 +4146,7 @@ func (c *Checker) checkConstructorRules(class classInfo) {
 		}
 		seen[key] = ctor
 		if missing := c.uninitializedLetFields(class.decl, ctor); len(missing) > 0 {
-			c.addDiagnostic("uninitialized_field", "constructor 'this' must initialize immutable fields: "+joinNames(missing), ctor.Span)
+			c.addDiagnostic("uninitialized_field", "constructor 'init' must initialize immutable fields: "+joinNames(missing), ctor.Span)
 		}
 	}
 }

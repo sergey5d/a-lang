@@ -6,7 +6,7 @@ class Counter {
 }
 
 impl Counter {
-    def this(count Int) {
+    def init(count Int) {
         this.count = count
     }
 

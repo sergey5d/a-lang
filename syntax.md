@@ -350,7 +350,7 @@ impl Counter {
 }
 ```
 
-Constructors currently use `def this(...)`:
+Constructors currently use `def init(...)`:
 
 ```txt
 class Person {
@@ -359,7 +359,7 @@ class Person {
 }
 
 impl Person {
-    def this(age Int, name Str) {
+    def init(age Int, name Str) {
         this.age = age
         this.name = name
     }

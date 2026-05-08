@@ -19,6 +19,7 @@ type Resolver struct {
 	classTypes         map[string]typeDecl
 	ifaceTypes         map[string]typeDecl
 	loopDepth          int
+	currentMethodCtor  bool
 }
 
 type importInfo struct {
@@ -329,6 +330,9 @@ func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
 func (r *Resolver) resolveMethod(method *parser.MethodDecl) {
 	r.pushTypeScope()
 	defer r.popTypeScope()
+	prevCtor := r.currentMethodCtor
+	r.currentMethodCtor = method.Constructor
+	defer func() { r.currentMethodCtor = prevCtor }()
 	for _, param := range method.TypeParameters {
 		r.defineType(param.Name, param.Span, "duplicate_type_parameter", "duplicate type parameter '"+param.Name+"'")
 	}
@@ -532,7 +536,9 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 			r.resolveExpr(item)
 		}
 	case *parser.CallExpr:
-		r.resolveExpr(e.Callee)
+		if ident, ok := e.Callee.(*parser.Identifier); !(ok && ident.Name == "init" && r.currentMethodCtor) {
+			r.resolveExpr(e.Callee)
+		}
 		for _, arg := range e.Args {
 			r.resolveExpr(arg.Value)
 		}

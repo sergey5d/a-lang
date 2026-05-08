@@ -20,11 +20,11 @@ func parseProgram(t *testing.T, src string) *parser.Program {
 func TestProgramFromTyped(t *testing.T) {
 	src := `
 class Counter {
-	private count Int := ?
+	private var count Int
 }
 
 impl Counter {
-	def this(count Int) {
+	def init(count Int) {
 		this.count = count
 	}
 

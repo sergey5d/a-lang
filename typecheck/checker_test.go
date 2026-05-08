@@ -532,7 +532,7 @@ class Box {
 }
 
 impl Box {
-	def this(value Int) {
+	def init(value Int) {
 		this.value = value
 	}
 }
@@ -631,7 +631,7 @@ class Counter {
 }
 
 impl Counter {
-	def this(count Int) {
+	def init(count Int) {
 		this.count = count
 	}
 
@@ -662,8 +662,8 @@ class Counter {
 }
 
 impl Counter {
-	def this(seed Int) {
-		this(count = seed, label = "ok")
+	def init(seed Int) {
+		init(count = seed, label = "ok")
 	}
 }
 
@@ -1236,7 +1236,7 @@ class Counter {
 }
 
 impl Counter {
-	def this(count Int) {
+	def init(count Int) {
 		this.count = count
 	}
 
@@ -1259,7 +1259,7 @@ class Counter {
 }
 
 impl Counter {
-	def init(count Int) {
+	def setup(count Int) {
 		this.count = count
 	}
 }
@@ -1284,7 +1284,7 @@ class Counter {
 }
 
 impl Counter {
-	def this(count Int) {
+	def init(count Int) {
 		this.count = count
 	}
 
@@ -1311,7 +1311,7 @@ class SecretBox {
 }
 
 impl SecretBox {
-	def this(value Int) {
+	def init(value Int) {
 		this.value = value
 	}
 
@@ -1346,7 +1346,7 @@ class SecretBox {
 }
 
 impl SecretBox {
-	def this(value Int) {
+	def init(value Int) {
 		this.value = value
 	}
 
@@ -1373,7 +1373,7 @@ class Counter {
 }
 
 impl Counter {
-	def this(count Int) {
+	def init(count Int) {
 		this.count = count
 	}
 
@@ -1409,7 +1409,7 @@ class Counter {
 }
 
 impl Counter {
-	def this(count Int) {
+	def init(count Int) {
 		this.count = count
 	}
 
@@ -1440,7 +1440,7 @@ class Counter {
 }
 
 impl Counter {
-	def this(count Int) {
+	def init(count Int) {
 		this.count = count
 	}
 
@@ -1472,11 +1472,11 @@ class Counter {
 }
 
 impl Counter {
-	def this(count Int) {
+	def init(count Int) {
 		this.count = count
 	}
 
-	def this(value Int) {
+	def init(value Int) {
 		this.count = value
 	}
 }
@@ -1515,7 +1515,7 @@ class Counter {
 }
 
 impl Counter {
-	def this() {
+	def init() {
 		this.seen = false
 	}
 }
@@ -1586,7 +1586,7 @@ class Box[T] {
 }
 
 impl Box[T] {
-	def this(value T) {
+	def init(value T) {
 		this.value = value
 	}
 
@@ -1684,7 +1684,7 @@ class Counter with Eq[Counter] {
 }
 
 impl Counter {
-	def this(count Int) {
+	def init(count Int) {
 		this.count = count
 	}
 
@@ -1713,7 +1713,7 @@ class Counter {
 }
 
 impl Counter {
-	def this(count Int) {
+	def init(count Int) {
 		this.count = count
 	}
 }
@@ -1987,7 +1987,7 @@ class Vec {
 }
 
 impl Vec {
-	def this(left Int, right Int) {
+	def init(left Int, right Int) {
 		this.items := Array(2)
 		this.items[0] := left
 		this.items[1] := right

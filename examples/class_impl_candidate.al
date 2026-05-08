@@ -23,7 +23,7 @@ impl Person {
 
     #replace this to self?
 
-    def this(firstName Str, lastName Str) {
+    def init(firstName Str, lastName Str) {
         this.firstName = firstName
         this.lastName = lastName
         this.age = 18

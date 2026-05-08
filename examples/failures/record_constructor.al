@@ -6,8 +6,8 @@ record Bad {
 }
 
 impl Bad {
-    def this(value Int) {
-        this(value = value)
+    def init(value Int) {
+        init(value = value)
     }
 }
 

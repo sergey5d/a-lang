@@ -942,8 +942,8 @@ class Counter {
 }
 
 impl Counter {
-	def this(seed Int) {
-		this(count = seed)
+	def init(seed Int) {
+		init(count = seed)
 	}
 }
 `
@@ -953,8 +953,8 @@ impl Counter {
 		t.Fatalf("Parse returned error: %v", err)
 	}
 	method := program.Classes[0].Methods[0]
-	if !method.Constructor || method.Name != "this" {
-		t.Fatalf("expected def this to be marked as constructor, got %#v", method)
+	if !method.Constructor || method.Name != "init" {
+		t.Fatalf("expected def init to be marked as constructor, got %#v", method)
 	}
 
 	bad := `
@@ -1353,7 +1353,7 @@ class Box[T] with Mapper[T, Stringable] {
 }
 
 impl Box[T] {
-	def this(value T) {
+	def init(value T) {
 		this.value = value
 	}
 
@@ -1368,7 +1368,7 @@ class SolidWork with Stringable {
 }
 
 impl SolidWork {
-	def this(a Int, b Bool) {
+	def init(a Int, b Bool) {
 		this.a = a
 		this.b = b
 	}

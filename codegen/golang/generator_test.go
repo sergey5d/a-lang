@@ -25,11 +25,11 @@ func parseProgram(t *testing.T, src string) *parser.Program {
 func TestGenerate(t *testing.T) {
 	src := `
 class Counter {
-	private count Int := ?
+	private var count Int
 }
 
 impl Counter {
-	def this(count Int) {
+	def init(count Int) {
 		this.count = count
 	}
 
@@ -42,7 +42,7 @@ impl Counter {
 seed Int = 1
 
 def sum(values Array[Int]) Int {
-	total Int := 0
+	var total Int = 0
 	for item <- values {
 		total += item
 	}

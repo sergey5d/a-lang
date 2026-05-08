@@ -10,7 +10,7 @@ class ArrayListIterator[T] with Iterator[T] {
 }
 
 impl ArrayListIterator[T] {
-    def this(items Array[T], limit Int) {
+    def init(items Array[T], limit Int) {
         this.items := items
         this.limit := limit
     }
@@ -30,7 +30,7 @@ class ArrayList[T] with Iterable[T] {
 }
 
 impl ArrayList[T] {
-    def this(capacity Int) {
+    def init(capacity Int) {
         this.items := Array(capacity)
     }
 

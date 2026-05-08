@@ -37,7 +37,7 @@ private class RangeIterator with Iterator[Int] {
 }
 
 impl RangeIterator {
-    def this(start Int, end Int, step Int) {
+    def init(start Int, end Int, step Int) {
         this.current := start
         this.end := end
         this.step := step

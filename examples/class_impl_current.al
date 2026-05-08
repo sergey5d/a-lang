@@ -12,7 +12,7 @@ class Person with Named, Aged {
     private var archived Bool = false
     private var internalScore Int = 0
 
-    def this(fullName Str, age Int, city Str) {
+    def init(fullName Str, age Int, city Str) {
         parts = fullName.split(" ")
         this.firstName = parts.get(0).getOr("")
         this.lastName = parts.get(1).getOr("")
@@ -20,7 +20,7 @@ class Person with Named, Aged {
         this.city = city
     }
 
-    def this(firstName Str, lastName Str) {
+    def init(firstName Str, lastName Str) {
         this.firstName = firstName
         this.lastName = lastName
         this.age = 18

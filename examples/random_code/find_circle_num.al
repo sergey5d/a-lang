@@ -13,7 +13,7 @@ class DisjointSet {
 
 impl DisjointSet {
 
-    def this(size Int) {
+    def init(size Int) {
         this.arr := Array(size)
         for i <- Range(0, size) {
             this.arr[i] := i

@@ -1698,10 +1698,10 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 }
 
 func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error) {
-	if ident, ok := call.Callee.(*parser.Identifier); ok && ident.Name == "this" {
+	if ident, ok := call.Callee.(*parser.Identifier); ok && ident.Name == "init" {
 		ctorFlag, ok := local.get("__constructor__")
 		if !ok || ctorFlag.value != true {
-			return nil, RuntimeError{Message: "'this(...)' is only valid inside constructors", Span: call.Span}
+			return nil, RuntimeError{Message: "'init(...)' is only valid inside constructors", Span: call.Span}
 		}
 		thisSlot, ok := local.get("this")
 		if !ok {
