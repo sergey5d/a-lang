@@ -3019,30 +3019,6 @@ func (c *Checker) checkRecordUpdateExpr(expr *parser.RecordUpdateExpr) *Type {
 
 func (c *Checker) checkAnonymousRecordExpr(expr *parser.AnonymousRecordExpr, expected *Type) *Type {
 	if len(expr.Values) > 0 {
-		if expected != nil && expected.Kind == TypeClass {
-			info, ok := c.classes[expected.Name]
-			if !ok {
-				for _, value := range expr.Values {
-					c.checkExpr(value)
-				}
-				return unknownType
-			}
-			argTypes := c.checkArgTypes(expr.Values)
-			if ctor, ok := c.resolveConstructorOverload(info, argTypes, expr.Span); ok {
-				sig := c.primaryConstructorSignature(info.decl)
-				if ctor != nil {
-					sig = c.instantiateMethodSignature(ctor, info.decl, c.substForDecl(info.decl.TypeParameters, expected.Args))
-				}
-				for i, value := range expr.Values {
-					if fieldType, ok := paramTypeForArg(sig, i); ok {
-						valueType := c.checkExprWithExpected(value, fieldType)
-						c.requireAssignable(valueType, fieldType, exprSpan(value), "type_mismatch", "cannot assign "+valueType.String()+" to "+fieldType.String())
-					}
-				}
-				return expected
-			}
-			return expected
-		}
 		if expected == nil || expected.Kind != TypeRecord {
 			for _, value := range expr.Values {
 				c.checkExpr(value)
@@ -3074,29 +3050,6 @@ func (c *Checker) checkAnonymousRecordExpr(expr *parser.AnonymousRecordExpr, exp
 		}
 		expr.Values = nil
 		return &Type{Kind: TypeRecord, Name: "Record", Fields: fields}
-	}
-	if expected != nil && expected.Kind == TypeClass {
-		info, ok := c.classes[expected.Name]
-		if !ok {
-			for _, field := range expr.Fields {
-				c.checkExpr(field.Value)
-			}
-			return unknownType
-		}
-		if ctor, ordered, ok := c.resolveNamedConstructorOverload(info, expr.Fields, expr.Span); ok {
-			sig := c.primaryConstructorSignature(info.decl)
-			if ctor != nil {
-				sig = c.instantiateMethodSignature(ctor, info.decl, c.substForDecl(info.decl.TypeParameters, expected.Args))
-			}
-			for i, value := range ordered {
-				if fieldType, ok := paramTypeForArg(sig, i); ok {
-					valueType := c.checkExprWithExpected(value, fieldType)
-					c.requireAssignable(valueType, fieldType, exprSpan(value), "type_mismatch", "cannot assign "+valueType.String()+" to "+fieldType.String())
-				}
-			}
-			return expected
-		}
-		return expected
 	}
 	fields := make([]RecordField, len(expr.Fields))
 	seen := map[string]bool{}
@@ -3177,7 +3130,27 @@ func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *
 			}
 		}
 	} else {
+		if len(orderedArgs) == 1 {
+			if recordExpr, ok := orderedArgs[0].(*parser.AnonymousRecordExpr); ok {
+				if len(recordExpr.Values) > 0 {
+					if c.resolvePositionalRecordConstructorOverload(class, recordExpr, call.Span) {
+						return classType
+					}
+				}
+			}
+		}
 		argTypes := c.checkArgTypes(orderedArgs)
+		if len(orderedArgs) == 1 && len(argTypes) == 1 && argTypes[0].Kind == TypeRecord {
+			if c.resolveRecordConstructorOverload(class, argTypes[0], call.Span) {
+				c.checkExpr(orderedArgs[0])
+				if ident, ok := call.Callee.(*parser.Identifier); ok {
+					if refType, ok := c.lookupTypeInstance(ident.Name); ok {
+						classType = refType
+					}
+				}
+				return classType
+			}
+		}
 		if ctor, ok := c.resolveConstructorOverload(class, argTypes, call.Span); ok {
 			sig := c.primaryConstructorSignature(class.decl)
 			if ctor != nil {
@@ -3199,6 +3172,80 @@ func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *
 		}
 	}
 	return classType
+}
+
+func (c *Checker) resolveRecordConstructorOverload(class classInfo, actual *Type, span parser.Span) bool {
+	ctorMatches := 0
+	for _, ctor := range class.constructors {
+		params := make([]RecordField, len(ctor.Parameters))
+		for i, param := range ctor.Parameters {
+			params[i] = RecordField{Name: param.Name, Type: c.resolveDeclaredType(param.Type)}
+		}
+		if c.recordAssignableToFields(actual.Fields, params) {
+			ctorMatches++
+		}
+	}
+	visible := implicitVisibleRecordFields(class.decl)
+	primary := make([]RecordField, len(visible))
+	for i, field := range visible {
+		primary[i] = RecordField{Name: field.Name, Type: c.resolveDeclaredType(field.Type)}
+	}
+	primaryMatches := c.recordAssignableToFields(actual.Fields, primary)
+	if ctorMatches == 1 {
+		return true
+	}
+	if ctorMatches > 1 {
+		c.addDiagnostic("ambiguous_overload", "constructor call for class '"+class.decl.Name+"' is ambiguous", span)
+		return false
+	}
+	if primaryMatches {
+		return true
+	}
+	c.addDiagnostic("no_matching_overload", "constructor '"+class.decl.Name+"' cannot be built from anonymous record shape "+actual.String(), span)
+	return false
+}
+
+func (c *Checker) resolvePositionalRecordConstructorOverload(class classInfo, actual *parser.AnonymousRecordExpr, span parser.Span) bool {
+	ctorMatches := 0
+	for _, ctor := range class.constructors {
+		if len(ctor.Parameters) != len(actual.Values) {
+			continue
+		}
+		for i, param := range ctor.Parameters {
+			expected := c.resolveDeclaredType(param.Type)
+			valueType := c.checkExprWithExpected(actual.Values[i], expected)
+			if !c.isAssignable(valueType, expected) {
+				goto nextCtor
+			}
+		}
+		ctorMatches++
+	nextCtor:
+	}
+	primary := primaryConstructorParams(class.decl)
+	primaryMatches := false
+	if len(primary) == len(actual.Values) {
+		for i, param := range primary {
+			expected := c.resolveDeclaredType(param.Type)
+			valueType := c.checkExprWithExpected(actual.Values[i], expected)
+			if !c.isAssignable(valueType, expected) {
+				goto donePrimary
+			}
+		}
+		primaryMatches = true
+	}
+donePrimary:
+	if ctorMatches == 1 {
+		return true
+	}
+	if ctorMatches > 1 {
+		c.addDiagnostic("ambiguous_overload", "constructor call for class '"+class.decl.Name+"' is ambiguous", span)
+		return false
+	}
+	if primaryMatches {
+		return true
+	}
+	c.addDiagnostic("no_matching_overload", "constructor '"+class.decl.Name+"' cannot be built from positional anonymous record", span)
+	return false
 }
 
 func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallArg) *Type {
@@ -4270,6 +4317,9 @@ func (c *Checker) currentFieldType(name string) (*Type, bool) {
 }
 
 func primaryConstructorParams(class *parser.ClassDecl) []parser.Parameter {
+	if !hasSafeImplicitConstructor(class) {
+		return nil
+	}
 	params := make([]parser.Parameter, 0, len(class.Fields))
 	for _, field := range class.Fields {
 		if constructorVisibleField(field) {
@@ -4286,6 +4336,22 @@ func (c *Checker) primaryConstructorSignature(class *parser.ClassDecl) Signature
 		out[i] = c.resolveDeclaredType(param.Type)
 	}
 	return Signature{Parameters: out, ReturnType: &Type{Kind: TypeClass, Name: class.Name}}
+}
+
+func hasSafeImplicitConstructor(class *parser.ClassDecl) bool {
+	for _, field := range class.Fields {
+		if field.Mutable {
+			continue
+		}
+		if constructorVisibleField(field) {
+			continue
+		}
+		if field.Initializer != nil {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func callArgValues(args []parser.CallArg) []parser.Expr {
@@ -5002,28 +5068,6 @@ func (c *Checker) isAssignable(actual, expected *Type) bool {
 		return true
 	}
 	if expected.Kind == TypeClass && actual.Kind == TypeRecord {
-		info, ok := c.classes[expected.Name]
-		if !ok {
-			return false
-		}
-		subst := c.substForDecl(info.decl.TypeParameters, expected.Args)
-		for _, ctor := range info.constructors {
-			params := make([]RecordField, len(ctor.Parameters))
-			for i, param := range ctor.Parameters {
-				params[i] = RecordField{Name: param.Name, Type: c.instantiateTypeRef(param.Type, subst)}
-			}
-			if c.recordAssignableToFields(actual.Fields, params) {
-				return true
-			}
-		}
-		primary := make([]RecordField, len(info.decl.Fields))
-		visible := implicitVisibleRecordFields(info.decl)
-		for i, field := range visible {
-			primary[i] = RecordField{Name: field.Name, Type: c.instantiateTypeRef(field.Type, subst)}
-		}
-		if c.recordAssignableToFields(actual.Fields, primary[:len(visible)]) {
-			return true
-		}
 		return false
 	}
 	if expected.Kind != TypeInterface {

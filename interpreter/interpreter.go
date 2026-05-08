@@ -312,25 +312,6 @@ func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl,
 	return in.coerceValueForTypeRef(method.ReturnType, value), nil
 }
 
-func (in *Interpreter) coerceArgsForParams(params []parser.Parameter, args []Value, parent *env) ([]Value, error) {
-	if len(args) == 0 {
-		return []Value{}, nil
-	}
-	out := make([]Value, len(args))
-	for i, arg := range args {
-		if i < len(params) {
-			value, err := in.coerceValueForTypeRefWithEnv(params[i].Type, arg, parent)
-			if err != nil {
-				return nil, err
-			}
-			out[i] = value
-			continue
-		}
-		out[i] = arg
-	}
-	return out, nil
-}
-
 func enumCaseMethods(class *parser.ClassDecl, caseName string) []*parser.MethodDecl {
 	if !class.Enum || caseName == "" {
 		return nil
@@ -350,6 +331,9 @@ func instanceMethods(obj *instance) []*parser.MethodDecl {
 }
 
 func implicitConstructorFields(class *parser.ClassDecl) []parser.FieldDecl {
+	if !hasSafeImplicitRuntimeConstructor(class) {
+		return nil
+	}
 	fields := make([]parser.FieldDecl, 0, len(class.Fields))
 	for _, field := range class.Fields {
 		if !field.Private && field.Initializer == nil {
@@ -357,6 +341,22 @@ func implicitConstructorFields(class *parser.ClassDecl) []parser.FieldDecl {
 		}
 	}
 	return fields
+}
+
+func hasSafeImplicitRuntimeConstructor(class *parser.ClassDecl) bool {
+	for _, field := range class.Fields {
+		if field.Mutable {
+			continue
+		}
+		if !field.Private && field.Initializer == nil {
+			continue
+		}
+		if field.Initializer != nil {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func (in *Interpreter) applyImplicitConstructor(receiver *instance, args []Value, span parser.Span) error {
@@ -406,12 +406,15 @@ func reorderConstructorValueArgs(class *parser.ClassDecl, args []namedValueArg, 
 func (in *Interpreter) constructInto(receiver *instance, class *parser.ClassDecl, args []Value, parent *env, span parser.Span) error {
 	for _, method := range class.Methods {
 		if method.Constructor && in.runtimeMethodMatches(method, args) {
-			coerced, err := in.coerceArgsForParams(method.Parameters, args, parent)
-			if err != nil {
-				return err
-			}
-			_, err = in.callMethod(receiver, method, coerced, parent)
+			_, err := in.callMethod(receiver, method, args, parent)
 			return err
+		}
+	}
+	if len(args) == 1 {
+		if record, ok := args[0].(*nativeRecord); ok {
+			if expanded, ok := in.constructorArgsFromRecord(class, record); ok {
+				return in.constructInto(receiver, class, expanded, parent, span)
+			}
 		}
 	}
 	if len(implicitConstructorFields(class)) > 0 || len(args) == 0 {
@@ -1773,6 +1776,32 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 		}
 		return fn.module.callFunctionByName(fn.name, ordered, local)
 	}
+	if fn, ok := callee.(classRef); ok && len(call.Args) == 1 {
+		class, ok := fn.module.classes[fn.name]
+		if !ok {
+			return nil, RuntimeError{Message: "undefined class '" + fn.name + "'", Span: call.Span}
+		}
+		if recordExpr, ok := call.Args[0].Value.(*parser.AnonymousRecordExpr); ok && len(recordExpr.Values) > 0 {
+			for _, params := range constructorParamOptions(class) {
+				if len(params) != len(recordExpr.Values) {
+					continue
+				}
+				args := make([]Value, len(recordExpr.Values))
+				matched := true
+				for i, valueExpr := range recordExpr.Values {
+					value, err := in.evalExprWithTypeRef(valueExpr, params[i].Type, local)
+					if err != nil || !in.runtimeValueMatchesType(value, params[i].Type) {
+						matched = false
+						break
+					}
+					args[i] = value
+				}
+				if matched {
+					return fn.module.construct(class, args, local)
+				}
+			}
+		}
+	}
 	args := make([]namedValueArg, len(call.Args))
 	for i, arg := range call.Args {
 		value, err := in.evalExpr(arg.Value, local)
@@ -1867,19 +1896,11 @@ func (in *Interpreter) callApplyMethod(obj *instance, args []namedValueArg, pars
 			}
 		}
 		if in.runtimeMethodMatches(method, ordered) {
-			coerced, err := in.coerceArgsForParams(method.Parameters, ordered, local)
-			if err != nil {
-				return nil, err
-			}
-			return in.callMethod(obj, method, coerced, local)
+			return in.callMethod(obj, method, ordered, local)
 		}
 	}
 	if fallbackMethod != nil {
-		coerced, err := in.coerceArgsForParams(fallbackMethod.Parameters, fallbackArgs, local)
-		if err != nil {
-			return nil, err
-		}
-		return in.callMethod(obj, fallbackMethod, coerced, local)
+		return in.callMethod(obj, fallbackMethod, fallbackArgs, local)
 	}
 	if firstErr != nil {
 		return nil, firstErr
@@ -2072,11 +2093,7 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 			if err != nil {
 				return nil, err
 			}
-			coerced, err := in.coerceArgsForParams(candidates[0].Parameters, ordered, local)
-			if err != nil {
-				return nil, err
-			}
-			return in.callMethod(obj, candidates[0], coerced, local)
+			return in.callMethod(obj, candidates[0], ordered, local)
 		}
 	}
 	var firstErr error
@@ -2102,19 +2119,11 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 			}
 		}
 		if in.runtimeMethodMatches(method, ordered) {
-			coerced, err := in.coerceArgsForParams(method.Parameters, ordered, local)
-			if err != nil {
-				return nil, err
-			}
-			return in.callMethod(obj, method, coerced, local)
+			return in.callMethod(obj, method, ordered, local)
 		}
 	}
 	if fallbackMethod != nil {
-		coerced, err := in.coerceArgsForParams(fallbackMethod.Parameters, fallbackArgs, local)
-		if err != nil {
-			return nil, err
-		}
-		return in.callMethod(obj, fallbackMethod, coerced, local)
+		return in.callMethod(obj, fallbackMethod, fallbackArgs, local)
 	}
 	if firstErr != nil {
 		return nil, firstErr
@@ -2944,21 +2953,6 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 		}
 		return false
 	default:
-		if record, ok := value.(*nativeRecord); ok {
-			coerced, err := in.coerceValueForTypeRefWithEnv(ref, record, in.globals)
-			if err == nil {
-				if instanceValue, ok := coerced.(*instance); ok {
-					if instanceValue.class.Name == ref.Name {
-						return true
-					}
-					for _, impl := range instanceValue.class.Implements {
-						if impl.Name == ref.Name || in.interfaceExtends(impl.Name, ref.Name, map[string]bool{}) {
-							return true
-						}
-					}
-				}
-			}
-		}
 		if instanceValue, ok := value.(*instance); ok {
 			if instanceValue.class.Name == ref.Name {
 				return true
@@ -3498,32 +3492,6 @@ func (in *Interpreter) evalExprWithTypeRef(expr parser.Expr, expected *parser.Ty
 		}
 		return &nativeArray{items: items}, nil
 	}
-	if record, ok := expr.(*parser.AnonymousRecordExpr); ok && len(record.Values) > 0 && expected != nil {
-		if class, ok := in.lookupClassForTypeRef(expected); ok {
-			for _, params := range constructorParamOptions(class) {
-				if len(params) != len(record.Values) {
-					continue
-				}
-				args := make([]Value, len(record.Values))
-				matched := true
-				for i, valueExpr := range record.Values {
-					value, err := in.evalExprWithTypeRef(valueExpr, params[i].Type, local)
-					if err != nil {
-						matched = false
-						break
-					}
-					if !in.runtimeValueMatchesType(value, params[i].Type) {
-						matched = false
-						break
-					}
-					args[i] = value
-				}
-				if matched {
-					return in.construct(class, args, local)
-				}
-			}
-		}
-	}
 	if record, ok := expr.(*parser.AnonymousRecordExpr); ok && len(record.Values) > 0 && expected != nil && len(expected.RecordFields) > 0 {
 		if len(record.Values) != len(expected.RecordFields) {
 			return nil, RuntimeError{Message: fmt.Sprintf("record(...) expects %d values, got %d", len(expected.RecordFields), len(record.Values)), Span: record.Span}
@@ -3553,11 +3521,7 @@ func (in *Interpreter) evalExprWithTypeRef(expr parser.Expr, expected *parser.Ty
 			env:                local,
 		}, nil
 	}
-	value, err := in.evalExpr(parser.WrapContextualFunctionExpr(expected, expr), local)
-	if err != nil {
-		return nil, err
-	}
-	return in.coerceValueForTypeRefWithEnv(expected, value, local)
+	return in.evalExpr(parser.WrapContextualFunctionExpr(expected, expr), local)
 }
 
 func (in *Interpreter) evalArgsWithParams(params []parser.Parameter, argExprs []parser.CallArg, local *env, span parser.Span, callable string) ([]Value, error) {
@@ -3647,47 +3611,13 @@ func isUnitTypeRef(ref *parser.TypeRef) bool {
 }
 
 func (in *Interpreter) coerceValueForTypeRef(ref *parser.TypeRef, value Value) Value {
-	coerced, err := in.coerceValueForTypeRefWithEnv(ref, value, in.globals)
-	if err != nil {
+	if ref == nil {
 		return value
 	}
-	return coerced
-}
-
-func (in *Interpreter) coerceValueForTypeRefWithEnv(ref *parser.TypeRef, value Value, parent *env) (Value, error) {
-	if ref == nil {
-		return value, nil
-	}
 	if isUnitTypeRef(ref) {
-		return nil, nil
+		return nil
 	}
-	record, ok := value.(*nativeRecord)
-	if !ok {
-		return value, nil
-	}
-	class, ok := in.lookupClassForTypeRef(ref)
-	if !ok {
-		return value, nil
-	}
-	args, ok := in.constructorArgsFromRecord(class, record)
-	if !ok {
-		return value, nil
-	}
-	return in.construct(class, args, parent)
-}
-
-func (in *Interpreter) lookupClassForTypeRef(ref *parser.TypeRef) (*parser.ClassDecl, bool) {
-	if ref == nil || ref.Name == "" || len(ref.RecordFields) > 0 || len(ref.TupleElements) > 0 || ref.ReturnType != nil {
-		return nil, false
-	}
-	if class, ok := in.classes[ref.Name]; ok {
-		return class, true
-	}
-	if symbol, ok := in.directImports[ref.Name]; ok && !symbol.isInterface {
-		class, ok := symbol.module.classes[symbol.original]
-		return class, ok
-	}
-	return nil, false
+	return value
 }
 
 func (in *Interpreter) constructorArgsFromRecord(class *parser.ClassDecl, record *nativeRecord) ([]Value, bool) {

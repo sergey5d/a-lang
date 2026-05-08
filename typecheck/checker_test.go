@@ -798,18 +798,19 @@ impl Team {
 }
 
 def run() Int {
-	user User = record {
+	userRecord = record {
 		name = "Ana"
 		age = 10
 	}
-	person Person = record("Ben", 12)
-	team Team = record {
+	user User = User(userRecord)
+	person Person = Person(record("Ben", 12))
+	team Team = Team(record {
 		name = "Core"
-		owner = record {
+		owner = Person(record {
 			name = "Cy"
 			age = 7
-		}
-	}
+		})
+	})
 	return user.age + person.age + team.owner.age
 }
 `

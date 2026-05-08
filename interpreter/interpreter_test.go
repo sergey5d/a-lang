@@ -1697,22 +1697,23 @@ impl Team {
 }
 
 def makeTeam(owner Person) Team {
-	return record {
+	return Team(record {
 		name = "Core"
 		owner = owner
-	}
+	})
 }
 
 def run() Bool {
-	user User = record {
+	userRecord = record {
 		name = "Ana"
 		age = 10
 	}
-	person Person = record("Ben", 12)
-	team = makeTeam(record {
+	user User = User(userRecord)
+	person Person = Person(record("Ben", 12))
+	team = makeTeam(Person(record {
 		name = "Cy"
 		age = 7
-	})
+	}))
 	return user.name == "Ana" &&
 		user.age == 10 &&
 		person.name == "Ben" &&

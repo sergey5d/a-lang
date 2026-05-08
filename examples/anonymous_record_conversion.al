@@ -46,26 +46,28 @@ impl MixedProfile {
 }
 
 def main() Unit {
-    user User = record {
+    userRecord = record {
         name = "Ada"
         age = 10
     }
+    user User = User(userRecord)
 
-    person Person = record("Ben", 12)
+    person Person = Person(record("Ben", 12))
 
-    point MutablePoint = record {
+    pointRecord = record {
         x = 3
         y = 4
     }
+    point MutablePoint = MutablePoint(pointRecord)
 
-    badge SecretBadge = record {
+    badge SecretBadge = SecretBadge(record {
         name = "Mia"
-    }
+    })
 
-    profile MixedProfile = record {
+    profile MixedProfile = MixedProfile(record {
         name = "Liam"
         age = 8
-    }
+    })
 
     OS.println("record", user.name, user.age)
     OS.println("public", person.name, person.age, person.city)
