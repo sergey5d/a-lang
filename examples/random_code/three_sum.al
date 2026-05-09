@@ -19,6 +19,8 @@ object Ascending with Ordering[Int] {
 
 object Solution {
 
+    private hello Str = "Hello"
+
     def sol2(nums List[Int]) List[List[Int]] {
         nums.sort(Ascending)
 
@@ -112,6 +114,7 @@ def main() Int {
 
     OS.println("case [-1,0,1,2,-1,-4]")
     OS.println("output [[-1,0,1],[-1,-1,2]]")
+  #  OS.println(solver.hello)
 
     printTriplets("hash sample1", solver.sol2(sample1Hash))
     printTriplets("two-pointer sample1", solver.threeSum(sample1TwoPointers))

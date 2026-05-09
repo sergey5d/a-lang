@@ -510,8 +510,14 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 		if decl.Object && !field.Mutable && field.Initializer == nil {
 			c.addDiagnostic("invalid_object_field", "object '"+decl.Name+"' must initialize immutable field '"+field.Name+"'", field.Span)
 		}
+		if decl.Record && field.Private {
+			c.addDiagnostic("invalid_record_field", "record '"+decl.Name+"' cannot declare private field '"+field.Name+"'", field.Span)
+		}
 		if decl.Record && field.Mutable {
 			c.addDiagnostic("invalid_record_field", "record '"+decl.Name+"' cannot declare mutable field '"+field.Name+"'", field.Span)
+		}
+		if decl.Enum && field.Private {
+			c.addDiagnostic("invalid_enum_field", "enum '"+decl.Name+"' cannot declare private field '"+field.Name+"'", field.Span)
 		}
 		if decl.Enum && field.Mutable {
 			c.addDiagnostic("invalid_enum_field", "enum '"+decl.Name+"' cannot declare mutable field '"+field.Name+"'", field.Span)
@@ -715,6 +721,9 @@ func (c *Checker) checkEnumCases(info classInfo) {
 		for _, field := range enumCase.Fields {
 			if _, ok := sharedFields[field.Name]; ok {
 				c.addDiagnostic("invalid_enum_case_field", "enum case '"+enumCase.Name+"' must assign shared field '"+field.Name+"' instead of redeclaring it", field.Span)
+			}
+			if field.Private {
+				c.addDiagnostic("invalid_enum_case_field", "enum case '"+enumCase.Name+"' cannot declare private field '"+field.Name+"'", field.Span)
 			}
 			if field.Mutable {
 				c.addDiagnostic("invalid_enum_case_field", "enum case '"+enumCase.Name+"' cannot declare mutable field '"+field.Name+"'", field.Span)
