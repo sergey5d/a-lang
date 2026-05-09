@@ -3310,6 +3310,34 @@ func (in *Interpreter) iterableToSlice(value Value, local *env, span parser.Span
 		return items.items, true
 	case *nativeArray:
 		return items.items, true
+	case *nativeTuple:
+		if len(items.items) != 2 {
+			return nil, false
+		}
+		start, ok := items.items[0].(int64)
+		if !ok {
+			return nil, false
+		}
+		end, ok := items.items[1].(int64)
+		if !ok {
+			return nil, false
+		}
+		step := int64(1)
+		if start > end {
+			step = -1
+		}
+		var out []Value
+		for current := start; ; current += step {
+			if step > 0 {
+				if current >= end {
+					break
+				}
+			} else if current <= end {
+				break
+			}
+			out = append(out, current)
+		}
+		return out, true
 	case *nativeSet:
 		out := make([]Value, 0, len(items.order))
 		for _, key := range items.order {

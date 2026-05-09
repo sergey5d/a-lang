@@ -961,6 +961,28 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeForTupleRangeRequiresTwoInts(t *testing.T) {
+	src := `
+def run() Unit {
+	for item <- ("x", 4) {
+		OS.println(item)
+	}
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	found := false
+	for _, diag := range result.Diagnostics {
+		if diag.Code == "invalid_for_range" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected invalid_for_range diagnostic, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeClassApplyCall(t *testing.T) {
 	src := `
 class Adder {

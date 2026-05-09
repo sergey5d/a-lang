@@ -1092,7 +1092,7 @@ func (c *Checker) defineForBindingParts(bindings []parser.Binding, bindingTypes 
 func (c *Checker) checkForClause(binding parser.ForBinding) {
 	if binding.Iterable != nil {
 		iterType := c.checkExpr(binding.Iterable)
-		elemType := c.iterableElementType(iterType)
+		elemType := c.forIterableElementType(iterType, binding.Iterable)
 		bindingTypes := []*Type{elemType}
 		if len(binding.Bindings) > 1 {
 			bindingTypes = c.destructureValueTypes(len(binding.Bindings), elemType, binding.Span, "invalid_binding_count", "for binding")
@@ -1102,6 +1102,17 @@ func (c *Checker) checkForClause(binding parser.ForBinding) {
 	}
 	valueTypes := c.bindingValueTypes(binding.Bindings, binding.Values, binding.Span)
 	c.defineForBindingParts(binding.Bindings, valueTypes)
+}
+
+func (c *Checker) forIterableElementType(t *Type, expr parser.Expr) *Type {
+	if t != nil && t.Kind == TypeTuple {
+		if len(t.Args) != 2 || !sameType(t.Args[0], builtin("Int")) || !sameType(t.Args[1], builtin("Int")) {
+			c.addDiagnostic("invalid_for_range", "tuple ranges in for loops must have shape (Int, Int)", exprSpan(expr))
+			return unknownType
+		}
+		return builtin("Int")
+	}
+	return c.iterableElementType(t)
 }
 
 func (c *Checker) checkStmt(stmt parser.Statement) {

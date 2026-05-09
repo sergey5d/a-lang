@@ -30,7 +30,7 @@ func (b *forStmtBuilder) Build(stmt *parser.ForStmt) (Stmt, error) {
 				b.ctx.popScope()
 				return nil, err
 			}
-			elemType := elementType(iterable.GetType())
+			elemType := forIterableElementType(iterable.GetType())
 			valueTypes = []*typecheck.Type{elemType}
 			if len(binding.Bindings) > 1 {
 				valueTypes = make([]*typecheck.Type, len(binding.Bindings))
@@ -57,7 +57,7 @@ func (b *forStmtBuilder) Build(stmt *parser.ForStmt) (Stmt, error) {
 				typ = valueTypes[j]
 			}
 			if binding.Iterable != nil && len(binding.Bindings) == 1 && iterable != nil {
-				typ = elementType(iterable.GetType())
+				typ = forIterableElementType(iterable.GetType())
 			} else if binding.Iterable == nil && len(binding.Values) == len(binding.Bindings) && j < len(values) && values[j] != nil {
 				typ = values[j].GetType()
 			}

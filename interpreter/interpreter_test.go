@@ -143,6 +143,33 @@ def run() Int {
 	}
 }
 
+func TestForTupleRangeLoops(t *testing.T) {
+	src := `
+def run() Int {
+	var total Int = 0
+
+	for item <- (1, 4) {
+		total += item
+	}
+
+	for item <- (5, 1) {
+		total += item
+	}
+
+	return total
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(20) {
+		t.Fatalf("expected 20, got %#v", value)
+	}
+}
+
 func TestYieldLoops(t *testing.T) {
 	src := `
 def run() Int {

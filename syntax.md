@@ -789,6 +789,16 @@ for item <- [1, 2, 3] {
 }
 ```
 
+Tuple range loop:
+
+```txt
+for i <- (0, 10) {
+    OS.println(i)
+}
+```
+
+In a `for` loop only, a two-element tuple `(start, end)` with both elements of type `Int` acts like a built-in range. It is start-inclusive and end-exclusive, with ascending and descending traversal following the same behavior as `Range(start, end)`.
+
 Destructuring loop:
 
 ```txt

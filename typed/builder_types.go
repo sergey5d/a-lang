@@ -277,6 +277,20 @@ func elementType(typ *typecheck.Type) *typecheck.Type {
 	return &typecheck.Type{Kind: typecheck.TypeUnknown, Name: "<unknown>"}
 }
 
+func forIterableElementType(typ *typecheck.Type) *typecheck.Type {
+	if typ == nil {
+		return &typecheck.Type{Kind: typecheck.TypeUnknown, Name: "<unknown>"}
+	}
+	if typ.Kind == typecheck.TypeTuple &&
+		len(typ.Args) == 2 &&
+		len(typ.TupleNames) <= 2 &&
+		typ.Args[0] != nil && typ.Args[0].Kind == typecheck.TypeBuiltin && typ.Args[0].Name == "Int" &&
+		typ.Args[1] != nil && typ.Args[1].Kind == typecheck.TypeBuiltin && typ.Args[1].Name == "Int" {
+		return typ.Args[0]
+	}
+	return elementType(typ)
+}
+
 // iterableElementType extracts the item type for iterable runtime values.
 func (b *typeRefBuilder) iterableElementType(typ *typecheck.Type) *typecheck.Type {
 	if typ == nil {
