@@ -1,0 +1,123 @@
+# EXPECT:
+# case [-1,0,1,2,-1,-4]
+# output [[-1,0,1],[-1,-1,2]]
+# hash sample1 size 2
+# hash sample1 -1 0 1
+# hash sample1 -1 -1 2
+# two-pointer sample1 size 2
+# two-pointer sample1 -1 -1 2
+# two-pointer sample1 -1 0 1
+# hash sample2 size 1
+# hash sample2 0 0 0
+# two-pointer sample2 size 1
+# two-pointer sample2 0 0 0
+# 0
+
+object Ascending with Ordering[Int] {
+    def compare(left Int, right Int) Int = left - right
+}
+
+class Solution {
+}
+
+impl Solution {
+    def sol2(nums List[Int]) List[List[Int]] {
+        nums.sort(Ascending)
+
+        res List[List[Int]] = []
+
+        for i <- (0, nums.size()) {
+            if nums[i] > 0 {
+                return res
+            }
+            if i == 0 || nums[i - 1] != nums[i] {
+                this.twoSum2(nums, i, res)
+            }
+        }
+        res
+    }
+
+    def twoSum2(nums List[Int], idx Int, res List[List[Int]]) Unit {
+        seen Set[Int] = Set()
+        var j Int = idx + 1
+
+        while j < nums.size() {
+            complement = -nums[idx] - nums[j]
+            if seen.contains(complement) {
+                res.append(List(nums[idx], complement, nums[j]))
+                j += 1
+                while j < nums.size() && nums[j - 1] == nums[j] {
+                    j += 1
+                }
+            } else {
+                seen.add(nums[j])
+                j += 1
+            }
+        }
+    }
+
+    def twoSum(nums List[Int], idx Int, res List[List[Int]]) Unit {
+        var low Int = idx + 1
+        var high Int = nums.size() - 1
+
+        while low < high {
+            sum = nums[low] + nums[high] + nums[idx]
+
+            if sum == 0 {
+                res.append(List(nums[idx], nums[low], nums[high]))
+                low += 1
+                high -= 1
+
+                while low < high && nums[low] == nums[low - 1] {
+                    low += 1
+                }
+            } else if sum > 0 {
+                high -= 1
+            } else {
+                low += 1
+            }
+        }
+    }
+
+    def threeSum(nums List[Int]) List[List[Int]] {
+        nums.sort(Ascending)
+
+        res List[List[Int]] = []
+
+        for i <- (0, nums.size()) {
+            if nums[i] > 0 {
+                return res
+            }
+            if i == 0 || nums[i - 1] != nums[i] {
+                this.twoSum(nums, i, res)
+            }
+        }
+        res
+    }
+}
+
+def printTriplets(label Str, triplets List[List[Int]]) Unit {
+    OS.println(label + " size " + triplets.size())
+    for triplet <- triplets {
+        OS.println(label + " " + triplet[0] + " " + triplet[1] + " " + triplet[2])
+    }
+}
+
+def main() Int {
+    solver = Solution()
+
+    sample1Hash List[Int] = List(-1, 0, 1, 2, -1, -4)
+    sample1TwoPointers List[Int] = List(-1, 0, 1, 2, -1, -4)
+    sample2Hash List[Int] = List(0, 0, 0, 0)
+    sample2TwoPointers List[Int] = List(0, 0, 0, 0)
+
+    OS.println("case [-1,0,1,2,-1,-4]")
+    OS.println("output [[-1,0,1],[-1,-1,2]]")
+
+    printTriplets("hash sample1", solver.sol2(sample1Hash))
+    printTriplets("two-pointer sample1", solver.threeSum(sample1TwoPointers))
+    printTriplets("hash sample2", solver.sol2(sample2Hash))
+    printTriplets("two-pointer sample2", solver.threeSum(sample2TwoPointers))
+
+    0
+}
