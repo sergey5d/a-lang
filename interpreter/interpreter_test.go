@@ -170,6 +170,50 @@ def run() Int {
 	}
 }
 
+func TestPrivateFieldInferenceInClassAndObject(t *testing.T) {
+	src := `
+class Box {
+	private count = 2
+	private var total = 0
+}
+
+impl Box {
+	def bump() Unit {
+		this.total += this.count
+	}
+
+	def value() Int = this.total
+}
+
+object Greeter {
+	private hello = "Hello"
+}
+
+impl Greeter {
+	def greet(times Int) Str = this.hello + " " + times
+}
+
+def run() Int {
+	box = Box()
+	box.bump()
+	box.bump()
+	if Greeter.greet(3) == "Hello 3" {
+		return box.value()
+	}
+	return 0
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(4) {
+		t.Fatalf("expected 4, got %#v", value)
+	}
+}
+
 func TestYieldLoops(t *testing.T) {
 	src := `
 def run() Int {

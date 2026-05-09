@@ -58,7 +58,7 @@ func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 			if sawNonField {
 				return nil, fmt.Errorf("enum fields must appear before method or case declarations")
 			}
-			field, err := p.parseField(false)
+			field, err := p.parseField(false, false)
 			if err != nil {
 				return nil, err
 			}
@@ -128,7 +128,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 			if sawMethod {
 				return nil, fmt.Errorf("class fields must appear before method declarations")
 			}
-			field, err := p.parseField(private)
+			field, err := p.parseField(private, !record && kind != TokenEnum)
 			if err != nil {
 				return nil, err
 			}
@@ -157,16 +157,23 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 	return decl, nil
 }
 
-func (p *Parser) parseField(private bool) (FieldDecl, error) {
+func (p *Parser) parseField(private bool, allowPrivateInference bool) (FieldDecl, error) {
 	mutable := p.match(TokenVar)
 	start, err := p.consume(TokenIdentifier, "expected field name")
 	if err != nil {
 		return FieldDecl{}, err
 	}
 	name := start
-	typ, err := p.parseTypeRef()
-	if err != nil {
-		return FieldDecl{}, err
+	var typ *TypeRef
+	if !(allowPrivateInference && private && (p.check(TokenAssign) || p.check(TokenColonAssign))) {
+		typ, err = p.parseTypeRef()
+		if err != nil {
+			return FieldDecl{}, err
+		}
+	}
+	span := tokenSpan(start)
+	if typ != nil {
+		span = mergeSpans(span, typeSpan(typ))
 	}
 	field := FieldDecl{
 		Name:     name.Lexeme,
@@ -174,7 +181,7 @@ func (p *Parser) parseField(private bool) (FieldDecl, error) {
 		Mutable:  mutable,
 		Deferred: true,
 		Private:  private,
-		Span:     mergeSpans(tokenSpan(start), typeSpan(typ)),
+		Span:     span,
 	}
 	switch p.peek().Type {
 	case TokenAssign, TokenColonAssign:
@@ -186,6 +193,9 @@ func (p *Parser) parseField(private bool) (FieldDecl, error) {
 			return FieldDecl{}, err
 		}
 		if p.match(TokenQuestion) {
+			if field.Type == nil {
+				return FieldDecl{}, fmt.Errorf("private fields with inferred type require an initializer")
+			}
 			if field.Mutable {
 				return FieldDecl{}, fmt.Errorf("mutable fields do not support '= ?'; omit the initializer instead")
 			}
@@ -200,6 +210,10 @@ func (p *Parser) parseField(private bool) (FieldDecl, error) {
 		field.Initializer = expr
 		field.Deferred = false
 		field.Span = mergeSpans(field.Span, exprSpan(expr))
+	default:
+		if field.Type == nil {
+			return FieldDecl{}, fmt.Errorf("private fields with inferred type require an initializer")
+		}
 	}
 	return field, nil
 }
@@ -445,7 +459,7 @@ func (p *Parser) parseEnumCase() (EnumCaseDecl, error) {
 			})
 			continue
 		}
-		field, err := p.parseField(false)
+		field, err := p.parseField(false, false)
 		if err != nil {
 			return EnumCaseDecl{}, err
 		}

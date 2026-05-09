@@ -28,6 +28,7 @@ type typeScope map[string]TypeKind
 
 type fieldInfo struct {
 	decl parser.FieldDecl
+	typ  *Type
 }
 
 type methodInfo struct {
@@ -507,6 +508,10 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 	c.validateTypeParameterBounds(decl.TypeParameters)
 
 	for _, field := range decl.Fields {
+		var fieldType *Type
+		if field.Type != nil {
+			fieldType = c.resolveDeclaredType(field.Type)
+		}
 		if decl.Object && !field.Mutable && field.Initializer == nil {
 			c.addDiagnostic("invalid_object_field", "object '"+decl.Name+"' must initialize immutable field '"+field.Name+"'", field.Span)
 		}
@@ -522,12 +527,23 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 		if decl.Enum && field.Mutable {
 			c.addDiagnostic("invalid_enum_field", "enum '"+decl.Name+"' cannot declare mutable field '"+field.Name+"'", field.Span)
 		}
-		fieldType := c.resolveDeclaredType(field.Type)
 		if field.Initializer != nil {
-			valueType := c.checkExprWithExpected(field.Initializer, fieldType)
-			c.requireAssignable(valueType, fieldType, exprSpan(field.Initializer), "type_mismatch", "cannot assign "+valueType.String()+" to "+fieldType.String())
+			if field.Type != nil {
+				valueType := c.checkExprWithExpected(field.Initializer, fieldType)
+				c.requireAssignable(valueType, fieldType, exprSpan(field.Initializer), "type_mismatch", "cannot assign "+valueType.String()+" to "+fieldType.String())
+			} else {
+				fieldType = c.checkExpr(field.Initializer)
+				if isUnknown(fieldType) {
+					c.addDiagnostic("cannot_infer_field_type", "cannot infer type for private field '"+field.Name+"'", field.Span)
+				}
+			}
+		} else if field.Type == nil {
+			fieldType = unknownType
+			c.addDiagnostic("cannot_infer_field_type", "cannot infer type for private field '"+field.Name+"' without an initializer", field.Span)
 		}
+		info.fields[field.Name] = fieldInfo{decl: field, typ: fieldType}
 	}
+	c.classes[decl.Name] = info
 	if !decl.Enum && !decl.Object {
 		c.checkConstructorRules(info)
 	}
@@ -796,7 +812,7 @@ func (c *Checker) checkEnumCaseMethod(owner *parser.ClassDecl, enumCase parser.E
 	defer func() { c.returnTypes = c.returnTypes[:len(c.returnTypes)-1] }()
 
 	for _, field := range owner.Fields {
-		c.define(field.Name, c.resolveDeclaredType(field.Type), false)
+		c.define(field.Name, c.classFieldType(owner, field), false)
 	}
 	for _, field := range enumCase.Fields {
 		c.define(field.Name, c.resolveDeclaredType(field.Type), false)
@@ -3816,7 +3832,7 @@ func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*
 				c.addDiagnostic("private_access", "cannot access private field '"+name+"' outside class '"+info.decl.Name+"'", span)
 				return unknownType, true
 			}
-			return c.instantiateTypeRef(field.decl.Type, subst), true
+			return c.instantiateFieldType(field, subst), true
 		}
 		if methods, ok := info.methods[name]; ok && len(methods) > 0 {
 			if hasPrivateOnlyMatch(methods, info.decl, c) {
@@ -4074,7 +4090,7 @@ func (c *Checker) checkFieldAssignment(expr *parser.MemberExpr, receiverType *Ty
 		c.addDiagnostic("private_access", "cannot access private field '"+expr.Name+"' outside class '"+info.decl.Name+"'", expr.Span)
 		return unknownType, false, true
 	}
-	fieldType := c.instantiateTypeRef(field.decl.Type, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
+	fieldType := c.instantiateFieldType(field, c.substForDecl(info.decl.TypeParameters, receiverType.Args))
 	if field.decl.Mutable {
 		return fieldType, true, true
 	}
@@ -4297,10 +4313,33 @@ func (c *Checker) currentFieldType(name string) (*Type, bool) {
 	}
 	for _, field := range c.currentClass.Fields {
 		if field.Name == name {
-			return c.resolveDeclaredType(field.Type), true
+			return c.classFieldType(c.currentClass, field), true
 		}
 	}
 	return nil, false
+}
+
+func (c *Checker) classFieldType(owner *parser.ClassDecl, field parser.FieldDecl) *Type {
+	info, ok := c.classes[owner.Name]
+	if ok {
+		if known, ok := info.fields[field.Name]; ok && known.typ != nil {
+			return known.typ
+		}
+	}
+	if field.Type == nil {
+		return unknownType
+	}
+	return c.resolveDeclaredType(field.Type)
+}
+
+func (c *Checker) instantiateFieldType(field fieldInfo, subst map[string]*Type) *Type {
+	if field.typ != nil {
+		return field.typ
+	}
+	if field.decl.Type == nil {
+		return unknownType
+	}
+	return c.instantiateTypeRef(field.decl.Type, subst)
 }
 
 func primaryConstructorParams(class *parser.ClassDecl) []parser.Parameter {

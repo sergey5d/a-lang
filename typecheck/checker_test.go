@@ -983,6 +983,36 @@ def run() Unit {
 	}
 }
 
+func TestAnalyzePrivateFieldInferenceInClassAndObject(t *testing.T) {
+	src := `
+class Box {
+	private count = 1
+	private var total = 0
+}
+
+impl Box {
+	def bump() Unit {
+		this.total += this.count
+	}
+
+	def value() Int = this.total
+}
+
+object Greeter {
+	private hello = "Hello"
+}
+
+impl Greeter {
+	def greet() Str = this.hello
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeClassApplyCall(t *testing.T) {
 	src := `
 class Adder {

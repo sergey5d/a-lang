@@ -205,6 +205,21 @@ class Box {
 }
 ```
 
+Private fields in classes and objects may infer their type from an initializer:
+
+```txt
+class Box {
+    private count = 0
+    private var hits = 0
+}
+
+object Greeter {
+    private hello = "Hello"
+}
+```
+
+Public fields, records, and enums still require explicit field types.
+
 ## Assignment and Update
 
 Reassignment:

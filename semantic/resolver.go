@@ -282,7 +282,9 @@ func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
 		r.resolveTypeRef(target)
 	}
 	for _, field := range decl.Fields {
-		r.resolveTypeRef(field.Type)
+		if field.Type != nil {
+			r.resolveTypeRef(field.Type)
+		}
 		if field.Initializer != nil {
 			r.resolveExpr(field.Initializer)
 		}
@@ -302,7 +304,9 @@ func (r *Resolver) resolveClass(decl *parser.ClassDecl) {
 		}
 		for _, enumCase := range decl.Cases {
 			for _, field := range enumCase.Fields {
-				r.resolveTypeRef(field.Type)
+				if field.Type != nil {
+					r.resolveTypeRef(field.Type)
+				}
 				if field.Initializer != nil {
 					r.resolveExpr(field.Initializer)
 				}
@@ -765,7 +769,9 @@ func (r *Resolver) resolveTypeRef(ref *parser.TypeRef) {
 			} else {
 				seen[field.Name] = field.Span
 			}
-			r.resolveTypeRef(field.Type)
+			if field.Type != nil {
+				r.resolveTypeRef(field.Type)
+			}
 		}
 		return
 	}
