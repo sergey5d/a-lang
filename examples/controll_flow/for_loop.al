@@ -2,13 +2,20 @@
 # item 1
 # item 2
 # item 3
-# total 6
+# item 4
+# item 5
+# total 15
 # 0
 
 def main() Int {
 	var total Int = 0
 
 	for item <- [1, 2, 3] {
+		OS.println("item " + item)
+		total += item
+	}
+
+	for item <- (4, 6) {
 		OS.println("item " + item)
 		total += item
 	}
