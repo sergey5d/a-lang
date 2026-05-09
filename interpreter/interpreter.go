@@ -412,8 +412,11 @@ func (in *Interpreter) constructInto(receiver *instance, class *parser.ClassDecl
 	}
 	if len(args) == 1 {
 		if record, ok := args[0].(*nativeRecord); ok {
-			if expanded, ok := in.constructorArgsFromRecord(class, record); ok {
-				return in.constructInto(receiver, class, expanded, parent, span)
+			if in.recordMatchesExactClassShape(class, record) {
+				for _, field := range class.Fields {
+					receiver.fields[field.Name] = record.fields[field.Name]
+				}
+				return nil
 			}
 		}
 	}
@@ -1782,22 +1785,23 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 			return nil, RuntimeError{Message: "undefined class '" + fn.name + "'", Span: call.Span}
 		}
 		if recordExpr, ok := call.Args[0].Value.(*parser.AnonymousRecordExpr); ok && len(recordExpr.Values) > 0 {
-			for _, params := range constructorParamOptions(class) {
-				if len(params) != len(recordExpr.Values) {
-					continue
-				}
+			if len(recordExpr.Values) == len(class.Fields) {
 				args := make([]Value, len(recordExpr.Values))
 				matched := true
-				for i, valueExpr := range recordExpr.Values {
-					value, err := in.evalExprWithTypeRef(valueExpr, params[i].Type, local)
-					if err != nil || !in.runtimeValueMatchesType(value, params[i].Type) {
+				for i, field := range class.Fields {
+					value, err := in.evalExprWithTypeRef(recordExpr.Values[i], field.Type, local)
+					if err != nil || !in.runtimeValueMatchesType(value, field.Type) {
 						matched = false
 						break
 					}
 					args[i] = value
 				}
 				if matched {
-					return fn.module.construct(class, args, local)
+					recordFields := make(map[string]Value, len(class.Fields))
+					for i, field := range class.Fields {
+						recordFields[field.Name] = args[i]
+					}
+					return fn.module.construct(class, []Value{&nativeRecord{fields: recordFields}}, local)
 				}
 			}
 		}
@@ -1817,6 +1821,14 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 			return nil, RuntimeError{Message: "undefined class '" + fn.name + "'", Span: call.Span}
 		}
 		ordered := namedArgValues(args)
+		if len(ordered) == 1 {
+			if record, ok := ordered[0].(*nativeRecord); ok {
+				if !fn.module.recordMatchesExactClassShape(class, record) {
+					return nil, RuntimeError{Message: "class/record '" + class.Name + "' requires an anonymous record with exactly matching field names and types", Span: call.Span}
+				}
+				return fn.module.construct(class, ordered, local)
+			}
+		}
 		if class.Object {
 			value, ok := fn.module.globals.get(fn.name)
 			if !ok {
@@ -3620,37 +3632,17 @@ func (in *Interpreter) coerceValueForTypeRef(ref *parser.TypeRef, value Value) V
 	return value
 }
 
-func (in *Interpreter) constructorArgsFromRecord(class *parser.ClassDecl, record *nativeRecord) ([]Value, bool) {
-	for _, method := range class.Methods {
-		if !method.Constructor {
-			continue
+func (in *Interpreter) recordMatchesExactClassShape(class *parser.ClassDecl, record *nativeRecord) bool {
+	if len(record.fields) != len(class.Fields) {
+		return false
+	}
+	for _, field := range class.Fields {
+		value, ok := record.fields[field.Name]
+		if !ok || !in.runtimeValueMatchesType(value, field.Type) {
+			return false
 		}
-		args, ok := in.recordArgsForParams(method.Parameters, record)
-		if ok {
-			return args, true
-		}
 	}
-	fields := implicitConstructorFields(class)
-	params := make([]parser.Parameter, len(fields))
-	for i, field := range fields {
-		params[i] = parser.Parameter{Name: field.Name, Type: field.Type, Span: field.Span}
-	}
-	return in.recordArgsForParams(params, record)
-}
-
-func (in *Interpreter) recordArgsForParams(params []parser.Parameter, record *nativeRecord) ([]Value, bool) {
-	if len(record.fields) != len(params) {
-		return nil, false
-	}
-	args := make([]Value, len(params))
-	for i, param := range params {
-		value, ok := record.fields[param.Name]
-		if !ok || !in.runtimeValueMatchesType(value, param.Type) {
-			return nil, false
-		}
-		args[i] = value
-	}
-	return args, true
+	return true
 }
 
 func (in *Interpreter) assignmentValues(targetCount int, values []parser.Expr, local *env, span parser.Span) ([]Value, error) {

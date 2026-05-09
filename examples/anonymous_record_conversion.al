@@ -2,7 +2,7 @@
 # record Ada 10
 # public Ben 12 NYC
 # vars 3 4
-# ctor Mia 99
+# full Nora 20 Paris
 # mixed Liam 8 5
 
 record User {
@@ -52,7 +52,7 @@ def main() Unit {
     }
     user User = User(userRecord)
 
-    person Person = Person(record("Ben", 12))
+    person Person = Person(record("Ben", 12, "NYC"))
 
     pointRecord = record {
         x = 3
@@ -60,18 +60,21 @@ def main() Unit {
     }
     point MutablePoint = MutablePoint(pointRecord)
 
-    badge SecretBadge = SecretBadge(record {
-        name = "Mia"
+    fullPerson Person = Person(record {
+        name = "Nora"
+        age = 20
+        city = "Paris"
     })
 
     profile MixedProfile = MixedProfile(record {
         name = "Liam"
         age = 8
+        score = 5
     })
 
     OS.println("record", user.name, user.age)
     OS.println("public", person.name, person.age, person.city)
     OS.println("vars", point.x, point.y)
-    OS.println("ctor", badge.name, badge.codeValue())
+    OS.println("full", fullPerson.name, fullPerson.age, fullPerson.city)
     OS.println("mixed", profile.name, profile.age, profile.scoreValue())
 }

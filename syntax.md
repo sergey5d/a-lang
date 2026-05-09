@@ -301,6 +301,27 @@ def makeUser() { name Str, age Int } = {
 describe(record("Cara", 14))
 ```
 
+Named records/classes can be built from an anonymous record only through an explicit type call:
+
+```txt
+userRecord = record {
+    name = "Ada"
+    age = 10
+}
+
+user User = User(userRecord)
+person Person = Person(record("Ben", 12, "NYC"))
+```
+
+Rules for this conversion:
+- it applies only when the single argument is an anonymous record value
+- the anonymous record shape must exactly match the declared field shape of the target class/record
+- field names and field types must match exactly
+- mutable vs immutable field differences do not matter for shape matching
+- explicit constructors are ignored for this conversion path
+- named record/class values do not structurally convert to other named record/class values
+- nested inner conversions must still be explicit, for example `owner = Person(record { ... })`
+
 Anonymous record shapes are structural:
 - field names and field types must match at compile time
 - extra fields are allowed when passing a value to a narrower shape

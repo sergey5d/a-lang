@@ -937,10 +937,9 @@ def run() Int {
 }
 `
 
-	in := New(parseProgram(t, src))
-	_, err := in.Call("run")
-	if err == nil || err.Error() != "unknown member '_1' at 4:9" {
-		t.Fatalf("expected unknown member error, got %#v", err)
+	_, err := parser.Parse(src)
+	if err == nil || err.Error() != "expected member name after '.', got _(\"_\" @ 4:14)" {
+		t.Fatalf("expected parse error, got %#v", err)
 	}
 }
 
@@ -1724,10 +1723,11 @@ def run() Bool {
 		age = 10
 	}
 	user User = User(userRecord)
-	person Person = Person(record("Ben", 12))
+	person Person = Person(record("Ben", 12, "NYC"))
 	team = makeTeam(Person(record {
 		name = "Cy"
 		age = 7
+		city = "SF"
 	}))
 	return user.name == "Ana" &&
 		user.age == 10 &&
@@ -1735,7 +1735,8 @@ def run() Bool {
 		person.age == 12 &&
 		person.city == "NYC" &&
 		team.owner.name == "Cy" &&
-		team.owner.age == 7
+		team.owner.age == 7 &&
+		team.owner.city == "SF"
 }
 `
 

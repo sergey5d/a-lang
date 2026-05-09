@@ -3133,23 +3133,21 @@ func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *
 		if len(orderedArgs) == 1 {
 			if recordExpr, ok := orderedArgs[0].(*parser.AnonymousRecordExpr); ok {
 				if len(recordExpr.Values) > 0 {
-					if c.resolvePositionalRecordConstructorOverload(class, recordExpr, call.Span) {
-						return classType
-					}
+					c.resolvePositionalRecordShapeConstruction(class, recordExpr, call.Span)
+					return classType
 				}
 			}
 		}
 		argTypes := c.checkArgTypes(orderedArgs)
 		if len(orderedArgs) == 1 && len(argTypes) == 1 && argTypes[0].Kind == TypeRecord {
-			if c.resolveRecordConstructorOverload(class, argTypes[0], call.Span) {
-				c.checkExpr(orderedArgs[0])
-				if ident, ok := call.Callee.(*parser.Identifier); ok {
-					if refType, ok := c.lookupTypeInstance(ident.Name); ok {
-						classType = refType
-					}
+			c.resolveRecordShapeConstruction(class, argTypes[0], call.Span)
+			c.checkExpr(orderedArgs[0])
+			if ident, ok := call.Callee.(*parser.Identifier); ok {
+				if refType, ok := c.lookupTypeInstance(ident.Name); ok {
+					classType = refType
 				}
-				return classType
 			}
+			return classType
 		}
 		if ctor, ok := c.resolveConstructorOverload(class, argTypes, call.Span); ok {
 			sig := c.primaryConstructorSignature(class.decl)
@@ -3174,78 +3172,29 @@ func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *
 	return classType
 }
 
-func (c *Checker) resolveRecordConstructorOverload(class classInfo, actual *Type, span parser.Span) bool {
-	ctorMatches := 0
-	for _, ctor := range class.constructors {
-		params := make([]RecordField, len(ctor.Parameters))
-		for i, param := range ctor.Parameters {
-			params[i] = RecordField{Name: param.Name, Type: c.resolveDeclaredType(param.Type)}
-		}
-		if c.recordAssignableToFields(actual.Fields, params) {
-			ctorMatches++
-		}
-	}
-	visible := implicitVisibleRecordFields(class.decl)
-	primary := make([]RecordField, len(visible))
-	for i, field := range visible {
-		primary[i] = RecordField{Name: field.Name, Type: c.resolveDeclaredType(field.Type)}
-	}
-	primaryMatches := c.recordAssignableToFields(actual.Fields, primary)
-	if ctorMatches == 1 {
+func (c *Checker) resolveRecordShapeConstruction(class classInfo, actual *Type, span parser.Span) bool {
+	expected := exactClassShapeFields(class.decl, nil, c)
+	if recordExactlyMatchesFields(actual.Fields, expected) {
 		return true
 	}
-	if ctorMatches > 1 {
-		c.addDiagnostic("ambiguous_overload", "constructor call for class '"+class.decl.Name+"' is ambiguous", span)
-		return false
-	}
-	if primaryMatches {
-		return true
-	}
-	c.addDiagnostic("no_matching_overload", "constructor '"+class.decl.Name+"' cannot be built from anonymous record shape "+actual.String(), span)
+	c.addDiagnostic("no_matching_overload", "class/record '"+class.decl.Name+"' requires an anonymous record with exactly matching field names and types", span)
 	return false
 }
 
-func (c *Checker) resolvePositionalRecordConstructorOverload(class classInfo, actual *parser.AnonymousRecordExpr, span parser.Span) bool {
-	ctorMatches := 0
-	for _, ctor := range class.constructors {
-		if len(ctor.Parameters) != len(actual.Values) {
-			continue
-		}
-		for i, param := range ctor.Parameters {
-			expected := c.resolveDeclaredType(param.Type)
-			valueType := c.checkExprWithExpected(actual.Values[i], expected)
-			if !c.isAssignable(valueType, expected) {
-				goto nextCtor
-			}
-		}
-		ctorMatches++
-	nextCtor:
-	}
-	primary := primaryConstructorParams(class.decl)
-	primaryMatches := false
-	if len(primary) == len(actual.Values) {
-		for i, param := range primary {
-			expected := c.resolveDeclaredType(param.Type)
-			valueType := c.checkExprWithExpected(actual.Values[i], expected)
-			if !c.isAssignable(valueType, expected) {
-				goto donePrimary
-			}
-		}
-		primaryMatches = true
-	}
-donePrimary:
-	if ctorMatches == 1 {
-		return true
-	}
-	if ctorMatches > 1 {
-		c.addDiagnostic("ambiguous_overload", "constructor call for class '"+class.decl.Name+"' is ambiguous", span)
+func (c *Checker) resolvePositionalRecordShapeConstruction(class classInfo, actual *parser.AnonymousRecordExpr, span parser.Span) bool {
+	expected := exactClassShapeFields(class.decl, nil, c)
+	if len(expected) != len(actual.Values) {
+		c.addDiagnostic("no_matching_overload", "class/record '"+class.decl.Name+"' requires an anonymous record with exactly matching field names and types", span)
 		return false
 	}
-	if primaryMatches {
-		return true
+	for i, field := range expected {
+		valueType := c.checkExprWithExpected(actual.Values[i], field.Type)
+		if !sameType(valueType, field.Type) {
+			c.addDiagnostic("no_matching_overload", "class/record '"+class.decl.Name+"' requires an anonymous record with exactly matching field names and types", span)
+			return false
+		}
 	}
-	c.addDiagnostic("no_matching_overload", "constructor '"+class.decl.Name+"' cannot be built from positional anonymous record", span)
-	return false
+	return true
 }
 
 func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallArg) *Type {
@@ -5120,6 +5069,31 @@ func implicitVisibleRecordFields(class *parser.ClassDecl) []parser.FieldDecl {
 		}
 	}
 	return fields
+}
+
+func exactClassShapeFields(class *parser.ClassDecl, subst map[string]*Type, c *Checker) []RecordField {
+	fields := make([]RecordField, len(class.Fields))
+	for i, field := range class.Fields {
+		fields[i] = RecordField{Name: field.Name, Type: c.instantiateTypeRef(field.Type, subst)}
+	}
+	return fields
+}
+
+func recordExactlyMatchesFields(actualFields, expectedFields []RecordField) bool {
+	if len(actualFields) != len(expectedFields) {
+		return false
+	}
+	actualByName := make(map[string]*Type, len(actualFields))
+	for i := range actualFields {
+		actualByName[actualFields[i].Name] = actualFields[i].Type
+	}
+	for _, expected := range expectedFields {
+		actual, ok := actualByName[expected.Name]
+		if !ok || !sameType(actual, expected.Type) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *Checker) interfaceAssignable(actual, expected *Type, seen map[string]bool) bool {

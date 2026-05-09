@@ -575,9 +575,9 @@ def run() Int {
 }
 `
 
-	result := Analyze(parseProgram(t, src))
-	if len(result.Diagnostics) == 0 || result.Diagnostics[0].Code != "unknown_member" {
-		t.Fatalf("expected unknown_member diagnostic, got %#v", result.Diagnostics)
+	_, err := parser.Parse(src)
+	if err == nil || err.Error() != "expected member name after '.', got _(\"_\" @ 4:14)" {
+		t.Fatalf("expected parse error, got %#v", err)
 	}
 }
 
@@ -817,12 +817,13 @@ def run() Int {
 		age = 10
 	}
 	user User = User(userRecord)
-	person Person = Person(record("Ben", 12))
+	person Person = Person(record("Ben", 12, "NYC"))
 	team Team = Team(record {
 		name = "Core"
 		owner = Person(record {
 			name = "Cy"
 			age = 7
+			city = "SF"
 		})
 	})
 	return user.age + person.age + team.owner.age
