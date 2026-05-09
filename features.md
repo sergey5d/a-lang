@@ -91,7 +91,7 @@ Still open:
 `Option`, `Result`, `Either`, and `unwrap`-based short-circuit extraction now exist.
 
 Still open:
-- whether the current `Unwrappable[T]` surface is enough, or needs a richer protocol later
+- whether unwrap-style propagation should stay hardcoded to these builtins or later grow a broader protocol
 
 One possible follow-up is a Rust-style propagation form that:
 - extracts the success value from `Ok`

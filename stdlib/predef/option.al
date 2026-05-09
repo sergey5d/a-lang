@@ -1,4 +1,4 @@
-enum Option[T] with Unwrappable[T] {
+enum Option[T] {
     def isSet() Bool = match this {
         Some(_) => true
         Option.None => false
@@ -7,12 +7,10 @@ enum Option[T] with Unwrappable[T] {
     def isEmpty() Bool = !this.isSet()
     def isFailure() Bool = !this.isSet()
 
-    def get() T = match this {
+    def expect() T = match this {
         Some(value) => value
         Option.None => OS.panic("Option has no value")
     }
-
-    def unwrap() T = this.get()
 
     def getOr(defaultValue T) T = match this {
         Some(value) => value

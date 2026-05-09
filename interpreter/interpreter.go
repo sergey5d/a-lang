@@ -874,7 +874,7 @@ func (in *Interpreter) optionBindingValue(optionValue Value, local *env, span pa
 		if !ok || !set {
 			return false, nil, nil
 		}
-		unwrapped, err := in.invokeMethod(value, "get", nil, local, span)
+		unwrapped, err := in.invokeMethod(value, "expect", nil, local, span)
 		if err != nil {
 			return false, nil, err
 		}
@@ -902,8 +902,23 @@ func (in *Interpreter) unwrappableBindingValue(sourceValue Value, local *env, sp
 		}
 		return true, value.right, nil
 	case *instance:
-		if !in.instanceImplements(value, "Unwrappable") {
-			return false, nil, RuntimeError{Message: "unwrap binding requires Unwrappable[T]", Span: span}
+		if value.class.Name == "Option" {
+			setValue, err := in.invokeMethod(value, "isSet", nil, local, span)
+			if err != nil {
+				return false, nil, err
+			}
+			set, ok := setValue.(bool)
+			if !ok || !set {
+				return false, nil, nil
+			}
+			unwrapped, err := in.invokeMethod(value, "expect", nil, local, span)
+			if err != nil {
+				return false, nil, err
+			}
+			return true, unwrapped, nil
+		}
+		if value.class.Name != "Result" && value.class.Name != "Either" {
+			return false, nil, RuntimeError{Message: "unwrap binding requires Option[T], Result[T, E], or Either[L, R]", Span: span}
 		}
 		isFailureValue, err := in.invokeMethod(value, "isFailure", nil, local, span)
 		if err != nil {
@@ -911,7 +926,7 @@ func (in *Interpreter) unwrappableBindingValue(sourceValue Value, local *env, sp
 		}
 		isFailure, ok := isFailureValue.(bool)
 		if !ok {
-			return false, nil, RuntimeError{Message: "Unwrappable.isFailure must return Bool", Span: span}
+			return false, nil, RuntimeError{Message: value.class.Name + ".isFailure must return Bool", Span: span}
 		}
 		if isFailure {
 			return false, nil, nil
@@ -922,7 +937,7 @@ func (in *Interpreter) unwrappableBindingValue(sourceValue Value, local *env, sp
 		}
 		return true, unwrapped, nil
 	default:
-		return false, nil, RuntimeError{Message: "unwrap binding requires Unwrappable[T]", Span: span}
+		return false, nil, RuntimeError{Message: "unwrap binding requires Option[T], Result[T, E], or Either[L, R]", Span: span}
 	}
 }
 
@@ -2881,7 +2896,7 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 		return true
 	}
 	switch ref.Name {
-	case "", "Unit", "Int", "Float", "Bool", "Str", "Rune", "List", "Iterable", "Iterator", "Set", "Map", "Option", "Result", "Either", "Unwrappable", "Array", "Printer", "OS":
+	case "", "Unit", "Int", "Float", "Bool", "Str", "Rune", "List", "Iterable", "Iterator", "Set", "Map", "Option", "Result", "Either", "Array", "Printer", "OS":
 	default:
 		if _, ok := in.classes[ref.Name]; !ok {
 			if _, ok := in.interfaces[ref.Name]; !ok {
@@ -2954,14 +2969,6 @@ func (in *Interpreter) runtimeValueMatchesType(value Value, ref *parser.TypeRef)
 			return builtinTypeImplements(typeName, "Either")
 		}
 		if instanceValue, ok := value.(*instance); ok && instanceValue.class.Name == "Either" {
-			return true
-		}
-		return false
-	case "Unwrappable":
-		if typeName, ok := nativeBuiltinTypeName(value); ok {
-			return builtinTypeImplements(typeName, "Unwrappable")
-		}
-		if instanceValue, ok := value.(*instance); ok && in.instanceImplements(instanceValue, "Unwrappable") {
 			return true
 		}
 		return false

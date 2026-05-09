@@ -1,4 +1,4 @@
-class Either[L, R] with Unwrappable[R] {
+class Either[L, R] {
     private var rightSet Bool
     private var left L
     private var right R

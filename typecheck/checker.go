@@ -1911,7 +1911,7 @@ func (c *Checker) resolveTypePatternTarget(ref *parser.TypeRef, span parser.Span
 
 func erasedNamedPatternType(name string) (*Type, bool) {
 	switch name {
-	case "List", "Iterable", "Iterator", "Set", "Map", "Option", "Result", "Either", "Unwrappable":
+	case "List", "Iterable", "Iterator", "Set", "Map", "Option", "Result", "Either":
 		return &Type{Kind: TypeInterface, Name: name}, true
 	case "Array":
 		return &Type{Kind: TypeBuiltin, Name: name}, true
@@ -1922,7 +1922,7 @@ func erasedNamedPatternType(name string) (*Type, bool) {
 
 func builtinGenericTypeArity(name string) (int, bool) {
 	switch name {
-	case "List", "Iterable", "Iterator", "Set", "Option", "Array", "Unwrappable":
+	case "List", "Iterable", "Iterator", "Set", "Option", "Array":
 		return 1, true
 	case "Map", "Result", "Either":
 		return 2, true
@@ -2045,7 +2045,7 @@ func (c *Checker) checkUnwrapBindings(bindings []parser.Binding, value parser.Ex
 	sourceType := c.checkExpr(value)
 	successType, ok := c.unwrappableSuccessType(sourceType)
 	if !ok {
-		c.addDiagnostic(code, label+" requires Unwrappable[T]", exprSpan(value))
+		c.addDiagnostic(code, label+" requires Option[T], Result[T, E], or Either[L, R]", exprSpan(value))
 		successType = unknownType
 	}
 	if requireShortCircuit && returnType != nil && !c.shortCircuitCompatible(sourceType, returnType) {
@@ -4926,9 +4926,6 @@ func (c *Checker) unwrappableSuccessType(t *Type) (*Type, bool) {
 	if isUnknown(t) {
 		return unknownType, true
 	}
-	if args, ok := c.interfaceArgsForType(t, "Unwrappable"); ok && len(args) == 1 {
-		return args[0], true
-	}
 	switch t.Name {
 	case "Option":
 		if len(t.Args) == 1 {
@@ -5408,7 +5405,7 @@ func isBuiltinType(name string) bool {
 
 func isBuiltinInterfaceType(name string) bool {
 	switch name {
-	case "Eq", "Ordering", "List", "Set", "Map", "Printer", "Option", "Result", "Either", "Unwrappable":
+	case "Eq", "Ordering", "List", "Set", "Map", "Printer", "Option", "Result", "Either":
 		return true
 	default:
 		return false

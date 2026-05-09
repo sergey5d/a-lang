@@ -49,13 +49,13 @@ func nativeOptionIsFailure(in *Interpreter, receiver Value, args []Value, local 
 	return nativeOptionIsEmpty(in, receiver, args, local, span)
 }
 
-func nativeOptionGet(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
+func nativeOptionExpect(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
 	set, value, ok := optionState(receiver)
 	if !ok {
-		return nil, RuntimeError{Message: "native Option.get receiver mismatch", Span: span}
+		return nil, RuntimeError{Message: "native Option.expect receiver mismatch", Span: span}
 	}
 	if len(args) != 0 {
-		return nil, RuntimeError{Message: "get expects 0 arguments", Span: span}
+		return nil, RuntimeError{Message: "expect expects 0 arguments", Span: span}
 	}
 	if !set {
 		return nil, RuntimeError{Message: "Option has no value", Span: span}
@@ -64,7 +64,7 @@ func nativeOptionGet(_ *Interpreter, receiver Value, args []Value, _ *env, span 
 }
 
 func nativeOptionUnwrap(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
-	return nativeOptionGet(in, receiver, args, local, span)
+	return nativeOptionExpect(in, receiver, args, local, span)
 }
 
 func nativeOptionGetOr(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {

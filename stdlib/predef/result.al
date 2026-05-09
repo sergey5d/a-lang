@@ -1,4 +1,4 @@
-class Result[T, E] with Unwrappable[T] {
+class Result[T, E] {
     private var ok Bool
     private var value T
     private var error E

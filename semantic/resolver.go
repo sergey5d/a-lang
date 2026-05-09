@@ -866,7 +866,7 @@ func builtinTypeArity(name string) (int, bool) {
 		return 1, true
 	case "Map", "Result", "Either":
 		return 2, true
-	case "Eq", "Ordering", "Unwrappable":
+	case "Eq", "Ordering":
 		return 1, true
 	default:
 		return 0, false
