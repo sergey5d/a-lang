@@ -1,4 +1,4 @@
-# expected type name, got =("=" @ .*)
+# member field 'value' requires an explicit type
 
 class Bad {
     value = 1

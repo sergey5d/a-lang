@@ -166,6 +166,9 @@ func (p *Parser) parseField(private bool, allowPrivateInference bool) (FieldDecl
 	name := start
 	var typ *TypeRef
 	if !(allowPrivateInference && private && (p.check(TokenAssign) || p.check(TokenColonAssign))) {
+		if !private && (p.check(TokenAssign) || p.check(TokenColonAssign)) {
+			return FieldDecl{}, fmt.Errorf("member field '%s' requires an explicit type", name.Lexeme)
+		}
 		typ, err = p.parseTypeRef()
 		if err != nil {
 			return FieldDecl{}, err
