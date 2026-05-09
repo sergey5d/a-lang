@@ -2559,6 +2559,13 @@ func nativeBuiltinTypeName(value Value) (string, bool) {
 		return "Printer", true
 	case *nativeOS:
 		return "OS", true
+	case *instance:
+		instanceValue := value.(*instance)
+		switch instanceValue.class.Name {
+		case "Option":
+			return instanceValue.class.Name, true
+		}
+		return "", false
 	default:
 		return "", false
 	}
@@ -3398,6 +3405,20 @@ func (in *Interpreter) constructStdlibOption(value Value, set bool, local *env, 
 			return &nativeOption{value: value, set: true}, nil
 		}
 		return &nativeOption{set: false}, nil
+	}
+	if class.Enum {
+		caseName := "None"
+		args := []Value{}
+		if set {
+			caseName = "Some"
+			args = []Value{value}
+		}
+		for _, enumCase := range class.Cases {
+			if enumCase.Name == caseName {
+				return in.constructEnumCase(class, enumCase, args, local, span)
+			}
+		}
+		return nil, RuntimeError{Message: "stdlib Option enum is missing case '" + caseName + "'", Span: span}
 	}
 	if set {
 		return in.construct(class, []Value{value}, local)

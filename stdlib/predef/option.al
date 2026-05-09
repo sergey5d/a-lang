@@ -1,32 +1,33 @@
-class Option[T] with Unwrappable[T] {
-    private var set Bool
-    private var value T
-}
-
-impl Option[T] {
-    def init() {
-        this.set = false
+enum Option[T] with Unwrappable[T] {
+    def isSet() Bool = match this {
+        Some(_) => true
+        Option.None => false
     }
 
-    def init(value T) {
-        this.set = true
-        this.value := value
+    def isEmpty() Bool = !this.isSet()
+    def isFailure() Bool = !this.isSet()
+
+    def get() T = match this {
+        Some(value) => value
+        Option.None => OS.panic("Option has no value")
     }
 
-    def isSet() Bool = set
-    def isEmpty() Bool = !set
-    def isFailure() Bool = !set
-    def get() T = value
-    def unwrap() T = value
-    def getOr(defaultValue T) T =
-        if set then value else defaultValue
+    def unwrap() T = this.get()
+
+    def getOr(defaultValue T) T = match this {
+        Some(value) => value
+        Option.None => defaultValue
+    }
 
     def getOrElse(defaultValue T) T = this.getOr(defaultValue)
 
-    def map[X](f T -> X) Option[X] =
-        if set {
-            Some(f(value))
-        } else {
-            None()
-        }
+    def map[X](f T -> X) Option[X] = match this {
+        Some(value) => Some(f(value))
+        Option.None => None()
+    }
+
+    case None
+    case Some {
+        value T
+    }
 }

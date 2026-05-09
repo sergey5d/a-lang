@@ -3547,6 +3547,9 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			for _, arg := range orderedArgs {
 				c.checkExpr(arg)
 			}
+			if member.Name == "panic" {
+				return unknownType
+			}
 			return builtin("Unit")
 		}
 		if !hasNamedCallArgs(args) {

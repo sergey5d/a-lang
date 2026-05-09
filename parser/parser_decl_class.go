@@ -48,6 +48,18 @@ func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 		return nil, err
 	}
 	decl := &ClassDecl{Name: name.Lexeme, Private: private, Enum: true, TypeParameters: typeParams}
+	if p.match(TokenWith) {
+		for {
+			target, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			decl.Implements = append(decl.Implements, target)
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+	}
 	if _, err := p.consume(TokenLBrace, "expected '{' after enum name"); err != nil {
 		return nil, err
 	}
