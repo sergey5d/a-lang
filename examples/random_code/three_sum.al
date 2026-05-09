@@ -17,10 +17,8 @@ object Ascending with Ordering[Int] {
     def compare(left Int, right Int) Int = left - right
 }
 
-class Solution {
-}
+object Solution {
 
-impl Solution {
     def sol2(nums List[Int]) List[List[Int]] {
         nums.sort(Ascending)
 
@@ -104,7 +102,8 @@ def printTriplets(label Str, triplets List[List[Int]]) Unit {
 }
 
 def main() Int {
-    solver = Solution()
+
+    solver = Solution
 
     sample1Hash List[Int] = List(-1, 0, 1, 2, -1, -4)
     sample1TwoPointers List[Int] = List(-1, 0, 1, 2, -1, -4)
