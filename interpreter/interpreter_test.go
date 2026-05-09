@@ -1723,11 +1723,10 @@ def run() Bool {
 		age = 10
 	}
 	user User = User(userRecord)
-	person Person = Person(record("Ben", 12, "NYC"))
+	person Person = Person(record("Ben", 12))
 	team = makeTeam(Person(record {
 		name = "Cy"
 		age = 7
-		city = "SF"
 	}))
 	return user.name == "Ana" &&
 		user.age == 10 &&
@@ -1736,7 +1735,7 @@ def run() Bool {
 		person.city == "NYC" &&
 		team.owner.name == "Cy" &&
 		team.owner.age == 7 &&
-		team.owner.city == "SF"
+		team.owner.city == "NYC"
 }
 `
 

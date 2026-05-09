@@ -52,7 +52,7 @@ def main() Unit {
     }
     user User = User(userRecord)
 
-    person Person = Person(record("Ben", 12, "NYC"))
+    person Person = Person(record("Ben", 12))
 
     pointRecord = record {
         x = 3
@@ -69,7 +69,6 @@ def main() Unit {
     profile MixedProfile = MixedProfile(record {
         name = "Liam"
         age = 8
-        score = 5
     })
 
     OS.println("record", user.name, user.age)

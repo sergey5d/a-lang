@@ -11,5 +11,6 @@ def main() Unit {
     _ MixedProfile = MixedProfile(record {
         name = "Liam"
         age = 8
+        score = 5
     })
 }

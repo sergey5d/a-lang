@@ -315,8 +315,12 @@ person Person = Person(record("Ben", 12, "NYC"))
 
 Rules for this conversion:
 - it applies only when the single argument is an anonymous record value
-- the anonymous record shape must exactly match the declared field shape of the target class/record
+- the anonymous record shape must match the visible construction shape of the target class/record
 - field names and field types must match exactly
+- public fields without initializers are required
+- public fields with initializers are optional and may be provided or omitted
+- private fields with initializers are not part of the accepted shape and may not be provided
+- private fields without initializers block this conversion entirely
 - mutable vs immutable field differences do not matter for shape matching
 - explicit constructors are ignored for this conversion path
 - named record/class values do not structurally convert to other named record/class values

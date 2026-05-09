@@ -412,9 +412,11 @@ func (in *Interpreter) constructInto(receiver *instance, class *parser.ClassDecl
 	}
 	if len(args) == 1 {
 		if record, ok := args[0].(*nativeRecord); ok {
-			if in.recordMatchesExactClassShape(class, record) {
+			if in.recordMatchesVisibleClassShape(class, record) {
 				for _, field := range class.Fields {
-					receiver.fields[field.Name] = record.fields[field.Name]
+					if value, ok := record.fields[field.Name]; ok {
+						receiver.fields[field.Name] = value
+					}
 				}
 				return nil
 			}
@@ -1785,10 +1787,15 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 			return nil, RuntimeError{Message: "undefined class '" + fn.name + "'", Span: call.Span}
 		}
 		if recordExpr, ok := call.Args[0].Value.(*parser.AnonymousRecordExpr); ok && len(recordExpr.Values) > 0 {
-			if len(recordExpr.Values) == len(class.Fields) {
+			required, optional, shapeOK := fn.module.visibleClassShape(class)
+			exposed := append(append([]parser.FieldDecl{}, required...), optional...)
+			if shapeOK && len(recordExpr.Values) >= len(required) && len(recordExpr.Values) <= len(exposed) {
 				args := make([]Value, len(recordExpr.Values))
 				matched := true
-				for i, field := range class.Fields {
+				for i, field := range exposed {
+					if i >= len(recordExpr.Values) {
+						break
+					}
 					value, err := in.evalExprWithTypeRef(recordExpr.Values[i], field.Type, local)
 					if err != nil || !in.runtimeValueMatchesType(value, field.Type) {
 						matched = false
@@ -1797,8 +1804,8 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 					args[i] = value
 				}
 				if matched {
-					recordFields := make(map[string]Value, len(class.Fields))
-					for i, field := range class.Fields {
+					recordFields := make(map[string]Value, len(recordExpr.Values))
+					for i, field := range exposed[:len(recordExpr.Values)] {
 						recordFields[field.Name] = args[i]
 					}
 					return fn.module.construct(class, []Value{&nativeRecord{fields: recordFields}}, local)
@@ -1823,7 +1830,7 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 		ordered := namedArgValues(args)
 		if len(ordered) == 1 {
 			if record, ok := ordered[0].(*nativeRecord); ok {
-				if !fn.module.recordMatchesExactClassShape(class, record) {
+				if !fn.module.recordMatchesVisibleClassShape(class, record) {
 					return nil, RuntimeError{Message: "class/record '" + class.Name + "' requires an anonymous record with exactly matching field names and types", Span: call.Span}
 				}
 				return fn.module.construct(class, ordered, local)
@@ -3632,17 +3639,58 @@ func (in *Interpreter) coerceValueForTypeRef(ref *parser.TypeRef, value Value) V
 	return value
 }
 
-func (in *Interpreter) recordMatchesExactClassShape(class *parser.ClassDecl, record *nativeRecord) bool {
-	if len(record.fields) != len(class.Fields) {
+func (in *Interpreter) recordMatchesVisibleClassShape(class *parser.ClassDecl, record *nativeRecord) bool {
+	required, optional, ok := in.visibleClassShape(class)
+	if !ok {
 		return false
 	}
-	for _, field := range class.Fields {
+	if len(record.fields) < len(required) || len(record.fields) > len(required)+len(optional) {
+		return false
+	}
+	optionalSet := map[string]*parser.TypeRef{}
+	for _, field := range optional {
+		optionalSet[field.Name] = field.Type
+	}
+	for _, field := range required {
 		value, ok := record.fields[field.Name]
 		if !ok || !in.runtimeValueMatchesType(value, field.Type) {
 			return false
 		}
 	}
+	for name, value := range record.fields {
+		requiredField := false
+		for _, field := range required {
+			if field.Name == name {
+				requiredField = true
+				break
+			}
+		}
+		if requiredField {
+			continue
+		}
+		fieldType, ok := optionalSet[name]
+		if !ok || !in.runtimeValueMatchesType(value, fieldType) {
+			return false
+		}
+	}
 	return true
+}
+
+func (in *Interpreter) visibleClassShape(class *parser.ClassDecl) (required []parser.FieldDecl, optional []parser.FieldDecl, ok bool) {
+	for _, field := range class.Fields {
+		if field.Private {
+			if field.Initializer == nil {
+				return nil, nil, false
+			}
+			continue
+		}
+		if field.Initializer != nil {
+			optional = append(optional, field)
+			continue
+		}
+		required = append(required, field)
+	}
+	return required, optional, true
 }
 
 func (in *Interpreter) assignmentValues(targetCount int, values []parser.Expr, local *env, span parser.Span) ([]Value, error) {

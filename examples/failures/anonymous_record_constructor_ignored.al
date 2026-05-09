@@ -1,5 +1,5 @@
 # FAIL_REGEX:
-# no_matching_overload at .*: class/record 'SecretBadge' requires an anonymous record with exactly matching field names and types
+# no_matching_overload at .*: class/record 'SecretBadge' cannot be built from an anonymous record because it has private fields without initializers
 
 class SecretBadge {
     name Str

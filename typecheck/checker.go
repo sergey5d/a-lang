@@ -3173,8 +3173,12 @@ func (c *Checker) checkConstructorCall(class classInfo, call *parser.CallExpr) *
 }
 
 func (c *Checker) resolveRecordShapeConstruction(class classInfo, actual *Type, span parser.Span) bool {
-	expected := exactClassShapeFields(class.decl, nil, c)
-	if recordExactlyMatchesFields(actual.Fields, expected) {
+	required, optional, ok := classAnonymousRecordShape(class.decl, nil, c)
+	if !ok {
+		c.addDiagnostic("no_matching_overload", "class/record '"+class.decl.Name+"' cannot be built from an anonymous record because it has private fields without initializers", span)
+		return false
+	}
+	if recordMatchesVisibleShape(actual.Fields, required, optional) {
 		return true
 	}
 	c.addDiagnostic("no_matching_overload", "class/record '"+class.decl.Name+"' requires an anonymous record with exactly matching field names and types", span)
@@ -3182,14 +3186,28 @@ func (c *Checker) resolveRecordShapeConstruction(class classInfo, actual *Type, 
 }
 
 func (c *Checker) resolvePositionalRecordShapeConstruction(class classInfo, actual *parser.AnonymousRecordExpr, span parser.Span) bool {
-	expected := exactClassShapeFields(class.decl, nil, c)
-	if len(expected) != len(actual.Values) {
+	required, optional, ok := classAnonymousRecordShape(class.decl, nil, c)
+	if !ok {
+		c.addDiagnostic("no_matching_overload", "class/record '"+class.decl.Name+"' cannot be built from an anonymous record because it has private fields without initializers", span)
+		return false
+	}
+	expected := append(append([]RecordField{}, required...), optional...)
+	if len(actual.Values) < len(required) || len(actual.Values) > len(expected) {
 		c.addDiagnostic("no_matching_overload", "class/record '"+class.decl.Name+"' requires an anonymous record with exactly matching field names and types", span)
 		return false
 	}
 	for i, field := range expected {
+		if i >= len(actual.Values) {
+			break
+		}
 		valueType := c.checkExprWithExpected(actual.Values[i], field.Type)
 		if !sameType(valueType, field.Type) {
+			c.addDiagnostic("no_matching_overload", "class/record '"+class.decl.Name+"' requires an anonymous record with exactly matching field names and types", span)
+			return false
+		}
+	}
+	for i := len(actual.Values); i < len(expected); i++ {
+		if i < len(required) {
 			c.addDiagnostic("no_matching_overload", "class/record '"+class.decl.Name+"' requires an anonymous record with exactly matching field names and types", span)
 			return false
 		}
@@ -5071,25 +5089,55 @@ func implicitVisibleRecordFields(class *parser.ClassDecl) []parser.FieldDecl {
 	return fields
 }
 
-func exactClassShapeFields(class *parser.ClassDecl, subst map[string]*Type, c *Checker) []RecordField {
-	fields := make([]RecordField, len(class.Fields))
-	for i, field := range class.Fields {
-		fields[i] = RecordField{Name: field.Name, Type: c.instantiateTypeRef(field.Type, subst)}
+func classAnonymousRecordShape(class *parser.ClassDecl, subst map[string]*Type, c *Checker) (required []RecordField, optional []RecordField, ok bool) {
+	for _, field := range class.Fields {
+		typed := RecordField{Name: field.Name, Type: c.instantiateTypeRef(field.Type, subst)}
+		if field.Private {
+			if field.Initializer == nil {
+				return nil, nil, false
+			}
+			continue
+		}
+		if field.Initializer != nil {
+			optional = append(optional, typed)
+			continue
+		}
+		required = append(required, typed)
 	}
-	return fields
+	return required, optional, true
 }
 
-func recordExactlyMatchesFields(actualFields, expectedFields []RecordField) bool {
-	if len(actualFields) != len(expectedFields) {
+func recordMatchesVisibleShape(actualFields, requiredFields, optionalFields []RecordField) bool {
+	if len(actualFields) < len(requiredFields) || len(actualFields) > len(requiredFields)+len(optionalFields) {
 		return false
+	}
+	optionalByName := make(map[string]*Type, len(optionalFields))
+	for i := range optionalFields {
+		optionalByName[optionalFields[i].Name] = optionalFields[i].Type
 	}
 	actualByName := make(map[string]*Type, len(actualFields))
 	for i := range actualFields {
 		actualByName[actualFields[i].Name] = actualFields[i].Type
 	}
-	for _, expected := range expectedFields {
-		actual, ok := actualByName[expected.Name]
-		if !ok || !sameType(actual, expected.Type) {
+	for _, required := range requiredFields {
+		actual, ok := actualByName[required.Name]
+		if !ok || !sameType(actual, required.Type) {
+			return false
+		}
+	}
+	for name, actual := range actualByName {
+		foundRequired := false
+		for _, required := range requiredFields {
+			if required.Name == name {
+				foundRequired = true
+				break
+			}
+		}
+		if foundRequired {
+			continue
+		}
+		expected, ok := optionalByName[name]
+		if !ok || !sameType(actual, expected) {
 			return false
 		}
 	}
