@@ -4,6 +4,8 @@
 # vars 3 4
 # full Nora 20 Paris
 # mixed Liam 8 5
+# mixed2 Liam 8 5
+# mixed3 Liam 8 5
 
 record User {
     name Str
@@ -71,9 +73,21 @@ def main() Unit {
         age = 8
     })
 
+    profile2 MixedProfile = MixedProfile({
+        name = "Liam"
+        age = 8
+    })
+
+    profile3 MixedProfile = MixedProfile {
+        name = "Liam"
+        age = 8
+    }
+
     OS.println("record", user.name, user.age)
     OS.println("public", person.name, person.age, person.city)
     OS.println("vars", point.x, point.y)
     OS.println("full", fullPerson.name, fullPerson.age, fullPerson.city)
     OS.println("mixed", profile.name, profile.age, profile.scoreValue())
+    OS.println("mixed2", profile2.name, profile2.age, profile2.scoreValue())
+    OS.println("mixed3", profile3.name, profile3.age, profile3.scoreValue())
 }

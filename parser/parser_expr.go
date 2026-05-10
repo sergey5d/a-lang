@@ -59,18 +59,15 @@ func (p *Parser) parseExpressionWithOptions(minPrec int, allowRecordUpdate bool)
 			if err != nil {
 				return nil, err
 			}
-			if call, ok := left.(*CallExpr); ok {
-				arg := CallArg{Value: lambda, Span: exprSpan(lambda)}
-				call.Args = append(call.Args, arg)
-				call.Span = mergeSpans(exprSpan(call.Callee), exprSpan(lambda))
-				left = call
-			} else {
-				left = &CallExpr{
-					Callee: left,
-					Args:   []CallArg{{Value: lambda, Span: exprSpan(lambda)}},
-					Span:   mergeSpans(exprSpan(left), exprSpan(lambda)),
-				}
+			left = p.appendTrailingCallArg(left, lambda)
+			continue
+		}
+		if p.isBareAnonymousRecordCallArgStart() {
+			record, err := p.parseAnonymousRecordExpr(p.advance())
+			if err != nil {
+				return nil, err
 			}
+			left = p.appendTrailingCallArg(left, record)
 			continue
 		}
 		if p.match(TokenDot) {
@@ -132,6 +129,20 @@ func (p *Parser) parseExpressionWithOptions(minPrec int, allowRecordUpdate bool)
 	}
 
 	return left, nil
+}
+
+func (p *Parser) appendTrailingCallArg(left Expr, arg Expr) Expr {
+	callArg := CallArg{Value: arg, Span: exprSpan(arg)}
+	if call, ok := left.(*CallExpr); ok {
+		call.Args = append(call.Args, callArg)
+		call.Span = mergeSpans(exprSpan(call.Callee), exprSpan(arg))
+		return call
+	}
+	return &CallExpr{
+		Callee: left,
+		Args:   []CallArg{callArg},
+		Span:   mergeSpans(exprSpan(left), exprSpan(arg)),
+	}
 }
 
 func (p *Parser) parsePrefix() (Expr, error) {
@@ -229,12 +240,20 @@ func (p *Parser) isAnonymousInterfaceExprStart() bool {
 			return false
 		}
 	}
-	return p.check(TokenLBrace)
+	if !p.check(TokenLBrace) {
+		return false
+	}
+	if p.pos+2 < len(p.tokens) && p.tokens[p.pos+1].Type == TokenIdentifier && p.tokens[p.pos+2].Type == TokenAssign {
+		return false
+	}
+	return true
 }
 
 func (p *Parser) parseAnonymousRecordExpr(start Token) (Expr, error) {
-	if p.check(TokenLBrace) {
-		p.advance()
+	if start.Type == TokenLBrace || p.check(TokenLBrace) {
+		if start.Type != TokenLBrace {
+			p.advance()
+		}
 		var fields []CallArg
 		if p.check(TokenRBrace) {
 			return nil, fmt.Errorf("anonymous record literal must declare at least one field at %d:%d", start.Line, start.Column)
@@ -778,7 +797,15 @@ func (p *Parser) parseCallArgs() ([]CallArg, error) {
 				if seenNamed {
 					return nil, fmt.Errorf("positional arguments cannot follow named arguments")
 				}
-				expr, err := p.parseExpressionWithOptions(0, true)
+				var (
+					expr Expr
+					err  error
+				)
+				if p.isBareAnonymousRecordCallArgStart() {
+					expr, err = p.parseAnonymousRecordExpr(p.advance())
+				} else {
+					expr, err = p.parseExpressionWithOptions(0, true)
+				}
 				if err != nil {
 					return nil, err
 				}
@@ -796,6 +823,16 @@ func (p *Parser) parseCallArgs() ([]CallArg, error) {
 		return nil, err
 	}
 	return args, nil
+}
+
+func (p *Parser) isBareAnonymousRecordCallArgStart() bool {
+	if !p.check(TokenLBrace) {
+		return false
+	}
+	if p.pos+2 >= len(p.tokens) {
+		return false
+	}
+	return p.tokens[p.pos+1].Type == TokenIdentifier && p.tokens[p.pos+2].Type == TokenAssign
 }
 
 func (p *Parser) parseRecordUpdateArgs() ([]CallArg, Token, error) {
