@@ -63,7 +63,6 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 		"Option": {
 			"isSet":     nativeOptionIsSet,
 			"isEmpty":   nativeOptionIsEmpty,
-			"isFailure": nativeOptionIsFailure,
 			"expect":    nativeOptionExpect,
 			"getOr":     nativeOptionGetOr,
 			"getOrElse": nativeOptionGetOrElse,

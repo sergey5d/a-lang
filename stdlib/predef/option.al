@@ -5,7 +5,6 @@ enum Option[T] {
     }
 
     def isEmpty() Bool = !this.isSet()
-    def isFailure() Bool = !this.isSet()
 
     def expect() T = match this {
         Some(value) => value

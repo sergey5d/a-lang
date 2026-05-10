@@ -45,10 +45,6 @@ func nativeOptionIsEmpty(_ *Interpreter, receiver Value, args []Value, _ *env, s
 	return !set, nil
 }
 
-func nativeOptionIsFailure(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
-	return nativeOptionIsEmpty(in, receiver, args, local, span)
-}
-
 func nativeOptionExpect(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
 	set, value, ok := optionState(receiver)
 	if !ok {
@@ -61,10 +57,6 @@ func nativeOptionExpect(_ *Interpreter, receiver Value, args []Value, _ *env, sp
 		return nil, RuntimeError{Message: "Option has no value", Span: span}
 	}
 	return value, nil
-}
-
-func nativeOptionUnwrap(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
-	return nativeOptionExpect(in, receiver, args, local, span)
 }
 
 func nativeOptionGetOr(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
