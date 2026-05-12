@@ -659,16 +659,16 @@ List literal:
 Array construction:
 
 ```txt
-values Array[Int] = Array(3)
+values Array[Int] = Array.ofLength(3)
 values[0] := 1
 ```
 
-When the expected type is `Array[T]`, list literal syntax initializes an array directly. In any other context, the same `[ ... ]` syntax remains a `List[T]` literal:
+Array elements can also be constructed directly:
 
 ```txt
-values Array[Int] = [1, 2, 3]
-boxes Array[Box] = [Box(1), Box(2)]
-takeArray([4, 5, 6])
+values Array[Int] = Array(1, 2, 3)
+boxes Array[Box] = Array(Box(1), Box(2))
+takeArray(Array(4, 5, 6))
 ```
 
 Tuple literal:

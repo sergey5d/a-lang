@@ -29,7 +29,7 @@ def findMaxAverage(nums Array[Float], k Int) Float {
 }
 
 def main() Int {
-    nums Array[Float] = Array(6)
+    nums Array[Float] = Array.ofLength(6)
     nums[0] := 1.
     nums[1] := 12.
     nums[2] := -5.

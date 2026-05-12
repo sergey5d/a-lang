@@ -2042,6 +2042,23 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 	if err != nil {
 		return nil, err
 	}
+	if builtin, ok := receiver.(builtinRef); ok && builtin.name == "Array" && member.Name == "ofLength" {
+		if len(argExprs) != 1 {
+			return nil, RuntimeError{Message: fmt.Sprintf("Array.ofLength expects 1 argument, got %d", len(argExprs)), Span: member.Span}
+		}
+		lengthValue, err := in.evalExpr(argExprs[0].Value, local)
+		if err != nil {
+			return nil, err
+		}
+		length, ok := lengthValue.(int64)
+		if !ok {
+			return nil, RuntimeError{Message: "Array.ofLength expects Int length", Span: exprSpan(argExprs[0].Value)}
+		}
+		if length < 0 {
+			return nil, RuntimeError{Message: "Array.ofLength length must be non-negative", Span: exprSpan(argExprs[0].Value)}
+		}
+		return &nativeArray{items: make([]Value, int(length))}, nil
+	}
 	if modRef, ok := receiver.(moduleRef); ok {
 		mod, ok := in.imports[modRef.name]
 		if !ok {
@@ -2304,6 +2321,11 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 			return nil, RuntimeError{Message: "method '" + expr.Name + "' must be called with ()", Span: expr.Span}
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
+	case builtinRef:
+		if value.name == "Array" && expr.Name == "ofLength" {
+			return nil, RuntimeError{Message: "method 'ofLength' must be called with ()", Span: expr.Span}
+		}
+		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
 	case *nativeTuple:
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
 	case *nativeRecord:
@@ -2460,9 +2482,6 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 		}
 		return &nativeList{items: append([]Value(nil), args...)}, nil
 	case "Array":
-		if len(argExprs) != 1 {
-			return nil, RuntimeError{Message: fmt.Sprintf("Array constructor expects 1 argument, got %d", len(argExprs)), Span: span}
-		}
 		if args == nil {
 			args = make([]Value, len(argExprs))
 			for i, arg := range argExprs {
@@ -2473,17 +2492,7 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 				args[i] = value
 			}
 		}
-		if source, ok := args[0].(*nativeList); ok {
-			return &nativeArray{items: append([]Value(nil), source.items...)}, nil
-		}
-		length, ok := args[0].(int64)
-		if !ok {
-			return nil, RuntimeError{Message: "Array constructor expects Int length or List source", Span: exprSpan(argExprs[0].Value)}
-		}
-		if length < 0 {
-			return nil, RuntimeError{Message: "Array constructor length must be non-negative", Span: exprSpan(argExprs[0].Value)}
-		}
-		return &nativeArray{items: make([]Value, int(length))}, nil
+		return &nativeArray{items: append([]Value(nil), args...)}, nil
 	case "Set":
 		if args == nil {
 			args = make([]Value, len(argExprs))
@@ -3735,17 +3744,6 @@ func (in *Interpreter) bindingValues(bindings []parser.Binding, values []parser.
 }
 
 func (in *Interpreter) evalExprWithTypeRef(expr parser.Expr, expected *parser.TypeRef, local *env) (Value, error) {
-	if list, ok := expr.(*parser.ListLiteral); ok && expected != nil && expected.Name == "Array" && len(expected.Arguments) == 1 {
-		items := make([]Value, len(list.Elements))
-		for i, item := range list.Elements {
-			value, err := in.evalExprWithTypeRef(item, expected.Arguments[0], local)
-			if err != nil {
-				return nil, err
-			}
-			items[i] = value
-		}
-		return &nativeArray{items: items}, nil
-	}
 	if record, ok := expr.(*parser.AnonymousRecordExpr); ok && len(record.Values) > 0 && expected != nil && len(expected.RecordFields) > 0 {
 		if len(record.Values) != len(expected.RecordFields) {
 			return nil, RuntimeError{Message: fmt.Sprintf("record(...) expects %d values, got %d", len(expected.RecordFields), len(record.Values)), Span: record.Span}

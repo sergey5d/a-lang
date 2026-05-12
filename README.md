@@ -99,7 +99,7 @@ var total Int = 0
 
 addOne Int -> Int = x -> x + 1
 
-values = [1, 2, 3]
+values = Array(1, 2, 3)
 values[1] := values[0] + 4
 
 pair (value Int, size Int) = (1, 2)

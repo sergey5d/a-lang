@@ -2368,17 +2368,6 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 	case *parser.UnitLiteral:
 		result = builtin("Unit")
 	case *parser.ListLiteral:
-		if expected != nil && expected.Kind == TypeBuiltin && expected.Name == "Array" && len(expected.Args) == 1 {
-			elemType := expected.Args[0]
-			for _, elem := range e.Elements {
-				nextType := c.checkExprWithExpected(elem, elemType)
-				if !sameType(elemType, nextType) {
-					c.addDiagnostic("type_mismatch", "array literal elements must have the same type as "+elemType.String(), exprSpan(elem))
-				}
-			}
-			result = expected
-			break
-		}
 		if len(e.Elements) == 0 {
 			result = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{unknownType}}
 			break
@@ -2948,22 +2937,17 @@ func (c *Checker) checkBuiltinConstructorCall(name string, call *parser.CallExpr
 		}
 		return &Type{Kind: TypeInterface, Name: "Map", Args: []*Type{keyType, valType}}
 	case "Array":
-		if len(call.Args) != 1 {
-			for _, arg := range call.Args {
-				c.checkExpr(arg.Value)
+		if len(call.Args) == 0 {
+			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
+		}
+		elemType := c.checkExpr(call.Args[0].Value)
+		for _, arg := range call.Args[1:] {
+			argType := c.checkExpr(arg.Value)
+			if !sameType(elemType, argType) {
+				c.addDiagnostic("type_mismatch", "Array constructor elements must have the same type", exprSpan(arg.Value))
 			}
-			c.addDiagnostic("invalid_argument_count", fmt.Sprintf("Array constructor expects 1 argument, got %d", len(call.Args)), call.Span)
-			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
 		}
-		argType := c.checkExpr(call.Args[0].Value)
-		if sameType(argType, builtin("Int")) {
-			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
-		}
-		if argType.Kind == TypeInterface && argType.Name == "List" && len(argType.Args) == 1 {
-			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{argType.Args[0]}}
-		}
-		c.addDiagnostic("invalid_argument_type", "Array constructor expects Int length or List[T] source", exprSpan(call.Args[0].Value))
-		return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
+		return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{elemType}}
 	case "Some":
 		optionType := &Type{Kind: TypeInterface, Name: "Option", Args: []*Type{unknownType}}
 		if _, ok := c.lookupClassInfo("Option"); ok {
@@ -3350,6 +3334,22 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 	if ident, ok := member.Receiver.(*parser.Identifier); ok {
 		if enumSig, ok := c.tryEnumCaseCallFromIdentifier(ident.Name, member.Name, args, member.Span); ok {
 			return enumSig
+		}
+		if ident.Name == "Array" && member.Name == "ofLength" {
+			if hasNamedCallArgs(args) {
+				c.checkArgTypes(callArgValues(args))
+				c.addDiagnostic("invalid_named_argument", "named arguments are not supported for Array.ofLength", member.Span)
+				return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
+			}
+			orderedArgs := callArgValues(args)
+			if len(orderedArgs) != 1 {
+				c.checkArgTypes(orderedArgs)
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %d arguments, got %d", member.Name, 1, len(orderedArgs)), member.Span)
+				return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
+			}
+			argType := c.checkExpr(orderedArgs[0])
+			c.requireAssignable(argType, builtin("Int"), exprSpan(orderedArgs[0]), "invalid_argument_type", "Array.ofLength length must be Int")
+			return &Type{Kind: TypeBuiltin, Name: "Array", Args: []*Type{unknownType}}
 		}
 	}
 	receiverType := c.checkExpr(member.Receiver)
@@ -3929,6 +3929,10 @@ func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
 	if ident, ok := expr.Receiver.(*parser.Identifier); ok {
 		if enumMember, ok := c.tryEnumCaseMemberFromIdentifier(ident.Name, expr.Name); ok {
 			return enumMember
+		}
+		if ident.Name == "Array" && expr.Name == "ofLength" {
+			c.addDiagnostic("invalid_member_access", "method 'ofLength' must be called with ()", expr.Span)
+			return unknownType
 		}
 	}
 	receiverType := c.checkExpr(expr.Receiver)

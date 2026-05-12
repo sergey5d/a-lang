@@ -31,7 +31,7 @@ class ArrayList[T] with Iterable[T] {
 
 impl ArrayList[T] {
     def init(capacity Int) {
-        this.items := Array(capacity)
+        this.items := Array.ofLength(capacity)
     }
 
     def append(value T) Unit {

@@ -32,11 +32,11 @@ def main() Unit {
     OS.println("list zip", secondLeft, secondRight)
     OS.println("list zipWithIndex", indexedValue, indexedPos)
 
-    values = Array(3)
+    values = Array.ofLength(3)
     values[0] := 4
     values[1] := 5
     values[2] := 6
-    other = Array(2)
+    other = Array.ofLength(2)
     other[0] := "x"
     other[1] := "y"
     arrayPairs = values.zip(other)

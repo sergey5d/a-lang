@@ -596,15 +596,15 @@ def run(values Array[Int]) Int {
 	}
 }
 
-func TestAnalyzeArrayLiteralFromExpectedType(t *testing.T) {
+func TestAnalyzeArrayElementConstruction(t *testing.T) {
 	src := `
 class Box {
 	value Int
 }
 
 def run() Int {
-	values Array[Int] = [4, 5, 6]
-	boxes Array[Box] = [Box(7), Box(8)]
+	values Array[Int] = Array(4, 5, 6)
+	boxes Array[Box] = Array(Box(7), Box(8))
 	return values[0] + values[2] + boxes[1].value
 }
 `
@@ -1964,11 +1964,11 @@ def run() Int {
 	pairs List[(Int, Str)] = items.zip(List("a", "b"))
 	indexed List[(Int, Int)] = items.zipWithIndex()
 
-	values Array[Int] = Array(3)
+	values Array[Int] = Array.ofLength(3)
 	values[0] := 4
 	values[1] := 5
 	values[2] := 6
-	other Array[Str] = Array(2)
+	other Array[Str] = Array.ofLength(2)
 	other[0] := "x"
 	other[1] := "y"
 	valuePairs Array[(Int, Str)] = values.zip(other)
@@ -2021,7 +2021,7 @@ def run() Int {
 func TestAnalyzeArrayHigherOrderMethods(t *testing.T) {
 	src := `
 def run() Int {
-	values Array[Int] = Array(3)
+	values Array[Int] = Array.ofLength(3)
 	values[0] := 4
 	values[1] := 5
 	values[2] := 6
@@ -2118,7 +2118,7 @@ class Vec {
 
 impl Vec {
 	def init(left Int, right Int) {
-		this.items := Array(2)
+		this.items := Array.ofLength(2)
 		this.items[0] := left
 		this.items[1] := right
 	}
@@ -2573,7 +2573,7 @@ def run() Int {
 func TestAnalyzeArrayConstructorAndSize(t *testing.T) {
 	src := `
 def run() Int {
-	values Array[Int] = Array(5)
+	values Array[Int] = Array.ofLength(5)
 	return values.size()
 }
 `
@@ -2587,7 +2587,7 @@ def run() Int {
 func TestAnalyzeInvalidArrayConstructor(t *testing.T) {
 	src := `
 def run() Array[Int] {
-	return Array(1, 2)
+	return Array(1, "x")
 }
 `
 
@@ -2595,7 +2595,7 @@ def run() Array[Int] {
 	if len(result.Diagnostics) == 0 {
 		t.Fatalf("expected diagnostics, got none")
 	}
-	if result.Diagnostics[0].Code != "invalid_argument_count" {
+	if result.Diagnostics[0].Code != "type_mismatch" {
 		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }

@@ -267,11 +267,11 @@ def run() Int {
 	pairs = items.zip(List("a", "b"))
 	indexed = items.zipWithIndex()
 
-	values = Array(3)
+	values = Array.ofLength(3)
 	values[0] := 4
 	values[1] := 5
 	values[2] := 6
-	other = Array(2)
+	other = Array.ofLength(2)
 	other[0] := "x"
 	other[1] := "y"
 	valuePairs = values.zip(other)
@@ -328,7 +328,7 @@ def run() Int {
 func TestArrayHigherOrderMethods(t *testing.T) {
 	src := `
 def run() Int {
-	values = Array(3)
+	values = Array.ofLength(3)
 	values[0] := 4
 	values[1] := 5
 	values[2] := 6
@@ -1196,15 +1196,15 @@ def run() Int {
 	}
 }
 
-func TestArrayLiteralFromExpectedType(t *testing.T) {
+func TestArrayElementConstruction(t *testing.T) {
 	src := `
 class Box {
 	value Int
 }
 
 def run() Int {
-	values Array[Int] = [4, 5, 6]
-	boxes Array[Box] = [Box(7), Box(8)]
+	values Array[Int] = Array(4, 5, 6)
+	boxes Array[Box] = Array(Box(7), Box(8))
 	return values[0] * 1000 + values[1] * 100 + values[2] * 10 + boxes[1].value
 }
 `
@@ -1250,7 +1250,7 @@ class Vec {
 
 impl Vec {
 	def init(left Int, right Int) {
-		this.items := Array(2)
+		this.items := Array.ofLength(2)
 		this.items[0] := left
 		this.items[1] := right
 	}
@@ -1582,7 +1582,7 @@ def run() Int {
 func TestArrayConstructorAndSize(t *testing.T) {
 	src := `
 def run() Int {
-	values = Array(5)
+	values = Array.ofLength(5)
 	values[1] := 7
 	return values.size()
 }

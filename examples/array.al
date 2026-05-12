@@ -15,8 +15,8 @@
 # size 3
 
 def main() Unit {
-    values Array[Int] = [4, 5, 6]
-    labels Array[Str] = ["a", "b"]
+    values Array[Int] = Array(4, 5, 6)
+    labels Array[Str] = Array("a", "b")
 
     mapped = values.map(item -> item * 2)
     hasBig = values.exists(item -> item > 5)
@@ -35,7 +35,7 @@ def main() Unit {
     zippedValue, zippedLabel = pairs[1]
     indexedValue, indexedPos = indexed[2]
 
-    assigned = Array(2)
+    assigned = Array.ofLength(2)
     assigned[0] := 9
     assigned[1] := 10
 
