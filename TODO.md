@@ -26,38 +26,6 @@ enum Option[T] {
 
 ## Enum Follow-Ups
 
-- Settle the enum behavior model around shared enum declarations plus `impl`.
-  - Candidate shape:
-
-```txt
-enum Either[L, R] {
-    case Left {
-        value L
-    }
-
-    case Right {
-        value R
-    }
-}
-
-impl Either[L, R] {
-    def isLeft() Bool = this match {
-        ...
-    }
-}
-
-impl Either[L, R].Left {
-    def isLeft() Bool = false
-
-    def map[T](f R -> T) Either[L, T] = Right(f(val))
-}
-```
-
-  - Main open questions:
-    - whether `impl Enum[...]` and `impl Enum[...].Case` should both be supported
-    - how case-local `impl` blocks should access payload fields like `value` / `val`
-    - whether enum-wide methods and case-local methods can overlap, and which one wins
-
 - Think through auto-generated constant values for enum-wide fields.
   - Candidate syntax:
 
