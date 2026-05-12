@@ -1316,7 +1316,6 @@ func TestAnalyzeInterfaceInheritance(t *testing.T) {
 interface Hopper {
 	def hop() Str
 }
-
 interface Jumper {
 	def jump(steps Int) Str
 }
@@ -1335,6 +1334,22 @@ impl Rabbit {
 def run() Str {
 	rabbit = Rabbit()
 	return rabbit.hop() + " " + rabbit.jump(3)
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeInterfaceDefaultMethod(t *testing.T) {
+	src := `
+interface Hopper {
+	def hop() Str = "hop"
+}
+
+class Rabbit with Hopper {
 }
 `
 

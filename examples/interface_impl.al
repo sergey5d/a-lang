@@ -4,7 +4,7 @@
 # 0
 
 interface Hopper {
-    def hop() Str
+    def hop() Str = "hop"
 }
 
 interface Jumper {
@@ -15,8 +15,6 @@ class Rabbit with Hopper, Jumper {
 }
 
 impl Rabbit {
-    def hop() Str = "hop"
-
     def jump(steps Int) Str = "jump " + steps
 }
 

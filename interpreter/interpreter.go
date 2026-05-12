@@ -312,6 +312,35 @@ func (in *Interpreter) callMethod(receiver *instance, method *parser.MethodDecl,
 	return in.coerceValueForTypeRef(method.ReturnType, value), nil
 }
 
+func (in *Interpreter) callInterfaceMethod(receiver *instance, method parser.InterfaceMethod, args []Value, parent *env) (Value, error) {
+	if !acceptsArgCount(method.Parameters, len(args)) {
+		return nil, RuntimeError{Message: fmt.Sprintf("method '%s' expects %s args, got %d", method.Name, expectedCallableArgs(method.Parameters), len(args)), Span: method.Span}
+	}
+	if method.Body == nil {
+		return nil, RuntimeError{Message: "interface method '" + method.Name + "' has no default body", Span: method.Span}
+	}
+	local := newEnv(parent)
+	local.define("this", receiver, false)
+	for i, param := range method.Parameters {
+		if param.Variadic {
+			local.define(param.Name, &nativeList{items: append([]Value{}, args[i:]...)}, false)
+			break
+		}
+		local.define(param.Name, args[i], false)
+	}
+	value, signal, err := in.execBlock(method.Body, local, receiver)
+	if err != nil {
+		return nil, err
+	}
+	if ret, ok := signal.(returnSignal); ok {
+		return in.coerceValueForTypeRef(method.ReturnType, ret.value), nil
+	}
+	if method.ReturnType == nil || isUnitTypeRef(method.ReturnType) {
+		return nil, nil
+	}
+	return in.coerceValueForTypeRef(method.ReturnType, value), nil
+}
+
 func enumCaseMethods(class *parser.ClassDecl, caseName string) []*parser.MethodDecl {
 	if !class.Enum || caseName == "" {
 		return nil
@@ -2162,6 +2191,37 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 	if firstErr != nil {
 		return nil, firstErr
 	}
+	defaultMethods := in.defaultInterfaceMethodsByName(obj, member.Name)
+	if len(defaultMethods) > 0 {
+		if len(defaultMethods) == 1 {
+			ordered, err := in.evalArgsWithParams(defaultMethods[0].Parameters, argExprs, local, member.Span, "method '"+member.Name+"'")
+			if err != nil {
+				return nil, err
+			}
+			return in.callInterfaceMethod(obj, defaultMethods[0], ordered, local)
+		}
+		if hasNamedParserArgs(argExprs) {
+			orderedExprs, err := reorderNamedParserArgs(defaultMethods[0].Parameters, argExprs, member.Span, "method '"+member.Name+"'")
+			if err == nil {
+				ordered := make([]Value, len(orderedExprs))
+				for i, expr := range orderedExprs {
+					value, evalErr := in.evalExpr(expr, local)
+					if evalErr != nil {
+						return nil, evalErr
+					}
+					ordered[i] = value
+				}
+				if method, ok := in.findDefaultInterfaceMethod(obj, member.Name, ordered); ok {
+					return in.callInterfaceMethod(obj, method, ordered, local)
+				}
+			}
+		} else {
+			ordered := namedArgValues(args)
+			if method, ok := in.findDefaultInterfaceMethod(obj, member.Name, ordered); ok {
+				return in.callInterfaceMethod(obj, method, ordered, local)
+			}
+		}
+	}
 	return nil, RuntimeError{Message: "unknown method '" + member.Name + "'", Span: member.Span}
 }
 
@@ -3402,7 +3462,80 @@ func (in *Interpreter) invokeMethod(receiver Value, name string, args []Value, l
 			return in.callMethod(obj, method, args, local)
 		}
 	}
+	if method, ok := in.findDefaultInterfaceMethod(obj, name, args); ok {
+		return in.callInterfaceMethod(obj, method, args, local)
+	}
 	return nil, RuntimeError{Message: "unknown method '" + name + "'", Span: span}
+}
+
+func (in *Interpreter) findDefaultInterfaceMethod(receiver *instance, name string, args []Value) (parser.InterfaceMethod, bool) {
+	candidates := in.defaultInterfaceMethodsByName(receiver, name)
+	var (
+		found parser.InterfaceMethod
+		ok    bool
+	)
+	for _, method := range candidates {
+		if !in.runtimeInterfaceMethodMatches(method, args) {
+			continue
+		}
+		if ok {
+			return parser.InterfaceMethod{}, false
+		}
+		found = method
+		ok = true
+	}
+	return found, ok
+}
+
+func (in *Interpreter) defaultInterfaceMethodsByName(receiver *instance, name string) []parser.InterfaceMethod {
+	var (
+		found []parser.InterfaceMethod
+	)
+	seen := map[string]bool{}
+	for _, impl := range receiver.class.Implements {
+		found = append(found, in.findDefaultInterfaceMethodsInRef(impl, name, seen)...)
+	}
+	return found
+}
+
+func (in *Interpreter) findDefaultInterfaceMethodsInRef(ref *parser.TypeRef, name string, seen map[string]bool) []parser.InterfaceMethod {
+	if ref == nil || seen[ref.Name] {
+		return nil
+	}
+	seen[ref.Name] = true
+	iface, ok := in.interfaces[ref.Name]
+	if !ok {
+		return nil
+	}
+	var found []parser.InterfaceMethod
+	for _, method := range iface.Methods {
+		if method.Name == name && method.Body != nil {
+			found = append(found, method)
+		}
+	}
+	for _, parent := range iface.Extends {
+		found = append(found, in.findDefaultInterfaceMethodsInRef(parent, name, seen)...)
+	}
+	return found
+}
+
+func (in *Interpreter) runtimeInterfaceMethodMatches(method parser.InterfaceMethod, args []Value) bool {
+	if !acceptsArgCount(method.Parameters, len(args)) {
+		return false
+	}
+	for i, arg := range args {
+		paramIndex := i
+		if len(method.Parameters) > 0 && method.Parameters[len(method.Parameters)-1].Variadic && paramIndex >= len(method.Parameters)-1 {
+			paramIndex = len(method.Parameters) - 1
+		}
+		if paramIndex >= len(method.Parameters) {
+			return false
+		}
+		if !in.runtimeValueMatchesType(arg, method.Parameters[paramIndex].Type) {
+			return false
+		}
+	}
+	return true
 }
 
 func (in *Interpreter) constructStdlibOption(value Value, set bool, local *env, span parser.Span) (Value, error) {

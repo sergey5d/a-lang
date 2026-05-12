@@ -1706,7 +1706,6 @@ func TestParseInterfaceInheritance(t *testing.T) {
 interface Hopper {
 	def hop() Str
 }
-
 interface Acrobat with Hopper {
 	def land() Str
 }
@@ -1725,6 +1724,29 @@ interface Acrobat with Hopper {
 	}
 	if len(acrobat.Extends) != 1 || acrobat.Extends[0].Name != "Hopper" {
 		t.Fatalf("unexpected extends clause %#v", acrobat.Extends)
+	}
+}
+
+func TestParseInterfaceDefaultMethod(t *testing.T) {
+	src := `
+interface Hopper {
+	def hop() Str = "hop"
+}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Interfaces) != 1 {
+		t.Fatalf("expected 1 interface, got %d", len(program.Interfaces))
+	}
+	method := program.Interfaces[0].Methods[0]
+	if method.Body == nil {
+		t.Fatalf("expected interface method body")
+	}
+	if method.ReturnType == nil || method.ReturnType.Name != "Str" {
+		t.Fatalf("expected Str return type, got %#v", method.ReturnType)
 	}
 }
 

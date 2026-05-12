@@ -92,6 +92,7 @@ type InterfaceMethod struct {
 	TypeParameters []TypeParameter `json:"typeParameters,omitempty"`
 	Parameters     []Parameter     `json:"parameters"`
 	ReturnType     *TypeRef        `json:"returnType"`
+	Body           *BlockStmt      `json:"body,omitempty"`
 	Span           Span            `json:"span"`
 }
 

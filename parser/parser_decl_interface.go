@@ -75,12 +75,25 @@ func (p *Parser) parseInterfaceMethod() (InterfaceMethod, error) {
 		return InterfaceMethod{}, err
 	}
 	var returnType *TypeRef
-	if p.check(TokenDef) || p.check(TokenRBrace) {
+	var body *BlockStmt
+	if p.check(TokenAssign) || (p.check(TokenLBrace) && !p.typeRefFollowedBy(TokenAssign)) {
+		body, err = p.parseCallableBody()
+		if err != nil {
+			return InterfaceMethod{}, err
+		}
+		returnType = implicitUnitType(body.Span)
+	} else if p.check(TokenDef) || p.check(TokenRBrace) {
 		returnType = implicitUnitType(tokenSpan(p.previous()))
 	} else {
 		returnType, err = p.parseTypeRef()
 		if err != nil {
 			return InterfaceMethod{}, err
+		}
+		if p.check(TokenAssign) || (p.check(TokenLBrace) && !p.typeRefFollowedBy(TokenAssign)) {
+			body, err = p.parseCallableBody()
+			if err != nil {
+				return InterfaceMethod{}, err
+			}
 		}
 	}
 	return InterfaceMethod{
@@ -88,6 +101,14 @@ func (p *Parser) parseInterfaceMethod() (InterfaceMethod, error) {
 		TypeParameters: typeParams,
 		Parameters:     params,
 		ReturnType:     returnType,
-		Span:           mergeSpans(tokenSpan(start), typeSpan(returnType)),
+		Body:           body,
+		Span:           mergeSpans(tokenSpan(start), endSpanOrType(returnType, body)),
 	}, nil
+}
+
+func endSpanOrType(returnType *TypeRef, body *BlockStmt) Span {
+	if body != nil {
+		return body.Span
+	}
+	return typeSpan(returnType)
 }

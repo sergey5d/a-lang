@@ -419,12 +419,49 @@ func (c *Checker) checkInterface(decl *parser.InterfaceDecl) {
 		if method.Name == "init" {
 			c.addDiagnostic("invalid_interface_method", "interface '"+decl.Name+"': interfaces cannot declare constructors", method.Span)
 		}
+		c.checkInterfaceMethod(decl, method)
 	}
 	for _, parent := range decl.Extends {
 		parentType := c.resolveDeclaredType(parent)
 		if parentType.Kind != TypeInterface {
 			c.addDiagnostic("invalid_interface_inheritance", "interface '"+decl.Name+"' can only inherit from interfaces", parent.Span)
 		}
+	}
+}
+
+func (c *Checker) checkInterfaceMethod(owner *parser.InterfaceDecl, method parser.InterfaceMethod) {
+	c.pushTypeScope()
+	defer c.popTypeScope()
+	for _, param := range owner.TypeParameters {
+		c.currentTypeScope()[param.Name] = TypeParam
+	}
+	for _, param := range method.TypeParameters {
+		c.currentTypeScope()[param.Name] = TypeParam
+	}
+	c.validateTypeParameterBounds(method.TypeParameters)
+	if method.Body == nil {
+		return
+	}
+	c.pushScope()
+	defer c.popScope()
+	classArgs := make([]*Type, len(owner.TypeParameters))
+	for i, param := range owner.TypeParameters {
+		classArgs[i] = &Type{Kind: TypeParam, Name: param.Name}
+	}
+	c.define("this", &Type{Kind: TypeInterface, Name: owner.Name, Args: classArgs}, false)
+	expectedReturn := c.resolveDeclaredType(method.ReturnType)
+	c.returnTypes = append(c.returnTypes, expectedReturn)
+	defer func() { c.returnTypes = c.returnTypes[:len(c.returnTypes)-1] }()
+	for _, param := range method.Parameters {
+		paramType := c.resolveDeclaredType(param.Type)
+		if param.Variadic {
+			paramType = &Type{Kind: TypeInterface, Name: "List", Args: []*Type{paramType}}
+		}
+		c.define(param.Name, paramType, false)
+	}
+	implicitReturn := c.checkBlock(method.Body)
+	if method.ReturnType != nil && !isUnknown(implicitReturn) && !isUnitType(expectedReturn) {
+		c.requireAssignable(implicitReturn, expectedReturn, method.Body.Span, "invalid_return_type", "cannot implicitly return "+implicitReturn.String()+" from interface method returning "+expectedReturn.String())
 	}
 }
 
@@ -648,6 +685,16 @@ func (c *Checker) checkInterfaceImplementation(class classInfo, impl *parser.Typ
 	}
 
 	for _, method := range c.interfaceMethods(iface.decl, map[string]bool{}) {
+		if method.Body != nil {
+			if classMethods, ok := class.methods[method.Name]; ok && len(classMethods) > 0 {
+				expected := c.instantiateInterfaceMethodSignature(method, subst)
+				if classMethod, ok := c.findMatchingMethodOverload(class, method.Name, expected.Parameters); ok {
+					actual := c.instantiateMethodSignature(classMethod.decl, class.decl, nil)
+					c.compareSignatures(actual, expected, classMethod.decl.Span, method.Name)
+				}
+			}
+			continue
+		}
 		classMethods, ok := class.methods[method.Name]
 		if !ok || len(classMethods) == 0 {
 			c.addDiagnostic("interface_not_implemented", "class '"+class.decl.Name+"' does not implement method '"+method.Name+"'", class.decl.Span)

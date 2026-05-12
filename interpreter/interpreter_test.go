@@ -1624,7 +1624,6 @@ func TestInterfaceInheritanceIsExpression(t *testing.T) {
 interface Hopper {
 	def hop() Str
 }
-
 interface Jumper {
 	def jump(steps Int) Str
 }
@@ -1653,6 +1652,40 @@ def run() Bool {
 	}
 	if value != true {
 		t.Fatalf("expected true, got %#v", value)
+	}
+}
+
+func TestInterfaceDefaultMethod(t *testing.T) {
+	src := `
+interface Hopper {
+	def hop() Str = "hop"
+}
+
+interface Jumper {
+	def jump(steps Int) Str
+}
+
+class Rabbit with Hopper, Jumper {
+}
+
+impl Rabbit {
+	def jump(steps Int) Str = "jump " + steps
+}
+
+def run() Str {
+	rabbit Hopper = Rabbit()
+	jumper Jumper = Rabbit()
+	return rabbit.hop() + " / " + jumper.jump(2)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != "hop / jump 2" {
+		t.Fatalf("expected %q, got %#v", "hop / jump 2", value)
 	}
 }
 

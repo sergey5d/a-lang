@@ -264,9 +264,16 @@ func (r *Resolver) resolveInterface(decl *parser.InterfaceDecl) {
 		}
 		r.resolveTypeParameterBounds(method.TypeParameters)
 		r.resolveTypeRef(method.ReturnType)
+		r.pushScope()
+		r.defineMutableAllowShadow("this", method.Span, false, "duplicate_binding", "duplicate binding 'this'", true)
 		for _, param := range method.Parameters {
 			r.resolveTypeRef(param.Type)
+			r.defineMutableAllowShadow(param.Name, param.Span, false, "duplicate_parameter", "duplicate parameter '"+param.Name+"'", false)
 		}
+		if method.Body != nil {
+			r.resolveBlockStatements(method.Body.Statements)
+		}
+		r.popScope()
 		r.popTypeScope()
 	}
 }

@@ -552,6 +552,16 @@ Interfaces:
 interface Named {
     def label() Str
 }
+```
+
+Interfaces may also provide default methods by attaching a body:
+
+```txt
+interface Named {
+    def label() Str
+    def greeting() Str = "Hello " + this.label()
+}
+```
 
 Methods that satisfy an interface just use ordinary `def`:
 
