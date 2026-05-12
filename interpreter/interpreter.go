@@ -38,6 +38,7 @@ type Interpreter struct {
 	program       *parser.Program
 	functions     map[string]*parser.FunctionDecl
 	classes       map[string]*parser.ClassDecl
+	objects       map[string]*parser.ClassDecl
 	interfaces    map[string]*parser.InterfaceDecl
 	imports       map[string]*Interpreter
 	directImports map[string]runtimeImportedSymbol
@@ -145,6 +146,7 @@ func New(program *parser.Program) *Interpreter {
 		program:       program,
 		functions:     map[string]*parser.FunctionDecl{},
 		classes:       map[string]*parser.ClassDecl{},
+		objects:       map[string]*parser.ClassDecl{},
 		interfaces:    map[string]*parser.InterfaceDecl{},
 		imports:       map[string]*Interpreter{},
 		directImports: map[string]runtimeImportedSymbol{},
@@ -156,7 +158,11 @@ func New(program *parser.Program) *Interpreter {
 		in.interfaces[iface.Name] = iface
 	}
 	for _, class := range program.Classes {
-		in.classes[class.Name] = class
+		if class.Object {
+			in.objects[class.Name] = class
+		} else {
+			in.classes[class.Name] = class
+		}
 	}
 	return in
 }
@@ -211,11 +217,12 @@ func (in *Interpreter) execTopLevel(global *env) error {
 		if symbol.isInterface {
 			continue
 		}
-		if class, ok := symbol.module.classes[symbol.original]; ok && class.Object {
+		if class, ok := symbol.module.objects[symbol.original]; ok {
 			if value, ok := symbol.module.globals.get(symbol.original); ok {
 				global.define(localName, value.value, false)
 				continue
 			}
+			_ = class
 		}
 		global.define(localName, classRef{module: symbol.module, name: symbol.original}, false)
 	}
@@ -1420,12 +1427,12 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		if _, ok := in.imports[e.Name]; ok {
 			return moduleRef{name: e.Name}, nil
 		}
-		if class, ok := in.classes[e.Name]; ok {
-			if class.Object {
-				if slot, ok := local.get(e.Name); ok {
-					return slot.value, nil
-				}
+		if _, ok := in.objects[e.Name]; ok {
+			if slot, ok := local.get(e.Name); ok {
+				return slot.value, nil
 			}
+		}
+		if _, ok := in.classes[e.Name]; ok {
 			return classRef{module: in, name: e.Name}, nil
 		}
 		return nil, RuntimeError{Message: "undefined name '" + e.Name + "'", Span: e.Span}
@@ -1666,6 +1673,11 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 	case *parser.CallExpr:
 		return in.evalCall(e, local)
 	case *parser.MemberExpr:
+		if ident, ok := e.Receiver.(*parser.Identifier); ok {
+			if value, ok, err := in.tryEnumCaseMemberFromIdentifier(local, ident.Name, e.Name, e.Span); ok || err != nil {
+				return value, err
+			}
+		}
 		receiver, err := in.evalExpr(e.Receiver, local)
 		if err != nil {
 			return nil, err
@@ -2052,17 +2064,6 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 		}
 		ordered := namedArgValues(args)
 		if class, ok := mod.classes[member.Name]; ok {
-			if class.Object {
-				value, ok := mod.globals.get(member.Name)
-				if !ok {
-					return nil, RuntimeError{Message: "undefined object '" + member.Name + "'", Span: member.Span}
-				}
-				argsOnly := make([]Value, len(ordered))
-				for i, arg := range ordered {
-					argsOnly[i] = arg
-				}
-				return mod.invokeCallableValue(value.value, argsOnly, mod.globals, member.Span)
-			}
 			if hasNamedParserArgs(argExprs) {
 				reordered, err := reorderConstructorValueArgs(class, args, member.Span)
 				if err != nil {
@@ -2071,6 +2072,17 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 				ordered = reordered
 			}
 			return mod.construct(class, ordered, mod.globals)
+		}
+		if _, ok := mod.objects[member.Name]; ok {
+			value, ok := mod.globals.get(member.Name)
+			if !ok {
+				return nil, RuntimeError{Message: "undefined object '" + member.Name + "'", Span: member.Span}
+			}
+			argsOnly := make([]Value, len(ordered))
+			for i, arg := range ordered {
+				argsOnly[i] = arg
+			}
+			return mod.invokeCallableValue(value.value, argsOnly, mod.globals, member.Span)
 		}
 		return nil, RuntimeError{Message: "unknown member '" + member.Name + "'", Span: member.Span}
 	}
@@ -2235,15 +2247,15 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 		if _, ok := mod.functions[expr.Name]; ok {
 			return functionRef{module: mod, name: expr.Name}, nil
 		}
-		if class, ok := mod.classes[expr.Name]; ok {
-			if class.Object {
-				slot, ok := mod.globals.get(expr.Name)
-				if !ok {
-					return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
-				}
-				return slot.value, nil
-			}
+		if _, ok := mod.classes[expr.Name]; ok {
 			return classRef{module: mod, name: expr.Name}, nil
+		}
+		if _, ok := mod.objects[expr.Name]; ok {
+			slot, ok := mod.globals.get(expr.Name)
+			if !ok {
+				return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
+			}
+			return slot.value, nil
 		}
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
 	case *instance:
@@ -2302,6 +2314,49 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 	default:
 		return nil, RuntimeError{Message: "member access expects class or record instance", Span: expr.Span}
 	}
+}
+
+func (in *Interpreter) identifierShadowsTypeName(local *env, name string) bool {
+	if slot, ok := local.get(name); ok {
+		if inst, ok := slot.value.(*instance); ok && inst.class != nil && inst.class.Object && inst.class.Name == name {
+			return false
+		}
+		return slot.value != nil
+	}
+	if _, ok := in.functions[name]; ok {
+		return true
+	}
+	if _, ok := in.imports[name]; ok {
+		return true
+	}
+	return isBuiltinRuntimeValue(name)
+}
+
+func isBuiltinRuntimeValue(name string) bool {
+	switch name {
+	case "List", "Set", "Map", "Array", "Some", "None", "Ok", "Err", "Left", "Right", "OS":
+		return true
+	default:
+		return false
+	}
+}
+
+func (in *Interpreter) tryEnumCaseMemberFromIdentifier(local *env, typeName, memberName string, span parser.Span) (Value, bool, error) {
+	class, ok := in.classes[typeName]
+	if !ok || !class.Enum {
+		return nil, false, nil
+	}
+	for _, enumCase := range class.Cases {
+		if enumCase.Name != memberName {
+			continue
+		}
+		if len(enumCase.Fields) == 0 {
+			value, err := in.constructEnumCase(class, enumCase, nil, local, span)
+			return value, true, err
+		}
+		return enumCaseRef{module: in, enumName: typeName, caseName: memberName}, true, nil
+	}
+	return nil, false, nil
 }
 
 type nativeCallResult struct {

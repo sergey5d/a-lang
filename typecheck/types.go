@@ -12,6 +12,7 @@ const (
 	TypeUnknown   TypeKind = "unknown"
 	TypeBuiltin   TypeKind = "builtin"
 	TypeClass     TypeKind = "class"
+	TypeObject    TypeKind = "object"
 	TypeInterface TypeKind = "interface"
 	TypeParam     TypeKind = "type_param"
 	TypeFunction  TypeKind = "function"

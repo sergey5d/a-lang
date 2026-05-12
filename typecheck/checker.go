@@ -58,6 +58,7 @@ type moduleInfo struct {
 	functions     map[string]Signature
 	functionDecls map[string]*parser.FunctionDecl
 	classes       map[string]classInfo
+	objects       map[string]classInfo
 	interfaces    map[string]interfaceInfo
 }
 
@@ -74,9 +75,11 @@ type Checker struct {
 	functions              map[string]Signature
 	functionDecls          map[string]*parser.FunctionDecl
 	classes                map[string]classInfo
+	objects                map[string]classInfo
 	interfaces             map[string]interfaceInfo
 	imports                map[string]moduleInfo
 	importedClasses        map[string]classInfo
+	importedObjects        map[string]classInfo
 	importedInterfaces     map[string]interfaceInfo
 	importedInterfaceNames map[string]string
 	returnTypes            []*Type
@@ -97,9 +100,11 @@ func Analyze(program *parser.Program) Result {
 		functions:              map[string]Signature{},
 		functionDecls:          map[string]*parser.FunctionDecl{},
 		classes:                map[string]classInfo{},
+		objects:                map[string]classInfo{},
 		interfaces:             map[string]interfaceInfo{},
 		imports:                map[string]moduleInfo{},
 		importedClasses:        map[string]classInfo{},
+		importedObjects:        map[string]classInfo{},
 		importedInterfaces:     map[string]interfaceInfo{},
 		importedInterfaceNames: map[string]string{},
 		exprTypes:              map[parser.Expr]*Type{},
@@ -122,9 +127,11 @@ func AnalyzeModule(mod *module.LoadedModule) Result {
 			functions:              map[string]Signature{},
 			functionDecls:          map[string]*parser.FunctionDecl{},
 			classes:                map[string]classInfo{},
+			objects:                map[string]classInfo{},
 			interfaces:             map[string]interfaceInfo{},
 			imports:                map[string]moduleInfo{},
 			importedClasses:        map[string]classInfo{},
+			importedObjects:        map[string]classInfo{},
 			importedInterfaces:     map[string]interfaceInfo{},
 			importedInterfaceNames: map[string]string{},
 			exprTypes:              map[parser.Expr]*Type{},
@@ -193,7 +200,11 @@ func (c *Checker) installBuiltinInterfaces() {
 				}
 			}
 		}
-		c.classes[decl.Name] = info
+		if decl.Object {
+			c.objects[decl.Name] = info
+		} else {
+			c.classes[decl.Name] = info
+		}
 	}
 }
 
@@ -205,6 +216,7 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 			functions:     map[string]Signature{},
 			functionDecls: map[string]*parser.FunctionDecl{},
 			classes:       map[string]classInfo{},
+			objects:       map[string]classInfo{},
 			interfaces:    map[string]interfaceInfo{},
 		}
 		for _, fn := range imported.Program.Functions {
@@ -268,8 +280,13 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 					}
 				}
 			}
-			info.classes[decl.Name] = class
-			c.classes[qualified] = class
+			if decl.Object {
+				info.objects[decl.Name] = class
+				c.objects[qualified] = class
+			} else {
+				info.classes[decl.Name] = class
+				c.classes[qualified] = class
+			}
 		}
 		c.imports[alias] = info
 	}
@@ -331,8 +348,13 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 					}
 				}
 			}
-			c.importedClasses[localName] = class
-			c.classes[class.name] = class
+			if decl.Object {
+				c.importedObjects[localName] = class
+				c.objects[class.name] = class
+			} else {
+				c.importedClasses[localName] = class
+				c.classes[class.name] = class
+			}
 			break
 		}
 	}
@@ -376,9 +398,11 @@ func (c *Checker) collectDecls(program *parser.Program) {
 				}
 			}
 		}
-		c.classes[decl.Name] = info
 		if decl.Object {
-			c.globals[decl.Name] = binding{typ: &Type{Kind: TypeClass, Name: decl.Name}, mutable: false}
+			c.objects[decl.Name] = info
+			c.globals[decl.Name] = binding{typ: &Type{Kind: TypeObject, Name: decl.Name}, mutable: false}
+		} else {
+			c.classes[decl.Name] = info
 		}
 	}
 	for _, fn := range program.Functions {
@@ -536,6 +560,9 @@ func (c *Checker) checkFunction(fn *parser.FunctionDecl) {
 
 func (c *Checker) checkClass(decl *parser.ClassDecl) {
 	info := c.classes[decl.Name]
+	if decl.Object {
+		info = c.objects[decl.Name]
+	}
 
 	c.pushTypeScope()
 	defer c.popTypeScope()
@@ -580,7 +607,11 @@ func (c *Checker) checkClass(decl *parser.ClassDecl) {
 		}
 		info.fields[field.Name] = fieldInfo{decl: field, typ: fieldType}
 	}
-	c.classes[decl.Name] = info
+	if decl.Object {
+		c.objects[decl.Name] = info
+	} else {
+		c.classes[decl.Name] = info
+	}
 	if !decl.Enum && !decl.Object {
 		c.checkConstructorRules(info)
 	}
@@ -627,7 +658,11 @@ func (c *Checker) checkMethod(method *parser.MethodDecl, owner *parser.ClassDecl
 	for i, param := range owner.TypeParameters {
 		classArgs[i] = &Type{Kind: TypeParam, Name: param.Name}
 	}
-	c.define("this", &Type{Kind: TypeClass, Name: owner.Name, Args: classArgs}, false)
+	thisKind := TypeClass
+	if owner.Object {
+		thisKind = TypeObject
+	}
+	c.define("this", &Type{Kind: thisKind, Name: owner.Name, Args: classArgs}, false)
 
 	expectedReturn := unknownType
 	if !method.Constructor {
@@ -2290,6 +2325,10 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			result = &Type{Kind: TypeModule, Name: e.Name}
 			break
 		}
+		if object, ok := c.importedObjects[e.Name]; ok {
+			result = &Type{Kind: TypeObject, Name: object.name}
+			break
+		}
 		if class, ok := c.importedClasses[e.Name]; ok {
 			result = &Type{Kind: TypeClass, Name: class.name}
 			break
@@ -2304,6 +2343,10 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 		}
 		if _, ok := c.classes[e.Name]; ok {
 			result = &Type{Kind: TypeClass, Name: e.Name}
+			break
+		}
+		if _, ok := c.objects[e.Name]; ok {
+			result = &Type{Kind: TypeObject, Name: e.Name}
 			break
 		}
 		if isBuiltinValue(e.Name) {
@@ -2515,16 +2558,16 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 		if isBuiltinValue(ident.Name) {
 			return c.checkBuiltinConstructorCall(ident.Name, call)
 		}
+		if object, ok := c.objects[ident.Name]; ok {
+			return c.checkApplyCall(object, &Type{Kind: TypeObject, Name: object.name}, call.Args, call.Span, "object '"+object.decl.Name+"' is not callable")
+		}
 		if class, ok := c.classes[ident.Name]; ok {
-			if class.decl.Object {
-				return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, call.Args, call.Span, "object '"+class.decl.Name+"' is not callable")
-			}
 			return c.checkConstructorCall(class, call)
 		}
+		if object, ok := c.importedObjects[ident.Name]; ok {
+			return c.checkApplyCall(object, &Type{Kind: TypeObject, Name: object.name}, call.Args, call.Span, "object '"+ident.Name+"' is not callable")
+		}
 		if class, ok := c.importedClasses[ident.Name]; ok {
-			if class.decl.Object {
-				return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, call.Args, call.Span, "object '"+ident.Name+"' is not callable")
-			}
 			return c.checkConstructorCall(class, call)
 		}
 		if fnDecl, ok := c.functionDecls[ident.Name]; ok {
@@ -2577,6 +2620,11 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 	calleeType := c.checkExpr(call.Callee)
 	if calleeType.Kind == TypeClass {
 		if info, ok := c.classes[calleeType.Name]; ok {
+			return c.checkInstanceApplyCall(info, calleeType, call.Args, call.Span)
+		}
+	}
+	if calleeType.Kind == TypeObject {
+		if info, ok := c.lookupObjectInfo(calleeType.Name); ok {
 			return c.checkInstanceApplyCall(info, calleeType, call.Args, call.Span)
 		}
 	}
@@ -3299,6 +3347,11 @@ func (c *Checker) resolvePositionalRecordShapeConstruction(class classInfo, actu
 }
 
 func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallArg) *Type {
+	if ident, ok := member.Receiver.(*parser.Identifier); ok {
+		if enumSig, ok := c.tryEnumCaseCallFromIdentifier(ident.Name, member.Name, args, member.Span); ok {
+			return enumSig
+		}
+	}
 	receiverType := c.checkExpr(member.Receiver)
 	if isUnknown(receiverType) {
 		c.checkArgTypes(callArgValues(args))
@@ -3353,11 +3406,11 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			return sig.ReturnType
 		}
 		if class, ok := info.classes[member.Name]; ok {
-			if class.decl.Object {
-				return c.checkApplyCall(class, &Type{Kind: TypeClass, Name: class.name}, args, member.Span, "object '"+class.decl.Name+"' is not callable")
-			}
 			call := &parser.CallExpr{Callee: member, Args: args, Span: member.Span}
 			return c.checkConstructorCall(class, call)
+		}
+		if object, ok := info.objects[member.Name]; ok {
+			return c.checkApplyCall(object, &Type{Kind: TypeObject, Name: object.name}, args, member.Span, "object '"+object.decl.Name+"' is not callable")
 		}
 		c.checkArgTypes(callArgValues(args))
 		c.addDiagnostic("unknown_member", "unknown imported member '"+member.Name+"' on module '"+receiverType.Name+"'", member.Span)
@@ -3653,6 +3706,48 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			}
 		}
 		return sig.ReturnType
+	case TypeObject:
+		info, ok := c.lookupObjectInfo(receiverType.Name)
+		if !ok {
+			c.checkArgTypes(callArgValues(args))
+			return unknownType
+		}
+		var (
+			method      methodInfo
+			okMethod    bool
+			orderedArgs []parser.Expr
+		)
+		if receiverType.Name == "OS" && (member.Name == "println" || member.Name == "print" || member.Name == "printf" || member.Name == "panic") {
+			if hasNamedCallArgs(args) {
+				c.addDiagnostic("invalid_named_argument", "named arguments are not supported for variadic methods", member.Span)
+				c.checkArgTypes(callArgValues(args))
+				return unknownType
+			}
+			orderedArgs = callArgValues(args)
+			for _, arg := range orderedArgs {
+				c.checkExpr(arg)
+			}
+			if member.Name == "panic" {
+				return unknownType
+			}
+			return builtin("Unit")
+		}
+		if hasNamedCallArgs(args) {
+			method, orderedArgs, okMethod = c.resolveNamedMethodOverload(info, &Type{Kind: TypeObject, Name: info.name}, member.Name, args, member.Span)
+		} else {
+			orderedArgs = callArgValues(args)
+			argTypes := c.checkArgTypes(orderedArgs)
+			method, okMethod = c.resolveMethodOverload(info, &Type{Kind: TypeObject, Name: info.name}, member.Name, argTypes, member.Span)
+		}
+		if !okMethod {
+			return unknownType
+		}
+		sig, ok := c.resolveMethodCallSignature(info, &Type{Kind: TypeObject, Name: info.name}, method.decl, orderedArgs, member.Span)
+		if !ok {
+			return unknownType
+		}
+		c.checkCallArgsAgainstSignature(orderedArgs, sig)
+		return sig.ReturnType
 	case TypeInterface:
 		info, ok := c.interfaces[receiverType.Name]
 		if !ok {
@@ -3831,6 +3926,11 @@ func containsUnknownType(t *Type) bool {
 }
 
 func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
+	if ident, ok := expr.Receiver.(*parser.Identifier); ok {
+		if enumMember, ok := c.tryEnumCaseMemberFromIdentifier(ident.Name, expr.Name); ok {
+			return enumMember
+		}
+	}
 	receiverType := c.checkExpr(expr.Receiver)
 	if receiverType.Kind == TypeModule {
 		info, ok := c.imports[receiverType.Name]
@@ -3842,6 +3942,9 @@ func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
 		}
 		if class, ok := info.classes[expr.Name]; ok {
 			return &Type{Kind: TypeClass, Name: class.name}
+		}
+		if object, ok := info.objects[expr.Name]; ok {
+			return &Type{Kind: TypeObject, Name: object.name}
 		}
 		c.addDiagnostic("unknown_member", "unknown imported member '"+expr.Name+"' on module '"+receiverType.Name+"'", expr.Span)
 		return unknownType
@@ -3859,6 +3962,13 @@ func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
 				return functionType(expr.Name, Signature{Parameters: params, ReturnType: receiverType})
 			}
 		}
+	}
+	if receiverType.Kind == TypeObject {
+		if memberType, ok := c.lookupMember(receiverType, expr.Name, expr.Span); ok {
+			return memberType
+		}
+		c.addDiagnostic("unknown_member", "unknown member '"+expr.Name+"'", expr.Span)
+		return unknownType
 	}
 	if memberType, ok := c.lookupMember(receiverType, expr.Name, expr.Span); ok {
 		return memberType
@@ -3906,6 +4016,27 @@ func (c *Checker) lookupMember(receiver *Type, name string, span parser.Span) (*
 		if methods, ok := info.methods[name]; ok && len(methods) > 0 {
 			if hasPrivateOnlyMatch(methods, info.decl, c) {
 				c.addDiagnostic("private_access", "cannot access private method '"+name+"' outside class '"+info.decl.Name+"'", span)
+				return unknownType, true
+			}
+			c.addDiagnostic("invalid_member_access", "method '"+name+"' must be called with ()", span)
+			return unknownType, true
+		}
+	case TypeObject:
+		info, ok := c.lookupObjectInfo(receiver.Name)
+		if !ok {
+			return unknownType, false
+		}
+		subst := c.substForDecl(info.decl.TypeParameters, receiver.Args)
+		if field, ok := info.fields[name]; ok {
+			if field.decl.Private && !c.canAccessPrivate(info.decl) {
+				c.addDiagnostic("private_access", "cannot access private field '"+name+"' outside object '"+info.decl.Name+"'", span)
+				return unknownType, true
+			}
+			return c.instantiateFieldType(field, subst), true
+		}
+		if methods, ok := info.methods[name]; ok && len(methods) > 0 {
+			if hasPrivateOnlyMatch(methods, info.decl, c) {
+				c.addDiagnostic("private_access", "cannot access private method '"+name+"' outside object '"+info.decl.Name+"'", span)
 				return unknownType, true
 			}
 			c.addDiagnostic("invalid_member_access", "method '"+name+"' must be called with ()", span)
@@ -4390,6 +4521,9 @@ func (c *Checker) currentFieldType(name string) (*Type, bool) {
 
 func (c *Checker) classFieldType(owner *parser.ClassDecl, field parser.FieldDecl) *Type {
 	info, ok := c.classes[owner.Name]
+	if !ok && owner.Object {
+		info, ok = c.objects[owner.Name]
+	}
 	if ok {
 		if known, ok := info.fields[field.Name]; ok && known.typ != nil {
 			return known.typ
@@ -5143,6 +5277,89 @@ func (c *Checker) lookupTypeInstance(name string) (*Type, bool) {
 	return nil, false
 }
 
+func (c *Checker) lookupObjectInfo(name string) (classInfo, bool) {
+	if info, ok := c.objects[name]; ok {
+		return info, true
+	}
+	if info, ok := c.importedObjects[name]; ok {
+		return info, true
+	}
+	return classInfo{}, false
+}
+
+func (c *Checker) identifierShadowsTypeName(name string) bool {
+	if _, _, ok := c.lookupWithDepth(name); ok {
+		return true
+	}
+	if _, ok := c.currentFieldType(name); ok {
+		return true
+	}
+	if binding, ok := c.globals[name]; ok && binding.typ != nil && binding.typ.Kind != TypeObject {
+		return true
+	}
+	if _, ok := c.functions[name]; ok {
+		return true
+	}
+	if _, ok := c.imports[name]; ok {
+		return true
+	}
+	if _, ok := c.importedObjects[name]; ok {
+		return true
+	}
+	return isBuiltinValue(name)
+}
+
+func (c *Checker) tryEnumCaseMemberFromIdentifier(typeName, memberName string) (*Type, bool) {
+	info, ok := c.lookupClassInfo(typeName)
+	if !ok || !info.decl.Enum {
+		return nil, false
+	}
+	enumCase, ok := info.enumCases[memberName]
+	if !ok {
+		return nil, false
+	}
+	receiverType := &Type{Kind: TypeClass, Name: info.name}
+	if len(enumCase.Fields) == 0 {
+		return receiverType, true
+	}
+	params := make([]*Type, len(enumCase.Fields))
+	for i, field := range enumCase.Fields {
+		params[i] = c.resolveDeclaredType(field.Type)
+	}
+	return functionType(memberName, Signature{Parameters: params, ReturnType: receiverType}), true
+}
+
+func (c *Checker) tryEnumCaseCallFromIdentifier(typeName, caseName string, args []parser.CallArg, span parser.Span) (*Type, bool) {
+	info, ok := c.lookupClassInfo(typeName)
+	if !ok || !info.decl.Enum {
+		return nil, false
+	}
+	enumCase, ok := info.enumCases[caseName]
+	if !ok {
+		return nil, false
+	}
+	params := make([]parser.Parameter, len(enumCase.Fields))
+	sig := Signature{Parameters: make([]*Type, len(enumCase.Fields)), ReturnType: &Type{Kind: TypeClass, Name: info.name}}
+	for i, field := range enumCase.Fields {
+		params[i] = parser.Parameter{Name: field.Name, Type: field.Type, Span: field.Span}
+		sig.Parameters[i] = c.resolveDeclaredType(field.Type)
+	}
+	orderedArgs := callArgValues(args)
+	if hasNamedCallArgs(args) {
+		reordered, ok := c.reorderCallArgs(params, args, span, "enum case '"+caseName+"'")
+		if !ok {
+			c.checkArgTypes(callArgValues(args))
+			return sig.ReturnType, true
+		}
+		orderedArgs = reordered
+	}
+	if !validArgCount(sig, len(orderedArgs)) {
+		c.addDiagnostic("invalid_argument_count", fmt.Sprintf("enum case '%s' expects %s arguments, got %d", caseName, expectedArgCount(sig), len(orderedArgs)), span)
+	}
+	c.checkCallArgsAgainstSignature(orderedArgs, sig)
+	return sig.ReturnType, true
+}
+
 func (c *Checker) lookupClassInfo(name string) (classInfo, bool) {
 	if info, ok := c.classes[name]; ok {
 		return info, true
@@ -5176,6 +5393,14 @@ func (c *Checker) iterableElementType(t *Type) *Type {
 	}
 	if t.Kind == TypeClass {
 		if info, ok := c.classes[t.Name]; ok {
+			subst := c.substForDecl(info.decl.TypeParameters, t.Args)
+			if elem := c.iterableTypeFromRefs(info.decl.Implements, subst); !isUnknown(elem) {
+				return elem
+			}
+		}
+	}
+	if t.Kind == TypeObject {
+		if info, ok := c.lookupObjectInfo(t.Name); ok {
 			subst := c.substForDecl(info.decl.TypeParameters, t.Args)
 			if elem := c.iterableTypeFromRefs(info.decl.Implements, subst); !isUnknown(elem) {
 				return elem
@@ -5393,6 +5618,18 @@ func (c *Checker) isAssignable(actual, expected *Type) bool {
 				return true
 			}
 		}
+	case TypeObject:
+		info, ok := c.lookupObjectInfo(actual.Name)
+		if !ok {
+			return false
+		}
+		subst := c.substForDecl(info.decl.TypeParameters, actual.Args)
+		for _, impl := range info.decl.Implements {
+			inst := c.instantiateTypeRef(impl, subst)
+			if sameType(inst, expected) || c.interfaceAssignable(inst, expected, map[string]bool{}) {
+				return true
+			}
+		}
 	case TypeInterface:
 		return c.interfaceAssignable(actual, expected, map[string]bool{})
 	}
@@ -5572,10 +5809,12 @@ func (c *Checker) typeSatisfiesBound(actual, bound *Type) bool {
 
 func (c *Checker) hasBoundWitness(expected *Type) bool {
 	for _, info := range c.classes {
-		if !info.decl.Object {
-			continue
-		}
 		if c.isAssignable(&Type{Kind: TypeClass, Name: info.name, Args: nil}, expected) {
+			return true
+		}
+	}
+	for _, info := range c.objects {
+		if c.isAssignable(&Type{Kind: TypeObject, Name: info.name, Args: nil}, expected) {
 			return true
 		}
 	}

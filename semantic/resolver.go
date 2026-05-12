@@ -12,9 +12,11 @@ type Resolver struct {
 	globals            map[string]symbol
 	functions          map[string]parser.Span
 	classes            map[string]parser.Span
+	objects            map[string]parser.Span
 	interfaces         map[string]parser.Span
 	imports            map[string]importInfo
 	importedClasses    map[string]parser.Span
+	importedObjects    map[string]parser.Span
 	importedInterfaces map[string]parser.Span
 	classTypes         map[string]typeDecl
 	ifaceTypes         map[string]typeDecl
@@ -25,6 +27,7 @@ type Resolver struct {
 type importInfo struct {
 	functions  map[string]parser.Span
 	classes    map[string]parser.Span
+	objects    map[string]parser.Span
 	interfaces map[string]parser.Span
 }
 
@@ -46,9 +49,11 @@ func Analyze(program *parser.Program) []Diagnostic {
 		globals:            map[string]symbol{},
 		functions:          map[string]parser.Span{},
 		classes:            map[string]parser.Span{},
+		objects:            map[string]parser.Span{},
 		interfaces:         map[string]parser.Span{},
 		imports:            map[string]importInfo{},
 		importedClasses:    map[string]parser.Span{},
+		importedObjects:    map[string]parser.Span{},
 		importedInterfaces: map[string]parser.Span{},
 		classTypes:         map[string]typeDecl{},
 		ifaceTypes:         map[string]typeDecl{},
@@ -73,9 +78,11 @@ func AnalyzeModule(mod *module.LoadedModule) []Diagnostic {
 			globals:            map[string]symbol{},
 			functions:          map[string]parser.Span{},
 			classes:            map[string]parser.Span{},
+			objects:            map[string]parser.Span{},
 			interfaces:         map[string]parser.Span{},
 			imports:            moduleImportInfo(current),
 			importedClasses:    map[string]parser.Span{},
+			importedObjects:    map[string]parser.Span{},
 			importedInterfaces: map[string]parser.Span{},
 			classTypes:         map[string]typeDecl{},
 			ifaceTypes:         map[string]typeDecl{},
@@ -115,8 +122,12 @@ func (r *Resolver) installDirectImports(mod *module.LoadedModule) {
 		if decl == nil {
 			continue
 		}
-		r.importedClasses[localName] = decl.Span
-		r.classTypes[localName] = typeDecl{span: decl.Span, arity: len(decl.TypeParameters)}
+		if decl.Object {
+			r.importedObjects[localName] = decl.Span
+		} else {
+			r.importedClasses[localName] = decl.Span
+			r.classTypes[localName] = typeDecl{span: decl.Span, arity: len(decl.TypeParameters)}
+		}
 	}
 }
 
@@ -128,6 +139,7 @@ func moduleImportInfo(mod *module.LoadedModule) map[string]importInfo {
 		info := importInfo{
 			functions:  map[string]parser.Span{},
 			classes:    map[string]parser.Span{},
+			objects:    map[string]parser.Span{},
 			interfaces: map[string]parser.Span{},
 		}
 		for _, fn := range imported.Program.Functions {
@@ -140,7 +152,11 @@ func moduleImportInfo(mod *module.LoadedModule) map[string]importInfo {
 			if class.Private && !samePackage {
 				continue
 			}
-			info.classes[class.Name] = class.Span
+			if class.Object {
+				info.objects[class.Name] = class.Span
+			} else {
+				info.classes[class.Name] = class.Span
+			}
 		}
 		for _, iface := range imported.Program.Interfaces {
 			if iface.Private && !samePackage {
@@ -172,6 +188,15 @@ func (r *Resolver) resolveProgram(program *parser.Program) {
 		r.ifaceTypes[decl.Name] = typeDecl{span: decl.Span, arity: len(decl.TypeParameters)}
 	}
 	for _, decl := range program.Classes {
+		if decl.Object {
+			if previous, exists := r.objects[decl.Name]; exists {
+				r.addDiagnostic("duplicate_class", "duplicate object '"+decl.Name+"'", decl.Span)
+				r.addDiagnostic("duplicate_class", "previous declaration of object '"+decl.Name+"'", previous)
+				continue
+			}
+			r.objects[decl.Name] = decl.Span
+			continue
+		}
 		if previous, exists := r.classes[decl.Name]; exists {
 			r.addDiagnostic("duplicate_class", "duplicate class '"+decl.Name+"'", decl.Span)
 			r.addDiagnostic("duplicate_class", "previous declaration of class '"+decl.Name+"'", previous)
@@ -535,7 +560,7 @@ func (r *Resolver) resolveBlockStatements(statements []parser.Statement) {
 func (r *Resolver) resolveExpr(expr parser.Expr) {
 	switch e := expr.(type) {
 	case *parser.Identifier:
-		if r.isDefined(e.Name) || r.functions[e.Name] != (parser.Span{}) || r.classes[e.Name] != (parser.Span{}) || r.interfaces[e.Name] != (parser.Span{}) || r.importedClasses[e.Name] != (parser.Span{}) || r.importedInterfaces[e.Name] != (parser.Span{}) || r.imports[e.Name].functions != nil || isBuiltin(e.Name) {
+		if r.isDefined(e.Name) || r.functions[e.Name] != (parser.Span{}) || r.classes[e.Name] != (parser.Span{}) || r.objects[e.Name] != (parser.Span{}) || r.interfaces[e.Name] != (parser.Span{}) || r.importedClasses[e.Name] != (parser.Span{}) || r.importedObjects[e.Name] != (parser.Span{}) || r.importedInterfaces[e.Name] != (parser.Span{}) || r.imports[e.Name].functions != nil || isBuiltin(e.Name) {
 			return
 		}
 		r.addDiagnostic("undefined_name", "undefined name '"+e.Name+"'", e.Span)
@@ -556,7 +581,7 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 	case *parser.MemberExpr:
 		if ident, ok := e.Receiver.(*parser.Identifier); ok {
 			if info, ok := r.imports[ident.Name]; ok {
-				if info.functions[e.Name] != (parser.Span{}) || info.classes[e.Name] != (parser.Span{}) || info.interfaces[e.Name] != (parser.Span{}) {
+				if info.functions[e.Name] != (parser.Span{}) || info.classes[e.Name] != (parser.Span{}) || info.objects[e.Name] != (parser.Span{}) || info.interfaces[e.Name] != (parser.Span{}) {
 					return
 				}
 				r.addDiagnostic("unknown_member", "unknown imported member '"+e.Name+"' on module '"+ident.Name+"'", e.Span)
