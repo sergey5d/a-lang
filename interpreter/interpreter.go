@@ -3470,21 +3470,12 @@ func (in *Interpreter) invokeMethod(receiver Value, name string, args []Value, l
 
 func (in *Interpreter) findDefaultInterfaceMethod(receiver *instance, name string, args []Value) (parser.InterfaceMethod, bool) {
 	candidates := in.defaultInterfaceMethodsByName(receiver, name)
-	var (
-		found parser.InterfaceMethod
-		ok    bool
-	)
 	for _, method := range candidates {
-		if !in.runtimeInterfaceMethodMatches(method, args) {
-			continue
+		if in.runtimeInterfaceMethodMatches(method, args) {
+			return method, true
 		}
-		if ok {
-			return parser.InterfaceMethod{}, false
-		}
-		found = method
-		ok = true
 	}
-	return found, ok
+	return parser.InterfaceMethod{}, false
 }
 
 func (in *Interpreter) defaultInterfaceMethodsByName(receiver *instance, name string) []parser.InterfaceMethod {

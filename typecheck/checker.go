@@ -3599,35 +3599,43 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 			}
 			return builtin("Unit")
 		}
-		if !hasNamedCallArgs(args) {
+		if !hasNamedCallArgs(args) && !c.classHasDefaultInterfaceMethod(info, member.Name) {
 			if methods := info.methods[member.Name]; len(methods) == 1 {
 				if methods[0].decl.Private && !c.canAccessPrivate(info.decl) {
 					c.addDiagnostic("private_access", "cannot access private method '"+member.Name+"' outside class '"+info.decl.Name+"'", member.Span)
 					return unknownType
 				}
-				method = methods[0]
 				orderedArgs = callArgValues(args)
-				sig, ok := c.resolveMethodCallSignature(info, receiverType, method.decl, orderedArgs, member.Span)
-				if !ok {
-					return unknownType
+				sig, ok := c.resolveMethodCallSignature(info, receiverType, methods[0].decl, orderedArgs, member.Span)
+				if ok {
+					c.checkCallArgsAgainstSignature(orderedArgs, sig)
+					return sig.ReturnType
 				}
-				for i := range orderedArgs {
-					if expected, ok := paramTypeForArg(sig, i); ok {
-						argType := c.checkExprWithExpected(orderedArgs[i], expected)
-						c.requireAssignable(argType, expected, exprSpan(orderedArgs[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
-					} else {
-						c.checkExpr(orderedArgs[i])
-					}
-				}
-				return sig.ReturnType
+				return unknownType
 			}
 		}
 		if hasNamedCallArgs(args) {
-			method, orderedArgs, okMethod = c.resolveNamedMethodOverload(info, receiverType, member.Name, args, member.Span)
+			method, orderedArgs, okMethod = c.tryResolveNamedMethodOverload(info, receiverType, member.Name, args)
+			if !okMethod {
+				sig, ifaceArgs, ok := c.tryResolveNamedDefaultInterfaceMethod(receiverType, info, member.Name, args, member.Span)
+				if ok {
+					c.checkCallArgsAgainstSignature(ifaceArgs, sig)
+					return sig.ReturnType
+				}
+				method, orderedArgs, okMethod = c.resolveNamedMethodOverload(info, receiverType, member.Name, args, member.Span)
+			}
 		} else {
 			orderedArgs = callArgValues(args)
 			argTypes := c.checkArgTypes(orderedArgs)
-			method, okMethod = c.resolveMethodOverload(info, receiverType, member.Name, argTypes, member.Span)
+			method, okMethod = c.tryResolveMethodOverload(info, receiverType, member.Name, argTypes)
+			if !okMethod {
+				sig, ok := c.tryResolveDefaultInterfaceMethod(receiverType, info, member.Name, orderedArgs, member.Span)
+				if ok {
+					c.checkCallArgsAgainstSignature(orderedArgs, sig)
+					return sig.ReturnType
+				}
+				method, okMethod = c.resolveMethodOverload(info, receiverType, member.Name, argTypes, member.Span)
+			}
 		}
 		if !okMethod {
 			return unknownType
@@ -3695,6 +3703,17 @@ func (c *Checker) checkMethodCall(member *parser.MemberExpr, args []parser.CallA
 	default:
 		c.addDiagnostic("invalid_call_target", "member call requires class or interface receiver", member.Span)
 		return unknownType
+	}
+}
+
+func (c *Checker) checkCallArgsAgainstSignature(args []parser.Expr, sig Signature) {
+	for i := range args {
+		if expected, ok := paramTypeForArg(sig, i); ok {
+			argType := c.checkExprWithExpected(args[i], expected)
+			c.requireAssignable(argType, expected, exprSpan(args[i]), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+		} else {
+			c.checkExpr(args[i])
+		}
 	}
 }
 
@@ -4576,10 +4595,9 @@ func (c *Checker) resolveConstructorOverload(class classInfo, argTypes []*Type, 
 	return nil, false
 }
 
-func (c *Checker) resolveMethodOverload(class classInfo, receiver *Type, name string, argTypes []*Type, span parser.Span) (methodInfo, bool) {
+func (c *Checker) tryResolveMethodOverload(class classInfo, receiver *Type, name string, argTypes []*Type) (methodInfo, bool) {
 	methods, ok := class.methods[name]
 	if !ok || len(methods) == 0 {
-		c.addDiagnostic("unknown_member", "unknown member '"+name+"'", span)
 		return methodInfo{}, false
 	}
 	subst := c.substForDecl(class.decl.TypeParameters, receiver.Args)
@@ -4602,7 +4620,36 @@ func (c *Checker) resolveMethodOverload(class classInfo, receiver *Type, name st
 	if len(matches) == 1 {
 		return matches[0], true
 	}
-	if len(matches) > 1 {
+	return methodInfo{}, false
+}
+
+func (c *Checker) resolveMethodOverload(class classInfo, receiver *Type, name string, argTypes []*Type, span parser.Span) (methodInfo, bool) {
+	methods, ok := class.methods[name]
+	if !ok || len(methods) == 0 {
+		c.addDiagnostic("unknown_member", "unknown member '"+name+"'", span)
+		return methodInfo{}, false
+	}
+	if method, ok := c.tryResolveMethodOverload(class, receiver, name, argTypes); ok {
+		return method, true
+	}
+	subst := c.substForDecl(class.decl.TypeParameters, receiver.Args)
+	matchCount := 0
+	for _, method := range methods {
+		if method.decl.Private && !c.canAccessPrivate(class.decl) {
+			continue
+		}
+		sig := c.instantiateMethodSignature(method.decl, class.decl, subst)
+		if len(method.decl.TypeParameters) > 0 {
+			inferred, ok := c.inferCallableTypeArgs(method.decl.TypeParameters, method.decl.Parameters, argTypes, subst)
+			if ok {
+				sig = c.instantiateMethodSignature(method.decl, class.decl, mergeSubst(inferred, subst))
+			}
+		}
+		if signatureMatches(sig, argTypes) {
+			matchCount++
+		}
+	}
+	if matchCount > 1 {
 		c.addDiagnostic("ambiguous_overload", "method call '"+name+"' is ambiguous", span)
 		return methodInfo{}, false
 	}
@@ -4664,11 +4711,51 @@ func (c *Checker) resolveNamedConstructorOverload(class classInfo, args []parser
 	return nil, nil, false
 }
 
+func (c *Checker) tryResolveNamedMethodOverload(class classInfo, receiver *Type, name string, args []parser.CallArg) (methodInfo, []parser.Expr, bool) {
+	methods, ok := class.methods[name]
+	if !ok || len(methods) == 0 {
+		return methodInfo{}, nil, false
+	}
+	subst := c.substForDecl(class.decl.TypeParameters, receiver.Args)
+	type candidate struct {
+		method methodInfo
+		args   []parser.Expr
+	}
+	var matches []candidate
+	for _, method := range methods {
+		if method.decl.Private && !c.canAccessPrivate(class.decl) {
+			continue
+		}
+		ordered, ok := tryReorderCallArgs(method.decl.Parameters, args)
+		if !ok {
+			continue
+		}
+		argTypes := c.checkArgTypes(ordered)
+		sig := c.instantiateMethodSignature(method.decl, class.decl, subst)
+		if len(method.decl.TypeParameters) > 0 {
+			inferred, ok := c.inferCallableTypeArgs(method.decl.TypeParameters, method.decl.Parameters, argTypes, subst)
+			if ok {
+				sig = c.instantiateMethodSignature(method.decl, class.decl, mergeSubst(inferred, subst))
+			}
+		}
+		if signatureMatches(sig, argTypes) {
+			matches = append(matches, candidate{method: method, args: ordered})
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0].method, matches[0].args, true
+	}
+	return methodInfo{}, nil, false
+}
+
 func (c *Checker) resolveNamedMethodOverload(class classInfo, receiver *Type, name string, args []parser.CallArg, span parser.Span) (methodInfo, []parser.Expr, bool) {
 	methods, ok := class.methods[name]
 	if !ok || len(methods) == 0 {
 		c.addDiagnostic("unknown_member", "unknown member '"+name+"'", span)
 		return methodInfo{}, nil, false
+	}
+	if method, ordered, ok := c.tryResolveNamedMethodOverload(class, receiver, name, args); ok {
+		return method, ordered, true
 	}
 	subst := c.substForDecl(class.decl.TypeParameters, receiver.Args)
 	type candidate struct {
@@ -4847,6 +4934,153 @@ func (c *Checker) resolveInterfaceMethodCallSignature(info interfaceInfo, receiv
 	sig = c.instantiateInterfaceMethodSignature(method, mergeSubst(inferred, baseSubst))
 	if !validArgCount(sig, len(args)) {
 		c.addDiagnostic("invalid_argument_count", fmt.Sprintf("method '%s' expects %s arguments, got %d", method.Name, expectedArgCount(sig), len(args)), span)
+		return Signature{}, false
+	}
+	return sig, true
+}
+
+func (c *Checker) tryResolveDefaultInterfaceMethod(receiver *Type, class classInfo, name string, args []parser.Expr, span parser.Span) (Signature, bool) {
+	seen := map[string]bool{}
+	for _, impl := range class.decl.Implements {
+		if sig, ok := c.tryResolveDefaultInterfaceMethodInRef(receiver, impl, name, args, seen, span); ok {
+			return sig, true
+		}
+	}
+	return Signature{}, false
+}
+
+func (c *Checker) classHasDefaultInterfaceMethod(class classInfo, name string) bool {
+	seen := map[string]bool{}
+	for _, impl := range class.decl.Implements {
+		if c.interfaceRefHasDefaultMethod(impl, name, seen) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Checker) tryResolveNamedDefaultInterfaceMethod(receiver *Type, class classInfo, name string, args []parser.CallArg, span parser.Span) (Signature, []parser.Expr, bool) {
+	seen := map[string]bool{}
+	for _, impl := range class.decl.Implements {
+		if sig, ordered, ok := c.tryResolveNamedDefaultInterfaceMethodInRef(receiver, impl, name, args, seen, span); ok {
+			return sig, ordered, true
+		}
+	}
+	return Signature{}, nil, false
+}
+
+func (c *Checker) interfaceRefHasDefaultMethod(ref *parser.TypeRef, name string, seen map[string]bool) bool {
+	if ref == nil || seen[ref.Name] {
+		return false
+	}
+	seen[ref.Name] = true
+	info, ok := c.lookupAnyInterfaceInfo(ref.Name)
+	if !ok {
+		return false
+	}
+	for _, method := range info.decl.Methods {
+		if method.Name == name && method.Body != nil {
+			return true
+		}
+	}
+	for _, parent := range info.decl.Extends {
+		if c.interfaceRefHasDefaultMethod(parent, name, seen) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Checker) tryResolveDefaultInterfaceMethodInRef(receiver *Type, ref *parser.TypeRef, name string, args []parser.Expr, seen map[string]bool, span parser.Span) (Signature, bool) {
+	if ref == nil || seen[ref.Name] {
+		return Signature{}, false
+	}
+	seen[ref.Name] = true
+	info, ok := c.lookupAnyInterfaceInfo(ref.Name)
+	if !ok {
+		return Signature{}, false
+	}
+	classSubst := c.substForDecl(c.classTypeParameters(receiver.Name), receiver.Args)
+	ifaceType := c.instantiateTypeRef(ref, classSubst)
+	for _, method := range info.decl.Methods {
+		if method.Name != name || method.Body == nil {
+			continue
+		}
+		if sig, ok := c.tryResolveInterfaceMethodCallSignature(info, ifaceType, method, args); ok {
+			return sig, true
+		}
+	}
+	for _, parent := range info.decl.Extends {
+		if sig, ok := c.tryResolveDefaultInterfaceMethodInRef(receiver, parent, name, args, seen, span); ok {
+			return sig, true
+		}
+	}
+	return Signature{}, false
+}
+
+func (c *Checker) tryResolveNamedDefaultInterfaceMethodInRef(receiver *Type, ref *parser.TypeRef, name string, args []parser.CallArg, seen map[string]bool, span parser.Span) (Signature, []parser.Expr, bool) {
+	if ref == nil || seen[ref.Name] {
+		return Signature{}, nil, false
+	}
+	seen[ref.Name] = true
+	info, ok := c.lookupAnyInterfaceInfo(ref.Name)
+	if !ok {
+		return Signature{}, nil, false
+	}
+	classSubst := c.substForDecl(c.classTypeParameters(receiver.Name), receiver.Args)
+	ifaceType := c.instantiateTypeRef(ref, classSubst)
+	for _, method := range info.decl.Methods {
+		if method.Name != name || method.Body == nil || (len(method.Parameters) > 0 && method.Parameters[len(method.Parameters)-1].Variadic) {
+			continue
+		}
+		ordered, ok := tryReorderCallArgs(method.Parameters, args)
+		if !ok {
+			continue
+		}
+		if sig, ok := c.tryResolveInterfaceMethodCallSignature(info, ifaceType, method, ordered); ok {
+			return sig, ordered, true
+		}
+	}
+	for _, parent := range info.decl.Extends {
+		if sig, ordered, ok := c.tryResolveNamedDefaultInterfaceMethodInRef(receiver, parent, name, args, seen, span); ok {
+			return sig, ordered, true
+		}
+	}
+	return Signature{}, nil, false
+}
+
+func (c *Checker) classTypeParameters(name string) []parser.TypeParameter {
+	if info, ok := c.lookupClassInfo(name); ok {
+		return info.decl.TypeParameters
+	}
+	return nil
+}
+
+func (c *Checker) lookupAnyInterfaceInfo(name string) (interfaceInfo, bool) {
+	if info, ok := c.interfaces[name]; ok {
+		return info, true
+	}
+	if info, ok := c.importedInterfaces[name]; ok {
+		return info, true
+	}
+	return interfaceInfo{}, false
+}
+
+func (c *Checker) tryResolveInterfaceMethodCallSignature(info interfaceInfo, receiver *Type, method parser.InterfaceMethod, args []parser.Expr) (Signature, bool) {
+	baseSubst := c.substForDecl(info.decl.TypeParameters, receiver.Args)
+	sig := c.instantiateInterfaceMethodSignature(method, baseSubst)
+	if len(method.TypeParameters) == 0 {
+		if !validArgCount(sig, len(args)) {
+			return Signature{}, false
+		}
+		return sig, true
+	}
+	inferred, ok := c.inferCallableTypeArgsFromExprs(method.TypeParameters, method.Parameters, args, baseSubst)
+	if !ok {
+		return Signature{}, false
+	}
+	sig = c.instantiateInterfaceMethodSignature(method, mergeSubst(inferred, baseSubst))
+	if !validArgCount(sig, len(args)) {
 		return Signature{}, false
 	}
 	return sig, true
