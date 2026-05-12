@@ -2790,7 +2790,7 @@ def run(left Option[Int]) Result[Int, Str] {
 	}
 }
 
-func TestAnalyzeEnumImplMethods(t *testing.T) {
+func TestAnalyzeEnumMethodsUseTopLevelImpl(t *testing.T) {
 	src := `
 enum Outcome {
 	tag Str
@@ -2807,15 +2807,10 @@ enum Outcome {
 }
 
 impl Outcome {
-	def describe() Str = tag
-}
-
-impl Outcome.Left {
-	def describe() Str = value
-}
-
-impl Outcome.Right {
-	def describe() Str = "num " + value
+	def describe() Str = match this {
+		Left(value) => value
+		Right(value) => "num " + value
+	}
 }
 
 def run() Str {

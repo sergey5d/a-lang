@@ -507,7 +507,6 @@ func (p *Parser) parseTopLevelImpl(program *Program) error {
 	if targetClass == nil {
 		return fmt.Errorf("unknown impl target '%s'", target.Name)
 	}
-	var targetCase *EnumCaseDecl
 	if p.match(TokenDot) {
 		caseName, err := p.consume(TokenIdentifier, "expected enum case name after '.'")
 		if err != nil {
@@ -516,15 +515,17 @@ func (p *Parser) parseTopLevelImpl(program *Program) error {
 		if !targetClass.Enum {
 			return fmt.Errorf("impl target '%s.%s' requires enum '%s'", target.Name, caseName.Lexeme, target.Name)
 		}
+		foundCase := false
 		for i := range targetClass.Cases {
 			if targetClass.Cases[i].Name == caseName.Lexeme {
-				targetCase = &targetClass.Cases[i]
+				foundCase = true
 				break
 			}
 		}
-		if targetCase == nil {
+		if !foundCase {
 			return fmt.Errorf("unknown enum case '%s.%s'", target.Name, caseName.Lexeme)
 		}
+		return fmt.Errorf("enum cases cannot declare methods; move methods to enum '%s'", target.Name)
 	}
 	if _, err := p.consume(TokenLBrace, "expected '{' after impl target"); err != nil {
 		return err
@@ -538,21 +539,13 @@ func (p *Parser) parseTopLevelImpl(program *Program) error {
 		if err != nil {
 			return err
 		}
-		if targetCase != nil {
-			targetCase.Methods = append(targetCase.Methods, method)
-		} else {
-			targetClass.Methods = append(targetClass.Methods, method)
-		}
+		targetClass.Methods = append(targetClass.Methods, method)
 	}
 	end, err := p.consume(TokenRBrace, "expected '}' after impl body")
 	if err != nil {
 		return err
 	}
-	if targetCase != nil {
-		targetCase.Span = mergeSpans(targetCase.Span, tokenSpan(end))
-	} else {
-		targetClass.Span = mergeSpans(targetClass.Span, tokenSpan(end))
-	}
+	targetClass.Span = mergeSpans(targetClass.Span, tokenSpan(end))
 	_ = start
 	return nil
 }

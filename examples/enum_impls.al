@@ -1,6 +1,6 @@
 # EXPECT:
-# bad
-# num 7
+# left: bad
+# right: num 7
 # left
 # right
 
@@ -19,15 +19,10 @@ enum Outcome {
 }
 
 impl Outcome {
-    def describe() Str = tag
-}
-
-impl Outcome.Left {
-    def describe() Str = value
-}
-
-impl Outcome.Right {
-    def describe() Str = "num " + value
+    def describe() Str = match this {
+        Left(value) => "left: " + value
+        Right(value) => "right: num " + value
+    }
 }
 
 def main() Unit {

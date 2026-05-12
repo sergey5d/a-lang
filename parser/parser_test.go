@@ -2590,7 +2590,7 @@ def run(value Option[Int]) Option[Int] {
 	}
 }
 
-func TestParseTopLevelEnumImpls(t *testing.T) {
+func TestParseTopLevelEnumImplsRejectCaseMethods(t *testing.T) {
 	src := `
 enum Either[L, R] {
 	case Left {
@@ -2609,20 +2609,8 @@ impl Either[L, R].Left {
 	def isLeft() Bool = true
 }
 `
-
-	program, err := Parse(src)
-	if err != nil {
-		t.Fatalf("Parse returned error: %v", err)
-	}
-	if len(program.Classes) != 1 {
-		t.Fatalf("expected 1 class, got %d", len(program.Classes))
-	}
-	enumDecl := program.Classes[0]
-	if len(enumDecl.Methods) != 1 {
-		t.Fatalf("expected 1 enum-wide method, got %d", len(enumDecl.Methods))
-	}
-	if len(enumDecl.Cases) != 2 || len(enumDecl.Cases[0].Methods) != 1 {
-		t.Fatalf("expected first case to have 1 method, got %#v", enumDecl.Cases)
+	if _, err := Parse(src); err == nil || err.Error() != "enum cases cannot declare methods; move methods to enum 'Either'" {
+		t.Fatalf("expected enum case impl parse error, got %v", err)
 	}
 }
 

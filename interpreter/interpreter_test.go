@@ -2377,7 +2377,7 @@ def run() Str {
 		t.Fatalf("expected output %q, got %#v", "9-true", out)
 	}
 }
-func TestEnumImplMethods(t *testing.T) {
+func TestEnumMethodsUseTopLevelImpl(t *testing.T) {
 	src := `
 enum Outcome {
 	tag Str
@@ -2394,15 +2394,10 @@ enum Outcome {
 }
 
 impl Outcome {
-	def describe() Str = tag
-}
-
-impl Outcome.Left {
-	def describe() Str = value
-}
-
-impl Outcome.Right {
-	def describe() Str = "num " + value
+	def describe() Str = match this {
+		Left(value) => value
+		Right(value) => "num " + value
+	}
 }
 
 def run() Str {
