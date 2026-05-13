@@ -76,11 +76,13 @@ Finalized policy:
 
 Current package/import support is usable.
 
+Settled direction:
+- top-level bindings are private by default
+- top-level functions are private by default
+- module state should not be exposed directly as imported variables
+- a future explicit public/export surface can be added later if needed, but it is not part of the default model
+
 Still open:
-- decide what to do with package variables and package-scoped methods
-- private by default vs public by default
-- whether package variables should ever be exposed through imports
-- whether package-scoped methods should be exposed by default or require an explicit rule
 - whether object members should ever be importable directly, for example importing `OS.println`-style names without importing the whole object surface
 - if both a wide package import and a renamed selective import target the same package, the wide import should come first and the `as` import should come after it
 

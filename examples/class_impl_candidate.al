@@ -10,19 +10,18 @@ priv class Person with Named, Aged {
     age Int
     city Str
 
-    priv archived Bool : = false
+    priv var archived Bool
     priv var internalScore Int = 1
 }
 
 impl Person {
-
-    #replace this to self?
 
     def init(firstName Str, lastName Str) {
         this.firstName = firstName
         this.lastName = lastName
         this.age = 18
         this.city = "unknown"
+        this.archived = false
     }
 
     priv def calc() Int {
