@@ -23,6 +23,8 @@ type ImportedSymbol struct {
 	LocalName    string
 	OriginalName string
 	IsInterface  bool
+	IsFunction   bool
+	IsValue      bool
 	Module       *LoadedModule
 }
 
@@ -129,6 +131,24 @@ func load(path string, cache map[string]*LoadedModule, loading map[string]bool) 
 func exportedSymbols(mod *LoadedModule, currentPackage string) []parser.ImportSymbol {
 	samePackage := currentPackage != "" && mod.SourceProgram.PackageName == currentPackage
 	out := []parser.ImportSymbol{}
+	for _, fn := range mod.SourceProgram.Functions {
+		if !fn.Public {
+			continue
+		}
+		out = append(out, parser.ImportSymbol{Name: fn.Name})
+	}
+	for _, stmt := range mod.SourceProgram.Statements {
+		valStmt, ok := stmt.(*parser.ValStmt)
+		if !ok || !valStmt.Public {
+			continue
+		}
+		for _, binding := range valStmt.Bindings {
+			if binding.Name == "_" {
+				continue
+			}
+			out = append(out, parser.ImportSymbol{Name: binding.Name})
+		}
+	}
 	for _, decl := range mod.SourceProgram.Classes {
 		if decl.Private && !samePackage {
 			continue
@@ -145,6 +165,23 @@ func exportedSymbols(mod *LoadedModule, currentPackage string) []parser.ImportSy
 }
 
 func resolveImportedSymbol(mod *LoadedModule, name string, samePackage bool) (ImportedSymbol, bool) {
+	for _, fn := range mod.SourceProgram.Functions {
+		if fn.Name != name || !fn.Public {
+			continue
+		}
+		return ImportedSymbol{OriginalName: name, Module: mod, IsFunction: true}, true
+	}
+	for _, stmt := range mod.SourceProgram.Statements {
+		valStmt, ok := stmt.(*parser.ValStmt)
+		if !ok || !valStmt.Public {
+			continue
+		}
+		for _, binding := range valStmt.Bindings {
+			if binding.Name == name {
+				return ImportedSymbol{OriginalName: name, Module: mod, IsValue: true}, true
+			}
+		}
+	}
 	for _, decl := range mod.SourceProgram.Classes {
 		if decl.Name != name {
 			continue

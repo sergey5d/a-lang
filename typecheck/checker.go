@@ -57,6 +57,7 @@ type interfaceInfo struct {
 type moduleInfo struct {
 	functions     map[string]Signature
 	functionDecls map[string]*parser.FunctionDecl
+	globals       map[string]binding
 	classes       map[string]classInfo
 	objects       map[string]classInfo
 	interfaces    map[string]interfaceInfo
@@ -78,6 +79,7 @@ type Checker struct {
 	objects                map[string]classInfo
 	interfaces             map[string]interfaceInfo
 	imports                map[string]moduleInfo
+	importedGlobals        map[string]binding
 	importedClasses        map[string]classInfo
 	importedObjects        map[string]classInfo
 	importedInterfaces     map[string]interfaceInfo
@@ -103,6 +105,7 @@ func Analyze(program *parser.Program) Result {
 		objects:                map[string]classInfo{},
 		interfaces:             map[string]interfaceInfo{},
 		imports:                map[string]moduleInfo{},
+		importedGlobals:        map[string]binding{},
 		importedClasses:        map[string]classInfo{},
 		importedObjects:        map[string]classInfo{},
 		importedInterfaces:     map[string]interfaceInfo{},
@@ -130,6 +133,7 @@ func AnalyzeModule(mod *module.LoadedModule) Result {
 			objects:                map[string]classInfo{},
 			interfaces:             map[string]interfaceInfo{},
 			imports:                map[string]moduleInfo{},
+			importedGlobals:        map[string]binding{},
 			importedClasses:        map[string]classInfo{},
 			importedObjects:        map[string]classInfo{},
 			importedInterfaces:     map[string]interfaceInfo{},
@@ -215,12 +219,13 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 		info := moduleInfo{
 			functions:     map[string]Signature{},
 			functionDecls: map[string]*parser.FunctionDecl{},
+			globals:       map[string]binding{},
 			classes:       map[string]classInfo{},
 			objects:       map[string]classInfo{},
 			interfaces:    map[string]interfaceInfo{},
 		}
 		for _, fn := range imported.Program.Functions {
-			if fn.Private && !samePackage {
+			if !fn.Public {
 				continue
 			}
 			params := make([]*Type, len(fn.Parameters))
@@ -233,6 +238,22 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 				Variadic:   len(fn.Parameters) > 0 && fn.Parameters[len(fn.Parameters)-1].Variadic,
 			}
 			info.functionDecls[fn.Name] = fn
+		}
+		for _, stmt := range imported.Program.Statements {
+			valStmt, ok := stmt.(*parser.ValStmt)
+			if !ok || !valStmt.Public {
+				continue
+			}
+			for _, bindingDecl := range valStmt.Bindings {
+				if bindingDecl.Name == "_" {
+					continue
+				}
+				typ := unknownType
+				if bindingDecl.Type != nil {
+					typ = fromTypeRef(bindingDecl.Type, c)
+				}
+				info.globals[bindingDecl.Name] = binding{typ: typ, mutable: false}
+			}
 		}
 		for _, decl := range imported.Program.Interfaces {
 			if decl.Private && !samePackage {
@@ -292,6 +313,50 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 	}
 	for localName, symbol := range current.SymbolImports {
 		samePackage := currentPackage != "" && symbol.Module.SourceProgram.PackageName == currentPackage
+		if symbol.IsFunction {
+			for _, fn := range symbol.Module.SourceProgram.Functions {
+				if fn.Name != symbol.OriginalName || !fn.Public {
+					continue
+				}
+				params := make([]*Type, len(fn.Parameters))
+				for i, param := range fn.Parameters {
+					params[i] = fromTypeRef(param.Type, c)
+				}
+				c.functions[localName] = Signature{
+					Parameters: params,
+					ReturnType: fromTypeRef(fn.ReturnType, c),
+					Variadic:   len(fn.Parameters) > 0 && fn.Parameters[len(fn.Parameters)-1].Variadic,
+				}
+				c.functionDecls[localName] = fn
+				break
+			}
+			continue
+		}
+		if symbol.IsValue {
+			found := false
+			for _, stmt := range symbol.Module.SourceProgram.Statements {
+				valStmt, ok := stmt.(*parser.ValStmt)
+				if !ok || !valStmt.Public {
+					continue
+				}
+				for _, bindingDecl := range valStmt.Bindings {
+					if bindingDecl.Name != symbol.OriginalName {
+						continue
+					}
+					typ := unknownType
+					if bindingDecl.Type != nil {
+						typ = fromTypeRef(bindingDecl.Type, c)
+					}
+					c.importedGlobals[localName] = binding{typ: typ, mutable: false}
+					found = true
+					break
+				}
+				if found {
+					break
+				}
+			}
+			continue
+		}
 		if symbol.IsInterface {
 			for _, decl := range symbol.Module.SourceProgram.Interfaces {
 				if decl.Name != symbol.OriginalName {
@@ -498,6 +563,14 @@ func (c *Checker) checkGlobals(statements []parser.Statement) {
 			for i, bindingDecl := range s.Bindings {
 				if bindingDecl.Deferred {
 					c.addDiagnostic("invalid_deferred", "binding '"+bindingDecl.Name+"' cannot be initialized with '?' outside class fields", bindingDecl.Span)
+				}
+				if s.Public {
+					if bindingDecl.Mutable {
+						c.addDiagnostic("invalid_public_binding", "public top-level bindings must be immutable", bindingDecl.Span)
+					}
+					if bindingDecl.Type == nil {
+						c.addDiagnostic("cannot_infer_public_binding_type", "public top-level binding '"+bindingDecl.Name+"' requires an explicit type", bindingDecl.Span)
+					}
 				}
 				valueType := unknownType
 				hasValue := i < len(s.Values) && s.Values[i] != nil
@@ -2325,6 +2398,10 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			result = &Type{Kind: TypeModule, Name: e.Name}
 			break
 		}
+		if imported, ok := c.importedGlobals[e.Name]; ok {
+			result = imported.typ
+			break
+		}
 		if object, ok := c.importedObjects[e.Name]; ok {
 			result = &Type{Kind: TypeObject, Name: object.name}
 			break
@@ -3943,6 +4020,9 @@ func (c *Checker) checkMemberExpr(expr *parser.MemberExpr) *Type {
 		}
 		if fn, ok := info.functions[expr.Name]; ok {
 			return functionType(expr.Name, fn)
+		}
+		if global, ok := info.globals[expr.Name]; ok {
+			return global.typ
 		}
 		if class, ok := info.classes[expr.Name]; ok {
 			return &Type{Kind: TypeClass, Name: class.name}

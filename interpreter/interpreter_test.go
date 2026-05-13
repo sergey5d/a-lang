@@ -3,9 +3,11 @@ package interpreter
 import (
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"a-lang/module"
 	"a-lang/parser"
 )
 
@@ -16,6 +18,16 @@ func parseProgram(t *testing.T, src string) *parser.Program {
 		t.Fatalf("Parse returned error: %v", err)
 	}
 	return program
+}
+
+func writeModuleFile(t *testing.T, path, src string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
 }
 
 func TestCallFunction(t *testing.T) {
@@ -44,6 +56,39 @@ def run(input Int) Int {
 	}
 	if value != int64(7) {
 		t.Fatalf("expected 7, got %#v", value)
+	}
+}
+
+func TestModulePublicFunctionAndBinding(t *testing.T) {
+	dir := t.TempDir()
+	writeModuleFile(t, filepath.Join(dir, "lib.al"), `
+package lib
+
+pub def hidden() Int = 7
+pub answer Int = 5
+`)
+	writeModuleFile(t, filepath.Join(dir, "main.al"), `
+package app
+
+import lib
+import lib/{answer as direct}
+
+def run() Int {
+	return lib.hidden() + lib.answer + direct
+}
+`)
+
+	mod, err := module.Load(filepath.Join(dir, "main.al"))
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	in := NewModule(mod)
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(17) {
+		t.Fatalf("expected 17, got %#v", value)
 	}
 }
 

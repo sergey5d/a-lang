@@ -3,14 +3,18 @@ package parser
 import "fmt"
 
 func (p *Parser) parseFunction() (*FunctionDecl, error) {
-	return p.parseFunctionWithPrivate(false)
+	return p.parseFunctionWithVisibility(false, false)
 }
 
 func (p *Parser) parsePrivateFunction() (*FunctionDecl, error) {
-	return p.parseFunctionWithPrivate(true)
+	return p.parseFunctionWithVisibility(true, false)
 }
 
-func (p *Parser) parseFunctionWithPrivate(private bool) (*FunctionDecl, error) {
+func (p *Parser) parsePublicFunction() (*FunctionDecl, error) {
+	return p.parseFunctionWithVisibility(false, true)
+}
+
+func (p *Parser) parseFunctionWithVisibility(private bool, public bool) (*FunctionDecl, error) {
 	defToken, err := p.consume(TokenDef, "expected 'def'")
 	if err != nil {
 		return nil, err
@@ -54,6 +58,7 @@ func (p *Parser) parseFunctionWithPrivate(private bool) (*FunctionDecl, error) {
 		ReturnType:     returnType,
 		Body:           body,
 		Private:        private,
+		Public:         public,
 		Span:           mergeSpans(tokenSpan(defToken), body.Span),
 	}, nil
 }

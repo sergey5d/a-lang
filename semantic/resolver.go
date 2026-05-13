@@ -15,6 +15,7 @@ type Resolver struct {
 	objects            map[string]parser.Span
 	interfaces         map[string]parser.Span
 	imports            map[string]importInfo
+	importedGlobals    map[string]symbol
 	importedClasses    map[string]parser.Span
 	importedObjects    map[string]parser.Span
 	importedInterfaces map[string]parser.Span
@@ -26,6 +27,7 @@ type Resolver struct {
 
 type importInfo struct {
 	functions  map[string]parser.Span
+	globals    map[string]parser.Span
 	classes    map[string]parser.Span
 	objects    map[string]parser.Span
 	interfaces map[string]parser.Span
@@ -52,6 +54,7 @@ func Analyze(program *parser.Program) []Diagnostic {
 		objects:            map[string]parser.Span{},
 		interfaces:         map[string]parser.Span{},
 		imports:            map[string]importInfo{},
+		importedGlobals:    map[string]symbol{},
 		importedClasses:    map[string]parser.Span{},
 		importedObjects:    map[string]parser.Span{},
 		importedInterfaces: map[string]parser.Span{},
@@ -81,6 +84,7 @@ func AnalyzeModule(mod *module.LoadedModule) []Diagnostic {
 			objects:            map[string]parser.Span{},
 			interfaces:         map[string]parser.Span{},
 			imports:            moduleImportInfo(current),
+			importedGlobals:    map[string]symbol{},
 			importedClasses:    map[string]parser.Span{},
 			importedObjects:    map[string]parser.Span{},
 			importedInterfaces: map[string]parser.Span{},
@@ -97,6 +101,35 @@ func AnalyzeModule(mod *module.LoadedModule) []Diagnostic {
 
 func (r *Resolver) installDirectImports(mod *module.LoadedModule) {
 	for localName, symbol := range mod.SymbolImports {
+		if symbol.IsFunction {
+			for _, fn := range symbol.Module.SourceProgram.Functions {
+				if fn.Name == symbol.OriginalName {
+					r.functions[localName] = fn.Span
+					break
+				}
+			}
+			continue
+		}
+		if symbol.IsValue {
+			found := false
+			for _, stmt := range symbol.Module.SourceProgram.Statements {
+				valStmt, ok := stmt.(*parser.ValStmt)
+				if !ok || !valStmt.Public {
+					continue
+				}
+				for _, binding := range valStmt.Bindings {
+					if binding.Name == symbol.OriginalName {
+						r.importedGlobals[localName] = symbolValue(binding)
+						found = true
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+			continue
+		}
 		if symbol.IsInterface {
 			var decl *parser.InterfaceDecl
 			for _, iface := range symbol.Module.SourceProgram.Interfaces {
@@ -138,15 +171,27 @@ func moduleImportInfo(mod *module.LoadedModule) map[string]importInfo {
 		samePackage := currentPackage != "" && imported.Program.PackageName == currentPackage
 		info := importInfo{
 			functions:  map[string]parser.Span{},
+			globals:    map[string]parser.Span{},
 			classes:    map[string]parser.Span{},
 			objects:    map[string]parser.Span{},
 			interfaces: map[string]parser.Span{},
 		}
 		for _, fn := range imported.Program.Functions {
-			if fn.Private && !samePackage {
+			if fn.Public {
+				info.functions[fn.Name] = fn.Span
+			}
+		}
+		for _, stmt := range imported.Program.Statements {
+			valStmt, ok := stmt.(*parser.ValStmt)
+			if !ok || !valStmt.Public {
 				continue
 			}
-			info.functions[fn.Name] = fn.Span
+			for _, binding := range valStmt.Bindings {
+				if binding.Name == "_" {
+					continue
+				}
+				info.globals[binding.Name] = binding.Span
+			}
 		}
 		for _, class := range imported.Program.Classes {
 			if class.Private && !samePackage {
@@ -560,7 +605,7 @@ func (r *Resolver) resolveBlockStatements(statements []parser.Statement) {
 func (r *Resolver) resolveExpr(expr parser.Expr) {
 	switch e := expr.(type) {
 	case *parser.Identifier:
-		if r.isDefined(e.Name) || r.functions[e.Name] != (parser.Span{}) || r.classes[e.Name] != (parser.Span{}) || r.objects[e.Name] != (parser.Span{}) || r.interfaces[e.Name] != (parser.Span{}) || r.importedClasses[e.Name] != (parser.Span{}) || r.importedObjects[e.Name] != (parser.Span{}) || r.importedInterfaces[e.Name] != (parser.Span{}) || r.imports[e.Name].functions != nil || isBuiltin(e.Name) {
+		if r.isDefined(e.Name) || r.importedGlobals[e.Name].span != (parser.Span{}) || r.functions[e.Name] != (parser.Span{}) || r.classes[e.Name] != (parser.Span{}) || r.objects[e.Name] != (parser.Span{}) || r.interfaces[e.Name] != (parser.Span{}) || r.importedClasses[e.Name] != (parser.Span{}) || r.importedObjects[e.Name] != (parser.Span{}) || r.importedInterfaces[e.Name] != (parser.Span{}) || r.imports[e.Name].functions != nil || r.imports[e.Name].globals != nil || isBuiltin(e.Name) {
 			return
 		}
 		r.addDiagnostic("undefined_name", "undefined name '"+e.Name+"'", e.Span)
@@ -581,7 +626,7 @@ func (r *Resolver) resolveExpr(expr parser.Expr) {
 	case *parser.MemberExpr:
 		if ident, ok := e.Receiver.(*parser.Identifier); ok {
 			if info, ok := r.imports[ident.Name]; ok {
-				if info.functions[e.Name] != (parser.Span{}) || info.classes[e.Name] != (parser.Span{}) || info.objects[e.Name] != (parser.Span{}) || info.interfaces[e.Name] != (parser.Span{}) {
+				if info.functions[e.Name] != (parser.Span{}) || info.globals[e.Name] != (parser.Span{}) || info.classes[e.Name] != (parser.Span{}) || info.objects[e.Name] != (parser.Span{}) || info.interfaces[e.Name] != (parser.Span{}) {
 					return
 				}
 				r.addDiagnostic("unknown_member", "unknown imported member '"+e.Name+"' on module '"+ident.Name+"'", e.Span)
@@ -932,6 +977,9 @@ func (r *Resolver) lookup(name string) (symbol, bool) {
 	if sym, ok := r.globals[name]; ok {
 		return sym, true
 	}
+	if sym, ok := r.importedGlobals[name]; ok {
+		return sym, true
+	}
 	return symbol{}, false
 }
 
@@ -946,7 +994,14 @@ func (r *Resolver) lookupOuter(name string) (symbol, bool) {
 	if sym, ok := r.globals[name]; ok {
 		return sym, true
 	}
+	if sym, ok := r.importedGlobals[name]; ok {
+		return sym, true
+	}
 	return symbol{}, false
+}
+
+func symbolValue(binding parser.Binding) symbol {
+	return symbol{span: binding.Span, mutable: binding.Mutable}
 }
 
 func (r *Resolver) addDiagnostic(code, message string, span parser.Span) {

@@ -1656,6 +1656,28 @@ priv interface Hidden {
 	}
 }
 
+func TestParsePublicTopLevelDecls(t *testing.T) {
+	src := `
+pub def helper() Int = 1
+pub answer Int = 42
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Functions) != 1 || !program.Functions[0].Public {
+		t.Fatalf("expected pub function, got %#v", program.Functions)
+	}
+	if len(program.Statements) != 1 {
+		t.Fatalf("expected 1 top-level statement, got %d", len(program.Statements))
+	}
+	stmt, ok := program.Statements[0].(*ValStmt)
+	if !ok || !stmt.Public {
+		t.Fatalf("expected pub top-level binding, got %#v", program.Statements[0])
+	}
+}
+
 func TestParseDestructuringSkipBinding(t *testing.T) {
 	src := `
 def run() Int {

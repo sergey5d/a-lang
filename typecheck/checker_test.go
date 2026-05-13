@@ -1133,7 +1133,7 @@ def run() Int {
 	}
 }
 
-func TestAnalyzeModuleAllowsPrivateFunctionWithinSamePackage(t *testing.T) {
+func TestAnalyzeModuleRejectsPrivateFunctionWithinSamePackage(t *testing.T) {
 	dir := t.TempDir()
 	writeModuleFile(t, filepath.Join(dir, "app.al"), `
 package app
@@ -1155,8 +1155,18 @@ def run() Int {
 		t.Fatalf("Load returned error: %v", err)
 	}
 	result := AnalyzeModule(mod)
-	if len(result.Diagnostics) != 0 {
-		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	found := false
+	for _, diag := range result.Diagnostics {
+		if diag.Code == "unknown_member" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected unknown_member diagnostic, got %#v", result.Diagnostics)
 	}
 }
 
@@ -1194,6 +1204,75 @@ def run() Int {
 	}
 	if !found {
 		t.Fatalf("expected unknown_member diagnostic, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeModuleAllowsPublicFunctionAcrossPackages(t *testing.T) {
+	dir := t.TempDir()
+	writeModuleFile(t, filepath.Join(dir, "lib.al"), `
+package lib
+
+pub def hidden() Int = 7
+`)
+	writeModuleFile(t, filepath.Join(dir, "main.al"), `
+package app
+
+import lib
+
+def run() Int {
+	return lib.hidden()
+}
+`)
+
+	mod, err := module.Load(filepath.Join(dir, "main.al"))
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	result := AnalyzeModule(mod)
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzeModuleAllowsPublicBindingAcrossPackages(t *testing.T) {
+	dir := t.TempDir()
+	writeModuleFile(t, filepath.Join(dir, "lib.al"), `
+package lib
+
+pub answer Int = 7
+`)
+	writeModuleFile(t, filepath.Join(dir, "main.al"), `
+package app
+
+import lib
+import lib/{answer as direct}
+
+def run() Int {
+	return lib.answer + direct
+}
+`)
+
+	mod, err := module.Load(filepath.Join(dir, "main.al"))
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	result := AnalyzeModule(mod)
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
+func TestAnalyzePublicBindingRequiresExplicitType(t *testing.T) {
+	src := `
+pub answer = 7
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if result.Diagnostics[0].Code != "cannot_infer_public_binding_type" {
+		t.Fatalf("unexpected diagnostic %#v", result.Diagnostics[0])
 	}
 }
 

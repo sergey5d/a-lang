@@ -79,8 +79,8 @@ Current package/import support is usable.
 Settled direction:
 - top-level bindings are private by default
 - top-level functions are private by default
-- module state should not be exposed directly as imported variables
-- a future explicit public/export surface can be added later if needed, but it is not part of the default model
+- exported top-level functions and exported immutable module bindings use explicit `pub`
+- mutable module state should not be exposed directly as imported variables
 
 Still open:
 - whether object members should ever be importable directly, for example importing `OS.println`-style names without importing the whole object surface

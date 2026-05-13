@@ -73,6 +73,7 @@ type FunctionDecl struct {
 	ReturnType     *TypeRef        `json:"returnType"`
 	Body           *BlockStmt      `json:"body"`
 	Private        bool            `json:"private,omitempty"`
+	Public         bool            `json:"public,omitempty"`
 	Span           Span            `json:"span"`
 }
 
@@ -200,6 +201,7 @@ type Expr interface {
 type ValStmt struct {
 	Bindings []Binding `json:"bindings"`
 	Values   []Expr    `json:"values"`
+	Public   bool      `json:"public,omitempty"`
 	Span     Span      `json:"span"`
 }
 

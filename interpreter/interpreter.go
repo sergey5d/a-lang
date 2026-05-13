@@ -42,6 +42,7 @@ type Interpreter struct {
 	interfaces    map[string]*parser.InterfaceDecl
 	imports       map[string]*Interpreter
 	directImports map[string]runtimeImportedSymbol
+	publicGlobals map[string]bool
 	globals       *env
 	ready         bool
 }
@@ -50,6 +51,8 @@ type runtimeImportedSymbol struct {
 	module      *Interpreter
 	original    string
 	isInterface bool
+	isFunction  bool
+	isValue     bool
 }
 
 type instance struct {
@@ -150,6 +153,7 @@ func New(program *parser.Program) *Interpreter {
 		interfaces:    map[string]*parser.InterfaceDecl{},
 		imports:       map[string]*Interpreter{},
 		directImports: map[string]runtimeImportedSymbol{},
+		publicGlobals: map[string]bool{},
 	}
 	for _, fn := range program.Functions {
 		in.functions[fn.Name] = fn
@@ -162,6 +166,17 @@ func New(program *parser.Program) *Interpreter {
 			in.objects[class.Name] = class
 		} else {
 			in.classes[class.Name] = class
+		}
+	}
+	for _, stmt := range program.Statements {
+		valStmt, ok := stmt.(*parser.ValStmt)
+		if !ok || !valStmt.Public {
+			continue
+		}
+		for _, binding := range valStmt.Bindings {
+			if binding.Name != "_" {
+				in.publicGlobals[binding.Name] = true
+			}
 		}
 	}
 	return in
@@ -177,6 +192,8 @@ func NewModule(mod *module.LoadedModule) *Interpreter {
 			module:      NewModule(symbol.Module),
 			original:    symbol.OriginalName,
 			isInterface: symbol.IsInterface,
+			isFunction:  symbol.IsFunction,
+			isValue:     symbol.IsValue,
 		}
 	}
 	return in
@@ -216,6 +233,16 @@ func (in *Interpreter) execTopLevel(global *env) error {
 		}
 		if symbol.isInterface {
 			continue
+		}
+		if symbol.isFunction {
+			global.define(localName, functionRef{module: symbol.module, name: symbol.original}, false)
+			continue
+		}
+		if symbol.isValue {
+			if value, ok := symbol.module.globals.get(symbol.original); ok {
+				global.define(localName, value.value, false)
+				continue
+			}
 		}
 		if class, ok := symbol.module.objects[symbol.original]; ok {
 			if value, ok := symbol.module.globals.get(symbol.original); ok {
@@ -2268,6 +2295,13 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 			return classRef{module: mod, name: expr.Name}, nil
 		}
 		if _, ok := mod.objects[expr.Name]; ok {
+			slot, ok := mod.globals.get(expr.Name)
+			if !ok {
+				return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
+			}
+			return slot.value, nil
+		}
+		if mod.publicGlobals[expr.Name] {
 			slot, ok := mod.globals.get(expr.Name)
 			if !ok {
 				return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}

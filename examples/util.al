@@ -1,4 +1,4 @@
 # SKIP
 package util
 
-def greet(name Str) Str = "hello, " + name
+pub def greet(name Str) Str = "hello, " + name

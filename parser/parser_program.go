@@ -109,6 +109,32 @@ func (p *Parser) parseProgram() (*Program, error) {
 			default:
 				return nil, fmt.Errorf("'priv' is only supported for top-level declarations")
 			}
+		case TokenPub:
+			p.advance()
+			switch p.peek().Type {
+			case TokenDef:
+				fn, err := p.parsePublicFunction()
+				if err != nil {
+					return nil, err
+				}
+				program.Functions = append(program.Functions, fn)
+			default:
+				stmt, err := p.parseStatement()
+				if err != nil {
+					return nil, err
+				}
+				valStmt, ok := stmt.(*ValStmt)
+				if !ok {
+					return nil, fmt.Errorf("'pub' is only supported for top-level functions and immutable bindings")
+				}
+				for _, binding := range valStmt.Bindings {
+					if binding.Name == "_" || binding.Mutable {
+						return nil, fmt.Errorf("'pub' is only supported for immutable named top-level bindings")
+					}
+				}
+				valStmt.Public = true
+				program.Statements = append(program.Statements, valStmt)
+			}
 		default:
 			stmt, err := p.parseStatement()
 			if err != nil {

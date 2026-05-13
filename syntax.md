@@ -136,6 +136,8 @@ Top-level forms:
 - `object`
 - `record`
 - `enum`
+- `pub def`
+- `pub name Type = expr`
 - `priv def`
 - `priv interface`
 - `priv class`
@@ -1109,13 +1111,15 @@ if flag then return 1
 
 Supported today:
 
+- `pub` on top-level `def`
+- `pub` on top-level immutable bindings
 - `priv` on top-level `def`
 - `priv` on top-level `interface`
 - `priv` on top-level `class` / `object` / `record` / `enum`
 - `priv` on fields
 - `priv` on methods
 
-Package-private visibility applies across imported modules in the same package.
+Top-level `def` and immutable bindings are private by default and only become importable across modules when marked `pub`.
 
 ## Notes
 

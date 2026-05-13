@@ -98,7 +98,7 @@
         },
         {
           "name": "keyword.declaration.a-lang",
-          "match": "\\b(?:def|class|record|enum|interface|object|impl|import|module|package|with|priv|case|var)\\b"
+          "match": "\\b(?:def|class|record|enum|interface|object|impl|import|module|package|with|priv|pub|case|var)\\b"
         }
       ]
     },
