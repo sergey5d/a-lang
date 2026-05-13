@@ -2,7 +2,7 @@
 
 record Point {
     x Int
-    private secret Int
+    priv secret Int
 }
 
 def main() Int = 0

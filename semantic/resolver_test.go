@@ -185,7 +185,7 @@ def run(value Int) Int {
 func TestAnalyzeConstructorParameterMayShadowField(t *testing.T) {
 	src := `
 class Box {
-	private value Int
+	priv value Int
 }
 
 impl Box {
@@ -352,7 +352,7 @@ interface Stringable {
 }
 
 class Box[T] with Mapper[T, Stringable] {
-	private value T
+	priv value T
 }
 
 impl Box[T] {
@@ -366,8 +366,8 @@ impl Box[T] {
 }
 
 class SolidWork with Stringable {
-	private a List[Int]
-	private var b Map[Str, Bool]
+	priv a List[Int]
+	priv var b Map[Str, Bool]
 }
 
 impl SolidWork {
@@ -380,7 +380,7 @@ impl SolidWork {
 		return this.buildLabel()
 	}
 
-	private def buildLabel() Str {
+	priv def buildLabel() Str {
 		return this.a.show()
 	}
 }

@@ -111,7 +111,7 @@ var keywords = map[string]TokenType{
 	"enum":      TokenEnum,
 	"case":      TokenCase,
 	"with":      TokenWith,
-	"private":   TokenPrivate,
+	"priv":      TokenPrivate,
 	"var":       TokenVar,
 	"if":        TokenIf,
 	"then":      TokenThen,

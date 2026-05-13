@@ -107,7 +107,7 @@ func (p *Parser) parseProgram() (*Program, error) {
 				}
 				program.Classes = append(program.Classes, decl)
 			default:
-				return nil, fmt.Errorf("'private' is only supported for top-level declarations")
+				return nil, fmt.Errorf("'priv' is only supported for top-level declarations")
 			}
 		default:
 			stmt, err := p.parseStatement()

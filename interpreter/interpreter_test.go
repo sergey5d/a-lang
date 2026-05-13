@@ -173,8 +173,8 @@ def run() Int {
 func TestPrivateFieldInferenceInClassAndObject(t *testing.T) {
 	src := `
 class Box {
-	private count = 2
-	private var total = 0
+	priv count = 2
+	priv var total = 0
 }
 
 impl Box {
@@ -186,7 +186,7 @@ impl Box {
 }
 
 object Greeter {
-	private hello = "Hello"
+	priv hello = "Hello"
 }
 
 impl Greeter {
@@ -358,7 +358,7 @@ def run() Int {
 func TestClassesAndMethods(t *testing.T) {
 	src := `
 class Counter {
-	private var count Int
+	priv var count Int
 }
 
 impl Counter {
@@ -423,7 +423,7 @@ def run() Int {
 func TestMethodWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
 	src := `
 class Counter {
-	private var count Int
+	priv var count Int
 }
 
 impl Counter {
@@ -1043,7 +1043,7 @@ def run() Int {
 func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {
-	private var count Int
+	priv var count Int
 }
 
 impl Counter {
@@ -1116,7 +1116,7 @@ def run() Int {
 func TestClassEqualityUsesEquals(t *testing.T) {
 	src := `
 class Counter {
-	private count Int
+	priv count Int
 }
 
 impl Counter {
@@ -1245,7 +1245,7 @@ def run() Int {
 func TestCustomAndCollectionOperators(t *testing.T) {
 	src := `
 class Vec {
-	private var items Array[Int]
+	priv var items Array[Int]
 }
 
 impl Vec {
@@ -2065,7 +2065,7 @@ func TestImplicitPrimaryConstructorAndThisDelegation(t *testing.T) {
 class Counter {
 	count Int
 	label Str
-	private var seen Bool = false
+	priv var seen Bool = false
 }
 
 impl Counter {

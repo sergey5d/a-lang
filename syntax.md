@@ -136,12 +136,12 @@ Top-level forms:
 - `object`
 - `record`
 - `enum`
-- `private def`
-- `private interface`
-- `private class`
-- `private object`
-- `private record`
-- `private enum`
+- `priv def`
+- `priv interface`
+- `priv class`
+- `priv object`
+- `priv record`
+- `priv enum`
 
 Examples:
 
@@ -200,21 +200,21 @@ Deferred / uninitialized fields are only valid in class-like field declarations:
 
 ```txt
 class Box {
-    private var cached Int
-    private label Str = ?
+    priv var cached Int
+    priv label Str = ?
 }
 ```
 
-Private fields in classes and objects may infer their type from an initializer:
+`priv` fields in classes and objects may infer their type from an initializer:
 
 ```txt
 class Box {
-    private count = 0
-    private var hits = 0
+    priv count = 0
+    priv var hits = 0
 }
 
 object Greeter {
-    private hello = "Hello"
+    priv hello = "Hello"
 }
 ```
 
@@ -1109,11 +1109,11 @@ if flag then return 1
 
 Supported today:
 
-- `private` on top-level `def`
-- `private` on top-level `interface`
-- `private` on top-level `class` / `object` / `record` / `enum`
-- `private` on fields
-- `private` on methods
+- `priv` on top-level `def`
+- `priv` on top-level `interface`
+- `priv` on top-level `class` / `object` / `record` / `enum`
+- `priv` on fields
+- `priv` on methods
 
 Package-private visibility applies across imported modules in the same package.
 

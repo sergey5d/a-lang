@@ -1349,7 +1349,7 @@ interface Stringable {
 }
 
 class Box[T] with Mapper[T, Stringable] {
-	private value T
+	priv value T
 }
 
 impl Box[T] {
@@ -1363,8 +1363,8 @@ impl Box[T] {
 }
 
 class SolidWork with Stringable {
-	private a List[Int]
-	private var b Map[Str, Bool]
+	priv a List[Int]
+	priv var b Map[Str, Bool]
 }
 
 impl SolidWork {
@@ -1379,13 +1379,13 @@ impl SolidWork {
 	def addOne(one Int) Int {
 	}
 
-	private def buildLabel() Str {
+	priv def buildLabel() Str {
 	}
 }
 
 class RecordKeeper {
 	entries Set[Str]
-	private approved Bool
+	priv approved Bool
 }
 
 recordKeeper = RecordKeeper("test record", true)
@@ -1615,7 +1615,7 @@ impl Vec {
 
 func TestParsePrivateClassDecl(t *testing.T) {
 	src := `
-private class Hidden {
+priv class Hidden {
 }
 
 impl Hidden {
@@ -1637,9 +1637,9 @@ impl Hidden {
 
 func TestParsePrivateTopLevelDecls(t *testing.T) {
 	src := `
-private def helper() Int = 1
+priv def helper() Int = 1
 
-private interface Hidden {
+priv interface Hidden {
 	def value() Int
 }
 `
@@ -1649,10 +1649,10 @@ private interface Hidden {
 		t.Fatalf("Parse returned error: %v", err)
 	}
 	if len(program.Functions) != 1 || !program.Functions[0].Private {
-		t.Fatalf("expected private function, got %#v", program.Functions)
+		t.Fatalf("expected priv function, got %#v", program.Functions)
 	}
 	if len(program.Interfaces) != 1 || !program.Interfaces[0].Private {
-		t.Fatalf("expected private interface, got %#v", program.Interfaces)
+		t.Fatalf("expected priv interface, got %#v", program.Interfaces)
 	}
 }
 

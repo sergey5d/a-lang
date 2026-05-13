@@ -8,7 +8,7 @@
 # 0
 
 class DisjointSet {
-    private var arr Array[Int]
+    priv var arr Array[Int]
 }
 
 impl DisjointSet {

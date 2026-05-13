@@ -45,7 +45,7 @@ Before running, the CLI always:
 
 ```txt
 class Counter {
-	private var count Int
+	priv var count Int
 }
 
 impl Counter {
@@ -81,7 +81,7 @@ The syntax is still evolving, but the current codebase supports a meaningful sub
 - functions with `def`
 - classes and interfaces
 - `with` for interface implementation, including multiple interfaces on one class or record
-- `private` members
+- `priv` members
 - generics on classes and interfaces
 - lambdas, including block-bodied lambdas
 - function types like `Int -> Int`
@@ -215,7 +215,7 @@ This pass is analysis-only.
 - interface conformance
 - class equality via `Eq`
 - constructor initialization rules
-- private access rules
+- priv access rules
 - array indexing rules
 
 This pass is also analysis-only. It does not rewrite the AST.

@@ -5,7 +5,7 @@
 # 3
 
 class Vec {
-    private var items Array[Int]
+    priv var items Array[Int]
 }
 
 impl Vec {
