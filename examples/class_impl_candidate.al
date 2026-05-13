@@ -12,11 +12,6 @@ class Person with Named, Aged {
 
     private archived Bool : = false
     private var internalScore Int = 1
-
-    #private {
-    #    archived2 Bool
-    #    internalScore2 Int
-    #}
 }
 
 impl Person {
