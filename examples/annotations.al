@@ -21,7 +21,8 @@ impl Service {
         this.name = "ok"
     }
 
-    @Tag(name = "health")
+    @Route("/health")
+    @Tag("health")
     def health() Str = this.name
 }
 

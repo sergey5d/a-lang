@@ -137,6 +137,9 @@ record Route {
 
 @Route(path = "/health")
 def health() Str = "ok"
+
+@Route("/health")
+def health2() Str = "ok"
 ```
 
 Supported targets currently include:
