@@ -1,7 +1,7 @@
 # private fields with inferred type require an initializer
 
 class Bad {
-    priv value
+    hidden value
 }
 
 def main() Int = 0

@@ -3,15 +3,15 @@
 # Candidate class shape where storage stays in `class` and behavior moves into
 # a separate `impl` block.
 
-priv class Person with Named, Aged {
+hidden class Person with Named, Aged {
 
     firstName Str
     lastName Str
     age Int
     city Str
 
-    priv var archived Bool
-    priv var internalScore Int = 1
+    hidden var archived Bool
+    var internalScore Int = 1
 }
 
 impl Person {
@@ -24,7 +24,7 @@ impl Person {
         this.archived = false
     }
 
-    priv def calc() Int {
+    hidden def calc() Int {
         firstName.size() + lastName.size()
     }
 

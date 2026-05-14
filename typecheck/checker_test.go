@@ -641,7 +641,7 @@ def fromArray(values Array[Int]) Int {
 func TestAnalyzeClassMembersAndConstructors(t *testing.T) {
 	src := `
 class Counter {
-	priv var count Int
+	hidden var count Int
 }
 
 impl Counter {
@@ -672,7 +672,7 @@ func TestAnalyzeImplicitPrimaryConstructorAndThisDelegation(t *testing.T) {
 class Counter {
 	count Int
 	label Str
-	priv var seen Bool = false
+	hidden var seen Bool = false
 }
 
 impl Counter {
@@ -884,7 +884,7 @@ func TestAnalyzeClassDestructuringRejectsPrivateFields(t *testing.T) {
 	src := `
 class Box {
 	value Int
-	priv hidden Str = "x"
+	hidden extra Str = "x"
 }
 
 def run() Int {
@@ -986,8 +986,8 @@ def run() Unit {
 func TestAnalyzePrivateFieldInferenceInClassAndObject(t *testing.T) {
 	src := `
 class Box {
-	priv count = 1
-	priv var total = 0
+	hidden count = 1
+	hidden var total = 0
 }
 
 impl Box {
@@ -999,7 +999,7 @@ impl Box {
 }
 
 object Greeter {
-	priv hello = "Hello"
+	hidden hello = "Hello"
 }
 
 impl Greeter {
@@ -1062,7 +1062,7 @@ func TestAnalyzeModuleAllowsPrivateClassWithinSamePackage(t *testing.T) {
 	writeModuleFile(t, filepath.Join(dir, "app.al"), `
 package app
 
-priv class Hidden {
+hidden class Hidden {
 }
 
 impl Hidden {
@@ -1095,7 +1095,7 @@ func TestAnalyzeModuleRejectsPrivateClassAcrossPackages(t *testing.T) {
 	writeModuleFile(t, filepath.Join(dir, "lib.al"), `
 package lib
 
-priv class Hidden {
+hidden class Hidden {
 }
 
 impl Hidden {
@@ -1138,7 +1138,7 @@ func TestAnalyzeModuleRejectsPrivateFunctionWithinSamePackage(t *testing.T) {
 	writeModuleFile(t, filepath.Join(dir, "app.al"), `
 package app
 
-priv def hidden() Int = 7
+hidden def localValue() Int = 7
 `)
 	writeModuleFile(t, filepath.Join(dir, "main.al"), `
 package app
@@ -1146,7 +1146,7 @@ package app
 import app
 
 def run() Int {
-	return app.hidden()
+	return app.localValue()
 }
 `)
 
@@ -1175,7 +1175,7 @@ func TestAnalyzeModuleRejectsPrivateFunctionAcrossPackages(t *testing.T) {
 	writeModuleFile(t, filepath.Join(dir, "lib.al"), `
 package lib
 
-priv def hidden() Int = 7
+hidden def localValue() Int = 7
 `)
 	writeModuleFile(t, filepath.Join(dir, "main.al"), `
 package app
@@ -1183,7 +1183,7 @@ package app
 import lib
 
 def run() Int {
-	return lib.hidden()
+	return lib.localValue()
 }
 `)
 
@@ -1212,7 +1212,7 @@ func TestAnalyzeModuleAllowsPublicFunctionAcrossPackages(t *testing.T) {
 	writeModuleFile(t, filepath.Join(dir, "lib.al"), `
 package lib
 
-pub def hidden() Int = 7
+public def exportedValue() Int = 7
 `)
 	writeModuleFile(t, filepath.Join(dir, "main.al"), `
 package app
@@ -1220,7 +1220,7 @@ package app
 import lib
 
 def run() Int {
-	return lib.hidden()
+	return lib.exportedValue()
 }
 `)
 
@@ -1239,7 +1239,7 @@ func TestAnalyzeModuleAllowsPublicBindingAcrossPackages(t *testing.T) {
 	writeModuleFile(t, filepath.Join(dir, "lib.al"), `
 package lib
 
-pub answer Int = 7
+public answer Int = 7
 `)
 	writeModuleFile(t, filepath.Join(dir, "main.al"), `
 package app
@@ -1264,7 +1264,7 @@ def run() Int {
 
 func TestAnalyzePublicBindingRequiresExplicitType(t *testing.T) {
 	src := `
-pub answer = 7
+public answer = 7
 `
 
 	result := Analyze(parseProgram(t, src))
@@ -1441,7 +1441,7 @@ class Rabbit with Hopper {
 func TestAnalyzeImmutableFieldAssignmentInConstructor(t *testing.T) {
 	src := `
 class Counter {
-	priv count Int
+	hidden count Int
 }
 
 impl Counter {
@@ -1464,7 +1464,7 @@ impl Counter {
 func TestAnalyzeImmutableFieldAssignmentInInitMethodFails(t *testing.T) {
 	src := `
 class Counter {
-	priv count Int
+	hidden count Int
 }
 
 impl Counter {
@@ -1489,7 +1489,7 @@ impl Counter {
 func TestAnalyzeImmutableFieldAssignmentOutsideConstructor(t *testing.T) {
 	src := `
 class Counter {
-	priv count Int
+	hidden count Int
 }
 
 impl Counter {
@@ -1516,7 +1516,7 @@ impl Counter {
 func TestAnalyzePrivateAccessOutsideClass(t *testing.T) {
 	src := `
 class SecretBox {
-	priv value Int
+	hidden value Int
 }
 
 impl SecretBox {
@@ -1524,7 +1524,7 @@ impl SecretBox {
 		this.value = value
 	}
 
-	priv def reveal() Int {
+	hidden def reveal() Int {
 		return this.value
 	}
 }
@@ -1551,7 +1551,7 @@ def run() Int {
 func TestAnalyzePrivateAccessInsideClass(t *testing.T) {
 	src := `
 class SecretBox {
-	priv value Int
+	hidden value Int
 }
 
 impl SecretBox {
@@ -1559,7 +1559,7 @@ impl SecretBox {
 		this.value = value
 	}
 
-	priv def reveal() Int {
+	hidden def reveal() Int {
 		return this.value
 	}
 
@@ -1578,7 +1578,7 @@ impl SecretBox {
 func TestAnalyzeMethodOverloadResolution(t *testing.T) {
 	src := `
 class Counter {
-	priv count Int
+	hidden count Int
 }
 
 impl Counter {
@@ -1614,7 +1614,7 @@ def run() Int {
 func TestAnalyzeNoMatchingMethodOverload(t *testing.T) {
 	src := `
 class Counter {
-	priv count Int
+	hidden count Int
 }
 
 impl Counter {
@@ -1645,7 +1645,7 @@ def run() Int {
 func TestAnalyzeMethodReferenceWithoutCall(t *testing.T) {
 	src := `
 class Counter {
-	priv count Int
+	hidden count Int
 }
 
 impl Counter {
@@ -1677,7 +1677,7 @@ def run() Int {
 func TestAnalyzeDuplicateConstructorOverload(t *testing.T) {
 	src := `
 class Counter {
-	priv count Int
+	hidden count Int
 }
 
 impl Counter {
@@ -1703,7 +1703,7 @@ impl Counter {
 func TestAnalyzeImplicitConstructorRequiresMutableOnlyFields(t *testing.T) {
 	src := `
 class Counter {
-	priv count Int
+	hidden count Int
 }
 `
 
@@ -1719,8 +1719,8 @@ class Counter {
 func TestAnalyzeConstructorMustInitializeImmutableFields(t *testing.T) {
 	src := `
 class Counter {
-	priv count Int
-	priv seen Bool = ?
+	hidden count Int
+	hidden seen Bool = ?
 }
 
 impl Counter {
@@ -1791,7 +1791,7 @@ def run() Int {
 func TestAnalyzeLambdaCanUseEnclosingGenericType(t *testing.T) {
 	src := `
 class Box[T] {
-	priv value T
+	hidden value T
 }
 
 impl Box[T] {
@@ -1889,7 +1889,7 @@ def run() Int {
 func TestAnalyzeEqSupportsClassEquality(t *testing.T) {
 	src := `
 class Counter with Eq[Counter] {
-	priv count Int
+	hidden count Int
 }
 
 impl Counter {
@@ -1918,7 +1918,7 @@ def run() Bool {
 func TestAnalyzeClassEqualityRequiresEq(t *testing.T) {
 	src := `
 class Counter {
-	priv count Int
+	hidden count Int
 }
 
 impl Counter {
@@ -2192,7 +2192,7 @@ def run() Int {
 func TestAnalyzeCustomAndCollectionOperators(t *testing.T) {
 	src := `
 class Vec {
-	priv var items Array[Int]
+	hidden var items Array[Int]
 }
 
 impl Vec {

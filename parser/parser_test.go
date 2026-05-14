@@ -1349,7 +1349,7 @@ interface Stringable {
 }
 
 class Box[T] with Mapper[T, Stringable] {
-	priv value T
+	hidden value T
 }
 
 impl Box[T] {
@@ -1363,8 +1363,8 @@ impl Box[T] {
 }
 
 class SolidWork with Stringable {
-	priv a List[Int]
-	priv var b Map[Str, Bool]
+	hidden a List[Int]
+	hidden var b Map[Str, Bool]
 }
 
 impl SolidWork {
@@ -1379,13 +1379,13 @@ impl SolidWork {
 	def addOne(one Int) Int {
 	}
 
-	priv def buildLabel() Str {
+	hidden def buildLabel() Str {
 	}
 }
 
 class RecordKeeper {
 	entries Set[Str]
-	priv approved Bool
+	hidden approved Bool
 }
 
 recordKeeper = RecordKeeper("test record", true)
@@ -1615,7 +1615,7 @@ impl Vec {
 
 func TestParsePrivateClassDecl(t *testing.T) {
 	src := `
-priv class Hidden {
+hidden class Hidden {
 }
 
 impl Hidden {
@@ -1637,9 +1637,9 @@ impl Hidden {
 
 func TestParsePrivateTopLevelDecls(t *testing.T) {
 	src := `
-priv def helper() Int = 1
+hidden def helper() Int = 1
 
-priv interface Hidden {
+hidden interface Hidden {
 	def value() Int
 }
 `
@@ -1649,17 +1649,17 @@ priv interface Hidden {
 		t.Fatalf("Parse returned error: %v", err)
 	}
 	if len(program.Functions) != 1 || !program.Functions[0].Private {
-		t.Fatalf("expected priv function, got %#v", program.Functions)
+		t.Fatalf("expected hidden function, got %#v", program.Functions)
 	}
 	if len(program.Interfaces) != 1 || !program.Interfaces[0].Private {
-		t.Fatalf("expected priv interface, got %#v", program.Interfaces)
+		t.Fatalf("expected hidden interface, got %#v", program.Interfaces)
 	}
 }
 
 func TestParsePublicTopLevelDecls(t *testing.T) {
 	src := `
-pub def helper() Int = 1
-pub answer Int = 42
+public def helper() Int = 1
+public answer Int = 42
 `
 
 	program, err := Parse(src)
@@ -1667,14 +1667,14 @@ pub answer Int = 42
 		t.Fatalf("Parse returned error: %v", err)
 	}
 	if len(program.Functions) != 1 || !program.Functions[0].Public {
-		t.Fatalf("expected pub function, got %#v", program.Functions)
+		t.Fatalf("expected public function, got %#v", program.Functions)
 	}
 	if len(program.Statements) != 1 {
 		t.Fatalf("expected 1 top-level statement, got %d", len(program.Statements))
 	}
 	stmt, ok := program.Statements[0].(*ValStmt)
 	if !ok || !stmt.Public {
-		t.Fatalf("expected pub top-level binding, got %#v", program.Statements[0])
+		t.Fatalf("expected public top-level binding, got %#v", program.Statements[0])
 	}
 }
 

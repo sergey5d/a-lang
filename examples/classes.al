@@ -8,7 +8,7 @@ class A {
     age Int
     name Str
 
-    priv var malnutritioned Bool = false
+    hidden var malnutritioned Bool = false
 }
 
 impl A {
@@ -28,14 +28,14 @@ impl A {
 
 class B {
     # immutable member variables
-    priv age Int
-    priv name Str
+    hidden age Int
+    hidden name Str
     # initialized mutable variable
-    priv var malnutritioned Bool = false
+    hidden var malnutritioned Bool = false
     # not yet initialized mutable variable
-    priv var unassigned Float
+    hidden var unassigned Float
     # not yet initialized immutable variable (syntax is for consistency only)
-    priv questionable Int = ?
+    hidden questionable Int = ?
 }
 
 impl B {

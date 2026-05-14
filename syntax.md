@@ -136,14 +136,14 @@ Top-level forms:
 - `object`
 - `record`
 - `enum`
-- `pub def`
-- `pub name Type = expr`
-- `priv def`
-- `priv interface`
-- `priv class`
-- `priv object`
-- `priv record`
-- `priv enum`
+- `public def`
+- `public name Type = expr`
+- `hidden def`
+- `hidden interface`
+- `hidden class`
+- `hidden object`
+- `hidden record`
+- `hidden enum`
 
 Examples:
 
@@ -202,21 +202,21 @@ Deferred / uninitialized fields are only valid in class-like field declarations:
 
 ```txt
 class Box {
-    priv var cached Int
-    priv label Str = ?
+    hidden var cached Int
+    hidden label Str = ?
 }
 ```
 
-`priv` fields in classes and objects may infer their type from an initializer:
+`hidden` fields in classes and objects may infer their type from an initializer:
 
 ```txt
 class Box {
-    priv count = 0
-    priv var hits = 0
+    hidden count = 0
+    hidden var hits = 0
 }
 
 object Greeter {
-    priv hello = "Hello"
+    hidden hello = "Hello"
 }
 ```
 
@@ -1111,15 +1111,15 @@ if flag then return 1
 
 Supported today:
 
-- `pub` on top-level `def`
-- `pub` on top-level immutable bindings
-- `priv` on top-level `def`
-- `priv` on top-level `interface`
-- `priv` on top-level `class` / `object` / `record` / `enum`
-- `priv` on fields
-- `priv` on methods
+- `public` on top-level `def`
+- `public` on top-level immutable bindings
+- `hidden` on top-level `def`
+- `hidden` on top-level `interface`
+- `hidden` on top-level `class` / `object` / `record` / `enum`
+- `hidden` on fields
+- `hidden` on methods
 
-Top-level `def` and immutable bindings are private by default and only become importable across modules when marked `pub`.
+Top-level `def` and immutable bindings are private by default and only become importable across modules when marked `public`.
 
 ## Notes
 

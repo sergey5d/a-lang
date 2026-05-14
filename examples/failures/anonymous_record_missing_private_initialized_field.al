@@ -4,7 +4,7 @@
 class MixedProfile {
     name Str
     age Int
-    priv score Int = 5
+    hidden score Int = 5
 }
 
 def main() Unit {

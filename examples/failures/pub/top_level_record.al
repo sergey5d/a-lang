@@ -1,7 +1,7 @@
 # FAIL:
-# 'pub' is only supported for top-level functions and immutable bindings
+# 'public' is only supported for top-level functions and immutable bindings
 
-pub record Point {
+public record Point {
     x Int
     y Int
 }

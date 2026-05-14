@@ -1,6 +1,6 @@
 # FAIL:
-# 'pub' is only supported for top-level functions and immutable bindings
+# 'public' is only supported for top-level functions and immutable bindings
 
-pub interface Named {
+public interface Named {
     def label() Str
 }

@@ -1,6 +1,6 @@
 # FAIL:
-# pub is not allowed on class members
+# public is not allowed on class members
 
 class Box {
-    pub value Int = 1
+    public value Int = 1
 }

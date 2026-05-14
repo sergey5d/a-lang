@@ -1,7 +1,7 @@
 class Either[L, R] {
-    priv var rightSet Bool
-    priv var left L
-    priv var right R
+    hidden var rightSet Bool
+    hidden var left L
+    hidden var right R
 }
 
 impl Either[L, R] {

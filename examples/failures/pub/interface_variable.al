@@ -1,6 +1,6 @@
 # FAIL:
-# pub is not allowed inside interfaces
+# public is not allowed inside interfaces
 
 interface Named {
-    pub value Str
+    public value Str
 }

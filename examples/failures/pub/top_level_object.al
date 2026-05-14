@@ -1,6 +1,6 @@
 # FAIL:
-# 'pub' is only supported for top-level functions and immutable bindings
+# 'public' is only supported for top-level functions and immutable bindings
 
-pub object MathBox {
+public object MathBox {
     value Int = 1
 }

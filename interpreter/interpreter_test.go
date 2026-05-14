@@ -64,8 +64,8 @@ func TestModulePublicFunctionAndBinding(t *testing.T) {
 	writeModuleFile(t, filepath.Join(dir, "lib.al"), `
 package lib
 
-pub def hidden() Int = 7
-pub answer Int = 5
+public def exportedValue() Int = 7
+public answer Int = 5
 `)
 	writeModuleFile(t, filepath.Join(dir, "main.al"), `
 package app
@@ -74,7 +74,7 @@ import lib
 import lib/{answer as direct}
 
 def run() Int {
-	return lib.hidden() + lib.answer + direct
+	return lib.exportedValue() + lib.answer + direct
 }
 `)
 
@@ -218,8 +218,8 @@ def run() Int {
 func TestPrivateFieldInferenceInClassAndObject(t *testing.T) {
 	src := `
 class Box {
-	priv count = 2
-	priv var total = 0
+	hidden count = 2
+	hidden var total = 0
 }
 
 impl Box {
@@ -231,7 +231,7 @@ impl Box {
 }
 
 object Greeter {
-	priv hello = "Hello"
+	hidden hello = "Hello"
 }
 
 impl Greeter {
@@ -403,7 +403,7 @@ def run() Int {
 func TestClassesAndMethods(t *testing.T) {
 	src := `
 class Counter {
-	priv var count Int
+	hidden var count Int
 }
 
 impl Counter {
@@ -468,7 +468,7 @@ def run() Int {
 func TestMethodWithoutReturnTypeDoesNotImplicitlyReturn(t *testing.T) {
 	src := `
 class Counter {
-	priv var count Int
+	hidden var count Int
 }
 
 impl Counter {
@@ -1088,7 +1088,7 @@ def run() Int {
 func TestMethodReferenceRequiresCall(t *testing.T) {
 	src := `
 class Counter {
-	priv var count Int
+	hidden var count Int
 }
 
 impl Counter {
@@ -1161,7 +1161,7 @@ def run() Int {
 func TestClassEqualityUsesEquals(t *testing.T) {
 	src := `
 class Counter {
-	priv count Int
+	hidden count Int
 }
 
 impl Counter {
@@ -1290,7 +1290,7 @@ def run() Int {
 func TestCustomAndCollectionOperators(t *testing.T) {
 	src := `
 class Vec {
-	priv var items Array[Int]
+	hidden var items Array[Int]
 }
 
 impl Vec {
@@ -2110,7 +2110,7 @@ func TestImplicitPrimaryConstructorAndThisDelegation(t *testing.T) {
 class Counter {
 	count Int
 	label Str
-	priv var seen Bool = false
+	hidden var seen Bool = false
 }
 
 impl Counter {

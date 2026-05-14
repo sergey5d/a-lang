@@ -14,7 +14,7 @@ class Box {
 
 class Crate {
     value Int
-    hidden Str
+    spare Str
     label Str
 }
 

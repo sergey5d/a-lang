@@ -1,6 +1,6 @@
 # FAIL:
-# pub is not allowed on object members
+# public is not allowed on object members
 
 object Counter {
-    pub def next() Int = 1
+    public def next() Int = 1
 }

@@ -1,7 +1,7 @@
 class Result[T, E] {
-    priv var ok Bool
-    priv var value T
-    priv var error E
+    hidden var ok Bool
+    hidden var value T
+    hidden var error E
 }
 
 impl Result[T, E] {

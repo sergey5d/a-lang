@@ -41,7 +41,7 @@ func (p *Parser) parseInterfaceWithPrivate(private bool) (*InterfaceDecl, error)
 	}
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		if p.check(TokenPub) {
-			return nil, fmt.Errorf("pub is not allowed inside interfaces")
+			return nil, fmt.Errorf("public is not allowed inside interfaces")
 		}
 		if p.check(TokenOperator) {
 			return nil, fmt.Errorf("use symbolic 'def' declarations instead of the 'operator' keyword")

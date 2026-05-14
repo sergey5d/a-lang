@@ -2,7 +2,7 @@
 # assign_immutable at .*: cannot assign to immutable field 'count' outside constructor
 
 class Counter {
-    priv count Int
+    hidden count Int
 }
 
 impl Counter {

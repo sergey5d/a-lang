@@ -79,7 +79,7 @@ Current package/import support is usable.
 Settled direction:
 - top-level bindings are private by default
 - top-level functions are private by default
-- exported top-level functions and exported immutable module bindings use explicit `pub`
+- exported top-level functions and exported immutable module bindings use explicit `public`
 - mutable module state should not be exposed directly as imported variables
 
 Still open:

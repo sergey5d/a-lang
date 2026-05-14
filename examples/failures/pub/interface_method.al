@@ -1,6 +1,6 @@
 # FAIL:
-# pub is not allowed inside interfaces
+# public is not allowed inside interfaces
 
 interface Named {
-    pub def label() Str = "named"
+    public def label() Str = "named"
 }

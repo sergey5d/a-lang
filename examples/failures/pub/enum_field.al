@@ -1,7 +1,7 @@
 # FAIL:
-# pub is not allowed on enum members
+# public is not allowed on enum members
 
 enum Color {
-    pub code Int = 1
+    public code Int = 1
     case Red
 }

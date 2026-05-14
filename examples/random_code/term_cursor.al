@@ -30,10 +30,10 @@ record Location {
 }
 
 class Cursor {
-    priv term Str
-    priv documents List[Str]
-    priv var current Location
-    priv var valid Bool = false
+    hidden term Str
+    hidden documents List[Str]
+    hidden var current Location
+    hidden var valid Bool = false
 }
 
 impl Cursor {

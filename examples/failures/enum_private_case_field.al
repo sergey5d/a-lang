@@ -3,7 +3,7 @@
 enum Value {
     case Pair {
         left Int
-        priv right Int
+        hidden right Int
     }
 }
 

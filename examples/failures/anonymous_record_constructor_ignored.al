@@ -3,7 +3,7 @@
 
 class SecretBadge {
     name Str
-    priv code Int
+    hidden code Int
 }
 
 impl SecretBadge {

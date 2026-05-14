@@ -5,8 +5,8 @@
 # 0
 
 class CounterBox {
-    priv count = 1
-    priv var hits = 0
+    hidden count = 1
+    hidden var hits = 0
 }
 
 impl CounterBox {
@@ -18,7 +18,7 @@ impl CounterBox {
 }
 
 object Greeter {
-    priv hello = "Hello"
+    hidden hello = "Hello"
 }
 
 impl Greeter {

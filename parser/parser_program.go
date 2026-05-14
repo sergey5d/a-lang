@@ -107,7 +107,7 @@ func (p *Parser) parseProgram() (*Program, error) {
 				}
 				program.Classes = append(program.Classes, decl)
 			default:
-				return nil, fmt.Errorf("'priv' is only supported for top-level declarations")
+				return nil, fmt.Errorf("'hidden' is only supported for top-level declarations")
 			}
 			case TokenPub:
 				p.advance()
@@ -119,7 +119,7 @@ func (p *Parser) parseProgram() (*Program, error) {
 					}
 					program.Functions = append(program.Functions, fn)
 				case TokenInterface, TokenClass, TokenObject, TokenRecord, TokenEnum, TokenImpl:
-					return nil, fmt.Errorf("'pub' is only supported for top-level functions and immutable bindings")
+					return nil, fmt.Errorf("'public' is only supported for top-level functions and immutable bindings")
 				default:
 					stmt, err := p.parseStatement()
 					if err != nil {
@@ -127,11 +127,11 @@ func (p *Parser) parseProgram() (*Program, error) {
 					}
 				valStmt, ok := stmt.(*ValStmt)
 				if !ok {
-					return nil, fmt.Errorf("'pub' is only supported for top-level functions and immutable bindings")
+					return nil, fmt.Errorf("'public' is only supported for top-level functions and immutable bindings")
 				}
 				for _, binding := range valStmt.Bindings {
 					if binding.Name == "_" || binding.Mutable {
-						return nil, fmt.Errorf("'pub' is only supported for immutable named top-level bindings")
+						return nil, fmt.Errorf("'public' is only supported for immutable named top-level bindings")
 					}
 				}
 				valStmt.Public = true

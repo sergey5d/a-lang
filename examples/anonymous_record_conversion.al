@@ -25,7 +25,7 @@ class MutablePoint {
 
 class SecretBadge {
     name Str
-    priv code Int
+    hidden code Int
 }
 
 impl SecretBadge {
@@ -40,7 +40,7 @@ impl SecretBadge {
 class MixedProfile {
     name Str
     age Int
-    priv score Int = 5
+    hidden score Int = 5
 }
 
 impl MixedProfile {

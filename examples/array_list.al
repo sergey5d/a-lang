@@ -4,9 +4,9 @@
 # ArrayList[Int](5) and ArrayListIterator[T](...) are supported.
 
 class ArrayListIterator[T] with Iterator[T] {
-    priv var items Array[T]
-    priv var limit Int
-    priv var index Int = 0
+    hidden var items Array[T]
+    hidden var limit Int
+    hidden var index Int = 0
 }
 
 impl ArrayListIterator[T] {
@@ -25,8 +25,8 @@ impl ArrayListIterator[T] {
 }
 
 class ArrayList[T] with Iterable[T] {
-    priv var items Array[T]
-    priv var count Int = 0
+    hidden var items Array[T]
+    hidden var count Int = 0
 }
 
 impl ArrayList[T] {

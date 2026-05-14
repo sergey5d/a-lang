@@ -30,7 +30,7 @@ impl IntRange {
     }
 }
 
-priv class RangeIterator with Iterator[Int] {
+hidden class RangeIterator with Iterator[Int] {
     var current Int
     var end Int
     var step Int

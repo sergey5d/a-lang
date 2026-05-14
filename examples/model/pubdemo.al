@@ -1,6 +1,6 @@
 # SKIP
 package pubdemo
 
-pub prefix Str = "hello"
+public prefix Str = "hello"
 
-pub def greet(name Str) Str = prefix + ", " + name
+public def greet(name Str) Str = prefix + ", " + name

@@ -83,7 +83,7 @@ func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 			}
 			decl.Methods = append(decl.Methods, method)
 		case TokenPub:
-			return nil, fmt.Errorf("pub is not allowed on enum members")
+			return nil, fmt.Errorf("public is not allowed on enum members")
 		case TokenOperator:
 			return nil, fmt.Errorf("use 'def %s' instead of 'operator %s' in enum declarations", p.peekNextOperatorExample(), p.peekNextOperatorExample())
 		case TokenCase:
@@ -138,7 +138,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
 		private := p.match(TokenPrivate)
 		if p.check(TokenPub) {
-			return nil, fmt.Errorf("pub is not allowed on %s members", noun)
+			return nil, fmt.Errorf("public is not allowed on %s members", noun)
 		}
 		switch p.peek().Type {
 		case TokenIdentifier, TokenVar:
