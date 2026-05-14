@@ -115,8 +115,8 @@ type nativePrinter struct {
 	stderr bool
 }
 type nativeOS struct {
-	out *nativePrinter
-	err *nativePrinter
+	stdout *nativePrinter
+	stderr *nativePrinter
 }
 
 type returnSignal struct {
@@ -1459,6 +1459,9 @@ func (in *Interpreter) evalExpr(expr parser.Expr, local *env) (Value, error) {
 		if _, ok := in.functions[e.Name]; ok {
 			return functionRef{module: in, name: e.Name}, nil
 		}
+		if isImplicitOSMethod(e.Name) {
+			return boundMethodRef{receiver: newNativeOS(), name: e.Name}, nil
+		}
 		switch e.Name {
 		case "List", "Set", "Map", "Array", "Some", "None", "Ok", "Err", "Left", "Right":
 			return builtinRef{name: e.Name}, nil
@@ -2302,7 +2305,14 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 	return nil, RuntimeError{Message: "unknown method '" + member.Name + "'", Span: member.Span}
 }
 
-func (in *Interpreter) evalBoundMethodArgs(obj *instance, methodName string, argExprs []parser.CallArg, local *env, span parser.Span) ([]Value, error) {
+func (in *Interpreter) evalBoundMethodArgs(receiver Value, methodName string, argExprs []parser.CallArg, local *env, span parser.Span) ([]Value, error) {
+	if descriptor, ok := in.nativeMethodDescriptor(receiver, methodName); ok {
+		return in.evalArgsWithParams(descriptor.Parameters, argExprs, local, span, "method '"+methodName+"'")
+	}
+	obj, ok := receiver.(*instance)
+	if !ok {
+		return nil, RuntimeError{Message: "unknown method '" + methodName + "'", Span: span}
+	}
 	methods := instanceMethods(obj)
 	var candidates []*parser.MethodDecl
 	for _, method := range methods {
@@ -2340,7 +2350,23 @@ func (in *Interpreter) evalBoundMethodArgs(obj *instance, methodName string, arg
 	return namedArgValues(args), nil
 }
 
-func (in *Interpreter) invokeBoundMethod(obj *instance, methodName string, args []Value, local *env, span parser.Span) (Value, error) {
+func (in *Interpreter) invokeBoundMethod(receiver Value, methodName string, args []Value, local *env, span parser.Span) (Value, error) {
+	if descriptor, ok := in.nativeMethodDescriptor(receiver, methodName); ok {
+		named := make([]namedValueArg, len(args))
+		for i, arg := range args {
+			named[i] = namedValueArg{Value: arg, Span: span}
+		}
+		if !acceptsArgCount(descriptor.Parameters, len(args)) {
+			return nil, RuntimeError{Message: fmt.Sprintf("method '%s' expects %s arguments, got %d", methodName, expectedCallableArgs(descriptor.Parameters), len(args)), Span: span}
+		}
+		if native, ok := in.callNativeMethod(receiver, methodName, named, local, span); ok {
+			return native.value, native.err
+		}
+	}
+	obj, ok := receiver.(*instance)
+	if !ok {
+		return nil, RuntimeError{Message: "unknown method '" + methodName + "'", Span: span}
+	}
 	methods := instanceMethods(obj)
 	for _, method := range methods {
 		if method.Name != methodName {
@@ -2420,10 +2446,10 @@ func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Valu
 		return nil, RuntimeError{Message: "unknown member '" + expr.Name + "'", Span: expr.Span}
 	case *nativeOS:
 		switch expr.Name {
-		case "out":
-			return value.out, nil
-		case "err":
-			return value.err, nil
+		case "stdout":
+			return value.stdout, nil
+		case "stderr":
+			return value.stderr, nil
 		}
 		if in.nativeHasMethod(receiver, expr.Name) {
 			return nil, RuntimeError{Message: "method '" + expr.Name + "' must be called with ()", Span: expr.Span}
@@ -2470,6 +2496,15 @@ func (in *Interpreter) identifierShadowsTypeName(local *env, name string) bool {
 func isBuiltinRuntimeValue(name string) bool {
 	switch name {
 	case "List", "Set", "Map", "Array", "Some", "None", "Ok", "Err", "Left", "Right", "OS":
+		return true
+	default:
+		return false
+	}
+}
+
+func isImplicitOSMethod(name string) bool {
+	switch name {
+	case "print", "println", "printf", "panic":
 		return true
 	default:
 		return false
@@ -2934,7 +2969,7 @@ type functionRef struct {
 	name   string
 }
 type boundMethodRef struct {
-	receiver *instance
+	receiver Value
 	name     string
 }
 type classRef struct {
@@ -3079,8 +3114,8 @@ func kindOrTuple(kind string) string {
 
 func newNativeOS() *nativeOS {
 	return &nativeOS{
-		out: &nativePrinter{},
-		err: &nativePrinter{stderr: true},
+		stdout: &nativePrinter{},
+		stderr: &nativePrinter{stderr: true},
 	}
 }
 

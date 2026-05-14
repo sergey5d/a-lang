@@ -1062,6 +1062,15 @@ func isBuiltin(name string) bool {
 	case "List", "Map", "Set", "Array", "Some", "None", "Ok", "Err", "Left", "Right", "OS":
 		return true
 	default:
+		return isImplicitOSMethod(name)
+	}
+}
+
+func isImplicitOSMethod(name string) bool {
+	switch name {
+	case "print", "println", "printf", "panic":
+		return true
+	default:
 		return false
 	}
 }

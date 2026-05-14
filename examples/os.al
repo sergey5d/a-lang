@@ -9,8 +9,8 @@ def main() Unit {
     OS.print("hello")
     OS.println(" world")
     OS.printf("fmt %d\n", 7)
-    OS.out.printf("pair %s %d\n", "left", 9)
-    OS.out.print("out")
-    OS.out.println(" line")
+    OS.stdout.printf("pair %s %d\n", "left", 9)
+    OS.stdout.print("out")
+    OS.stdout.println(" line")
     OS.println("done")
 }

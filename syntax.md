@@ -87,11 +87,11 @@ OS.print("hello")
 OS.println("hello")
 OS.printf("value=%d\n", 42)
 OS.panic("boom")
-OS.out.println("hello")
-OS.err.println("oops")
+OS.stdout.println("hello")
+OS.stderr.println("oops")
 ```
 
-`OS.out` and `OS.err` implement `Printer`.
+`OS.stdout` and `OS.stderr` implement `Printer`.
 
 ## Imports
 
@@ -121,6 +121,8 @@ Meaning:
   import all visible object methods unqualified
 - `import package/sub/Object/{printLn as printN, print}`
   import selected visible object methods from an object
+
+Built-in `OS` methods are imported implicitly in every file, so `print(...)`, `println(...)`, `printf(...)`, and `panic(...)` work without writing `import OS/*`. Fields like `OS.stdout` and `OS.stderr` still use explicit member access.
 
 ## Top-Level Declarations
 

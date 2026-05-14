@@ -3,6 +3,6 @@
 # 0
 
 def main() Int {
-	OS.println("hello world")
+		println("hello world")
 	0
 }

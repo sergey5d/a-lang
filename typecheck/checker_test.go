@@ -1336,6 +1336,22 @@ def run() Int {
 	}
 }
 
+func TestAnalyzeImplicitOSMethods(t *testing.T) {
+	src := `
+def run() Unit {
+	println("hello")
+	print("x")
+	printf("%s", "y")
+	OS.println("z")
+}
+`
+
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics, got %#v", result.Diagnostics)
+	}
+}
+
 func TestAnalyzeInterfaceImplementation(t *testing.T) {
 	src := `
 interface Stringable {

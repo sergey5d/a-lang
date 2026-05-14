@@ -127,14 +127,30 @@ def run() Int {
 	}
 }
 
+func TestImplicitOSMethods(t *testing.T) {
+	src := `
+def run() Unit {
+	println("hello")
+	print("x")
+	printf("%s", "y")
+	OS.println("z")
+}
+`
+
+	in := New(parseProgram(t, src))
+	if _, err := in.Call("run"); err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+}
+
 func TestOSPrinters(t *testing.T) {
 	src := `
 def run() Unit {
 	OS.print("out")
-	OS.out.println(" line")
+	OS.stdout.println(" line")
 	OS.printf(" %s %d", "fmt", 7)
-	OS.err.println("err line")
-	OS.err.printf("err %s %d", "fmt", 3)
+	OS.stderr.println("err line")
+	OS.stderr.printf("err %s %d", "fmt", 3)
 	OS.println("legacy")
 }
 `

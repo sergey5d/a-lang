@@ -2441,6 +2441,12 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 			result = functionType(e.Name, sig)
 			break
 		}
+		if isImplicitOSMethod(e.Name) {
+			if sig, ok := c.implicitOSMethodSignature(e.Name); ok {
+				result = functionType(e.Name, sig)
+				break
+			}
+		}
 		if _, ok := c.classes[e.Name]; ok {
 			result = &Type{Kind: TypeClass, Name: e.Name}
 			break
@@ -2701,14 +2707,14 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 			}
 			return sig.ReturnType
 		}
-		if sig, ok := c.functions[ident.Name]; ok {
-			if hasNamedCallArgs(call.Args) {
-				for _, arg := range call.Args {
-					c.checkExpr(arg.Value)
+			if sig, ok := c.functions[ident.Name]; ok {
+				if hasNamedCallArgs(call.Args) {
+					for _, arg := range call.Args {
+						c.checkExpr(arg.Value)
+					}
+					c.addDiagnostic("invalid_named_argument", "named arguments require a direct function or method declaration", call.Span)
+					return sig.ReturnType
 				}
-				c.addDiagnostic("invalid_named_argument", "named arguments require a direct function or method declaration", call.Span)
-				return sig.ReturnType
-			}
 			if !validArgCount(sig, len(call.Args)) {
 				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(sig), len(call.Args)), call.Span)
 			}
@@ -2719,9 +2725,33 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 					continue
 				}
 				c.checkExpr(arg.Value)
+				}
+				return sig.ReturnType
 			}
-			return sig.ReturnType
-		}
+			if isImplicitOSMethod(ident.Name) {
+				sig, ok := c.implicitOSMethodSignature(ident.Name)
+				if ok {
+					if hasNamedCallArgs(call.Args) {
+						for _, arg := range call.Args {
+							c.checkExpr(arg.Value)
+						}
+						c.addDiagnostic("invalid_named_argument", "named arguments require a direct function or method declaration", call.Span)
+						return sig.ReturnType
+					}
+					if !validArgCount(sig, len(call.Args)) {
+						c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(sig), len(call.Args)), call.Span)
+					}
+					for i, arg := range call.Args {
+						if expected, ok := paramTypeForArg(sig, i); ok {
+							argType := c.checkExprWithExpected(arg.Value, expected)
+							c.requireAssignable(argType, expected, exprSpan(arg.Value), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+							continue
+						}
+						c.checkExpr(arg.Value)
+					}
+					return sig.ReturnType
+				}
+			}
 	}
 	if member, ok := call.Callee.(*parser.MemberExpr); ok {
 		return c.checkMethodCall(member, call.Args)
@@ -6067,6 +6097,61 @@ func isBuiltinValue(name string) bool {
 	default:
 		return false
 	}
+}
+
+func isImplicitOSMethod(name string) bool {
+	switch name {
+	case "print", "println", "printf", "panic":
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *Checker) implicitOSMethodSignature(name string) (Signature, bool) {
+	registry, err := predef.Load()
+	if err != nil {
+		panic(err)
+	}
+	seen := map[string]bool{}
+	var lookup func(typeName, methodName string) (predef.MethodDescriptor, bool)
+	lookup = func(typeName, methodName string) (predef.MethodDescriptor, bool) {
+		if seen[typeName] {
+			return predef.MethodDescriptor{}, false
+		}
+		seen[typeName] = true
+		descriptor, ok := registry.Types[typeName]
+		if !ok {
+			return predef.MethodDescriptor{}, false
+		}
+		for _, method := range descriptor.Methods {
+			if method.Name == methodName && !method.Private && !method.Constructor {
+				return method, true
+			}
+		}
+		for _, iface := range descriptor.ImplementedInterfaces {
+			if iface == nil || iface.Name == "" {
+				continue
+			}
+			if method, ok := lookup(iface.Name, methodName); ok {
+				return method, true
+			}
+		}
+		return predef.MethodDescriptor{}, false
+	}
+	method, ok := lookup("OS", name)
+	if !ok {
+		return Signature{}, false
+	}
+	params := make([]*Type, len(method.Parameters))
+	for i, param := range method.Parameters {
+		params[i] = fromTypeRef(param.Type, c)
+	}
+	return Signature{
+		Parameters: params,
+		ReturnType: fromTypeRef(method.ReturnType, c),
+		Variadic:   len(method.Parameters) > 0 && method.Parameters[len(method.Parameters)-1].Variadic,
+	}, true
 }
 
 func isNumeric(t *Type) bool {

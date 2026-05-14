@@ -71,7 +71,7 @@ func nativeOSPrint(in *Interpreter, receiver Value, args []Value, local *env, sp
 	if !ok {
 		return nil, RuntimeError{Message: "native OS.print receiver mismatch", Span: span}
 	}
-	return nativePrinterPrint(in, value.out, args, local, span)
+	return nativePrinterPrint(in, value.stdout, args, local, span)
 }
 
 func nativeOSPrintln(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
@@ -79,7 +79,7 @@ func nativeOSPrintln(in *Interpreter, receiver Value, args []Value, local *env, 
 	if !ok {
 		return nil, RuntimeError{Message: "native OS.println receiver mismatch", Span: span}
 	}
-	return nativePrinterPrintln(in, value.out, args, local, span)
+	return nativePrinterPrintln(in, value.stdout, args, local, span)
 }
 
 func nativeOSPrintf(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
@@ -87,7 +87,7 @@ func nativeOSPrintf(in *Interpreter, receiver Value, args []Value, local *env, s
 	if !ok {
 		return nil, RuntimeError{Message: "native OS.printf receiver mismatch", Span: span}
 	}
-	return nativePrinterPrintf(in, value.out, args, local, span)
+	return nativePrinterPrintf(in, value.stdout, args, local, span)
 }
 
 func nativeOSPanic(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
