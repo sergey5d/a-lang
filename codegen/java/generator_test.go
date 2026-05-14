@@ -165,6 +165,80 @@ def run() Int {
 	}
 }
 
+func TestGenerateCompilesWithTupleRangeLoop(t *testing.T) {
+	src := `
+def run(limit Int) Int {
+	var total Int = 0
+	for i <- (0, limit) {
+		total += i
+	}
+	return total
+}
+`
+
+	lowered := lowerProgram(t, src)
+	source, err := GenerateForPackage(lowered, "")
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+
+	text := string(source)
+	if !strings.Contains(text, "for (long i = 0L; i < limit; i++)") {
+		t.Fatalf("expected tuple range loop lowering in generated Java, got:\n%s", text)
+	}
+}
+
+func TestGenerateCompilesWithListSetAndLambda(t *testing.T) {
+	src := `
+def run() Int {
+	values List[List[Int]] = List(
+		List(1, 2),
+		List(3, 4)
+	)
+	seen Set[Int] = Set()
+	stack List[Int] = List(0)
+	row = values[0]
+	first = row[0]
+	row.forEach(next -> stack.append(next))
+	seen.add(stack.remove(stack.size() - 1).getOr(-1) + first)
+	return seen.size()
+}
+`
+
+	lowered := lowerProgram(t, src)
+	source, err := GenerateForPackage(lowered, "")
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+
+	text := string(source)
+	if !strings.Contains(text, "alang.stdlib.List<alang.stdlib.List<Long>>") {
+		t.Fatalf("expected List type lowering in generated Java, got:\n%s", text)
+	}
+	if !strings.Contains(text, "row.get(0L).expect()") {
+		t.Fatalf("expected list indexing lowering in generated Java, got:\n%s", text)
+	}
+	if !strings.Contains(text, "row.forEach(next -> { stack.append(next); })") {
+		t.Fatalf("expected lambda lowering in generated Java, got:\n%s", text)
+	}
+
+	tmpDir := t.TempDir()
+	if err := WriteStdlibSupport(tmpDir); err != nil {
+		t.Fatalf("WriteStdlibSupport returned error: %v", err)
+	}
+	path := filepath.Join(tmpDir, "Pkg_Default.java")
+	if err := os.WriteFile(path, source, 0o644); err != nil {
+		t.Fatalf("write generated source: %v", err)
+	}
+
+	javaFiles := collectJavaFiles(t, tmpDir)
+	cmd := exec.Command("javac", javaFiles...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("javac failed: %v\n%s\n%s", err, text, string(output))
+	}
+}
+
 func TestGenerateRejectsUnsupportedListLiteral(t *testing.T) {
 	src := `
 def run() Int {
@@ -197,6 +271,7 @@ func TestWriteStdlibSupportCreatesOptionAndTupleFiles(t *testing.T) {
 		t.Fatalf("WriteStdlibSupport returned error: %v", err)
 	}
 	for _, rel := range []string{
+		filepath.Join("alang", "stdlib", "OS.java"),
 		filepath.Join("alang", "stdlib", "Option.java"),
 		filepath.Join("alang", "stdlib", "Tuple2.java"),
 		filepath.Join("alang", "stdlib", "Tuple10.java"),
@@ -204,6 +279,35 @@ func TestWriteStdlibSupportCreatesOptionAndTupleFiles(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(tmpDir, rel)); err != nil {
 			t.Fatalf("expected runtime file %s: %v", rel, err)
 		}
+	}
+}
+
+func TestGenerateFindCircleNumCompilesWithJavac(t *testing.T) {
+	srcBytes, err := os.ReadFile(filepath.Join("..", "..", "examples", "random_code", "find_circle_num.al"))
+	if err != nil {
+		t.Fatalf("read example source: %v", err)
+	}
+
+	lowered := lowerProgram(t, string(srcBytes))
+	source, err := GenerateForPackage(lowered, "")
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	if err := WriteStdlibSupport(tmpDir); err != nil {
+		t.Fatalf("WriteStdlibSupport returned error: %v", err)
+	}
+	path := filepath.Join(tmpDir, "Pkg_Default.java")
+	if err := os.WriteFile(path, source, 0o644); err != nil {
+		t.Fatalf("write generated source: %v", err)
+	}
+
+	javaFiles := collectJavaFiles(t, tmpDir)
+	cmd := exec.Command("javac", javaFiles...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("javac failed: %v\n%s\n%s", err, string(source), string(output))
 	}
 }
 

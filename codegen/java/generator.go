@@ -16,6 +16,7 @@ const defaultClassName = "Generated"
 type Generator struct {
 	b           strings.Builder
 	indent      int
+	tempID      int
 	moduleClass string
 	packageName string
 	classes     map[string]*lower.Class
@@ -120,6 +121,140 @@ public final class Option<T> {
     }
 }
 `,
+		filepath.Join("alang", "stdlib", "OS.java"): `package alang.stdlib;
+
+public final class OS {
+    private OS() {}
+
+    public static void print(Object value) {
+        System.out.print(String.valueOf(value));
+    }
+
+    public static void println(Object value) {
+        System.out.println(String.valueOf(value));
+    }
+
+    public static void printf(String format, Object... values) {
+        System.out.printf(format, values);
+    }
+
+    public static void panic(Object value) {
+        throw new RuntimeException(String.valueOf(value));
+    }
+}
+`,
+		filepath.Join("alang", "stdlib", "List.java"): `package alang.stdlib;
+
+public final class List<T> implements Iterable<T> {
+    private final java.util.ArrayList<T> items;
+
+    private List(java.util.ArrayList<T> items) {
+        this.items = items;
+    }
+
+    public List() {
+        this(new java.util.ArrayList<>());
+    }
+
+    @SafeVarargs
+    public static <T> List<T> of(T... values) {
+        java.util.ArrayList<T> items = new java.util.ArrayList<>();
+        for (T value : values) {
+            items.add(value);
+        }
+        return new List<>(items);
+    }
+
+    public List<T> append(T value) {
+        this.items.add(value);
+        return this;
+    }
+
+    public Option<T> get(long index) {
+        int idx = (int) index;
+        if (idx < 0 || idx >= this.items.size()) {
+            return Option.none();
+        }
+        return Option.some(this.items.get(idx));
+    }
+
+    public Option<T> remove(long index) {
+        int idx = (int) index;
+        if (idx < 0 || idx >= this.items.size()) {
+            return Option.none();
+        }
+        return Option.some(this.items.remove(idx));
+    }
+
+    public long size() {
+        return this.items.size();
+    }
+
+    public boolean isEmpty() {
+        return this.items.isEmpty();
+    }
+
+    @Override
+    public void forEach(java.util.function.Consumer<? super T> consumer) {
+        for (T item : this.items) {
+            consumer.accept(item);
+        }
+    }
+
+    @Override
+    public java.util.Iterator<T> iterator() {
+        return this.items.iterator();
+    }
+}
+`,
+		filepath.Join("alang", "stdlib", "Set.java"): `package alang.stdlib;
+
+public final class Set<T> implements Iterable<T> {
+    private final java.util.LinkedHashSet<T> items;
+
+    private Set(java.util.LinkedHashSet<T> items) {
+        this.items = items;
+    }
+
+    public Set() {
+        this(new java.util.LinkedHashSet<>());
+    }
+
+    @SafeVarargs
+    public static <T> Set<T> of(T... values) {
+        java.util.LinkedHashSet<T> items = new java.util.LinkedHashSet<>();
+        for (T value : values) {
+            items.add(value);
+        }
+        return new Set<>(items);
+    }
+
+    public Set<T> add(T value) {
+        this.items.add(value);
+        return this;
+    }
+
+    public boolean contains(T value) {
+        return this.items.contains(value);
+    }
+
+    public long size() {
+        return this.items.size();
+    }
+
+    @Override
+    public void forEach(java.util.function.Consumer<? super T> consumer) {
+        for (T item : this.items) {
+            consumer.accept(item);
+        }
+    }
+
+    @Override
+    public java.util.Iterator<T> iterator() {
+        return this.items.iterator();
+    }
+}
+`,
 	}
 
 	for arity := 2; arity <= 10; arity++ {
@@ -209,7 +344,7 @@ func (g *Generator) writeGlobal(global *lower.Global) error {
 		g.linef("%s %s %s;", modifier, typ, name)
 		return nil
 	}
-	initExpr, err := g.expr(global.Init)
+	initExpr, err := g.exprWithExpected(global.Init, global.Type)
 	if err != nil {
 		return err
 	}
@@ -384,7 +519,7 @@ func (g *Generator) writeField(field *lower.Field) error {
 		g.linef("%s;", prefix)
 		return nil
 	}
-	initExpr, err := g.expr(field.Init)
+	initExpr, err := g.exprWithExpected(field.Init, field.Type)
 	if err != nil {
 		return err
 	}
@@ -494,7 +629,7 @@ func (g *Generator) writeStmt(stmt lower.Stmt) error {
 			g.linef("%s %s;", typ, javaIdent(s.Name))
 			return nil
 		}
-		initExpr, err := g.expr(s.Init)
+		initExpr, err := g.exprWithExpected(s.Init, s.Type)
 		if err != nil {
 			return err
 		}
@@ -504,7 +639,7 @@ func (g *Generator) writeStmt(stmt lower.Stmt) error {
 		if err != nil {
 			return err
 		}
-		value, err := g.expr(s.Value)
+		value, err := g.exprWithExpected(s.Value, g.assignmentTargetType(s.Target))
 		if err != nil {
 			return err
 		}
@@ -536,6 +671,11 @@ func (g *Generator) writeStmt(stmt lower.Stmt) error {
 		g.indent--
 		g.line("}")
 	case *lower.ForEach:
+		if ok, err := g.writeRangeLoop(s); err != nil {
+			return err
+		} else if ok {
+			return nil
+		}
 		iterable, err := g.expr(s.Iterable)
 		if err != nil {
 			return err
@@ -583,9 +723,66 @@ func (g *Generator) writeStmt(stmt lower.Stmt) error {
 	return nil
 }
 
+func (g *Generator) writeRangeLoop(loop *lower.ForEach) (bool, error) {
+	start, end, err := g.rangeBounds(loop.Iterable)
+	if err != nil {
+		return false, err
+	}
+	if start == "" && end == "" {
+		return false, nil
+	}
+	g.linef("for (long %s = %s; %s < %s; %s++) {", javaIdent(loop.Name), start, javaIdent(loop.Name), end, javaIdent(loop.Name))
+	g.indent++
+	if err := g.writeStmtBlock(loop.Body); err != nil {
+		return false, err
+	}
+	g.indent--
+	g.line("}")
+	return true, nil
+}
+
+func (g *Generator) rangeBounds(iterable lower.Expr) (string, string, error) {
+	t := exprType(iterable)
+	if t == nil || t.Kind != typecheck.TypeTuple || len(t.Args) != 2 {
+		return "", "", nil
+	}
+	for _, arg := range t.Args {
+		if arg == nil || arg.Kind != typecheck.TypeBuiltin || (arg.Name != "Int" && arg.Name != "Int64") {
+			return "", "", nil
+		}
+	}
+	switch e := iterable.(type) {
+	case *lower.TupleLiteral:
+		start, err := g.expr(e.Elements[0])
+		if err != nil {
+			return "", "", err
+		}
+		end, err := g.expr(e.Elements[1])
+		if err != nil {
+			return "", "", err
+		}
+		return start, end, nil
+	default:
+		iterableExpr, err := g.expr(iterable)
+		if err != nil {
+			return "", "", err
+		}
+		temp := g.nextTemp("range")
+		typeName, err := g.javaType(t, false)
+		if err != nil {
+			return "", "", err
+		}
+		g.linef("%s %s = %s;", typeName, temp, iterableExpr)
+		return temp + ".item1", temp + ".item2", nil
+	}
+}
+
 func (g *Generator) expr(expr lower.Expr) (string, error) {
 	switch e := expr.(type) {
 	case *lower.VarRef:
+		if e.Name == "OS" {
+			return "alang.stdlib.OS", nil
+		}
 		if e.Type != nil && e.Type.Kind == typecheck.TypeObject {
 			if _, ok := g.objects[e.Name]; ok {
 				return g.className(g.objects[e.Name]) + ".INSTANCE", nil
@@ -648,6 +845,12 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		if e.Name == "Array" {
 			return g.arrayLiteral(e)
 		}
+		if e.Name == "List" {
+			return g.collectionLiteral("alang.stdlib.List", e.Args)
+		}
+		if e.Name == "Set" {
+			return g.collectionLiteral("alang.stdlib.Set", e.Args)
+		}
 		if e.Name == "Some" {
 			if len(e.Args) != 1 {
 				return "", fmt.Errorf("Some expects 1 argument")
@@ -696,10 +899,22 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if receiverType := exprType(e.Receiver); receiverType != nil && receiverType.Kind == typecheck.TypeInterface && receiverType.Name == "List" && len(receiverType.Args) == 1 {
+			return fmt.Sprintf("%s.get(%s).expect()", receiver, index), nil
+		}
 		return fmt.Sprintf("%s[(int)(%s)]", receiver, index), nil
 	case *lower.MethodCall:
 		if receiver, ok := e.Receiver.(*lower.VarRef); ok && receiver.Name == "Array" && e.Method == "ofLength" {
 			return g.arrayOfLength(e)
+		}
+		if receiverType := exprType(e.Receiver); receiverType != nil && receiverType.Kind == typecheck.TypeBuiltin && receiverType.Name == "Array" {
+			if e.Method == "size" && len(e.Args) == 0 {
+				receiver, err := g.expr(e.Receiver)
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("%s.length", receiver), nil
+			}
 		}
 		receiver, err := g.expr(e.Receiver)
 		if err != nil {
@@ -711,10 +926,16 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		}
 		return fmt.Sprintf("%s.%s(%s)", receiver, javaIdent(e.Method), args), nil
 	case *lower.Lambda:
-		return "", fmt.Errorf("unsupported lowered expression %T", expr)
+		return g.lambdaExpr(e)
 	case *lower.Invoke:
 		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "Array" {
 			return g.arrayLiteralFromArgs(e.Args, e.Type)
+		}
+		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "List" {
+			return g.collectionLiteral("alang.stdlib.List", e.Args)
+		}
+		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "Set" {
+			return g.collectionLiteral("alang.stdlib.Set", e.Args)
 		}
 		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "Some" {
 			if len(e.Args) != 1 {
@@ -736,6 +957,16 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported lowered expression %T", expr)
 	}
+}
+
+func (g *Generator) exprWithExpected(expr lower.Expr, expected *typecheck.Type) (string, error) {
+	switch e := expr.(type) {
+	case *lower.MethodCall:
+		if receiver, ok := e.Receiver.(*lower.VarRef); ok && receiver.Name == "Array" && e.Method == "ofLength" {
+			return g.arrayOfLengthWithExpected(e, expected)
+		}
+	}
+	return g.expr(expr)
 }
 
 func (g *Generator) params(params []lower.Parameter) string {
@@ -767,6 +998,14 @@ func (g *Generator) arrayLiteral(call *lower.FunctionCall) (string, error) {
 	return g.arrayLiteralFromArgs(call.Args, call.Type)
 }
 
+func (g *Generator) collectionLiteral(className string, args []lower.Expr) (string, error) {
+	items, err := g.exprList(args)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s.of(%s)", className, items), nil
+}
+
 func (g *Generator) arrayLiteralFromArgs(args []lower.Expr, typ *typecheck.Type) (string, error) {
 	if typ == nil || typ.Kind != typecheck.TypeBuiltin || typ.Name != "Array" || len(typ.Args) != 1 {
 		return "", fmt.Errorf("Array(...) requires resolved Array[T] type")
@@ -779,17 +1018,28 @@ func (g *Generator) arrayLiteralFromArgs(args []lower.Expr, typ *typecheck.Type)
 	if err != nil {
 		return "", err
 	}
+	if strings.Contains(elemType, "<") {
+		return fmt.Sprintf("(%s[]) new %s[] {%s}", elemType, eraseJavaGenerics(elemType), items), nil
+	}
 	return fmt.Sprintf("new %s[] {%s}", elemType, items), nil
 }
 
 func (g *Generator) arrayOfLength(call *lower.MethodCall) (string, error) {
+	return g.arrayOfLengthWithExpected(call, call.Type)
+}
+
+func (g *Generator) arrayOfLengthWithExpected(call *lower.MethodCall, expected *typecheck.Type) (string, error) {
 	if len(call.Args) != 1 {
 		return "", fmt.Errorf("Array.ofLength expects 1 argument")
 	}
-	if call.Type == nil || call.Type.Kind != typecheck.TypeBuiltin || call.Type.Name != "Array" || len(call.Type.Args) != 1 {
+	arrayType := call.Type
+	if arrayType == nil || arrayType.Kind == typecheck.TypeUnknown || hasUnknownTypeArg(arrayType) {
+		arrayType = expected
+	}
+	if arrayType == nil || arrayType.Kind != typecheck.TypeBuiltin || arrayType.Name != "Array" || len(arrayType.Args) != 1 {
 		return "", fmt.Errorf("Array.ofLength requires resolved Array[T] type")
 	}
-	elemType, err := g.javaType(call.Type.Args[0], false)
+	elemType, err := g.javaType(arrayType.Args[0], false)
 	if err != nil {
 		return "", err
 	}
@@ -797,7 +1047,77 @@ func (g *Generator) arrayOfLength(call *lower.MethodCall) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if strings.Contains(elemType, "<") {
+		return fmt.Sprintf("(%s[]) new %s[(int)(%s)]", elemType, eraseJavaGenerics(elemType), length), nil
+	}
 	return fmt.Sprintf("new %s[(int)(%s)]", elemType, length), nil
+}
+
+func eraseJavaGenerics(typeName string) string {
+	if idx := strings.IndexByte(typeName, '<'); idx >= 0 {
+		return typeName[:idx]
+	}
+	return typeName
+}
+
+func hasUnknownTypeArg(t *typecheck.Type) bool {
+	if t == nil {
+		return true
+	}
+	for _, arg := range t.Args {
+		if arg == nil || arg.Kind == typecheck.TypeUnknown {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Generator) assignmentTargetType(target lower.Expr) *typecheck.Type {
+	switch t := target.(type) {
+	case *lower.VarRef:
+		return t.Type
+	case *lower.FieldGet:
+		if t.Type != nil && t.Type.Kind != typecheck.TypeUnknown {
+			return t.Type
+		}
+		receiverType := exprType(t.Receiver)
+		if receiverType == nil {
+			return t.Type
+		}
+		switch receiverType.Kind {
+		case typecheck.TypeClass:
+			if class, ok := g.classes[receiverType.Name]; ok {
+				for _, field := range class.Fields {
+					if field.Name == t.Name {
+						return field.Type
+					}
+				}
+			}
+		case typecheck.TypeObject:
+			if obj, ok := g.objects[receiverType.Name]; ok {
+				for _, field := range obj.Fields {
+					if field.Name == t.Name {
+						return field.Type
+					}
+				}
+			}
+		}
+		return t.Type
+	case *lower.IndexGet:
+		receiverType := exprType(t.Receiver)
+		if receiverType == nil {
+			return t.Type
+		}
+		if receiverType.Kind == typecheck.TypeBuiltin && receiverType.Name == "Array" && len(receiverType.Args) == 1 {
+			return receiverType.Args[0]
+		}
+		if receiverType.Kind == typecheck.TypeInterface && receiverType.Name == "List" && len(receiverType.Args) == 1 {
+			return receiverType.Args[0]
+		}
+		return t.Type
+	default:
+		return exprType(target)
+	}
 }
 
 func (g *Generator) tupleLiteral(tuple *lower.TupleLiteral) (string, error) {
@@ -829,6 +1149,8 @@ func (g *Generator) foreachItemType(iterable lower.Expr) (string, error) {
 		return "", fmt.Errorf("foreach iterable has no type")
 	case t.Kind == typecheck.TypeBuiltin && t.Name == "Array" && len(t.Args) == 1:
 		return g.javaType(t.Args[0], false)
+	case t.Kind == typecheck.TypeInterface && (t.Name == "List" || t.Name == "Set" || t.Name == "Iterable") && len(t.Args) == 1:
+		return g.javaReferenceType(t.Args[0])
 	default:
 		return "", fmt.Errorf("unsupported foreach iterable type %s", t.String())
 	}
@@ -933,6 +1255,20 @@ func (g *Generator) javaType(t *typecheck.Type, allowVoid bool) (string, error) 
 	case typecheck.TypeInterface:
 		if t.Name == "Option" {
 			return g.optionType(t)
+		}
+		if (t.Name == "List" || t.Name == "Set" || t.Name == "Iterable") && len(t.Args) == 1 {
+			argType, err := g.javaReferenceType(t.Args[0])
+			if err != nil {
+				return "", err
+			}
+			switch t.Name {
+			case "List":
+				return "alang.stdlib.List<" + argType + ">", nil
+			case "Set":
+				return "alang.stdlib.Set<" + argType + ">", nil
+			default:
+				return "Iterable<" + argType + ">", nil
+			}
 		}
 		return "", fmt.Errorf("unsupported interface type %s", t.String())
 	case typecheck.TypeTuple:
@@ -1052,6 +1388,33 @@ func ModuleClassName(packageName string) string {
 		return "Pkg_Default"
 	}
 	return "Pkg_" + sanitizeTypeName(packageName)
+}
+
+func (g *Generator) nextTemp(prefix string) string {
+	g.tempID++
+	return "__" + prefix + strconv.Itoa(g.tempID)
+}
+
+func (g *Generator) lambdaExpr(lambda *lower.Lambda) (string, error) {
+	if len(lambda.Parameters) != 1 {
+		return "", fmt.Errorf("unsupported lambda arity %d", len(lambda.Parameters))
+	}
+	param := javaIdent(lambda.Parameters[0].Name)
+	if len(lambda.Body) != 1 {
+		return "", fmt.Errorf("unsupported lambda body with %d statements", len(lambda.Body))
+	}
+	ret, ok := lambda.Body[0].(*lower.Return)
+	if !ok || ret.Value == nil {
+		return "", fmt.Errorf("unsupported lambda body %T", lambda.Body[0])
+	}
+	value, err := g.expr(ret.Value)
+	if err != nil {
+		return "", err
+	}
+	if isUnitType(lambda.ReturnType) {
+		return fmt.Sprintf("%s -> { %s; }", param, value), nil
+	}
+	return fmt.Sprintf("%s -> %s", param, value), nil
 }
 
 func OutputPath(baseDir, packageName string) string {
