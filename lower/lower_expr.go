@@ -60,6 +60,27 @@ func (l *Lowerer) lowerExpr(expr typed.Expr) (Expr, error) {
 		return nil, unsupportedExprErr(expr)
 	case *typed.AnonymousInterfaceExpr:
 		return nil, unsupportedExprErr(expr)
+	case *typed.IfExpr:
+		condition, err := l.lowerExpr(e.Condition)
+		if err != nil {
+			return nil, err
+		}
+		thenPrefix, thenValue, err := l.lowerExprBlock(e.Then)
+		if err != nil {
+			return nil, err
+		}
+		elsePrefix, elseValue, err := l.lowerExprBlock(e.Else)
+		if err != nil {
+			return nil, err
+		}
+		return &IfExpr{
+			Condition:  condition,
+			ThenPrefix: thenPrefix,
+			ThenValue:  thenValue,
+			ElsePrefix: elsePrefix,
+			ElseValue:  elseValue,
+			Type:       e.GetType(),
+		}, nil
 	case *typed.UnaryExpr:
 		right, err := l.lowerExpr(e.Right)
 		if err != nil {
@@ -140,6 +161,27 @@ func (l *Lowerer) lowerExpr(expr typed.Expr) (Expr, error) {
 	default:
 		return nil, unsupportedExprErr(expr)
 	}
+}
+
+func (l *Lowerer) lowerExprBlock(block *typed.BlockStmt) ([]Stmt, Expr, error) {
+	if block == nil || len(block.Statements) == 0 {
+		return nil, nil, fmt.Errorf("expression block must end with an expression")
+	}
+	prefix := block.Statements[:len(block.Statements)-1]
+	last := block.Statements[len(block.Statements)-1]
+	exprStmt, ok := last.(*typed.ExprStmt)
+	if !ok {
+		return nil, nil, fmt.Errorf("expression block must end with an expression statement")
+	}
+	loweredPrefix, err := l.lowerStmtBlock(prefix)
+	if err != nil {
+		return nil, nil, err
+	}
+	value, err := l.lowerExpr(exprStmt.Expr)
+	if err != nil {
+		return nil, nil, err
+	}
+	return loweredPrefix, value, nil
 }
 
 func (l *Lowerer) lowerArgs(args []typed.Expr) ([]Expr, error) {

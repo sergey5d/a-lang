@@ -55,13 +55,22 @@ func (l *Lowerer) lowerGlobal(stmt typed.Stmt) ([]*Global, error) {
 }
 
 func (l *Lowerer) lowerClass(class *typed.ClassDecl) (*Class, error) {
-	out := &Class{Name: class.Name}
+	out := &Class{Name: class.Name, Object: class.Object, Record: class.Record}
 	for _, field := range class.Fields {
+		var init Expr
+		var err error
+		if field.Init != nil {
+			init, err = l.lowerExpr(field.Init)
+			if err != nil {
+				return nil, err
+			}
+		}
 		out.Fields = append(out.Fields, &Field{
 			Name:    field.Name,
 			Mutable: field.Mode == typed.BindingMutable,
 			Private: field.Private,
 			Type:    field.Type,
+			Init:    init,
 		})
 	}
 	for _, method := range class.Methods {

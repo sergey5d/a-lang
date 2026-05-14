@@ -1,29 +1,95 @@
 package main
 
 import (
+	"a-lang/codegen/java"
 	"a-lang/interpreter"
+	"a-lang/lower"
 	"a-lang/module"
 	"a-lang/parser"
 	"a-lang/semantic"
 	"a-lang/typecheck"
+	"a-lang/typed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: a-lang <file> [run [entry [args...]]|ast]")
+		fmt.Fprintln(os.Stderr, "usage: a-lang <file> [run [entry [args...]]|ast|java]")
 		os.Exit(1)
+	}
+
+	mode := "run"
+	if len(os.Args) >= 3 {
+		mode = os.Args[2]
 	}
 
 	srcBytes, readErr := os.ReadFile(os.Args[1])
 	src := ""
 	if readErr == nil {
 		src = string(srcBytes)
+	}
+
+	if mode == "java" {
+		if readErr != nil {
+			fmt.Fprintf(os.Stderr, "read source: %v\n", readErr)
+			os.Exit(1)
+		}
+		program, err := parser.Parse(src)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "parse error: %v\n", err)
+			os.Exit(1)
+		}
+		if len(program.Imports) > 0 {
+			fmt.Fprintln(os.Stderr, "java generation does not support imports/modules yet")
+			os.Exit(1)
+		}
+		diagnostics := semantic.Analyze(program)
+		typeResult := typecheck.Analyze(program)
+		diagnostics = append(diagnostics, typeResult.Diagnostics...)
+		if len(diagnostics) > 0 {
+			seen := map[string]bool{}
+			for _, diagnostic := range diagnostics {
+				message := formatDiagnostic(diagnostic, src)
+				if seen[message] {
+					continue
+				}
+				seen[message] = true
+				fmt.Fprintln(os.Stderr, message)
+			}
+			os.Exit(1)
+		}
+		typedProgram, err := typed.Build(program, typeResult)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "typed build: %v\n", err)
+			os.Exit(1)
+		}
+		lowered, err := lower.ProgramFromTyped(typedProgram)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "lowering: %v\n", err)
+			os.Exit(1)
+		}
+		generated, err := java.GenerateForPackage(lowered, program.PackageName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "java generation: %v\n", err)
+			os.Exit(1)
+		}
+		outputPath := java.OutputPath("bin/java/src", program.PackageName)
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+			fmt.Fprintf(os.Stderr, "create java output dir: %v\n", err)
+			os.Exit(1)
+		}
+		if err := os.WriteFile(outputPath, generated, 0o644); err != nil {
+			fmt.Fprintf(os.Stderr, "write java output: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Print(string(generated))
+		return
 	}
 
 	loaded, err := module.Load(os.Args[1])
@@ -47,11 +113,6 @@ func main() {
 			fmt.Fprintln(os.Stderr, message)
 		}
 		os.Exit(1)
-	}
-
-	mode := "run"
-	if len(os.Args) >= 3 {
-		mode = os.Args[2]
 	}
 
 	switch mode {

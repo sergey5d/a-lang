@@ -20,7 +20,7 @@ func parseProgram(t *testing.T, src string) *parser.Program {
 func TestProgramFromTyped(t *testing.T) {
 	src := `
 class Counter {
-	private var count Int
+	hidden var count Int
 }
 
 impl Counter {
@@ -188,5 +188,42 @@ def run(values Array[Int]) Int {
 	}
 	if _, ok := ret.Value.(*IndexGet); !ok {
 		t.Fatalf("expected lowered index get, got %T", ret.Value)
+	}
+}
+
+func TestProgramFromTypedLowersIfExpr(t *testing.T) {
+	src := `
+def choose(flag Bool) Int = if flag {
+	1
+} else {
+	2
+}
+`
+
+	program := parseProgram(t, src)
+	types := typecheck.Analyze(program)
+	if len(types.Diagnostics) != 0 {
+		t.Fatalf("expected no type diagnostics, got %#v", types.Diagnostics)
+	}
+	typedProgram, err := typed.Build(program, types)
+	if err != nil {
+		t.Fatalf("typed.Build returned error: %v", err)
+	}
+
+	lowered, err := ProgramFromTyped(typedProgram)
+	if err != nil {
+		t.Fatalf("ProgramFromTyped returned error: %v", err)
+	}
+
+	exprStmt, ok := lowered.Functions[0].Body[0].(*ExprStmt)
+	if !ok {
+		t.Fatalf("expected expression statement, got %T", lowered.Functions[0].Body[0])
+	}
+	ifExpr, ok := exprStmt.Expr.(*IfExpr)
+	if !ok {
+		t.Fatalf("expected lowered if expression, got %T", exprStmt.Expr)
+	}
+	if len(ifExpr.ThenPrefix) != 0 || len(ifExpr.ElsePrefix) != 0 {
+		t.Fatalf("expected branch prefixes to be empty, got then=%d else=%d", len(ifExpr.ThenPrefix), len(ifExpr.ElsePrefix))
 	}
 }

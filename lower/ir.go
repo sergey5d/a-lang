@@ -17,6 +17,8 @@ type Global struct {
 
 type Class struct {
 	Name        string
+	Object      bool
+	Record      bool
 	Fields      []*Field
 	Constructor *Function
 	Methods     []*Function
@@ -27,6 +29,7 @@ type Field struct {
 	Mutable bool
 	Private bool
 	Type    *typecheck.Type
+	Init    Expr
 }
 
 type Function struct {
@@ -173,6 +176,17 @@ type Binary struct {
 }
 
 func (*Binary) exprNode() {}
+
+type IfExpr struct {
+	Condition  Expr
+	ThenPrefix []Stmt
+	ThenValue  Expr
+	ElsePrefix []Stmt
+	ElseValue  Expr
+	Type       *typecheck.Type
+}
+
+func (*IfExpr) exprNode() {}
 
 type FunctionCall struct {
 	Name string
