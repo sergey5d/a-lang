@@ -22,6 +22,7 @@ type LoadedModule struct {
 type ImportedSymbol struct {
 	LocalName    string
 	OriginalName string
+	ObjectName   string
 	IsInterface  bool
 	IsFunction   bool
 	IsValue      bool
@@ -85,7 +86,7 @@ func load(path string, cache map[string]*LoadedModule, loading map[string]bool) 
 			return nil, fmt.Errorf("load import %q: %w", imp.Path, err)
 		}
 		mod.Dependencies[child.Path] = child
-		if len(imp.Symbols) == 0 && !imp.Wildcard {
+		if imp.ObjectName == "" && len(imp.Symbols) == 0 && !imp.Wildcard {
 			alias := filepath.Base(imp.Path)
 			if existing, ok := mod.ImportPaths[alias]; ok && existing != imp.Path {
 				return nil, fmt.Errorf("duplicate import alias '%s' for paths '%s' and '%s'", alias, existing, imp.Path)
@@ -101,13 +102,28 @@ func load(path string, cache map[string]*LoadedModule, loading map[string]bool) 
 			continue
 		}
 		symbols := imp.Symbols
-		if imp.Wildcard {
+		if imp.ObjectName != "" {
+			if imp.Wildcard {
+				symbols = exportedObjectMembers(child, imp.ObjectName, program.PackageName)
+			}
+		} else if imp.Wildcard {
 			symbols = exportedSymbols(child, program.PackageName)
 		}
 		samePackage := program.PackageName != "" && child.Program.PackageName == program.PackageName
 		for _, symbol := range symbols {
-			resolved, ok := resolveImportedSymbol(child, symbol.Name, samePackage)
+			var (
+				resolved ImportedSymbol
+				ok       bool
+			)
+			if imp.ObjectName != "" {
+				resolved, ok = resolveImportedObjectMember(child, imp.ObjectName, symbol.Name, samePackage)
+			} else {
+				resolved, ok = resolveImportedSymbol(child, symbol.Name, samePackage)
+			}
 			if !ok {
+				if imp.ObjectName != "" {
+					return nil, fmt.Errorf("import %q has no visible member '%s' on object '%s'", imp.Path, symbol.Name, imp.ObjectName)
+				}
 				return nil, fmt.Errorf("import %q has no public symbol '%s'", imp.Path, symbol.Name)
 			}
 			localName := symbol.Name
@@ -164,6 +180,32 @@ func exportedSymbols(mod *LoadedModule, currentPackage string) []parser.ImportSy
 	return out
 }
 
+func exportedObjectMembers(mod *LoadedModule, objectName string, currentPackage string) []parser.ImportSymbol {
+	samePackage := currentPackage != "" && mod.SourceProgram.PackageName == currentPackage
+	for _, decl := range mod.SourceProgram.Classes {
+		if !decl.Object || decl.Name != objectName {
+			continue
+		}
+		if decl.Private && !samePackage {
+			return nil
+		}
+		out := []parser.ImportSymbol{}
+		seen := map[string]bool{}
+		for _, method := range decl.Methods {
+			if method.Private && !samePackage {
+				continue
+			}
+			if seen[method.Name] {
+				continue
+			}
+			seen[method.Name] = true
+			out = append(out, parser.ImportSymbol{Name: method.Name})
+		}
+		return out
+	}
+	return nil
+}
+
 func resolveImportedSymbol(mod *LoadedModule, name string, samePackage bool) (ImportedSymbol, bool) {
 	for _, fn := range mod.SourceProgram.Functions {
 		if fn.Name != name || !fn.Public {
@@ -199,6 +241,33 @@ func resolveImportedSymbol(mod *LoadedModule, name string, samePackage bool) (Im
 			return ImportedSymbol{}, false
 		}
 		return ImportedSymbol{OriginalName: name, Module: mod, IsInterface: true}, true
+	}
+	return ImportedSymbol{}, false
+}
+
+func resolveImportedObjectMember(mod *LoadedModule, objectName string, memberName string, samePackage bool) (ImportedSymbol, bool) {
+	for _, decl := range mod.SourceProgram.Classes {
+		if !decl.Object || decl.Name != objectName {
+			continue
+		}
+		if decl.Private && !samePackage {
+			return ImportedSymbol{}, false
+		}
+		for _, method := range decl.Methods {
+			if method.Name != memberName {
+				continue
+			}
+			if method.Private && !samePackage {
+				return ImportedSymbol{}, false
+			}
+			return ImportedSymbol{
+				OriginalName: memberName,
+				ObjectName:   objectName,
+				Module:       mod,
+				IsFunction:   true,
+			}, true
+		}
+		return ImportedSymbol{}, false
 	}
 	return ImportedSymbol{}, false
 }

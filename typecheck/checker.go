@@ -314,6 +314,29 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 	for localName, symbol := range current.SymbolImports {
 		samePackage := currentPackage != "" && symbol.Module.SourceProgram.PackageName == currentPackage
 		if symbol.IsFunction {
+			if symbol.ObjectName != "" {
+				for _, decl := range symbol.Module.SourceProgram.Classes {
+					if !decl.Object || decl.Name != symbol.ObjectName {
+						continue
+					}
+					if decl.Private && !samePackage {
+						break
+					}
+					for _, method := range decl.Methods {
+						if method.Name != symbol.OriginalName {
+							continue
+						}
+						if method.Private && !samePackage {
+							break
+						}
+						sig := c.instantiateMethodSignature(method, decl, nil)
+						c.functions[localName] = sig
+						break
+					}
+					break
+				}
+				continue
+			}
 			for _, fn := range symbol.Module.SourceProgram.Functions {
 				if fn.Name != symbol.OriginalName || !fn.Public {
 					continue
@@ -2675,6 +2698,27 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 					continue
 				}
 				c.checkExpr(arg)
+			}
+			return sig.ReturnType
+		}
+		if sig, ok := c.functions[ident.Name]; ok {
+			if hasNamedCallArgs(call.Args) {
+				for _, arg := range call.Args {
+					c.checkExpr(arg.Value)
+				}
+				c.addDiagnostic("invalid_named_argument", "named arguments require a direct function or method declaration", call.Span)
+				return sig.ReturnType
+			}
+			if !validArgCount(sig, len(call.Args)) {
+				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(sig), len(call.Args)), call.Span)
+			}
+			for i, arg := range call.Args {
+				if expected, ok := paramTypeForArg(sig, i); ok {
+					argType := c.checkExprWithExpected(arg.Value, expected)
+					c.requireAssignable(argType, expected, exprSpan(arg.Value), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+					continue
+				}
+				c.checkExpr(arg.Value)
 			}
 			return sig.ReturnType
 		}

@@ -1301,6 +1301,8 @@ impl B {
 
 object C {
 	def apply(value Int) Int = value + 1
+	def print(value Int) Int = value + 10
+	def printLn(value Int) Int = value + 100
 }
 `)
 	writeModuleFile(t, filepath.Join(dir, "main.al"), `
@@ -1311,13 +1313,15 @@ import model/things/A
 import model/things/A as AliasA
 import model/things/{B as AliasB, Named}
 import model/things/*
+import model/things/C/*
+import model/things/C/{printLn as printN, print}
 
 def run() Int {
 	value A = A()
 	aliasA AliasA = AliasA()
 	valueB AliasB = AliasB()
 	named Named = value
-	total Int = C(4)
+	total Int = C(4) + printN(2) + print(3)
 	return total + things.C(5)
 }
 `)

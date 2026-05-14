@@ -225,6 +225,25 @@ func (p *Parser) parseImportDecl(keyword Token) (*ImportDecl, error) {
 				return nil, err
 			}
 			imp.Path = joinImportSegments(segments)
+			if p.match(TokenSlash) {
+				imp.ObjectName = next.Lexeme
+				switch {
+				case p.match(TokenStar):
+					imp.Wildcard = true
+					span = mergeSpans(span, tokenSpan(p.previous()))
+				case p.match(TokenLBrace):
+					symbols, symbolsSpan, err := p.parseImportSymbolList()
+					if err != nil {
+						return nil, err
+					}
+					imp.Symbols = symbols
+					span = mergeSpans(span, symbolsSpan)
+				default:
+					return nil, fmt.Errorf("expected object member import '*', or '{' after '%s/'", next.Lexeme)
+				}
+				span = mergeSpans(span, tokenSpan(next))
+				break
+			}
 			symbol := ImportSymbol{Name: next.Lexeme, Span: tokenSpan(next)}
 			if p.match(TokenAs) {
 				alias, err := p.consume(TokenIdentifier, "expected alias after 'as'")

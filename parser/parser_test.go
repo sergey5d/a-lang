@@ -884,14 +884,16 @@ func TestParseExtendedImportForms(t *testing.T) {
 	import model/things/A
 	import model/things/A as B
 	import model/things/{A, B as D, C}
+	import model/things/C/*
+	import model/things/C/{printLn as printN, print}
 `
 
 	program, err := Parse(src)
 	if err != nil {
 		t.Fatalf("Parse returned error: %v", err)
 	}
-	if len(program.Imports) != 5 {
-		t.Fatalf("expected 5 imports, got %d", len(program.Imports))
+	if len(program.Imports) != 7 {
+		t.Fatalf("expected 7 imports, got %d", len(program.Imports))
 	}
 	if program.Imports[0].Path != "model/things" || program.Imports[0].Wildcard || len(program.Imports[0].Symbols) != 0 {
 		t.Fatalf("unexpected package import %#v", program.Imports[0])
@@ -907,6 +909,12 @@ func TestParseExtendedImportForms(t *testing.T) {
 	}
 	if got := program.Imports[4].Symbols; len(got) != 3 || got[0].Name != "A" || got[1].Name != "B" || got[1].Alias != "D" || got[2].Name != "C" {
 		t.Fatalf("unexpected grouped import %#v", program.Imports[4])
+	}
+	if program.Imports[5].Path != "model/things" || program.Imports[5].ObjectName != "C" || !program.Imports[5].Wildcard {
+		t.Fatalf("unexpected object wildcard import %#v", program.Imports[5])
+	}
+	if got := program.Imports[6].Symbols; program.Imports[6].Path != "model/things" || program.Imports[6].ObjectName != "C" || len(got) != 2 || got[0].Name != "printLn" || got[0].Alias != "printN" || got[1].Name != "print" {
+		t.Fatalf("unexpected object member import %#v", program.Imports[6])
 	}
 }
 

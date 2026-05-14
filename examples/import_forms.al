@@ -3,6 +3,8 @@
 # A
 # B
 # 11
+# 112
+# 110
 # 0
 
 package app
@@ -12,6 +14,8 @@ import model/things/A
 import model/things/A as AliasA
 import model/things/{B as AliasB, Named}
 import model/things/*
+import model/things/C/*
+import model/things/C/{printLn as printN, print}
 
 def main() Int {
     value A = A()
@@ -22,6 +26,8 @@ def main() Int {
     OS.println(named.label())
     OS.println(aliasA.label())
     OS.println(valueB.label())
-    OS.println(C(4) + things.C(5))
+    OS.println(apply(4) + things.C(5))
+    OS.println(printN(12))
+    OS.println(print(100))
     return 0
 }

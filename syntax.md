@@ -117,8 +117,10 @@ Meaning:
   import one symbol with a local alias
 - `import package/sub/{A, B as D, C}`
   import a selected symbol set
-
-Method-level imports are currently out of scope.
+- `import package/sub/Object/*`
+  import all visible object methods unqualified
+- `import package/sub/Object/{printLn as printN, print}`
+  import selected visible object methods from an object
 
 ## Top-Level Declarations
 

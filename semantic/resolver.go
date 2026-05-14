@@ -102,10 +102,25 @@ func AnalyzeModule(mod *module.LoadedModule) []Diagnostic {
 func (r *Resolver) installDirectImports(mod *module.LoadedModule) {
 	for localName, symbol := range mod.SymbolImports {
 		if symbol.IsFunction {
-			for _, fn := range symbol.Module.SourceProgram.Functions {
-				if fn.Name == symbol.OriginalName {
-					r.functions[localName] = fn.Span
+			if symbol.ObjectName != "" {
+				for _, class := range symbol.Module.SourceProgram.Classes {
+					if !class.Object || class.Name != symbol.ObjectName {
+						continue
+					}
+					for _, method := range class.Methods {
+						if method.Name == symbol.OriginalName {
+							r.functions[localName] = method.Span
+							break
+						}
+					}
 					break
+				}
+			} else {
+				for _, fn := range symbol.Module.SourceProgram.Functions {
+					if fn.Name == symbol.OriginalName {
+						r.functions[localName] = fn.Span
+						break
+					}
 				}
 			}
 			continue

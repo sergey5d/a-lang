@@ -22,4 +22,8 @@ impl B {
 
 object C {
     def apply(value Int) Int = value + 1
+
+    def print(value Int) Int = value + 10
+
+    def printLn(value Int) Int = value + 100
 }

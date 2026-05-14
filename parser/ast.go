@@ -26,10 +26,11 @@ type Program struct {
 
 // ImportDecl describes a single imported module path.
 type ImportDecl struct {
-	Path     string         `json:"path"`
-	Wildcard bool           `json:"wildcard,omitempty"`
-	Symbols  []ImportSymbol `json:"symbols,omitempty"`
-	Span     Span           `json:"span"`
+	Path       string         `json:"path"`
+	ObjectName string         `json:"objectName,omitempty"`
+	Wildcard   bool           `json:"wildcard,omitempty"`
+	Symbols    []ImportSymbol `json:"symbols,omitempty"`
+	Span       Span           `json:"span"`
 }
 
 // ImportSymbol describes a directly imported symbol and its optional alias.

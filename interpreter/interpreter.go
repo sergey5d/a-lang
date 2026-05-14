@@ -50,6 +50,7 @@ type Interpreter struct {
 type runtimeImportedSymbol struct {
 	module      *Interpreter
 	original    string
+	objectName  string
 	isInterface bool
 	isFunction  bool
 	isValue     bool
@@ -191,6 +192,7 @@ func NewModule(mod *module.LoadedModule) *Interpreter {
 		in.directImports[localName] = runtimeImportedSymbol{
 			module:      NewModule(symbol.Module),
 			original:    symbol.OriginalName,
+			objectName:  symbol.ObjectName,
 			isInterface: symbol.IsInterface,
 			isFunction:  symbol.IsFunction,
 			isValue:     symbol.IsValue,
@@ -235,6 +237,18 @@ func (in *Interpreter) execTopLevel(global *env) error {
 			continue
 		}
 		if symbol.isFunction {
+			if symbol.objectName != "" {
+				value, ok := symbol.module.globals.get(symbol.objectName)
+				if !ok {
+					return RuntimeError{Message: "undefined object '" + symbol.objectName + "'", Span: parser.Span{}}
+				}
+				obj, ok := value.value.(*instance)
+				if !ok {
+					return RuntimeError{Message: "object '" + symbol.objectName + "' is not an instance", Span: parser.Span{}}
+				}
+				global.define(localName, boundMethodRef{receiver: obj, name: symbol.original}, false)
+				continue
+			}
 			global.define(localName, functionRef{module: symbol.module, name: symbol.original}, false)
 			continue
 		}
@@ -1864,6 +1878,13 @@ func (in *Interpreter) evalCall(call *parser.CallExpr, local *env) (Value, error
 		}
 		return fn.module.callFunctionByName(fn.name, ordered, local)
 	}
+	if method, ok := callee.(boundMethodRef); ok {
+		ordered, err := in.evalBoundMethodArgs(method.receiver, method.name, call.Args, local, call.Span)
+		if err != nil {
+			return nil, err
+		}
+		return in.invokeBoundMethod(method.receiver, method.name, ordered, local, call.Span)
+	}
 	if fn, ok := callee.(classRef); ok && len(call.Args) == 1 {
 		class, ok := fn.module.classes[fn.name]
 		if !ok {
@@ -2279,6 +2300,64 @@ func (in *Interpreter) evalMethodCall(member *parser.MemberExpr, argExprs []pars
 		}
 	}
 	return nil, RuntimeError{Message: "unknown method '" + member.Name + "'", Span: member.Span}
+}
+
+func (in *Interpreter) evalBoundMethodArgs(obj *instance, methodName string, argExprs []parser.CallArg, local *env, span parser.Span) ([]Value, error) {
+	methods := instanceMethods(obj)
+	var candidates []*parser.MethodDecl
+	for _, method := range methods {
+		if method.Name == methodName {
+			candidates = append(candidates, method)
+		}
+	}
+	if len(candidates) == 1 {
+		return in.evalArgsWithParams(candidates[0].Parameters, argExprs, local, span, "method '"+methodName+"'")
+	}
+	args := make([]namedValueArg, len(argExprs))
+	for i, arg := range argExprs {
+		value, err := in.evalExpr(arg.Value, local)
+		if err != nil {
+			return nil, err
+		}
+		args[i] = namedValueArg{Name: arg.Name, Value: value, Span: arg.Span}
+	}
+	if hasNamedParserArgs(argExprs) {
+		var firstErr error
+		for _, method := range candidates {
+			reordered, err := reorderNamedValueArgs(method.Parameters, args, span, "method '"+methodName+"'")
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
+			}
+			return reordered, nil
+		}
+		if firstErr != nil {
+			return nil, firstErr
+		}
+	}
+	return namedArgValues(args), nil
+}
+
+func (in *Interpreter) invokeBoundMethod(obj *instance, methodName string, args []Value, local *env, span parser.Span) (Value, error) {
+	methods := instanceMethods(obj)
+	for _, method := range methods {
+		if method.Name != methodName {
+			continue
+		}
+		if in.runtimeMethodMatches(method, args) {
+			return in.callMethod(obj, method, args, local)
+		}
+	}
+	defaultMethods := in.defaultInterfaceMethodsByName(obj, methodName)
+	if method, ok := in.findDefaultInterfaceMethod(obj, methodName, args); ok {
+		return in.callInterfaceMethod(obj, method, args, local)
+	}
+	if len(defaultMethods) > 0 {
+		return in.callInterfaceMethod(obj, defaultMethods[0], args, local)
+	}
+	return nil, RuntimeError{Message: "unknown method '" + methodName + "'", Span: span}
 }
 
 func (in *Interpreter) evalMember(receiver Value, expr *parser.MemberExpr) (Value, error) {
@@ -2814,6 +2893,8 @@ func (in *Interpreter) invokeCallableValue(callee Value, args []Value, local *en
 		return in.callClosure(fn, args)
 	case builtinRef:
 		return in.callBuiltin(fn.name, nil, args, local, span)
+	case boundMethodRef:
+		return in.invokeBoundMethod(fn.receiver, fn.name, args, local, span)
 	case *instance:
 		named := make([]namedValueArg, len(args))
 		for i, arg := range args {
@@ -2851,6 +2932,10 @@ type moduleRef struct{ name string }
 type functionRef struct {
 	module *Interpreter
 	name   string
+}
+type boundMethodRef struct {
+	receiver *instance
+	name     string
 }
 type classRef struct {
 	module *Interpreter

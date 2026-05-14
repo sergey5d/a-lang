@@ -92,6 +92,41 @@ def run() Int {
 	}
 }
 
+func TestModuleObjectMethodImports(t *testing.T) {
+	dir := t.TempDir()
+	writeModuleFile(t, filepath.Join(dir, "lib.al"), `
+package lib
+
+object Tools {
+	def inc(value Int) Int = value + 1
+	def twice(value Int) Int = value * 2
+}
+`)
+	writeModuleFile(t, filepath.Join(dir, "main.al"), `
+package app
+
+import lib/Tools/*
+import lib/Tools/{twice as double}
+
+def run() Int {
+	return inc(4) + double(5)
+}
+`)
+
+	mod, err := module.Load(filepath.Join(dir, "main.al"))
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	in := NewModule(mod)
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(15) {
+		t.Fatalf("expected 15, got %#v", value)
+	}
+}
+
 func TestOSPrinters(t *testing.T) {
 	src := `
 def run() Unit {
