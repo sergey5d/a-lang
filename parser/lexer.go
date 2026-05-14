@@ -93,6 +93,9 @@ func (l *Lexer) nextToken() (Token, error) {
 	case '?':
 		l.advance()
 		return l.token(TokenQuestion, "?", startLine, startColumn), nil
+	case '@':
+		l.advance()
+		return l.token(TokenAt, "@", startLine, startColumn), nil
 	case '+':
 		l.advance()
 		if l.match('=') {

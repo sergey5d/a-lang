@@ -126,6 +126,29 @@ Built-in `OS` methods are imported implicitly in every file, so `print(...)`, `p
 
 ## Top-Level Declarations
 
+Annotations use `@` followed by a normal constructor call, typically for a record type. They are parsed and attached to declarations and members as metadata.
+
+Examples:
+
+```txt
+record Route {
+    path Str
+}
+
+@Route(path = "/health")
+def health() Str = "ok"
+```
+
+Supported targets currently include:
+
+- top-level `def`, `class`, `object`, `record`, `enum`, `interface`
+- fields
+- methods
+- interface methods
+- enum cases
+
+Annotations on `impl` blocks themselves are not supported; annotate the methods inside the block instead.
+
 Package declaration:
 
 ```txt

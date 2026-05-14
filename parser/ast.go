@@ -40,6 +40,12 @@ type ImportSymbol struct {
 	Span  Span   `json:"span"`
 }
 
+// Annotation describes metadata attached to a declaration or member.
+type Annotation struct {
+	Value Expr `json:"value"`
+	Span  Span `json:"span"`
+}
+
 // TypeRef represents a named, generic, or function type in source.
 type TypeRef struct {
 	Name           string      `json:"name,omitempty"`
@@ -68,6 +74,7 @@ type TypeParameter struct {
 
 // FunctionDecl describes a top-level function declaration.
 type FunctionDecl struct {
+	Annotations    []Annotation    `json:"annotations,omitempty"`
 	Name           string          `json:"name"`
 	TypeParameters []TypeParameter `json:"typeParameters,omitempty"`
 	Parameters     []Parameter     `json:"parameters"`
@@ -80,6 +87,7 @@ type FunctionDecl struct {
 
 // InterfaceDecl describes an interface declaration and its methods.
 type InterfaceDecl struct {
+	Annotations    []Annotation      `json:"annotations,omitempty"`
 	Name           string            `json:"name"`
 	Private        bool              `json:"private,omitempty"`
 	TypeParameters []TypeParameter   `json:"typeParameters,omitempty"`
@@ -90,6 +98,7 @@ type InterfaceDecl struct {
 
 // InterfaceMethod describes a method signature inside an interface.
 type InterfaceMethod struct {
+	Annotations    []Annotation    `json:"annotations,omitempty"`
 	Name           string          `json:"name"`
 	TypeParameters []TypeParameter `json:"typeParameters,omitempty"`
 	Parameters     []Parameter     `json:"parameters"`
@@ -100,6 +109,7 @@ type InterfaceMethod struct {
 
 // ClassDecl describes a class declaration, its fields, and its methods.
 type ClassDecl struct {
+	Annotations    []Annotation      `json:"annotations,omitempty"`
 	Name           string          `json:"name"`
 	Private        bool            `json:"private,omitempty"`
 	Object         bool            `json:"object,omitempty"`
@@ -115,6 +125,7 @@ type ClassDecl struct {
 
 // EnumCaseDecl describes a single enum case, including shared-field assignments and payload fields.
 type EnumCaseDecl struct {
+	Annotations []Annotation         `json:"annotations,omitempty"`
 	Name        string               `json:"name"`
 	Fields      []FieldDecl          `json:"fields,omitempty"`
 	Assignments []EnumCaseAssignment `json:"assignments,omitempty"`
@@ -131,6 +142,7 @@ type EnumCaseAssignment struct {
 
 // FieldDecl describes a class field declaration.
 type FieldDecl struct {
+	Annotations []Annotation `json:"annotations,omitempty"`
 	Name        string   `json:"name"`
 	Type        *TypeRef `json:"type"`
 	Initializer Expr     `json:"initializer,omitempty"`
@@ -142,6 +154,7 @@ type FieldDecl struct {
 
 // MethodDecl describes a class method or constructor declaration.
 type MethodDecl struct {
+	Annotations    []Annotation    `json:"annotations,omitempty"`
 	Name           string          `json:"name"`
 	TypeParameters []TypeParameter `json:"typeParameters,omitempty"`
 	Parameters     []Parameter     `json:"parameters"`

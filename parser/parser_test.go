@@ -918,6 +918,47 @@ func TestParseExtendedImportForms(t *testing.T) {
 	}
 }
 
+func TestParseAnnotations(t *testing.T) {
+	src := `
+record Tag {
+	name Str
+}
+
+record Route {
+	path Str
+}
+
+	@Tag(name = "service")
+	class Service {
+		@Tag(name = "field")
+		name Str
+	}
+
+	impl Service {
+		@Route(path = "/health")
+		def health() Str = "ok"
+	}
+`
+
+	program, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if len(program.Classes) < 3 {
+		t.Fatalf("expected declarations, got %#v", program.Classes)
+	}
+	service := program.Classes[2]
+	if service.Name != "Service" || len(service.Annotations) != 1 {
+		t.Fatalf("expected annotated Service class, got %#v", service)
+	}
+	if len(service.Fields) != 1 || len(service.Fields[0].Annotations) != 1 {
+		t.Fatalf("expected annotated field, got %#v", service.Fields)
+	}
+	if len(service.Methods) != 1 || len(service.Methods[0].Annotations) != 1 {
+		t.Fatalf("expected annotated impl method, got %#v", service.Methods)
+	}
+}
+
 func TestParseMethodWithoutReturnType(t *testing.T) {
 	src := `
 class Counter {

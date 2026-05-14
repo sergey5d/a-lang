@@ -40,13 +40,17 @@ func (p *Parser) parseInterfaceWithPrivate(private bool) (*InterfaceDecl, error)
 		return nil, err
 	}
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		annotations, err := p.parseAnnotations()
+		if err != nil {
+			return nil, err
+		}
 		if p.check(TokenPub) {
 			return nil, fmt.Errorf("public is not allowed inside interfaces")
 		}
 		if p.check(TokenOperator) {
 			return nil, fmt.Errorf("use symbolic 'def' declarations instead of the 'operator' keyword")
 		}
-		method, err := p.parseInterfaceMethod()
+		method, err := p.parseInterfaceMethod(annotations)
 		if err != nil {
 			return nil, err
 		}
@@ -60,7 +64,7 @@ func (p *Parser) parseInterfaceWithPrivate(private bool) (*InterfaceDecl, error)
 	return decl, nil
 }
 
-func (p *Parser) parseInterfaceMethod() (InterfaceMethod, error) {
+func (p *Parser) parseInterfaceMethod(annotations []Annotation) (InterfaceMethod, error) {
 	start, err := p.consume(TokenDef, "expected 'def' in interface")
 	if err != nil {
 		return InterfaceMethod{}, err
@@ -100,6 +104,7 @@ func (p *Parser) parseInterfaceMethod() (InterfaceMethod, error) {
 		}
 	}
 	return InterfaceMethod{
+		Annotations:    annotations,
 		Name:           nameLexeme,
 		TypeParameters: typeParams,
 		Parameters:     params,

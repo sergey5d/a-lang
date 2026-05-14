@@ -58,6 +58,7 @@ const (
 	TokenColonColon  TokenType = "::"
 	TokenDot         TokenType = "."
 	TokenQuestion    TokenType = "?"
+	TokenAt          TokenType = "@"
 	TokenEllipsis    TokenType = "..."
 	TokenAssign      TokenType = "="
 	TokenFatArrow    TokenType = "=>"

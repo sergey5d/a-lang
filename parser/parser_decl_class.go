@@ -65,19 +65,23 @@ func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 	}
 	sawNonField := false
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		annotations, err := p.parseAnnotations()
+		if err != nil {
+			return nil, err
+		}
 		switch p.peek().Type {
 		case TokenIdentifier, TokenVar:
 			if sawNonField {
 				return nil, fmt.Errorf("enum fields must appear before method or case declarations")
 			}
-			field, err := p.parseField(false, false)
+			field, err := p.parseField(annotations, false, false)
 			if err != nil {
 				return nil, err
 			}
 			decl.Fields = append(decl.Fields, field)
 		case TokenDef, TokenPartial:
 			sawNonField = true
-			method, err := p.parseMethodLike(false, false)
+			method, err := p.parseMethodLike(annotations, false, false)
 			if err != nil {
 				return nil, err
 			}
@@ -88,7 +92,7 @@ func (p *Parser) parseEnumLike(private bool) (*ClassDecl, error) {
 			return nil, fmt.Errorf("use 'def %s' instead of 'operator %s' in enum declarations", p.peekNextOperatorExample(), p.peekNextOperatorExample())
 		case TokenCase:
 			sawNonField = true
-			enumCase, err := p.parseEnumCase()
+			enumCase, err := p.parseEnumCase(annotations)
 			if err != nil {
 				return nil, err
 			}
@@ -136,6 +140,10 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 	}
 	sawMethod := false
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		annotations, err := p.parseAnnotations()
+		if err != nil {
+			return nil, err
+		}
 		private := p.match(TokenPrivate)
 		if p.check(TokenPub) {
 			return nil, fmt.Errorf("public is not allowed on %s members", noun)
@@ -145,7 +153,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 			if sawMethod {
 				return nil, fmt.Errorf("class fields must appear before method declarations")
 			}
-			field, err := p.parseField(private, !record && kind != TokenEnum)
+			field, err := p.parseField(annotations, private, !record && kind != TokenEnum)
 			if err != nil {
 				return nil, err
 			}
@@ -155,7 +163,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 				return nil, fmt.Errorf("%s methods must be declared in top-level impl blocks", noun)
 			}
 			sawMethod = true
-			method, err := p.parseMethodLike(private, false)
+			method, err := p.parseMethodLike(annotations, private, false)
 			if err != nil {
 				return nil, err
 			}
@@ -174,7 +182,7 @@ func (p *Parser) parseClassLike(kind TokenType, record bool, private bool, noun 
 	return decl, nil
 }
 
-func (p *Parser) parseField(private bool, allowPrivateInference bool) (FieldDecl, error) {
+func (p *Parser) parseField(annotations []Annotation, private bool, allowPrivateInference bool) (FieldDecl, error) {
 	mutable := p.match(TokenVar)
 	start, err := p.consume(TokenIdentifier, "expected field name")
 	if err != nil {
@@ -196,6 +204,7 @@ func (p *Parser) parseField(private bool, allowPrivateInference bool) (FieldDecl
 		span = mergeSpans(span, typeSpan(typ))
 	}
 	field := FieldDecl{
+		Annotations: annotations,
 		Name:     name.Lexeme,
 		Type:     typ,
 		Mutable:  mutable,
@@ -238,11 +247,11 @@ func (p *Parser) parseField(private bool, allowPrivateInference bool) (FieldDecl
 	return field, nil
 }
 
-func (p *Parser) parseMethodLike(private bool, allowShortApply bool) (*MethodDecl, error) {
-	return p.parseMethod(private, allowShortApply)
+func (p *Parser) parseMethodLike(annotations []Annotation, private bool, allowShortApply bool) (*MethodDecl, error) {
+	return p.parseMethod(annotations, private, allowShortApply)
 }
 
-func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, error) {
+func (p *Parser) parseMethod(annotations []Annotation, private bool, allowShortApply bool) (*MethodDecl, error) {
 	start := p.peek()
 	partial := false
 	switch p.peek().Type {
@@ -303,6 +312,7 @@ func (p *Parser) parseMethod(private bool, allowShortApply bool) (*MethodDecl, e
 		returnType = implicitUnitType(body.Span)
 	}
 	return &MethodDecl{
+		Annotations:    annotations,
 		Name:           nameLexeme,
 		TypeParameters: typeParams,
 		Parameters:     params,
@@ -445,7 +455,7 @@ func (p *Parser) peekNextOperatorExample() string {
 	return "<op>"
 }
 
-func (p *Parser) parseEnumCase() (EnumCaseDecl, error) {
+func (p *Parser) parseEnumCase(annotations []Annotation) (EnumCaseDecl, error) {
 	start, err := p.consume(TokenCase, "expected 'case'")
 	if err != nil {
 		return EnumCaseDecl{}, err
@@ -454,7 +464,7 @@ func (p *Parser) parseEnumCase() (EnumCaseDecl, error) {
 	if err != nil {
 		return EnumCaseDecl{}, err
 	}
-	decl := EnumCaseDecl{Name: name.Lexeme, Span: mergeSpans(tokenSpan(start), tokenSpan(name))}
+	decl := EnumCaseDecl{Annotations: annotations, Name: name.Lexeme, Span: mergeSpans(tokenSpan(start), tokenSpan(name))}
 	if !p.match(TokenLBrace) {
 		return decl, nil
 	}
@@ -479,7 +489,7 @@ func (p *Parser) parseEnumCase() (EnumCaseDecl, error) {
 			})
 			continue
 		}
-		field, err := p.parseField(false, false)
+		field, err := p.parseField(nil, false, false)
 		if err != nil {
 			return EnumCaseDecl{}, err
 		}
@@ -536,11 +546,15 @@ func (p *Parser) parseTopLevelImpl(program *Program) error {
 		return err
 	}
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		annotations, err := p.parseAnnotations()
+		if err != nil {
+			return err
+		}
 		private := p.match(TokenPrivate)
 		if !p.check(TokenDef) && !p.check(TokenPartial) {
 			return fmt.Errorf("expected method declaration in impl block, got %s", p.peek().String())
 		}
-		method, err := p.parseMethodLike(private, false)
+		method, err := p.parseMethodLike(annotations, private, false)
 		if err != nil {
 			return err
 		}

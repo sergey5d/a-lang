@@ -342,10 +342,14 @@ func (p *Parser) parseAnonymousInterfaceExpr() (Expr, error) {
 	}
 	var methods []*MethodDecl
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
+		annotations, err := p.parseAnnotations()
+		if err != nil {
+			return nil, err
+		}
 		private := p.match(TokenPrivate)
 		switch p.peek().Type {
 		case TokenDef, TokenImpl:
-			method, err := p.parseMethodLike(private, false)
+			method, err := p.parseMethodLike(annotations, private, false)
 			if err != nil {
 				return nil, err
 			}

@@ -2,6 +2,22 @@ package parser
 
 import "fmt"
 
+func (p *Parser) parseAnnotations() ([]Annotation, error) {
+	var annotations []Annotation
+	for p.match(TokenAt) {
+		start := p.previous()
+		value, err := p.parseExpressionWithOptions(0, true)
+		if err != nil {
+			return nil, err
+		}
+		annotations = append(annotations, Annotation{
+			Value: value,
+			Span:  mergeSpans(tokenSpan(start), exprSpan(value)),
+		})
+	}
+	return annotations, nil
+}
+
 func (p *Parser) parseFunction() (*FunctionDecl, error) {
 	return p.parseFunctionWithVisibility(false, false)
 }

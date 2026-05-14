@@ -22,6 +22,10 @@ func (p *Parser) parseProgram() (*Program, error) {
 		program.Imports = append(program.Imports, *imp)
 	}
 	for !p.isAtEnd() {
+		annotations, err := p.parseAnnotations()
+		if err != nil {
+			return nil, err
+		}
 		switch p.peek().Type {
 		case TokenPackage:
 			return nil, fmt.Errorf("'package' must appear before declarations")
@@ -32,38 +36,47 @@ func (p *Parser) parseProgram() (*Program, error) {
 			if err != nil {
 				return nil, err
 			}
+			fn.Annotations = annotations
 			program.Functions = append(program.Functions, fn)
 		case TokenInterface:
 			decl, err := p.parseInterface()
 			if err != nil {
 				return nil, err
 			}
+			decl.Annotations = annotations
 			program.Interfaces = append(program.Interfaces, decl)
 		case TokenClass:
 			decl, err := p.parseClass()
 			if err != nil {
 				return nil, err
 			}
+			decl.Annotations = annotations
 			program.Classes = append(program.Classes, decl)
 		case TokenObject:
 			decl, err := p.parseObject()
 			if err != nil {
 				return nil, err
 			}
+			decl.Annotations = annotations
 			program.Classes = append(program.Classes, decl)
 		case TokenRecord:
 			decl, err := p.parseRecord()
 			if err != nil {
 				return nil, err
 			}
+			decl.Annotations = annotations
 			program.Classes = append(program.Classes, decl)
 		case TokenEnum:
 			decl, err := p.parseEnum()
 			if err != nil {
 				return nil, err
 			}
+			decl.Annotations = annotations
 			program.Classes = append(program.Classes, decl)
 		case TokenImpl:
+			if len(annotations) > 0 {
+				return nil, fmt.Errorf("annotations are not supported on impl blocks")
+			}
 			if err := p.parseTopLevelImpl(program); err != nil {
 				return nil, err
 			}
@@ -75,36 +88,42 @@ func (p *Parser) parseProgram() (*Program, error) {
 				if err != nil {
 					return nil, err
 				}
+				fn.Annotations = annotations
 				program.Functions = append(program.Functions, fn)
 			case TokenInterface:
 				decl, err := p.parsePrivateInterface()
 				if err != nil {
 					return nil, err
 				}
+				decl.Annotations = annotations
 				program.Interfaces = append(program.Interfaces, decl)
 			case TokenClass:
 				decl, err := p.parsePrivateClass()
 				if err != nil {
 					return nil, err
 				}
+				decl.Annotations = annotations
 				program.Classes = append(program.Classes, decl)
 			case TokenObject:
 				decl, err := p.parsePrivateObject()
 				if err != nil {
 					return nil, err
 				}
+				decl.Annotations = annotations
 				program.Classes = append(program.Classes, decl)
 			case TokenRecord:
 				decl, err := p.parsePrivateRecord()
 				if err != nil {
 					return nil, err
 				}
+				decl.Annotations = annotations
 				program.Classes = append(program.Classes, decl)
 			case TokenEnum:
 				decl, err := p.parsePrivateEnum()
 				if err != nil {
 					return nil, err
 				}
+				decl.Annotations = annotations
 				program.Classes = append(program.Classes, decl)
 			default:
 				return nil, fmt.Errorf("'hidden' is only supported for top-level declarations")
@@ -117,10 +136,14 @@ func (p *Parser) parseProgram() (*Program, error) {
 					if err != nil {
 						return nil, err
 					}
+					fn.Annotations = annotations
 					program.Functions = append(program.Functions, fn)
 				case TokenInterface, TokenClass, TokenObject, TokenRecord, TokenEnum, TokenImpl:
 					return nil, fmt.Errorf("'public' is only supported for top-level functions and immutable bindings")
 				default:
+					if len(annotations) > 0 {
+						return nil, fmt.Errorf("annotations are only supported on top-level declarations")
+					}
 					stmt, err := p.parseStatement()
 					if err != nil {
 						return nil, err
@@ -138,6 +161,9 @@ func (p *Parser) parseProgram() (*Program, error) {
 				program.Statements = append(program.Statements, valStmt)
 			}
 		default:
+			if len(annotations) > 0 {
+				return nil, fmt.Errorf("annotations are only supported on top-level declarations")
+			}
 			stmt, err := p.parseStatement()
 			if err != nil {
 				return nil, err
