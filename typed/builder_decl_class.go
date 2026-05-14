@@ -86,10 +86,12 @@ func (b *classBuilder) Build(class *parser.ClassDecl) (*ClassDecl, error) {
 		Name:           class.Name,
 		Object:         class.Object,
 		Record:         class.Record,
+		Enum:           class.Enum,
 		TypeParameters: b.params.buildTypeParameters(class.TypeParameters),
 		Interfaces:     implements,
 		Fields:         fields,
 		Methods:        methods,
+		Cases:          append([]parser.EnumCaseDecl(nil), class.Cases...),
 		Symbol:         b.ctx.classSymbols[class.Name],
 		Span:           class.Span,
 	}, nil

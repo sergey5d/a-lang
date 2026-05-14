@@ -231,6 +231,10 @@ func (g *Generator) writeClass(class *lower.Class) error {
 		g.inObject = prevInObject
 	}()
 
+	if class.Enum {
+		return g.writeEnumClass(class)
+	}
+
 	if class.Object {
 		g.linef("static final %s INSTANCE = new %s();", name, name)
 		g.line("")
@@ -270,6 +274,93 @@ func (g *Generator) writeClass(class *lower.Class) error {
 	g.indent--
 	g.line("}")
 	return nil
+}
+
+func (g *Generator) writeEnumClass(class *lower.Class) error {
+	name := g.className(class)
+	allFields := g.enumUnionFields(class)
+	g.line(`private final String __tag;`)
+	for _, field := range allFields {
+		if err := g.writeField(field); err != nil {
+			return err
+		}
+	}
+	g.line("")
+
+	constructorParams := []string{"String __tag"}
+	for _, field := range allFields {
+		typ, err := g.javaType(field.Type, false)
+		if err != nil {
+			return err
+		}
+		constructorParams = append(constructorParams, typ+" "+javaIdent(field.Name))
+	}
+	g.linef("private %s(%s) {", name, strings.Join(constructorParams, ", "))
+	g.indent++
+	g.line("this.__tag = __tag;")
+	for _, field := range allFields {
+		g.linef("this.%s = %s;", javaIdent(field.Name), javaIdent(field.Name))
+	}
+	g.indent--
+	g.line("}")
+	g.line("")
+
+	for _, enumCase := range class.Cases {
+		if len(enumCase.Fields) == 0 {
+			g.linef("static final %s %s = new %s(%s);", name, javaIdent(enumCase.Name), name, g.enumConstructorArgs(enumCase.Name, allFields, nil))
+			continue
+		}
+		params := make([]lower.Parameter, len(enumCase.Fields))
+		for i, field := range enumCase.Fields {
+			params[i] = lower.Parameter{Name: field.Name, Type: field.Type}
+		}
+		g.linef("public static %s %s(%s) {", name, javaIdent(enumCase.Name), g.params(params))
+		g.indent++
+		g.linef("return new %s(%s);", name, g.enumConstructorArgs(enumCase.Name, allFields, enumCase.Fields))
+		g.indent--
+		g.line("}")
+	}
+	g.indent--
+	g.line("}")
+	return nil
+}
+
+func (g *Generator) enumUnionFields(class *lower.Class) []*lower.Field {
+	seen := map[string]bool{}
+	var out []*lower.Field
+	for _, field := range class.Fields {
+		if seen[field.Name] {
+			continue
+		}
+		seen[field.Name] = true
+		out = append(out, field)
+	}
+	for _, enumCase := range class.Cases {
+		for _, field := range enumCase.Fields {
+			if seen[field.Name] {
+				continue
+			}
+			seen[field.Name] = true
+			out = append(out, field)
+		}
+	}
+	return out
+}
+
+func (g *Generator) enumConstructorArgs(caseName string, unionFields []*lower.Field, caseFields []*lower.Field) string {
+	args := []string{strconv.Quote(caseName)}
+	caseFieldMap := map[string]*lower.Field{}
+	for _, field := range caseFields {
+		caseFieldMap[field.Name] = field
+	}
+	for _, field := range unionFields {
+		if _, ok := caseFieldMap[field.Name]; ok {
+			args = append(args, javaIdent(field.Name))
+			continue
+		}
+		args = append(args, g.zeroValueJava(field.Type))
+	}
+	return strings.Join(args, ", ")
 }
 
 func (g *Generator) writeField(field *lower.Field) error {
@@ -892,6 +983,31 @@ func (g *Generator) javaReferenceType(t *typecheck.Type) (string, error) {
 		return "Boolean", nil
 	default:
 		return base, nil
+	}
+}
+
+func (g *Generator) zeroValueJava(t *typecheck.Type) string {
+	if t == nil {
+		return "null"
+	}
+	switch t.Kind {
+	case typecheck.TypeBuiltin:
+		switch t.Name {
+		case "Int", "Int64", "Rune":
+			return "0L"
+		case "Float", "Float64", "Decimal":
+			return "0.0"
+		case "Bool":
+			return "false"
+		case "Str":
+			return `""`
+		case "Array":
+			return "null"
+		default:
+			return "null"
+		}
+	default:
+		return "null"
 	}
 }
 

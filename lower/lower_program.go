@@ -1,8 +1,16 @@
 package lower
 
-import "a-lang/typed"
+import (
+	"a-lang/parser"
+	"a-lang/typecheck"
+	"a-lang/typed"
+)
 
 func (l *Lowerer) lowerProgram(program *typed.Program) (*Program, error) {
+	l.classes = map[string]*typed.ClassDecl{}
+	for _, class := range program.Classes {
+		l.classes[class.Name] = class
+	}
 	out := &Program{}
 	for _, stmt := range program.Globals {
 		globals, err := l.lowerGlobal(stmt)
@@ -55,7 +63,7 @@ func (l *Lowerer) lowerGlobal(stmt typed.Stmt) ([]*Global, error) {
 }
 
 func (l *Lowerer) lowerClass(class *typed.ClassDecl) (*Class, error) {
-	out := &Class{Name: class.Name, Object: class.Object, Record: class.Record}
+	out := &Class{Name: class.Name, Object: class.Object, Record: class.Record, Enum: class.Enum}
 	for _, field := range class.Fields {
 		var init Expr
 		var err error
@@ -83,6 +91,18 @@ func (l *Lowerer) lowerClass(class *typed.ClassDecl) (*Class, error) {
 		} else {
 			out.Methods = append(out.Methods, lowered)
 		}
+	}
+	for _, enumCase := range class.Cases {
+		loweredCase := EnumCase{Name: enumCase.Name}
+		for _, field := range enumCase.Fields {
+			loweredCase.Fields = append(loweredCase.Fields, &Field{
+				Name:    field.Name,
+				Mutable: field.Mutable,
+				Private: field.Private,
+				Type:    l.resolveFieldType(field.Type),
+			})
+		}
+		out.Cases = append(out.Cases, loweredCase)
 	}
 	return out, nil
 }
@@ -122,4 +142,47 @@ func (l *Lowerer) lowerParams(params []typed.Parameter) []Parameter {
 		out[i] = Parameter{Name: param.Name, Type: param.Type}
 	}
 	return out
+}
+
+func (l *Lowerer) resolveFieldType(ref *parser.TypeRef) *typecheck.Type {
+	if ref == nil {
+		return unknownType()
+	}
+	if ref.ReturnType != nil {
+		params := make([]*typecheck.Type, len(ref.ParameterTypes))
+		for i, param := range ref.ParameterTypes {
+			params[i] = l.resolveFieldType(param)
+		}
+		return &typecheck.Type{
+			Kind: typecheck.TypeFunction,
+			Name: "func",
+			Signature: &typecheck.Signature{
+				Parameters: params,
+				ReturnType: l.resolveFieldType(ref.ReturnType),
+			},
+		}
+	}
+	if len(ref.TupleElements) > 0 {
+		args := make([]*typecheck.Type, len(ref.TupleElements))
+		for i, arg := range ref.TupleElements {
+			args[i] = l.resolveFieldType(arg)
+		}
+		return &typecheck.Type{Kind: typecheck.TypeTuple, Name: "Tuple", Args: args, TupleNames: append([]string(nil), ref.TupleNames...)}
+	}
+	args := make([]*typecheck.Type, len(ref.Arguments))
+	for i, arg := range ref.Arguments {
+		args[i] = l.resolveFieldType(arg)
+	}
+	kind := typecheck.TypeUnknown
+	if _, ok := l.classes[ref.Name]; ok {
+		kind = typecheck.TypeClass
+	} else {
+		switch ref.Name {
+		case "Int", "Float", "Bool", "Str", "Rune", "Decimal", "Array", "Unit":
+			kind = typecheck.TypeBuiltin
+		case "List", "Map", "Set", "Printer", "Eq", "Option", "Result", "Either":
+			kind = typecheck.TypeInterface
+		}
+	}
+	return &typecheck.Type{Kind: kind, Name: ref.Name, Args: args}
 }

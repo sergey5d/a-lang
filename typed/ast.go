@@ -138,10 +138,12 @@ type ClassDecl struct {
 	Name           string
 	Object         bool
 	Record         bool
+	Enum           bool
 	TypeParameters []TypeParameter
 	Interfaces     []*typecheck.Type
 	Fields         []FieldDecl
 	Methods        []*MethodDecl
+	Cases          []parser.EnumCaseDecl
 	Symbol         SymbolRef
 	Span           parser.Span
 }
@@ -519,6 +521,7 @@ type MatchCase struct {
 // MatchExpr is a typed match expression.
 type MatchExpr struct {
 	baseExpr
+	Partial bool
 	Value Expr
 	Cases []MatchCase
 }

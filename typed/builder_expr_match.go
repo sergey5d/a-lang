@@ -37,5 +37,5 @@ func (b *exprBuilder) buildMatchExpr(expr parser.Expr, match *parser.MatchExpr) 
 			Expr:    caseExpr,
 		}
 	}
-	return &MatchExpr{baseExpr: b.base(expr), Value: value, Cases: cases}, nil
+	return &MatchExpr{baseExpr: b.base(expr), Partial: match.Partial, Value: value, Cases: cases}, nil
 }

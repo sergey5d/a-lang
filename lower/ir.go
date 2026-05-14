@@ -19,9 +19,16 @@ type Class struct {
 	Name        string
 	Object      bool
 	Record      bool
+	Enum        bool
 	Fields      []*Field
+	Cases       []EnumCase
 	Constructor *Function
 	Methods     []*Function
+}
+
+type EnumCase struct {
+	Name   string
+	Fields []*Field
 }
 
 type Field struct {
