@@ -105,12 +105,60 @@ def run() Int {
 	}
 
 	tmpDir := t.TempDir()
+	if err := WriteStdlibSupport(tmpDir); err != nil {
+		t.Fatalf("WriteStdlibSupport returned error: %v", err)
+	}
 	path := filepath.Join(tmpDir, "Pkg_Default.java")
 	if err := os.WriteFile(path, source, 0o644); err != nil {
 		t.Fatalf("write generated source: %v", err)
 	}
 
-	cmd := exec.Command("javac", path)
+	javaFiles := collectJavaFiles(t, tmpDir)
+	cmd := exec.Command("javac", javaFiles...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("javac failed: %v\n%s\n%s", err, text, string(output))
+	}
+}
+
+func TestGenerateCompilesWithTupleAndOptionRuntime(t *testing.T) {
+	src := `
+pair (Int, Str) = (1, "ok")
+
+def run() Int {
+	value Option[Int] = Some(5)
+	return value.getOr(0)
+}
+`
+
+	lowered := lowerProgram(t, src)
+	source, err := GenerateForPackage(lowered, "")
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+
+	text := string(source)
+	if !strings.Contains(text, "new alang.stdlib.Tuple2<Long, String>(1L, \"ok\")") {
+		t.Fatalf("expected tuple literal lowering in generated Java, got:\n%s", text)
+	}
+	if !strings.Contains(text, "alang.stdlib.Option.some(5L)") {
+		t.Fatalf("expected Some(...) lowering in generated Java, got:\n%s", text)
+	}
+	if !strings.Contains(text, "alang.stdlib.Option<Long>") {
+		t.Fatalf("expected Option[T] Java type in generated Java, got:\n%s", text)
+	}
+
+	tmpDir := t.TempDir()
+	if err := WriteStdlibSupport(tmpDir); err != nil {
+		t.Fatalf("WriteStdlibSupport returned error: %v", err)
+	}
+	path := filepath.Join(tmpDir, "Pkg_Default.java")
+	if err := os.WriteFile(path, source, 0o644); err != nil {
+		t.Fatalf("write generated source: %v", err)
+	}
+
+	javaFiles := collectJavaFiles(t, tmpDir)
+	cmd := exec.Command("javac", javaFiles...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("javac failed: %v\n%s\n%s", err, text, string(output))
@@ -141,4 +189,39 @@ func TestOutputPathUsesPackageStructure(t *testing.T) {
 	if path != expected {
 		t.Fatalf("expected output path %q, got %q", expected, path)
 	}
+}
+
+func TestWriteStdlibSupportCreatesOptionAndTupleFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := WriteStdlibSupport(tmpDir); err != nil {
+		t.Fatalf("WriteStdlibSupport returned error: %v", err)
+	}
+	for _, rel := range []string{
+		filepath.Join("alang", "stdlib", "Option.java"),
+		filepath.Join("alang", "stdlib", "Tuple2.java"),
+		filepath.Join("alang", "stdlib", "Tuple10.java"),
+	} {
+		if _, err := os.Stat(filepath.Join(tmpDir, rel)); err != nil {
+			t.Fatalf("expected runtime file %s: %v", rel, err)
+		}
+	}
+}
+
+func collectJavaFiles(t *testing.T, root string) []string {
+	t.Helper()
+	var files []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || filepath.Ext(path) != ".java" {
+			return nil
+		}
+		files = append(files, path)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("collect Java files: %v", err)
+	}
+	return files
 }

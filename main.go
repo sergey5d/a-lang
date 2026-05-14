@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -36,6 +37,22 @@ func main() {
 	}
 
 	if mode == "java" {
+		if err := java.WriteStdlibSupport("bin/java/stdlib/src"); err != nil {
+			fmt.Fprintf(os.Stderr, "write java stdlib support: %v\n", err)
+			os.Exit(1)
+		}
+		info, err := os.Stat(os.Args[1])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "stat source: %v\n", err)
+			os.Exit(1)
+		}
+		if info.IsDir() {
+			if err := generateJavaTree(os.Args[1]); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			return
+		}
 		if readErr != nil {
 			fmt.Fprintf(os.Stderr, "read source: %v\n", readErr)
 			os.Exit(1)
@@ -191,6 +208,94 @@ func main() {
 		fmt.Fprintf(os.Stderr, "unknown mode %q\n", mode)
 		os.Exit(1)
 	}
+}
+
+func generateJavaTree(root string) error {
+	written := map[string]string{}
+	var failures []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", path, err))
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".al" {
+			return nil
+		}
+		generated, outputPath, err := generateJavaFile(path)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", path, err))
+			return nil
+		}
+		if prior, ok := written[outputPath]; ok {
+			failures = append(failures, fmt.Sprintf("java output collision: %s and %s both map to %s", prior, path, outputPath))
+			return nil
+		}
+		written[outputPath] = path
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+			failures = append(failures, fmt.Sprintf("%s: create java output dir: %v", path, err))
+			return nil
+		}
+		if err := os.WriteFile(outputPath, generated, 0o644); err != nil {
+			failures = append(failures, fmt.Sprintf("%s: write java output: %v", path, err))
+			return nil
+		}
+		fmt.Printf("generated %s -> %s\n", path, outputPath)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if len(failures) == 0 {
+		return nil
+	}
+	return fmt.Errorf("java generation completed with %d failure(s):\n%s", len(failures), strings.Join(failures, "\n"))
+}
+
+func generateJavaFile(path string) ([]byte, string, error) {
+	srcBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, "", fmt.Errorf("read source: %w", err)
+	}
+	src := string(srcBytes)
+	program, err := parser.Parse(src)
+	if err != nil {
+		return nil, "", fmt.Errorf("parse error: %w", err)
+	}
+	if len(program.Imports) > 0 {
+		return nil, "", fmt.Errorf("java generation does not support imports/modules yet")
+	}
+	diagnostics := semantic.Analyze(program)
+	typeResult := typecheck.Analyze(program)
+	diagnostics = append(diagnostics, typeResult.Diagnostics...)
+	if len(diagnostics) > 0 {
+		var parts []string
+		seen := map[string]bool{}
+		for _, diagnostic := range diagnostics {
+			message := formatDiagnostic(diagnostic, src)
+			if seen[message] {
+				continue
+			}
+			seen[message] = true
+			parts = append(parts, message)
+		}
+		return nil, "", fmt.Errorf("%s", strings.Join(parts, "\n"))
+	}
+	typedProgram, err := typed.Build(program, typeResult)
+	if err != nil {
+		return nil, "", fmt.Errorf("typed build: %w", err)
+	}
+	lowered, err := lower.ProgramFromTyped(typedProgram)
+	if err != nil {
+		return nil, "", fmt.Errorf("lowering: %w", err)
+	}
+	generated, err := java.GenerateForPackage(lowered, program.PackageName)
+	if err != nil {
+		return nil, "", fmt.Errorf("java generation: %w", err)
+	}
+	return generated, java.OutputPath("bin/java/src", program.PackageName), nil
 }
 
 func formatDiagnostic(d semantic.Diagnostic, src string) string {

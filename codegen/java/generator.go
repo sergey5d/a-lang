@@ -4,6 +4,7 @@ import (
 	"a-lang/lower"
 	"a-lang/typecheck"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -56,6 +57,98 @@ func GenerateForPackageNamed(program *lower.Program, packageName, className stri
 		return nil, err
 	}
 	return []byte(g.b.String()), nil
+}
+
+func WriteStdlibSupport(baseDir string) error {
+	for rel, src := range stdlibSources() {
+		path := filepath.Join(baseDir, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return fmt.Errorf("create stdlib output dir: %w", err)
+		}
+		if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+			return fmt.Errorf("write stdlib source %s: %w", rel, err)
+		}
+	}
+	return nil
+}
+
+func stdlibSources() map[string]string {
+	sources := map[string]string{
+		filepath.Join("alang", "stdlib", "Option.java"): `package alang.stdlib;
+
+public final class Option<T> {
+    private static final Option<?> NONE = new Option<>(false, null);
+
+    private final boolean set;
+    private final T value;
+
+    private Option(boolean set, T value) {
+        this.set = set;
+        this.value = value;
+    }
+
+    public static <T> Option<T> some(T value) {
+        return new Option<>(true, value);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> Option<T> none() {
+        return (Option<T>) NONE;
+    }
+
+    public boolean isSet() {
+        return this.set;
+    }
+
+    public boolean isEmpty() {
+        return !this.set;
+    }
+
+    public T expect() {
+        if (!this.set) {
+            throw new IllegalStateException("Option.None");
+        }
+        return this.value;
+    }
+
+    public T getOr(T defaultValue) {
+        return this.set ? this.value : defaultValue;
+    }
+
+    public T getOrElse(T defaultValue) {
+        return this.getOr(defaultValue);
+    }
+}
+`,
+	}
+
+	for arity := 2; arity <= 10; arity++ {
+		typeParams := make([]string, arity)
+		fields := make([]string, arity)
+		params := make([]string, arity)
+		assignments := make([]string, arity)
+		for i := 0; i < arity; i++ {
+			typeName := fmt.Sprintf("T%d", i+1)
+			fieldName := fmt.Sprintf("_%d", i+1)
+			typeParams[i] = typeName
+			fields[i] = fmt.Sprintf("    public final %s %s;", typeName, fieldName)
+			params[i] = fmt.Sprintf("%s %s", typeName, fieldName)
+			assignments[i] = fmt.Sprintf("        this.%s = %s;", fieldName, fieldName)
+		}
+
+		sources[filepath.Join("alang", "stdlib", fmt.Sprintf("Tuple%d.java", arity))] = fmt.Sprintf(`package alang.stdlib;
+
+public final class Tuple%d<%s> {
+%s
+
+    public Tuple%d(%s) {
+%s
+    }
+}
+`, arity, strings.Join(typeParams, ", "), strings.Join(fields, "\n"), arity, strings.Join(params, ", "), strings.Join(assignments, "\n"))
+	}
+
+	return sources
 }
 
 func (g *Generator) writeProgram(program *lower.Program) error {
@@ -425,6 +518,8 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		return strconv.FormatInt(int64(e.Value), 10) + "L", nil
 	case *lower.ListLiteral:
 		return "", fmt.Errorf("unsupported lowered expression %T", expr)
+	case *lower.TupleLiteral:
+		return g.tupleLiteral(e)
 	case *lower.Unary:
 		right, err := g.expr(e.Right)
 		if err != nil {
@@ -462,11 +557,27 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		if e.Name == "Array" {
 			return g.arrayLiteral(e)
 		}
+		if e.Name == "Some" {
+			if len(e.Args) != 1 {
+				return "", fmt.Errorf("Some expects 1 argument")
+			}
+			value, err := g.expr(e.Args[0])
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("alang.stdlib.Option.some(%s)", value), nil
+		}
+		if e.Name == "None" {
+			if len(e.Args) != 0 {
+				return "", fmt.Errorf("None expects 0 arguments")
+			}
+			return "alang.stdlib.Option.none()", nil
+		}
 		args, err := g.exprList(e.Args)
 		if err != nil {
 			return "", err
 		}
-			return fmt.Sprintf("%s.%s(%s)", g.moduleClass, javaIdent(e.Name), args), nil
+		return fmt.Sprintf("%s.%s(%s)", g.moduleClass, javaIdent(e.Name), args), nil
 	case *lower.BuiltinCall:
 		return "", fmt.Errorf("unsupported lowered expression %T", expr)
 	case *lower.Construct:
@@ -513,6 +624,22 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 	case *lower.Invoke:
 		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "Array" {
 			return g.arrayLiteralFromArgs(e.Args, e.Type)
+		}
+		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "Some" {
+			if len(e.Args) != 1 {
+				return "", fmt.Errorf("Some expects 1 argument")
+			}
+			value, err := g.expr(e.Args[0])
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("alang.stdlib.Option.some(%s)", value), nil
+		}
+		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "None" {
+			if len(e.Args) != 0 {
+				return "", fmt.Errorf("None expects 0 arguments")
+			}
+			return "alang.stdlib.Option.none()", nil
 		}
 		return "", fmt.Errorf("unsupported lowered expression %T", expr)
 	default:
@@ -582,6 +709,25 @@ func (g *Generator) arrayOfLength(call *lower.MethodCall) (string, error) {
 	return fmt.Sprintf("new %s[(int)(%s)]", elemType, length), nil
 }
 
+func (g *Generator) tupleLiteral(tuple *lower.TupleLiteral) (string, error) {
+	if tuple.Type == nil || tuple.Type.Kind != typecheck.TypeTuple {
+		return "", fmt.Errorf("tuple literal requires resolved tuple type")
+	}
+	arity := len(tuple.Elements)
+	if arity < 2 || arity > 10 {
+		return "", fmt.Errorf("tuple arity %d is unsupported", arity)
+	}
+	args, err := g.exprList(tuple.Elements)
+	if err != nil {
+		return "", err
+	}
+	typeName, err := g.javaType(tuple.Type, false)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("new %s(%s)", typeName, args), nil
+}
+
 func (g *Generator) foreachItemType(iterable lower.Expr) (string, error) {
 	switch e := iterable.(type) {
 	case interface{ GetType() *typecheck.Type }:
@@ -614,6 +760,8 @@ func exprType(expr lower.Expr) *typecheck.Type {
 	case *lower.RuneLiteral:
 		return e.Type
 	case *lower.ListLiteral:
+		return e.Type
+	case *lower.TupleLiteral:
 		return e.Type
 	case *lower.Unary:
 		return e.Type
@@ -679,6 +827,9 @@ func (g *Generator) javaType(t *typecheck.Type, allowVoid bool) (string, error) 
 			return "", fmt.Errorf("unsupported builtin type %s", t.Name)
 		}
 	case typecheck.TypeClass:
+		if t.Name == "Option" {
+			return g.optionType(t)
+		}
 		if class, ok := g.classes[t.Name]; ok {
 			return g.className(class), nil
 		}
@@ -688,8 +839,59 @@ func (g *Generator) javaType(t *typecheck.Type, allowVoid bool) (string, error) 
 			return g.className(class), nil
 		}
 		return g.objectClassName(t.Name), nil
+	case typecheck.TypeInterface:
+		if t.Name == "Option" {
+			return g.optionType(t)
+		}
+		return "", fmt.Errorf("unsupported interface type %s", t.String())
+	case typecheck.TypeTuple:
+		return g.tupleType(t)
 	default:
 		return "", fmt.Errorf("unsupported type %s", t.String())
+	}
+}
+
+func (g *Generator) optionType(t *typecheck.Type) (string, error) {
+	if len(t.Args) != 1 {
+		return "", fmt.Errorf("Option requires one type argument")
+	}
+	argType, err := g.javaReferenceType(t.Args[0])
+	if err != nil {
+		return "", err
+	}
+	return "alang.stdlib.Option<" + argType + ">", nil
+}
+
+func (g *Generator) tupleType(t *typecheck.Type) (string, error) {
+	arity := len(t.Args)
+	if arity < 2 || arity > 10 {
+		return "", fmt.Errorf("tuple arity %d is unsupported", arity)
+	}
+	parts := make([]string, arity)
+	for i, arg := range t.Args {
+		part, err := g.javaReferenceType(arg)
+		if err != nil {
+			return "", err
+		}
+		parts[i] = part
+	}
+	return fmt.Sprintf("alang.stdlib.Tuple%d<%s>", arity, strings.Join(parts, ", ")), nil
+}
+
+func (g *Generator) javaReferenceType(t *typecheck.Type) (string, error) {
+	base, err := g.javaType(t, false)
+	if err != nil {
+		return "", err
+	}
+	switch base {
+	case "long":
+		return "Long", nil
+	case "double":
+		return "Double", nil
+	case "boolean":
+		return "Boolean", nil
+	default:
+		return base, nil
 	}
 }
 

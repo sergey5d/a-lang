@@ -160,6 +160,13 @@ type ListLiteral struct {
 
 func (*ListLiteral) exprNode() {}
 
+type TupleLiteral struct {
+	Elements []Expr
+	Type     *typecheck.Type
+}
+
+func (*TupleLiteral) exprNode() {}
+
 type Unary struct {
 	Operator string
 	Right    Expr

@@ -52,6 +52,16 @@ func (l *Lowerer) lowerExpr(expr typed.Expr) (Expr, error) {
 			items[i] = lowered
 		}
 		return &ListLiteral{Elements: items, Type: e.GetType()}, nil
+	case *typed.TupleLiteral:
+		items := make([]Expr, len(e.Elements))
+		for i, item := range e.Elements {
+			lowered, err := l.lowerExpr(item)
+			if err != nil {
+				return nil, err
+			}
+			items[i] = lowered
+		}
+		return &TupleLiteral{Elements: items, Type: e.GetType()}, nil
 	case *typed.GroupExpr:
 		return l.lowerExpr(e.Inner)
 	case *typed.BlockExpr:
