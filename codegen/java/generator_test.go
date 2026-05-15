@@ -91,6 +91,9 @@ def run() Int {
 	}
 
 	text := string(source)
+	if !strings.Contains(text, "import alang.stdlib.*;") {
+		t.Fatalf("expected stdlib import in generated Java, got:\n%s", text)
+	}
 	if !strings.Contains(text, "public final class Pkg_Default") {
 		t.Fatalf("expected package holder class in generated Java, got:\n%s", text)
 	}
@@ -138,13 +141,13 @@ def run() Int {
 	}
 
 	text := string(source)
-	if !strings.Contains(text, "new alang.stdlib.Tuple2<Long, String>(1L, \"ok\")") {
+	if !strings.Contains(text, "new Tuple2<Long, String>(1L, \"ok\")") {
 		t.Fatalf("expected tuple literal lowering in generated Java, got:\n%s", text)
 	}
-	if !strings.Contains(text, "alang.stdlib.Option.some(5L)") {
+	if !strings.Contains(text, "Option.some(5L)") {
 		t.Fatalf("expected Some(...) lowering in generated Java, got:\n%s", text)
 	}
-	if !strings.Contains(text, "alang.stdlib.Option<Long>") {
+	if !strings.Contains(text, "Option<Long>") {
 		t.Fatalf("expected Option[T] Java type in generated Java, got:\n%s", text)
 	}
 
@@ -212,7 +215,7 @@ def run() Int {
 	}
 
 	text := string(source)
-	if !strings.Contains(text, "alang.stdlib.List<alang.stdlib.List<Long>>") {
+	if !strings.Contains(text, "List<List<Long>>") {
 		t.Fatalf("expected List type lowering in generated Java, got:\n%s", text)
 	}
 	if !strings.Contains(text, "row.get(0L).expect()") {

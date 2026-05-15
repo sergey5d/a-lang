@@ -291,6 +291,8 @@ func (g *Generator) writeProgram(program *lower.Program) error {
 		g.linef("package %s;", g.packageName)
 		g.line("")
 	}
+	g.line("import alang.stdlib.*;")
+	g.line("")
 
 	g.linef("public final class %s {", g.moduleClass)
 	g.indent++
@@ -781,7 +783,7 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 	switch e := expr.(type) {
 	case *lower.VarRef:
 		if e.Name == "OS" {
-			return "alang.stdlib.OS", nil
+			return "OS", nil
 		}
 		if e.Type != nil && e.Type.Kind == typecheck.TypeObject {
 			if _, ok := g.objects[e.Name]; ok {
@@ -846,10 +848,10 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 			return g.arrayLiteral(e)
 		}
 		if e.Name == "List" {
-			return g.collectionLiteral("alang.stdlib.List", e.Args)
+			return g.collectionLiteral("List", e.Args)
 		}
 		if e.Name == "Set" {
-			return g.collectionLiteral("alang.stdlib.Set", e.Args)
+			return g.collectionLiteral("Set", e.Args)
 		}
 		if e.Name == "Some" {
 			if len(e.Args) != 1 {
@@ -859,13 +861,13 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			return fmt.Sprintf("alang.stdlib.Option.some(%s)", value), nil
+			return fmt.Sprintf("Option.some(%s)", value), nil
 		}
 		if e.Name == "None" {
 			if len(e.Args) != 0 {
 				return "", fmt.Errorf("None expects 0 arguments")
 			}
-			return "alang.stdlib.Option.none()", nil
+			return "Option.none()", nil
 		}
 		args, err := g.exprList(e.Args)
 		if err != nil {
@@ -932,10 +934,10 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 			return g.arrayLiteralFromArgs(e.Args, e.Type)
 		}
 		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "List" {
-			return g.collectionLiteral("alang.stdlib.List", e.Args)
+			return g.collectionLiteral("List", e.Args)
 		}
 		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "Set" {
-			return g.collectionLiteral("alang.stdlib.Set", e.Args)
+			return g.collectionLiteral("Set", e.Args)
 		}
 		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "Some" {
 			if len(e.Args) != 1 {
@@ -945,13 +947,13 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			return fmt.Sprintf("alang.stdlib.Option.some(%s)", value), nil
+			return fmt.Sprintf("Option.some(%s)", value), nil
 		}
 		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "None" {
 			if len(e.Args) != 0 {
 				return "", fmt.Errorf("None expects 0 arguments")
 			}
-			return "alang.stdlib.Option.none()", nil
+			return "Option.none()", nil
 		}
 		return "", fmt.Errorf("unsupported lowered expression %T", expr)
 	default:
@@ -1263,9 +1265,9 @@ func (g *Generator) javaType(t *typecheck.Type, allowVoid bool) (string, error) 
 			}
 			switch t.Name {
 			case "List":
-				return "alang.stdlib.List<" + argType + ">", nil
+				return "List<" + argType + ">", nil
 			case "Set":
-				return "alang.stdlib.Set<" + argType + ">", nil
+				return "Set<" + argType + ">", nil
 			default:
 				return "Iterable<" + argType + ">", nil
 			}
@@ -1286,7 +1288,7 @@ func (g *Generator) optionType(t *typecheck.Type) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "alang.stdlib.Option<" + argType + ">", nil
+	return "Option<" + argType + ">", nil
 }
 
 func (g *Generator) tupleType(t *typecheck.Type) (string, error) {
@@ -1302,7 +1304,7 @@ func (g *Generator) tupleType(t *typecheck.Type) (string, error) {
 		}
 		parts[i] = part
 	}
-	return fmt.Sprintf("alang.stdlib.Tuple%d<%s>", arity, strings.Join(parts, ", ")), nil
+	return fmt.Sprintf("Tuple%d<%s>", arity, strings.Join(parts, ", ")), nil
 }
 
 func (g *Generator) javaReferenceType(t *typecheck.Type) (string, error) {
