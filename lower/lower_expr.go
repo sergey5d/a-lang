@@ -488,12 +488,26 @@ func equalityExpr(left, right Expr, leftType *typecheck.Type) Expr {
 }
 
 func andExpr(left, right Expr) Expr {
+	if isBoolLiteral(left, true) {
+		return right
+	}
+	if isBoolLiteral(right, true) {
+		return left
+	}
+	if isBoolLiteral(left, false) || isBoolLiteral(right, false) {
+		return &BoolLiteral{Value: false, Type: &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Bool"}}
+	}
 	return &Binary{
 		Left:     left,
 		Operator: "&&",
 		Right:    right,
 		Type:     &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Bool"},
 	}
+}
+
+func isBoolLiteral(expr Expr, value bool) bool {
+	lit, ok := expr.(*BoolLiteral)
+	return ok && lit.Value == value
 }
 
 func zeroValueExpr(t *typecheck.Type) Expr {
