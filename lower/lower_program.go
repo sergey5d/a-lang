@@ -169,6 +169,13 @@ func (l *Lowerer) resolveFieldType(ref *parser.TypeRef) *typecheck.Type {
 		}
 		return &typecheck.Type{Kind: typecheck.TypeTuple, Name: "Tuple", Args: args, TupleNames: append([]string(nil), ref.TupleNames...)}
 	}
+	if len(ref.RecordFields) > 0 {
+		fields := make([]typecheck.RecordField, len(ref.RecordFields))
+		for i, field := range ref.RecordFields {
+			fields[i] = typecheck.RecordField{Name: field.Name, Type: l.resolveFieldType(field.Type)}
+		}
+		return &typecheck.Type{Kind: typecheck.TypeRecord, Name: "Record", Fields: fields}
+	}
 	args := make([]*typecheck.Type, len(ref.Arguments))
 	for i, arg := range ref.Arguments {
 		args[i] = l.resolveFieldType(arg)

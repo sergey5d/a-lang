@@ -219,6 +219,18 @@ func (g *Generator) writeStmt(stmt lower.Stmt) error {
 		}
 		g.indent--
 		g.line("}")
+	case *lower.While:
+		cond, err := g.expr(s.Condition)
+		if err != nil {
+			return err
+		}
+		g.linef("for %s {", cond)
+		g.indent++
+		if err := g.writeStmtBlock(s.Body); err != nil {
+			return err
+		}
+		g.indent--
+		g.line("}")
 	case *lower.Loop:
 		g.line("for {")
 		g.indent++

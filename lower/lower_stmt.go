@@ -294,13 +294,7 @@ func (l *Lowerer) lowerWhileStmt(stmt *typed.WhileStmt) ([]Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []Stmt{&Loop{Body: []Stmt{
-		&If{
-			Condition: cond,
-			Then:      body,
-			Else:      []Stmt{&Break{}},
-		},
-	}}}, nil
+	return []Stmt{&While{Condition: cond, Body: body}}, nil
 }
 
 func (l *Lowerer) lowerForStmt(stmt *typed.ForStmt) ([]Stmt, error) {

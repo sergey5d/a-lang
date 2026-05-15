@@ -90,6 +90,13 @@ type ForEach struct {
 
 func (*ForEach) stmtNode() {}
 
+type While struct {
+	Condition Expr
+	Body      []Stmt
+}
+
+func (*While) stmtNode() {}
+
 type Loop struct {
 	Body []Stmt
 }
@@ -173,6 +180,18 @@ type TupleLiteral struct {
 }
 
 func (*TupleLiteral) exprNode() {}
+
+type RecordFieldValue struct {
+	Name  string
+	Value Expr
+}
+
+type RecordLiteral struct {
+	Fields []RecordFieldValue
+	Type   *typecheck.Type
+}
+
+func (*RecordLiteral) exprNode() {}
 
 type Unary struct {
 	Operator string

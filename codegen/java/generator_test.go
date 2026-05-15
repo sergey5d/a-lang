@@ -241,6 +241,31 @@ def run(nums List[Int]) Int {
 	}
 }
 
+func TestGeneratePreservesWhileLoop(t *testing.T) {
+	src := `
+def run(keys List[Int]) Int {
+	while keys.size() != 0 {
+		keys.remove(0)
+	}
+	return 0
+}
+`
+
+	lowered := lowerProgram(t, src)
+	source, err := GenerateForPackage(lowered, "")
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+
+	text := string(source)
+	if strings.Contains(text, "while (true)") {
+		t.Fatalf("expected direct while loop in generated Java, got:\n%s", text)
+	}
+	if !strings.Contains(text, "while (keys.size() != 0L)") {
+		t.Fatalf("expected direct while condition in generated Java, got:\n%s", text)
+	}
+}
+
 func TestGenerateCompilesWithListSetAndLambda(t *testing.T) {
 	src := `
 def run() Int {

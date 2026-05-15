@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -24,8 +25,10 @@ type Generator struct {
 	packageName string
 	classes     map[string]*lower.Class
 	objects     map[string]*lower.Class
+	records     map[string]*typecheck.Type
 	inObject    bool
 	thisClass   *lower.Class
+	currentReturnType *typecheck.Type
 }
 
 func Generate(program *lower.Program) ([]byte, error) {
@@ -50,6 +53,7 @@ func GenerateForPackageNamed(program *lower.Program, packageName, className stri
 		packageName: javaPackageName(packageName),
 		classes:     map[string]*lower.Class{},
 		objects:     map[string]*lower.Class{},
+		records:     map[string]*typecheck.Type{},
 	}
 	if g.moduleClass == "" {
 		g.moduleClass = defaultClassName
@@ -61,6 +65,7 @@ func GenerateForPackageNamed(program *lower.Program, packageName, className stri
 		}
 		g.classes[class.Name] = class
 	}
+	g.collectRecordTypes(program)
 	if err := g.writeProgram(program); err != nil {
 		return nil, err
 	}
@@ -85,6 +90,10 @@ func stdlibSources() map[string]string {
 		filepath.Join("alang", "stdlib", "Option.java"): `package alang.stdlib;
 
 public final class Option<T> {
+    public interface Mapper<T, R> {
+        R apply(T value);
+    }
+
     private static final Option<?> NONE = new Option<>(false, null);
 
     private final boolean set;
@@ -125,6 +134,13 @@ public final class Option<T> {
 
     public T getOrElse(T defaultValue) {
         return this.getOr(defaultValue);
+    }
+
+    public <R> Option<R> map(Mapper<? super T, ? extends R> mapper) {
+        if (!this.set) {
+            return Option.none();
+        }
+        return Option.some(mapper.apply(this.value));
     }
 }
 `,
@@ -292,6 +308,13 @@ func (g *Generator) writeProgram(program *lower.Program) error {
 	g.indent--
 	g.line("}")
 
+	for _, recordType := range g.orderedRecordTypes() {
+		g.line("")
+		if err := g.writeRecordClass(recordType); err != nil {
+			return err
+		}
+	}
+
 	for _, class := range program.Classes {
 		g.line("")
 		if err := g.writeClass(class); err != nil {
@@ -363,6 +386,11 @@ func (g *Generator) writeClass(class *lower.Class) error {
 			return err
 		}
 		g.line("")
+	} else if class.Record {
+		if err := g.writeRecordDefaultConstructor(class); err != nil {
+			return err
+		}
+		g.line("")
 	} else {
 		g.linef("public %s() {}", name)
 		g.line("")
@@ -377,6 +405,40 @@ func (g *Generator) writeClass(class *lower.Class) error {
 		}
 	}
 
+	g.indent--
+	g.line("}")
+	return nil
+}
+
+func (g *Generator) writeRecordClass(recordType *typecheck.Type) error {
+	name := g.recordClassName(recordType)
+	g.linef("final class %s {", name)
+	g.indent++
+	for _, field := range recordType.Fields {
+		typ, err := g.javaType(field.Type, false)
+		if err != nil {
+			return err
+		}
+		g.linef("public final %s %s;", typ, javaIdent(field.Name))
+	}
+	if len(recordType.Fields) > 0 {
+		g.line("")
+	}
+	params := make([]string, len(recordType.Fields))
+	for i, field := range recordType.Fields {
+		typ, err := g.javaType(field.Type, false)
+		if err != nil {
+			return err
+		}
+		params[i] = typ + " " + javaIdent(field.Name)
+	}
+	g.linef("public %s(%s) {", name, strings.Join(params, ", "))
+	g.indent++
+	for _, field := range recordType.Fields {
+		g.linef("this.%s = %s;", javaIdent(field.Name), javaIdent(field.Name))
+	}
+	g.indent--
+	g.line("}")
 	g.indent--
 	g.line("}")
 	return nil
@@ -514,6 +576,21 @@ func (g *Generator) writeConstructor(class *lower.Class) error {
 	return nil
 }
 
+func (g *Generator) writeRecordDefaultConstructor(class *lower.Class) error {
+	params := make([]lower.Parameter, len(class.Fields))
+	for i, field := range class.Fields {
+		params[i] = lower.Parameter{Name: field.Name, Type: field.Type}
+	}
+	g.linef("public %s(%s) {", g.className(class), g.params(params))
+	g.indent++
+	for _, field := range class.Fields {
+		g.linef("this.%s = %s;", javaIdent(field.Name), javaIdent(field.Name))
+	}
+	g.indent--
+	g.line("}")
+	return nil
+}
+
 func (g *Generator) writeMethod(class *lower.Class, fn *lower.Function) error {
 	returnType, err := g.javaType(fn.ReturnType, true)
 	if err != nil {
@@ -576,6 +653,11 @@ func (g *Generator) writeStmtBlock(stmts []lower.Stmt) error {
 }
 
 func (g *Generator) writeCallableBody(stmts []lower.Stmt, returnType *typecheck.Type, constructor bool) error {
+	prevReturnType := g.currentReturnType
+	g.currentReturnType = returnType
+	defer func() {
+		g.currentReturnType = prevReturnType
+	}()
 	for i, stmt := range stmts {
 		if !constructor && !isUnitType(returnType) && i == len(stmts)-1 {
 			if exprStmt, ok := stmt.(*lower.ExprStmt); ok {
@@ -667,7 +749,24 @@ func (g *Generator) writeStmt(stmt lower.Stmt) error {
 		}
 		g.indent--
 		g.line("}")
+	case *lower.While:
+		cond, err := g.expr(s.Condition)
+		if err != nil {
+			return err
+		}
+		g.linef("while (%s) {", unwrapGroupedJavaExpr(cond))
+		g.indent++
+		if err := g.writeStmtBlock(s.Body); err != nil {
+			return err
+		}
+		g.indent--
+		g.line("}")
 	case *lower.Loop:
+		if ok, err := g.writeWhileLoop(s); err != nil {
+			return err
+		} else if ok {
+			return nil
+		}
 		g.line("while (true) {")
 		g.indent++
 		if err := g.writeStmtBlock(s.Body); err != nil {
@@ -677,6 +776,15 @@ func (g *Generator) writeStmt(stmt lower.Stmt) error {
 		g.line("}")
 	case *lower.Return:
 		if s.Value == nil {
+			g.line("return;")
+			return nil
+		}
+		if isUnitType(g.currentReturnType) {
+			value, err := g.expr(s.Value)
+			if err != nil {
+				return err
+			}
+			g.linef("%s;", value)
 			g.line("return;")
 			return nil
 		}
@@ -697,6 +805,34 @@ func (g *Generator) writeStmt(stmt lower.Stmt) error {
 		return fmt.Errorf("unsupported lowered statement %T", stmt)
 	}
 	return nil
+}
+
+func (g *Generator) writeWhileLoop(loop *lower.Loop) (bool, error) {
+	if len(loop.Body) != 1 {
+		return false, nil
+	}
+	guard, ok := loop.Body[0].(*lower.If)
+	if !ok {
+		return false, nil
+	}
+	if len(guard.Else) != 1 {
+		return false, nil
+	}
+	if _, ok := guard.Else[0].(*lower.Break); !ok {
+		return false, nil
+	}
+	cond, err := g.expr(guard.Condition)
+	if err != nil {
+		return false, err
+	}
+	g.linef("while (%s) {", unwrapGroupedJavaExpr(cond))
+	g.indent++
+	if err := g.writeStmtBlock(guard.Then); err != nil {
+		return false, err
+	}
+	g.indent--
+	g.line("}")
+	return true, nil
 }
 
 func (g *Generator) writeRangeLoop(loop *lower.ForEach) (bool, error) {
@@ -784,6 +920,8 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		return g.listLiteral(e)
 	case *lower.TupleLiteral:
 		return g.tupleLiteral(e)
+	case *lower.RecordLiteral:
+		return g.recordLiteral(e)
 	case *lower.Unary:
 		right, err := g.expr(e.Right)
 		if err != nil {
@@ -828,20 +966,10 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 			return g.collectionLiteral("Set", e.Args)
 		}
 		if e.Name == "Some" {
-			if len(e.Args) != 1 {
-				return "", fmt.Errorf("Some expects 1 argument")
-			}
-			value, err := g.expr(e.Args[0])
-			if err != nil {
-				return "", err
-			}
-			return fmt.Sprintf("Option.some(%s)", value), nil
+			return g.optionCallExpr("Some", e.Args, nil)
 		}
 		if e.Name == "None" {
-			if len(e.Args) != 0 {
-				return "", fmt.Errorf("None expects 0 arguments")
-			}
-			return "Option.none()", nil
+			return g.optionCallExpr("None", e.Args, nil)
 		}
 		args, err := g.exprList(e.Args)
 		if err != nil {
@@ -855,11 +983,15 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		if !ok {
 			return "", fmt.Errorf("unknown class %q", e.Class)
 		}
-		args, err := g.exprList(e.Args)
-		if err != nil {
-			return "", err
+		args := make([]string, len(e.Args))
+		for i, arg := range e.Args {
+			value, err := g.exprWithExpected(arg, g.constructArgType(class, i))
+			if err != nil {
+				return "", err
+			}
+			args[i] = value
 		}
-		return fmt.Sprintf("new %s(%s)", g.className(class), args), nil
+		return fmt.Sprintf("new %s(%s)", g.className(class), strings.Join(args, ", ")), nil
 	case *lower.FieldGet:
 		receiver, err := g.expr(e.Receiver)
 		if err != nil {
@@ -917,20 +1049,10 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 			return g.collectionLiteral("Set", e.Args)
 		}
 		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "Some" {
-			if len(e.Args) != 1 {
-				return "", fmt.Errorf("Some expects 1 argument")
-			}
-			value, err := g.expr(e.Args[0])
-			if err != nil {
-				return "", err
-			}
-			return fmt.Sprintf("Option.some(%s)", value), nil
+			return g.optionCallExpr("Some", e.Args, nil)
 		}
 		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "None" {
-			if len(e.Args) != 0 {
-				return "", fmt.Errorf("None expects 0 arguments")
-			}
-			return "Option.none()", nil
+			return g.optionCallExpr("None", e.Args, nil)
 		}
 		return "", fmt.Errorf("unsupported lowered expression %T", expr)
 	default:
@@ -964,11 +1086,47 @@ func unwrapGroupedJavaExpr(expr string) string {
 	return expr[1 : len(expr)-1]
 }
 
+func (g *Generator) optionCallExpr(name string, args []lower.Expr, expected *typecheck.Type) (string, error) {
+	switch name {
+	case "Some":
+		if len(args) != 1 {
+			return "", fmt.Errorf("Some expects 1 argument")
+		}
+		value, err := g.expr(args[0])
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Option.some(%s)", value), nil
+	case "None":
+		if len(args) != 0 {
+			return "", fmt.Errorf("None expects 0 arguments")
+		}
+		if expected != nil && expected.Name == "Option" && len(expected.Args) == 1 {
+			argType, err := g.javaReferenceType(expected.Args[0])
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("Option.<%s>none()", argType), nil
+		}
+		return "Option.none()", nil
+	default:
+		return "", fmt.Errorf("unsupported option call %s", name)
+	}
+}
+
 func (g *Generator) exprWithExpected(expr lower.Expr, expected *typecheck.Type) (string, error) {
 	switch e := expr.(type) {
 	case *lower.MethodCall:
 		if receiver, ok := e.Receiver.(*lower.VarRef); ok && receiver.Name == "Array" && e.Method == "ofLength" {
 			return g.arrayOfLengthWithExpected(e, expected)
+		}
+	case *lower.FunctionCall:
+		if e.Name == "Some" || e.Name == "None" {
+			return g.optionCallExpr(e.Name, e.Args, expected)
+		}
+	case *lower.Invoke:
+		if callee, ok := e.Callee.(*lower.VarRef); ok && (callee.Name == "Some" || callee.Name == "None") {
+			return g.optionCallExpr(callee.Name, e.Args, expected)
 		}
 	}
 	return g.expr(expr)
@@ -1145,6 +1303,24 @@ func (g *Generator) assignmentTargetType(target lower.Expr) *typecheck.Type {
 	}
 }
 
+func (g *Generator) constructArgType(class *lower.Class, index int) *typecheck.Type {
+	if class == nil {
+		return nil
+	}
+	if class.Constructor != nil {
+		if index >= 0 && index < len(class.Constructor.Parameters) {
+			return class.Constructor.Parameters[index].Type
+		}
+		return nil
+	}
+	if class.Record {
+		if index >= 0 && index < len(class.Fields) {
+			return class.Fields[index].Type
+		}
+	}
+	return nil
+}
+
 func (g *Generator) tupleLiteral(tuple *lower.TupleLiteral) (string, error) {
 	if tuple.Type == nil || tuple.Type.Kind != typecheck.TypeTuple {
 		return "", fmt.Errorf("tuple literal requires resolved tuple type")
@@ -1162,6 +1338,21 @@ func (g *Generator) tupleLiteral(tuple *lower.TupleLiteral) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("new %s(%s)", typeName, args), nil
+}
+
+func (g *Generator) recordLiteral(record *lower.RecordLiteral) (string, error) {
+	if record.Type == nil || record.Type.Kind != typecheck.TypeRecord {
+		return "", fmt.Errorf("record literal requires resolved record type")
+	}
+	args := make([]string, len(record.Fields))
+	for i, field := range record.Fields {
+		value, err := g.exprWithExpected(field.Value, record.Type.Fields[i].Type)
+		if err != nil {
+			return "", err
+		}
+		args[i] = value
+	}
+	return fmt.Sprintf("new %s(%s)", g.recordClassName(record.Type), strings.Join(args, ", ")), nil
 }
 
 func (g *Generator) foreachItemType(iterable lower.Expr) (string, error) {
@@ -1200,6 +1391,8 @@ func exprType(expr lower.Expr) *typecheck.Type {
 	case *lower.ListLiteral:
 		return e.Type
 	case *lower.TupleLiteral:
+		return e.Type
+	case *lower.RecordLiteral:
 		return e.Type
 	case *lower.Unary:
 		return e.Type
@@ -1298,6 +1491,8 @@ func (g *Generator) javaType(t *typecheck.Type, allowVoid bool) (string, error) 
 		return "", fmt.Errorf("unsupported interface type %s", t.String())
 	case typecheck.TypeTuple:
 		return g.tupleType(t)
+	case typecheck.TypeRecord:
+		return g.recordClassName(t), nil
 	default:
 		return "", fmt.Errorf("unsupported type %s", t.String())
 	}
@@ -1381,6 +1576,227 @@ func (g *Generator) className(class *lower.Class) string {
 
 func (g *Generator) objectClassName(name string) string {
 	return "Object_" + sanitizeTypeName(name)
+}
+
+func (g *Generator) collectRecordTypes(program *lower.Program) {
+	for _, global := range program.Globals {
+		g.collectRecordType(global.Type)
+		g.collectRecordExpr(global.Init)
+	}
+	for _, fn := range program.Functions {
+		g.collectRecordFunction(fn)
+	}
+	for _, class := range program.Classes {
+		for _, field := range class.Fields {
+			g.collectRecordType(field.Type)
+			g.collectRecordExpr(field.Init)
+		}
+		if class.Constructor != nil {
+			g.collectRecordFunction(class.Constructor)
+		}
+		for _, method := range class.Methods {
+			g.collectRecordFunction(method)
+		}
+	}
+}
+
+func (g *Generator) collectRecordFunction(fn *lower.Function) {
+	for _, param := range fn.Parameters {
+		g.collectRecordType(param.Type)
+	}
+	g.collectRecordType(fn.ReturnType)
+	for _, stmt := range fn.Body {
+		g.collectRecordStmt(stmt)
+	}
+}
+
+func (g *Generator) collectRecordStmt(stmt lower.Stmt) {
+	switch s := stmt.(type) {
+	case *lower.VarDecl:
+		g.collectRecordType(s.Type)
+		g.collectRecordExpr(s.Init)
+	case *lower.Assign:
+		g.collectRecordExpr(s.Target)
+		g.collectRecordExpr(s.Value)
+	case *lower.If:
+		g.collectRecordExpr(s.Condition)
+		for _, stmt := range s.Then {
+			g.collectRecordStmt(stmt)
+		}
+		for _, stmt := range s.Else {
+			g.collectRecordStmt(stmt)
+		}
+	case *lower.ForEach:
+		g.collectRecordExpr(s.Iterable)
+		for _, stmt := range s.Body {
+			g.collectRecordStmt(stmt)
+		}
+	case *lower.While:
+		g.collectRecordExpr(s.Condition)
+		for _, stmt := range s.Body {
+			g.collectRecordStmt(stmt)
+		}
+	case *lower.Loop:
+		for _, stmt := range s.Body {
+			g.collectRecordStmt(stmt)
+		}
+	case *lower.Return:
+		g.collectRecordExpr(s.Value)
+	case *lower.ExprStmt:
+		g.collectRecordExpr(s.Expr)
+	}
+}
+
+func (g *Generator) collectRecordExpr(expr lower.Expr) {
+	if expr == nil {
+		return
+	}
+	g.collectRecordType(exprType(expr))
+	switch e := expr.(type) {
+	case *lower.ListLiteral:
+		for _, elem := range e.Elements {
+			g.collectRecordExpr(elem)
+		}
+	case *lower.TupleLiteral:
+		for _, elem := range e.Elements {
+			g.collectRecordExpr(elem)
+		}
+	case *lower.RecordLiteral:
+		for _, field := range e.Fields {
+			g.collectRecordExpr(field.Value)
+		}
+	case *lower.Unary:
+		g.collectRecordExpr(e.Right)
+	case *lower.Binary:
+		g.collectRecordExpr(e.Left)
+		g.collectRecordExpr(e.Right)
+	case *lower.IfExpr:
+		g.collectRecordExpr(e.Condition)
+		for _, stmt := range e.ThenPrefix {
+			g.collectRecordStmt(stmt)
+		}
+		g.collectRecordExpr(e.ThenValue)
+		for _, stmt := range e.ElsePrefix {
+			g.collectRecordStmt(stmt)
+		}
+		g.collectRecordExpr(e.ElseValue)
+	case *lower.FunctionCall:
+		for _, arg := range e.Args {
+			g.collectRecordExpr(arg)
+		}
+	case *lower.Construct:
+		for _, arg := range e.Args {
+			g.collectRecordExpr(arg)
+		}
+	case *lower.FieldGet:
+		g.collectRecordExpr(e.Receiver)
+	case *lower.IndexGet:
+		g.collectRecordExpr(e.Receiver)
+		g.collectRecordExpr(e.Index)
+	case *lower.MethodCall:
+		g.collectRecordExpr(e.Receiver)
+		for _, arg := range e.Args {
+			g.collectRecordExpr(arg)
+		}
+	case *lower.Lambda:
+		for _, param := range e.Parameters {
+			g.collectRecordType(param.Type)
+		}
+		g.collectRecordType(e.ReturnType)
+		for _, stmt := range e.Body {
+			g.collectRecordStmt(stmt)
+		}
+	case *lower.Invoke:
+		g.collectRecordExpr(e.Callee)
+		for _, arg := range e.Args {
+			g.collectRecordExpr(arg)
+		}
+	}
+}
+
+func (g *Generator) collectRecordType(t *typecheck.Type) {
+	if t == nil {
+		return
+	}
+	if t.Kind == typecheck.TypeRecord {
+		key := g.recordTypeKey(t)
+		if _, ok := g.records[key]; !ok {
+			g.records[key] = t
+		}
+	}
+	for _, arg := range t.Args {
+		g.collectRecordType(arg)
+	}
+	if t.Signature != nil {
+		for _, param := range t.Signature.Parameters {
+			g.collectRecordType(param)
+		}
+		g.collectRecordType(t.Signature.ReturnType)
+	}
+	for _, field := range t.Fields {
+		g.collectRecordType(field.Type)
+	}
+}
+
+func (g *Generator) orderedRecordTypes() []*typecheck.Type {
+	keys := make([]string, 0, len(g.records))
+	for key := range g.records {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	out := make([]*typecheck.Type, len(keys))
+	for i, key := range keys {
+		out[i] = g.records[key]
+	}
+	return out
+}
+
+func (g *Generator) recordClassName(t *typecheck.Type) string {
+	return "Record_" + sanitizeTypeName(g.recordTypeKey(t))
+}
+
+func (g *Generator) recordTypeKey(t *typecheck.Type) string {
+	parts := make([]string, len(t.Fields))
+	for i, field := range t.Fields {
+		parts[i] = field.Name + "_" + sanitizeTypeName(g.typeKey(field.Type))
+	}
+	return strings.Join(parts, "_")
+}
+
+func (g *Generator) typeKey(t *typecheck.Type) string {
+	if t == nil {
+		return "Unknown"
+	}
+	switch t.Kind {
+	case typecheck.TypeBuiltin, typecheck.TypeClass, typecheck.TypeInterface, typecheck.TypeObject, typecheck.TypeParam:
+		if len(t.Args) == 0 {
+			return t.Name
+		}
+		args := make([]string, len(t.Args))
+		for i, arg := range t.Args {
+			args[i] = g.typeKey(arg)
+		}
+		return t.Name + "_" + strings.Join(args, "_")
+	case typecheck.TypeTuple:
+		args := make([]string, len(t.Args))
+		for i, arg := range t.Args {
+			args[i] = g.typeKey(arg)
+		}
+		return "Tuple_" + strings.Join(args, "_")
+	case typecheck.TypeRecord:
+		return "Record_" + g.recordTypeKey(t)
+	case typecheck.TypeFunction:
+		if t.Signature == nil {
+			return "Func"
+		}
+		args := make([]string, len(t.Signature.Parameters))
+		for i, arg := range t.Signature.Parameters {
+			args[i] = g.typeKey(arg)
+		}
+		return "Func_" + strings.Join(args, "_") + "_To_" + g.typeKey(t.Signature.ReturnType)
+	default:
+		return t.Name
+	}
 }
 
 func sanitizeTypeName(name string) string {

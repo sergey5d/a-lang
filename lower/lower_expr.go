@@ -68,7 +68,15 @@ func (l *Lowerer) lowerExpr(expr typed.Expr) (Expr, error) {
 	case *typed.BlockExpr:
 		return nil, unsupportedExprErr(expr)
 	case *typed.AnonymousRecordExpr:
-		return nil, unsupportedExprErr(expr)
+		fields := make([]RecordFieldValue, len(e.Fields))
+		for i, field := range e.Fields {
+			value, err := l.lowerExpr(field.Value)
+			if err != nil {
+				return nil, err
+			}
+			fields[i] = RecordFieldValue{Name: field.Name, Value: value}
+		}
+		return &RecordLiteral{Fields: fields, Type: e.GetType()}, nil
 	case *typed.AnonymousInterfaceExpr:
 		return nil, unsupportedExprErr(expr)
 	case *typed.IfExpr:

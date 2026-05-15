@@ -3319,12 +3319,38 @@ func (c *Checker) checkAnonymousRecordExpr(expr *parser.AnonymousRecordExpr, exp
 	}
 	fields := make([]RecordField, len(expr.Fields))
 	seen := map[string]bool{}
+	expectedByName := map[string]*Type{}
+	if expected != nil && expected.Kind == TypeRecord {
+		for _, field := range expected.Fields {
+			expectedByName[field.Name] = field.Type
+		}
+	}
+	matchesExpected := expected != nil && expected.Kind == TypeRecord && len(expected.Fields) == len(expr.Fields)
 	for i, field := range expr.Fields {
 		if seen[field.Name] {
 			c.addDiagnostic("duplicate_record_field", "duplicate record field '"+field.Name+"'", field.Span)
 		}
 		seen[field.Name] = true
-		fields[i] = RecordField{Name: field.Name, Type: c.checkExpr(field.Value)}
+		expectedFieldType, hasExpectedField := expectedByName[field.Name]
+		valueType := c.checkExprWithExpected(field.Value, expectedFieldType)
+		if hasExpectedField {
+			c.requireAssignable(valueType, expectedFieldType, exprSpan(field.Value), "type_mismatch", "cannot assign "+valueType.String()+" to "+expectedFieldType.String())
+			fields[i] = RecordField{Name: field.Name, Type: expectedFieldType}
+			continue
+		}
+		matchesExpected = false
+		fields[i] = RecordField{Name: field.Name, Type: valueType}
+	}
+	if matchesExpected {
+		for _, field := range expected.Fields {
+			if !seen[field.Name] {
+				matchesExpected = false
+				break
+			}
+		}
+		if matchesExpected {
+			return expected
+		}
 	}
 	return &Type{Kind: TypeRecord, Name: "Record", Fields: fields}
 }
