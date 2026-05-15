@@ -275,13 +275,64 @@ func TestWriteStdlibSupportCreatesOptionAndTupleFiles(t *testing.T) {
 	}
 	for _, rel := range []string{
 		filepath.Join("alang", "stdlib", "OS.java"),
+		filepath.Join("alang", "stdlib", "Map.java"),
 		filepath.Join("alang", "stdlib", "Option.java"),
+		filepath.Join("alang", "stdlib", "Set.java"),
 		filepath.Join("alang", "stdlib", "Tuple2.java"),
 		filepath.Join("alang", "stdlib", "Tuple10.java"),
 	} {
 		if _, err := os.Stat(filepath.Join(tmpDir, rel)); err != nil {
 			t.Fatalf("expected runtime file %s: %v", rel, err)
 		}
+	}
+}
+
+func TestWriteStdlibSupportCopiesBundledListRuntime(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := WriteStdlibSupport(tmpDir); err != nil {
+		t.Fatalf("WriteStdlibSupport returned error: %v", err)
+	}
+	bytes, err := os.ReadFile(filepath.Join(tmpDir, "alang", "stdlib", "List.java"))
+	if err != nil {
+		t.Fatalf("read copied List runtime: %v", err)
+	}
+	text := string(bytes)
+	if !strings.Contains(text, "public <X> List<X> map(") {
+		t.Fatalf("expected checked-in List runtime contents, got:\n%s", text)
+	}
+	if !strings.Contains(text, "public Option<T> removeLast()") {
+		t.Fatalf("expected richer List runtime contents, got:\n%s", text)
+	}
+}
+
+func TestWriteStdlibSupportCopiesBundledSetAndMapRuntime(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := WriteStdlibSupport(tmpDir); err != nil {
+		t.Fatalf("WriteStdlibSupport returned error: %v", err)
+	}
+
+	setBytes, err := os.ReadFile(filepath.Join(tmpDir, "alang", "stdlib", "Set.java"))
+	if err != nil {
+		t.Fatalf("read copied Set runtime: %v", err)
+	}
+	setText := string(setBytes)
+	if !strings.Contains(setText, "private final HashSet<T> items;") {
+		t.Fatalf("expected checked-in Set runtime contents, got:\n%s", setText)
+	}
+	if !strings.Contains(setText, "public <X> Set<X> map(") {
+		t.Fatalf("expected richer Set runtime contents, got:\n%s", setText)
+	}
+
+	mapBytes, err := os.ReadFile(filepath.Join(tmpDir, "alang", "stdlib", "Map.java"))
+	if err != nil {
+		t.Fatalf("read copied Map runtime: %v", err)
+	}
+	mapText := string(mapBytes)
+	if !strings.Contains(mapText, "private final HashMap<K, V> items;") {
+		t.Fatalf("expected checked-in Map runtime contents, got:\n%s", mapText)
+	}
+	if !strings.Contains(mapText, "public <X> Map<K, X> mapValues(") {
+		t.Fatalf("expected richer Map runtime contents, got:\n%s", mapText)
 	}
 }
 

@@ -1975,7 +1975,7 @@ def run() Int {
 	items.sort(Ascending)
 
 	values Map[Str, Int] = Map("a" : 1)
-	values.set("b", 2)
+	values.put("b", 2)
 
 	seen Set[Int] = Set(1, 2)
 	if seen.contains(2) {

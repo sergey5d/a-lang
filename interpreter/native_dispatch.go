@@ -101,7 +101,7 @@ func nativeMethodHandlers() map[string]map[string]nativeMethodHandler {
 			"size":     nativeSetSize,
 		},
 		"Map": {
-			"set":       nativeMapSet,
+			"put":       nativeMapPut,
 			"iterator":  nativeMapIterator,
 			"map":       nativeMapMap,
 			"mapValues": nativeMapMapValues,

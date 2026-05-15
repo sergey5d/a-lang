@@ -1247,14 +1247,13 @@ func TestBuiltinCollectionsAndTerm(t *testing.T) {
 object Ascending with Ordering[Int] {
 	def compare(left Int, right Int) Int = left - right
 }
-
 def run() Int {
 	items = List(1, 2)
 	items.append(3)
 	items.sort(Ascending)
 
 	values = Map("a" : 1)
-	values.set("b", 2)
+	values.put("b", 2)
 
 	seen = Set(1, 2)
 	if seen.contains(2) {
@@ -2213,6 +2212,25 @@ def run() Int {
 	}
 	if value != int64(9) {
 		t.Fatalf("expected 9, got %#v", value)
+	}
+}
+
+func TestMapIndexAssignment(t *testing.T) {
+	src := `
+def run() Int {
+	values = Map("a" : 1)
+	values["b"] := 2
+	return values.get("b").getOr(0)
+}
+`
+
+	in := New(parseProgram(t, src))
+	value, err := in.Call("run")
+	if err != nil {
+		t.Fatalf("Call returned error: %v", err)
+	}
+	if value != int64(2) {
+		t.Fatalf("expected 2, got %#v", value)
 	}
 }
 

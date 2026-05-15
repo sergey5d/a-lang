@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"unicode"
@@ -143,118 +144,16 @@ public final class OS {
     }
 }
 `,
-		filepath.Join("alang", "stdlib", "List.java"): `package alang.stdlib;
+	}
 
-public final class List<T> implements Iterable<T> {
-    private final java.util.ArrayList<T> items;
-
-    private List(java.util.ArrayList<T> items) {
-        this.items = items;
-    }
-
-    public List() {
-        this(new java.util.ArrayList<>());
-    }
-
-    @SafeVarargs
-    public static <T> List<T> of(T... values) {
-        java.util.ArrayList<T> items = new java.util.ArrayList<>();
-        for (T value : values) {
-            items.add(value);
-        }
-        return new List<>(items);
-    }
-
-    public List<T> append(T value) {
-        this.items.add(value);
-        return this;
-    }
-
-    public Option<T> get(long index) {
-        int idx = (int) index;
-        if (idx < 0 || idx >= this.items.size()) {
-            return Option.none();
-        }
-        return Option.some(this.items.get(idx));
-    }
-
-    public Option<T> remove(long index) {
-        int idx = (int) index;
-        if (idx < 0 || idx >= this.items.size()) {
-            return Option.none();
-        }
-        return Option.some(this.items.remove(idx));
-    }
-
-    public long size() {
-        return this.items.size();
-    }
-
-    public boolean isEmpty() {
-        return this.items.isEmpty();
-    }
-
-    @Override
-    public void forEach(java.util.function.Consumer<? super T> consumer) {
-        for (T item : this.items) {
-            consumer.accept(item);
-        }
-    }
-
-    @Override
-    public java.util.Iterator<T> iterator() {
-        return this.items.iterator();
-    }
-}
-`,
-		filepath.Join("alang", "stdlib", "Set.java"): `package alang.stdlib;
-
-public final class Set<T> implements Iterable<T> {
-    private final java.util.LinkedHashSet<T> items;
-
-    private Set(java.util.LinkedHashSet<T> items) {
-        this.items = items;
-    }
-
-    public Set() {
-        this(new java.util.LinkedHashSet<>());
-    }
-
-    @SafeVarargs
-    public static <T> Set<T> of(T... values) {
-        java.util.LinkedHashSet<T> items = new java.util.LinkedHashSet<>();
-        for (T value : values) {
-            items.add(value);
-        }
-        return new Set<>(items);
-    }
-
-    public Set<T> add(T value) {
-        this.items.add(value);
-        return this;
-    }
-
-    public boolean contains(T value) {
-        return this.items.contains(value);
-    }
-
-    public long size() {
-        return this.items.size();
-    }
-
-    @Override
-    public void forEach(java.util.function.Consumer<? super T> consumer) {
-        for (T item : this.items) {
-            consumer.accept(item);
-        }
-    }
-
-    @Override
-    public java.util.Iterator<T> iterator() {
-        return this.items.iterator();
-    }
-}
-`,
+	if src, err := bundledStdlibFile(filepath.Join("alang", "stdlib", "List.java")); err == nil {
+		sources[filepath.Join("alang", "stdlib", "List.java")] = src
+	}
+	if src, err := bundledStdlibFile(filepath.Join("alang", "stdlib", "Set.java")); err == nil {
+		sources[filepath.Join("alang", "stdlib", "Set.java")] = src
+	}
+	if src, err := bundledStdlibFile(filepath.Join("alang", "stdlib", "Map.java")); err == nil {
+		sources[filepath.Join("alang", "stdlib", "Map.java")] = src
 	}
 
 	for arity := 2; arity <= 10; arity++ {
@@ -284,6 +183,19 @@ public final class Tuple%d<%s> {
 	}
 
 	return sources
+}
+
+func bundledStdlibFile(rel string) (string, error) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", fmt.Errorf("resolve generator file path")
+	}
+	path := filepath.Join(filepath.Dir(file), "..", "..", "java", "stdlib", rel)
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }
 
 func (g *Generator) writeProgram(program *lower.Program) error {

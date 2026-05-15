@@ -1394,6 +1394,28 @@ func (in *Interpreter) assign(target parser.Expr, operator string, value Value, 
 		if err != nil {
 			return err
 		}
+		if m, ok := receiver.(*nativeMap); ok {
+			keyValue, err := in.evalExpr(t.Index, local)
+			if err != nil {
+				return err
+			}
+			if operator == "=" {
+				return RuntimeError{Message: "use ':=' for mutable reassignment", Span: t.Span}
+			}
+			if operator != ":=" {
+				return RuntimeError{Message: "compound assignment is not supported for map indexes", Span: t.Span}
+			}
+			key, err := nativeKey(keyValue, exprSpan(t.Index), local, in)
+			if err != nil {
+				return err
+			}
+			if _, exists := m.items[key]; !exists {
+				m.order = append(m.order, key)
+				m.keys[key] = keyValue
+			}
+			m.items[key] = value
+			return nil
+		}
 		items, ok := indexedItems(receiver)
 		if !ok {
 			return RuntimeError{Message: "index assignment requires array-like value", Span: t.Span}

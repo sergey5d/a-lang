@@ -2,13 +2,13 @@ package interpreter
 
 import "a-lang/parser"
 
-func nativeMapSet(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+func nativeMapPut(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
 	value, ok := asNativeMap(receiver)
 	if !ok {
-		return nil, RuntimeError{Message: "native Map.set receiver mismatch", Span: span}
+		return nil, RuntimeError{Message: "native Map.put receiver mismatch", Span: span}
 	}
 	if len(args) != 2 {
-		return nil, RuntimeError{Message: "set expects 2 arguments", Span: span}
+		return nil, RuntimeError{Message: "put expects 2 arguments", Span: span}
 	}
 	key, err := nativeKey(args[0], span, local, in)
 	if err != nil {
