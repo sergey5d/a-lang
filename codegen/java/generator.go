@@ -629,7 +629,7 @@ func (g *Generator) writeStmt(stmt lower.Stmt) error {
 		if err != nil {
 			return err
 		}
-		g.linef("if (%s) {", cond)
+		g.linef("if (%s) {", unwrapGroupedJavaExpr(cond))
 		g.indent++
 		if err := g.writeStmtBlock(s.Then); err != nil {
 			return err
@@ -936,6 +936,32 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported lowered expression %T", expr)
 	}
+}
+
+func unwrapGroupedJavaExpr(expr string) string {
+	expr = strings.TrimSpace(expr)
+	if len(expr) < 2 || expr[0] != '(' || expr[len(expr)-1] != ')' {
+		return expr
+	}
+	depth := 0
+	for i, r := range expr {
+		switch r {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 && i != len(expr)-1 {
+				return expr
+			}
+		}
+		if depth < 0 {
+			return expr
+		}
+	}
+	if depth != 0 {
+		return expr
+	}
+	return expr[1 : len(expr)-1]
 }
 
 func (g *Generator) exprWithExpected(expr lower.Expr, expected *typecheck.Type) (string, error) {

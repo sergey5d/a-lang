@@ -216,6 +216,31 @@ def run(limit Int) Int {
 	}
 }
 
+func TestGenerateAvoidsDoubleWrappedIfConditions(t *testing.T) {
+	src := `
+def run(nums List[Int]) Int {
+	if nums[0] > 0 {
+		return 1
+	}
+	return 0
+}
+`
+
+	lowered := lowerProgram(t, src)
+	source, err := GenerateForPackage(lowered, "")
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+
+	text := string(source)
+	if strings.Contains(text, "if ((nums.get(0L).expect() > 0L))") {
+		t.Fatalf("expected single-wrapped if condition, got:\n%s", text)
+	}
+	if !strings.Contains(text, "if (nums.get(0L).expect() > 0L)") {
+		t.Fatalf("expected simplified if condition, got:\n%s", text)
+	}
+}
+
 func TestGenerateCompilesWithListSetAndLambda(t *testing.T) {
 	src := `
 def run() Int {

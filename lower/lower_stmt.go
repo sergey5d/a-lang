@@ -187,12 +187,16 @@ func (l *Lowerer) lowerGuardBindings(bindings []typed.BindingDecl, unwrapped Exp
 		if binding.Name == "_" {
 			return nil, nil, nil
 		}
+		bindingType := binding.Type
+		if bindingType == nil || bindingType.Kind == typecheck.TypeUnknown {
+			bindingType = unwrappedType
+		}
 		return []Stmt{&VarDecl{
 				Name:    binding.Name,
 				Mutable: false,
-				Type:    binding.Type,
+				Type:    bindingType,
 			}}, []Stmt{&Assign{
-				Target:   &VarRef{Name: binding.Name, Type: binding.Type},
+				Target:   &VarRef{Name: binding.Name, Type: bindingType},
 				Operator: ":=",
 				Value:    unwrapped,
 			}}, nil
@@ -217,15 +221,19 @@ func (l *Lowerer) lowerGuardBindings(bindings []typed.BindingDecl, unwrapped Exp
 		if binding.Name == "_" {
 			continue
 		}
-		fieldName := fmt.Sprintf("item%d", i+1)
-		prefix = append(prefix, &VarDecl{Name: binding.Name, Mutable: false, Type: binding.Type})
+		fieldName := fmt.Sprintf("_%d", i+1)
+		bindingType := binding.Type
+		if bindingType == nil || bindingType.Kind == typecheck.TypeUnknown {
+			bindingType = unwrappedType.Args[i]
+		}
+		prefix = append(prefix, &VarDecl{Name: binding.Name, Mutable: false, Type: bindingType})
 		then = append(then, &Assign{
-			Target:   &VarRef{Name: binding.Name, Type: binding.Type},
+			Target:   &VarRef{Name: binding.Name, Type: bindingType},
 			Operator: ":=",
 			Value: &FieldGet{
 				Receiver: tempRef,
 				Name:     fieldName,
-				Type:     binding.Type,
+				Type:     bindingType,
 			},
 		})
 	}

@@ -101,9 +101,8 @@ public final class List<T> implements Iterable<T> {
     }
 
     public List<T> sort(Comparator<? super T> ordering) {
-        ArrayList<T> out = new ArrayList<>(this.items);
-        out.sort(ordering);
-        return new List<>(out);
+        this.items.sort(ordering);
+        return this;
     }
 
     public <X> List<Tuple2<T, X>> zip(List<X> other) {
