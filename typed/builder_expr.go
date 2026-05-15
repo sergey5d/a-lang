@@ -17,6 +17,9 @@ type exprBuilder struct {
 
 // Build converts a parser expression into a typed expression node.
 func (b *exprBuilder) Build(expr parser.Expr) (Expr, error) {
+	if aliased, ok := b.ctx.exprAliases[expr]; ok && aliased != nil && aliased != expr {
+		return b.Build(aliased)
+	}
 	switch e := expr.(type) {
 	case *parser.Identifier:
 		ident := &IdentifierExpr{baseExpr: b.base(expr), Name: e.Name}

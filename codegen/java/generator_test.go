@@ -336,6 +336,56 @@ def run() Int {
 	}
 }
 
+func TestGenerateUsesInheritanceBasedEnumLayout(t *testing.T) {
+	src := `
+enum Color {
+	color Str
+	temperature Int
+
+	def isReddish() Bool = temperature % 5 == 0
+
+	case Black {
+		color = "xxx"
+		temperature = 1
+	}
+	case Red {
+		color = "xxx2"
+		temperature = 2
+	}
+}
+
+enum OptionX[T] {
+	case NoneX
+	case SomeX {
+		value T
+	}
+}
+`
+
+	lowered := lowerProgram(t, src)
+	source, err := GenerateForPackage(lowered, "")
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+
+	text := string(source)
+	if !strings.Contains(text, "abstract class Color") {
+		t.Fatalf("expected shared-field enum to lower to abstract class, got:\n%s", text)
+	}
+	if !strings.Contains(text, "final class Color_Black extends Color") {
+		t.Fatalf("expected enum case subclass for shared-field enum, got:\n%s", text)
+	}
+	if !strings.Contains(text, "interface OptionX<T>") {
+		t.Fatalf("expected memberless enum to lower to interface, got:\n%s", text)
+	}
+	if !strings.Contains(text, "final class OptionX_SomeX<T> implements OptionX<T>") {
+		t.Fatalf("expected generic enum case to implement enum interface, got:\n%s", text)
+	}
+	if strings.Contains(text, "__tag") {
+		t.Fatalf("did not expect old tag-based enum lowering in generated Java, got:\n%s", text)
+	}
+}
+
 func TestOutputPathUsesPackageStructure(t *testing.T) {
 	path := OutputPath("bin/java/src", "model/pubdemo")
 	expected := filepath.Join("bin/java/src", "model", "pubdemo", "Pkg_Model_pubdemo.java")

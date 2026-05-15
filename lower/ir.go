@@ -16,19 +16,26 @@ type Global struct {
 }
 
 type Class struct {
-	Name        string
-	Object      bool
-	Record      bool
-	Enum        bool
-	Fields      []*Field
-	Cases       []EnumCase
-	Constructor *Function
-	Methods     []*Function
+	Name           string
+	Object         bool
+	Record         bool
+	Enum           bool
+	TypeParameters []string
+	Fields         []*Field
+	Cases          []EnumCase
+	Constructor    *Function
+	Methods        []*Function
 }
 
 type EnumCase struct {
-	Name   string
-	Fields []*Field
+	Name        string
+	Fields      []*Field
+	Assignments []EnumCaseAssignment
+}
+
+type EnumCaseAssignment struct {
+	Name  string
+	Value Expr
 }
 
 type Field struct {
@@ -160,6 +167,12 @@ type StringLiteral struct {
 
 func (*StringLiteral) exprNode() {}
 
+type UnitLiteral struct {
+	Type *typecheck.Type
+}
+
+func (*UnitLiteral) exprNode() {}
+
 type RuneLiteral struct {
 	Value rune
 	Type  *typecheck.Type
@@ -192,6 +205,22 @@ type RecordLiteral struct {
 }
 
 func (*RecordLiteral) exprNode() {}
+
+type TypeIs struct {
+	Value  Expr
+	Target string
+	Type   *typecheck.Type
+}
+
+func (*TypeIs) exprNode() {}
+
+type Cast struct {
+	Value  Expr
+	Target string
+	Type   *typecheck.Type
+}
+
+func (*Cast) exprNode() {}
 
 type Unary struct {
 	Operator string

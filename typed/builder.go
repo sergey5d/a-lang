@@ -13,6 +13,7 @@ type Builder[T any, R any] interface {
 // buildContext stores the shared state that multiple typed-builder pieces need.
 type buildContext struct {
 	exprTypes        map[parser.Expr]*typecheck.Type
+	exprAliases      map[parser.Expr]parser.Expr
 	functions        map[string]*parser.FunctionDecl
 	classes          map[string]*parser.ClassDecl
 	interfaces       map[string]*parser.InterfaceDecl
@@ -82,6 +83,7 @@ func Build(program *parser.Program, info typecheck.Result) (*Program, error) {
 func newBuildContext(program *parser.Program, info typecheck.Result) *buildContext {
 	ctx := &buildContext{
 		exprTypes:        info.ExprTypes,
+		exprAliases:      info.ExprAliases,
 		functions:        map[string]*parser.FunctionDecl{},
 		classes:          map[string]*parser.ClassDecl{},
 		interfaces:       map[string]*parser.InterfaceDecl{},

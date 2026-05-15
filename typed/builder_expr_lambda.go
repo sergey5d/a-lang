@@ -15,12 +15,17 @@ func (b *lambdaExprBuilder) Build(expr *parser.LambdaExpr) (Expr, error) {
 	b.ctx.pushScope()
 	defer b.ctx.popScope()
 
+	lambdaType := b.ctx.exprTypes[expr]
 	params := make([]LambdaParameter, len(expr.Parameters))
 	for i, param := range expr.Parameters {
 		symbol := b.ctx.newSymbol(SymbolParameter, param.Name, "", param.Span)
+		paramType := b.types.BuildType(param.Type)
+		if param.Type == nil && lambdaType != nil && lambdaType.Signature != nil && i < len(lambdaType.Signature.Parameters) {
+			paramType = lambdaType.Signature.Parameters[i]
+		}
 		params[i] = LambdaParameter{
 			Name:   param.Name,
-			Type:   b.types.BuildType(param.Type),
+			Type:   paramType,
 			Symbol: symbol,
 			Span:   param.Span,
 		}

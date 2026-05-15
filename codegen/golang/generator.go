@@ -240,6 +240,14 @@ func (g *Generator) writeStmt(stmt lower.Stmt) error {
 		g.indent--
 		g.line("}")
 	case *lower.Return:
+		if s.Value == nil {
+			g.line("return")
+			return nil
+		}
+		if _, ok := s.Value.(*lower.UnitLiteral); ok {
+			g.line("return")
+			return nil
+		}
 		value, err := g.expr(s.Value)
 		if err != nil {
 			return err
@@ -276,6 +284,8 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		return "false", nil
 	case *lower.StringLiteral:
 		return strconv.Quote(e.Value), nil
+	case *lower.UnitLiteral:
+		return "nil", nil
 	case *lower.RuneLiteral:
 		return strconv.QuoteRune(e.Value), nil
 	case *lower.ListLiteral:

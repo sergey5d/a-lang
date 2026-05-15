@@ -66,6 +66,7 @@ type moduleInfo struct {
 type Result struct {
 	Diagnostics []semantic.Diagnostic
 	ExprTypes   map[parser.Expr]*Type
+	ExprAliases map[parser.Expr]parser.Expr
 }
 
 type Checker struct {
@@ -90,6 +91,7 @@ type Checker struct {
 	currentMethod          *parser.MethodDecl
 	lambdaScopes           []int
 	anonClassID            int
+	exprAliases            map[parser.Expr]parser.Expr
 }
 
 type typeLookup interface {
@@ -111,11 +113,12 @@ func Analyze(program *parser.Program) Result {
 		importedInterfaces:     map[string]interfaceInfo{},
 		importedInterfaceNames: map[string]string{},
 		exprTypes:              map[parser.Expr]*Type{},
+		exprAliases:            map[parser.Expr]parser.Expr{},
 	}
 	c.installBuiltinInterfaces()
 	c.collectDecls(program)
 	c.checkProgram(program)
-	return Result{Diagnostics: c.diagnostics, ExprTypes: c.exprTypes}
+	return Result{Diagnostics: c.diagnostics, ExprTypes: c.exprTypes, ExprAliases: c.exprAliases}
 }
 
 func AnalyzeModule(mod *module.LoadedModule) Result {
@@ -2402,6 +2405,9 @@ func (c *Checker) checkExprWithExpected(expr parser.Expr, expected *Type) *Type 
 	if expected != nil && expected.Kind == TypeFunction && expected.Signature != nil &&
 		len(expected.Signature.Parameters) == 1 && parser.HasPlaceholderExpr(expr) {
 		expr = parser.WrapPlaceholderLambdaExpr(expr)
+		if expr != originalExpr {
+			c.exprAliases[originalExpr] = expr
+		}
 	}
 	var result *Type
 	switch e := expr.(type) {

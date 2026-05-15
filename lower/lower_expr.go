@@ -36,6 +36,8 @@ func (l *Lowerer) lowerExpr(expr typed.Expr) (Expr, error) {
 		return &BoolLiteral{Value: e.Value, Type: e.GetType()}, nil
 	case *typed.StringLiteral:
 		return &StringLiteral{Value: e.Value, Type: e.GetType()}, nil
+	case *typed.UnitLiteral:
+		return &UnitLiteral{Type: e.GetType()}, nil
 	case *typed.RuneLiteral:
 		runes := []rune(e.Value)
 		var value rune
@@ -358,12 +360,16 @@ func (l *Lowerer) lowerConstructorPattern(value Expr, valueType *typecheck.Type,
 	if enumCase == nil {
 		return nil, nil, fmt.Errorf("unknown enum case %q for %s", caseName, valueType.Name)
 	}
-	tagField := &FieldGet{Receiver: value, Name: "__tag", Type: &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Str"}}
-	condition := Expr(&MethodCall{
-		Receiver: tagField,
-		Method:   "equals",
-		Args:     []Expr{&StringLiteral{Value: caseName, Type: &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Str"}}},
-		Type:     &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Bool"},
+	caseTypeName := valueType.Name + "_" + caseName
+	condition := Expr(&TypeIs{
+		Value:  value,
+		Target: caseTypeName,
+		Type:   &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Bool"},
+	})
+	castValue := Expr(&Cast{
+		Value:  value,
+		Target: caseTypeName,
+		Type:   &typecheck.Type{Kind: typecheck.TypeClass, Name: caseTypeName, Args: append([]*typecheck.Type(nil), valueType.Args...)},
 	})
 	var prefix []Stmt
 	fullCondition := condition
@@ -372,7 +378,7 @@ func (l *Lowerer) lowerConstructorPattern(value Expr, valueType *typecheck.Type,
 			return nil, nil, fmt.Errorf("enum case %q expects %d pattern args, got %d", caseName, len(enumCase.Fields), len(pattern.Args))
 		}
 		field := enumCase.Fields[i]
-		fieldExpr := &FieldGet{Receiver: value, Name: field.Name, Type: l.resolveFieldType(field.Type)}
+		fieldExpr := &FieldGet{Receiver: castValue, Name: field.Name, Type: l.resolveFieldType(field.Type)}
 		argCondition, bindPrefix, err := l.lowerMatchPattern(fieldExpr, l.resolveFieldType(field.Type), arg)
 		if err != nil {
 			return nil, nil, err
@@ -409,9 +415,58 @@ func (l *Lowerer) lowerParserLiteral(expr parser.Expr) (Expr, error) {
 		}
 		return &RuneLiteral{Value: value, Type: &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Rune"}}, nil
 	case *parser.UnitLiteral:
-		return zeroValueExpr(&typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Unit"}), nil
+		return &UnitLiteral{Type: &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Unit"}}, nil
 	default:
 		return nil, fmt.Errorf("unsupported literal pattern %T during lowering", expr)
+	}
+}
+
+func (l *Lowerer) lowerExprFromParser(expr parser.Expr) (Expr, error) {
+	switch e := expr.(type) {
+	case *parser.Identifier:
+		return &VarRef{Name: e.Name}, nil
+	case *parser.IntegerLiteral, *parser.FloatLiteral, *parser.BoolLiteral, *parser.StringLiteral, *parser.RuneLiteral, *parser.UnitLiteral:
+		return l.lowerParserLiteral(expr)
+	case *parser.GroupExpr:
+		return l.lowerExprFromParser(e.Inner)
+	case *parser.UnaryExpr:
+		right, err := l.lowerExprFromParser(e.Right)
+		if err != nil {
+			return nil, err
+		}
+		return &Unary{Operator: e.Operator, Right: right}, nil
+	case *parser.BinaryExpr:
+		left, err := l.lowerExprFromParser(e.Left)
+		if err != nil {
+			return nil, err
+		}
+		right, err := l.lowerExprFromParser(e.Right)
+		if err != nil {
+			return nil, err
+		}
+		return &Binary{Left: left, Operator: e.Operator, Right: right}, nil
+	case *parser.CallExpr:
+		callee, err := l.lowerExprFromParser(e.Callee)
+		if err != nil {
+			return nil, err
+		}
+		args := make([]Expr, len(e.Args))
+		for i, arg := range e.Args {
+			value, err := l.lowerExprFromParser(arg.Value)
+			if err != nil {
+				return nil, err
+			}
+			args[i] = value
+		}
+		return &Invoke{Callee: callee, Args: args}, nil
+	case *parser.MemberExpr:
+		receiver, err := l.lowerExprFromParser(e.Receiver)
+		if err != nil {
+			return nil, err
+		}
+		return &FieldGet{Receiver: receiver, Name: e.Name}, nil
+	default:
+		return nil, fmt.Errorf("unsupported parser expression %T during lowering", expr)
 	}
 }
 
@@ -460,7 +515,7 @@ func zeroValueExpr(t *typecheck.Type) Expr {
 		case "Rune":
 			return &RuneLiteral{Value: 0, Type: t}
 		case "Unit":
-			return &BoolLiteral{Value: false, Type: &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Bool"}}
+			return &UnitLiteral{Type: t}
 		default:
 			return &IntLiteral{Value: 0, Type: t}
 		}

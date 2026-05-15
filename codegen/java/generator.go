@@ -18,16 +18,16 @@ import (
 const defaultClassName = "Generated"
 
 type Generator struct {
-	b           strings.Builder
-	indent      int
-	tempID      int
-	moduleClass string
-	packageName string
-	classes     map[string]*lower.Class
-	objects     map[string]*lower.Class
-	records     map[string]*typecheck.Type
-	inObject    bool
-	thisClass   *lower.Class
+	b                 strings.Builder
+	indent            int
+	tempID            int
+	moduleClass       string
+	packageName       string
+	classes           map[string]*lower.Class
+	objects           map[string]*lower.Class
+	records           map[string]*typecheck.Type
+	inObject          bool
+	thisClass         *lower.Class
 	currentReturnType *typecheck.Type
 }
 
@@ -149,12 +149,14 @@ public final class Option<T> {
 public final class OS {
     private OS() {}
 
-    public static void print(Object value) {
-        System.out.print(String.valueOf(value));
+    public static void print(Object... values) {
+        for (Object value : values) {
+            System.out.print(String.valueOf(value));
+        }
     }
 
-    public static void println(Object value) {
-        System.out.println(String.valueOf(value));
+    public static void println(Object... values) {
+        System.out.println(join(values));
     }
 
     public static void printf(String format, Object... values) {
@@ -163,6 +165,20 @@ public final class OS {
 
     public static void panic(Object value) {
         throw new RuntimeException(String.valueOf(value));
+    }
+
+    private static String join(Object... values) {
+        if (values.length == 0) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                out.append(" ");
+            }
+            out.append(String.valueOf(values[i]));
+        }
+        return out.toString();
     }
 }
 `,
@@ -347,6 +363,9 @@ func (g *Generator) writeGlobal(global *lower.Global) error {
 }
 
 func (g *Generator) writeClass(class *lower.Class) error {
+	if class.Enum {
+		return g.writeEnumClass(class)
+	}
 	name := g.className(class)
 	g.linef("final class %s {", name)
 	g.indent++
@@ -359,10 +378,6 @@ func (g *Generator) writeClass(class *lower.Class) error {
 		g.thisClass = prevClass
 		g.inObject = prevInObject
 	}()
-
-	if class.Enum {
-		return g.writeEnumClass(class)
-	}
 
 	if class.Object {
 		g.linef("static final %s INSTANCE = new %s();", name, name)
@@ -446,87 +461,256 @@ func (g *Generator) writeRecordClass(recordType *typecheck.Type) error {
 
 func (g *Generator) writeEnumClass(class *lower.Class) error {
 	name := g.className(class)
-	allFields := g.enumUnionFields(class)
-	g.line(`private final String __tag;`)
-	for _, field := range allFields {
-		if err := g.writeField(field); err != nil {
-			return err
-		}
-	}
-	g.line("")
-
-	constructorParams := []string{"String __tag"}
-	for _, field := range allFields {
-		typ, err := g.javaType(field.Type, false)
-		if err != nil {
-			return err
-		}
-		constructorParams = append(constructorParams, typ+" "+javaIdent(field.Name))
-	}
-	g.linef("private %s(%s) {", name, strings.Join(constructorParams, ", "))
-	g.indent++
-	g.line("this.__tag = __tag;")
-	for _, field := range allFields {
-		g.linef("this.%s = %s;", javaIdent(field.Name), javaIdent(field.Name))
-	}
-	g.indent--
-	g.line("}")
-	g.line("")
-
-	for _, enumCase := range class.Cases {
-		if len(enumCase.Fields) == 0 {
-			g.linef("static final %s %s = new %s(%s);", name, javaIdent(enumCase.Name), name, g.enumConstructorArgs(enumCase.Name, allFields, nil))
-			continue
-		}
-		params := make([]lower.Parameter, len(enumCase.Fields))
-		for i, field := range enumCase.Fields {
-			params[i] = lower.Parameter{Name: field.Name, Type: field.Type}
-		}
-		g.linef("public static %s %s(%s) {", name, javaIdent(enumCase.Name), g.params(params))
+	typeDecl := g.typeParamsDecl(class.TypeParameters)
+	typeUse := g.typeParamsUse(class.TypeParameters)
+	if len(class.Fields) == 0 {
+		g.linef("interface %s%s {", name, typeDecl)
 		g.indent++
-		g.linef("return new %s(%s);", name, g.enumConstructorArgs(enumCase.Name, allFields, enumCase.Fields))
+		for _, method := range class.Methods {
+			if err := g.writeEnumInterfaceMethod(class, method); err != nil {
+				return err
+			}
+			g.line("")
+		}
+		for _, enumCase := range class.Cases {
+			if len(enumCase.Fields) == 0 {
+				fieldType := name
+				if len(class.TypeParameters) == 0 {
+					fieldType += typeUse
+				}
+				g.linef("%s %s = %s.INSTANCE;", fieldType, javaIdent(enumCase.Name), g.enumCaseClassName(class, enumCase.Name))
+				if len(class.TypeParameters) > 0 {
+					methodTypeDecl := typeDecl
+					if methodTypeDecl != "" {
+						methodTypeDecl += " "
+					}
+					g.linef("@SuppressWarnings(\"unchecked\")")
+					g.linef("static %s%s%s %s() {", methodTypeDecl, name, typeUse, javaIdent(enumCase.Name))
+					g.indent++
+					g.linef("return (%s%s) %s;", name, typeUse, javaIdent(enumCase.Name))
+					g.indent--
+					g.line("}")
+				}
+				continue
+			}
+			params := make([]lower.Parameter, len(enumCase.Fields))
+			for i, field := range enumCase.Fields {
+				params[i] = lower.Parameter{Name: field.Name, Type: field.Type}
+			}
+			methodTypeDecl := g.typeParamsDecl(class.TypeParameters)
+			if methodTypeDecl != "" {
+				methodTypeDecl += " "
+			}
+			g.linef("static %s%s%s %s(%s) {", methodTypeDecl, name, typeUse, javaIdent(enumCase.Name), g.params(params))
+			g.indent++
+			g.linef("return new %s%s(%s);", g.enumCaseClassName(class, enumCase.Name), typeUse, g.enumCasePayloadArgs(enumCase.Fields))
+			g.indent--
+			g.line("}")
+		}
 		g.indent--
 		g.line("}")
+	} else {
+		g.linef("abstract class %s%s {", name, typeDecl)
+		g.indent++
+		for _, field := range class.Fields {
+			if err := g.writeField(field); err != nil {
+				return err
+			}
+		}
+		g.line("")
+		params := make([]lower.Parameter, len(class.Fields))
+		for i, field := range class.Fields {
+			params[i] = lower.Parameter{Name: field.Name, Type: field.Type}
+		}
+		g.linef("protected %s(%s) {", name, g.params(params))
+		g.indent++
+		for _, field := range class.Fields {
+			g.linef("this.%s = %s;", javaIdent(field.Name), javaIdent(field.Name))
+		}
+		g.indent--
+		g.line("}")
+		g.line("")
+		for i, method := range class.Methods {
+			if err := g.writeMethod(class, method); err != nil {
+				return err
+			}
+			if i < len(class.Methods)-1 || len(class.Cases) > 0 {
+				g.line("")
+			}
+		}
+		for _, enumCase := range class.Cases {
+			if len(enumCase.Fields) == 0 {
+				fieldType := name
+				if len(class.TypeParameters) == 0 {
+					fieldType += typeUse
+				}
+				g.linef("static final %s %s = %s.INSTANCE;", fieldType, javaIdent(enumCase.Name), g.enumCaseClassName(class, enumCase.Name))
+				if len(class.TypeParameters) > 0 {
+					methodTypeDecl := typeDecl
+					if methodTypeDecl != "" {
+						methodTypeDecl += " "
+					}
+					g.linef("@SuppressWarnings(\"unchecked\")")
+					g.linef("public static %s%s%s %s() {", methodTypeDecl, name, typeUse, javaIdent(enumCase.Name))
+					g.indent++
+					g.linef("return (%s%s) %s;", name, typeUse, javaIdent(enumCase.Name))
+					g.indent--
+					g.line("}")
+				}
+				continue
+			}
+			params := make([]lower.Parameter, len(enumCase.Fields))
+			for i, field := range enumCase.Fields {
+				params[i] = lower.Parameter{Name: field.Name, Type: field.Type}
+			}
+			methodTypeDecl := g.typeParamsDecl(class.TypeParameters)
+			if methodTypeDecl != "" {
+				methodTypeDecl += " "
+			}
+			g.linef("public static %s%s%s %s(%s) {", methodTypeDecl, name, typeUse, javaIdent(enumCase.Name), g.params(params))
+			g.indent++
+			g.linef("return new %s%s(%s);", g.enumCaseClassName(class, enumCase.Name), typeUse, g.enumCasePayloadArgs(enumCase.Fields))
+			g.indent--
+			g.line("}")
+		}
+		g.indent--
+		g.line("}")
+	}
+	for _, enumCase := range class.Cases {
+		g.line("")
+		if err := g.writeEnumCaseClass(class, enumCase); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (g *Generator) writeEnumInterfaceMethod(class *lower.Class, fn *lower.Function) error {
+	returnType, err := g.javaType(fn.ReturnType, true)
+	if err != nil {
+		return err
+	}
+	header := "default " + returnType + " " + javaIdent(fn.Name) + "(" + g.params(fn.Parameters) + ")"
+	g.linef("%s {", header)
+	g.indent++
+	prevClass := g.thisClass
+	prevInObject := g.inObject
+	g.thisClass = class
+	g.inObject = false
+	defer func() {
+		g.thisClass = prevClass
+		g.inObject = prevInObject
+	}()
+	if err := g.writeCallableBody(fn.Body, fn.ReturnType, false); err != nil {
+		return err
 	}
 	g.indent--
 	g.line("}")
 	return nil
 }
 
-func (g *Generator) enumUnionFields(class *lower.Class) []*lower.Field {
-	seen := map[string]bool{}
-	var out []*lower.Field
-	for _, field := range class.Fields {
-		if seen[field.Name] {
-			continue
-		}
-		seen[field.Name] = true
-		out = append(out, field)
+func (g *Generator) writeEnumCaseClass(class *lower.Class, enumCase lower.EnumCase) error {
+	caseName := g.enumCaseClassName(class, enumCase.Name)
+	baseName := g.className(class)
+	typeDecl := g.typeParamsDecl(class.TypeParameters)
+	typeUse := g.typeParamsUse(class.TypeParameters)
+	if len(class.Fields) == 0 {
+		g.linef("final class %s%s implements %s%s {", caseName, typeDecl, baseName, typeUse)
+	} else {
+		g.linef("final class %s%s extends %s%s {", caseName, typeDecl, baseName, typeUse)
 	}
-	for _, enumCase := range class.Cases {
-		for _, field := range enumCase.Fields {
-			if seen[field.Name] {
-				continue
-			}
-			seen[field.Name] = true
-			out = append(out, field)
+	g.indent++
+	for _, field := range enumCase.Fields {
+		if err := g.writeField(field); err != nil {
+			return err
 		}
 	}
-	return out
+	if len(enumCase.Fields) > 0 {
+		g.line("")
+	}
+	if len(enumCase.Fields) == 0 {
+		instanceType := caseName
+		constructorType := caseName
+		if len(class.TypeParameters) == 0 {
+			instanceType += typeUse
+			constructorType += typeUse
+		}
+		g.linef("static final %s INSTANCE = new %s();", instanceType, constructorType)
+		g.line("")
+	}
+	header := caseName + "(" + g.params(g.enumCaseParams(enumCase.Fields)) + ")"
+	if len(enumCase.Fields) == 0 {
+		header = "private " + header
+	} else {
+		header = "public " + header
+	}
+	g.linef("%s {", header)
+	g.indent++
+	if len(class.Fields) > 0 {
+		g.linef("super(%s);", g.enumCaseBaseArgs(class, enumCase))
+	}
+	for _, field := range enumCase.Fields {
+		g.linef("this.%s = %s;", javaIdent(field.Name), javaIdent(field.Name))
+	}
+	g.indent--
+	g.line("}")
+	g.indent--
+	g.line("}")
+	return nil
 }
 
-func (g *Generator) enumConstructorArgs(caseName string, unionFields []*lower.Field, caseFields []*lower.Field) string {
-	args := []string{strconv.Quote(caseName)}
-	caseFieldMap := map[string]*lower.Field{}
-	for _, field := range caseFields {
-		caseFieldMap[field.Name] = field
+func (g *Generator) enumCaseClassName(class *lower.Class, caseName string) string {
+	return sanitizeTypeName(class.Name + "_" + caseName)
+}
+
+func (g *Generator) typeParamsDecl(params []string) string {
+	if len(params) == 0 {
+		return ""
 	}
-	for _, field := range unionFields {
-		if _, ok := caseFieldMap[field.Name]; ok {
-			args = append(args, javaIdent(field.Name))
+	names := make([]string, len(params))
+	for i, param := range params {
+		names[i] = sanitizeTypeName(param)
+	}
+	return "<" + strings.Join(names, ", ") + ">"
+}
+
+func (g *Generator) typeParamsUse(params []string) string {
+	return g.typeParamsDecl(params)
+}
+
+func (g *Generator) enumCaseParams(fields []*lower.Field) []lower.Parameter {
+	params := make([]lower.Parameter, len(fields))
+	for i, field := range fields {
+		params[i] = lower.Parameter{Name: field.Name, Type: field.Type}
+	}
+	return params
+}
+
+func (g *Generator) enumCasePayloadArgs(fields []*lower.Field) string {
+	args := make([]string, len(fields))
+	for i, field := range fields {
+		args[i] = javaIdent(field.Name)
+	}
+	return strings.Join(args, ", ")
+}
+
+func (g *Generator) enumCaseBaseArgs(class *lower.Class, enumCase lower.EnumCase) string {
+	assignments := map[string]lower.Expr{}
+	for _, assignment := range enumCase.Assignments {
+		assignments[assignment.Name] = assignment.Value
+	}
+	args := make([]string, len(class.Fields))
+	for i, field := range class.Fields {
+		if value, ok := assignments[field.Name]; ok {
+			rendered, err := g.exprWithExpected(value, field.Type)
+			if err != nil {
+				args[i] = g.zeroValueJava(field.Type)
+			} else {
+				args[i] = rendered
+			}
 			continue
 		}
-		args = append(args, g.zeroValueJava(field.Type))
+		args[i] = g.zeroValueJava(field.Type)
 	}
 	return strings.Join(args, ", ")
 }
@@ -780,6 +964,10 @@ func (g *Generator) writeStmt(stmt lower.Stmt) error {
 			return nil
 		}
 		if isUnitType(g.currentReturnType) {
+			if _, ok := s.Value.(*lower.UnitLiteral); ok {
+				g.line("return;")
+				return nil
+			}
 			value, err := g.expr(s.Value)
 			if err != nil {
 				return err
@@ -914,6 +1102,8 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		return "false", nil
 	case *lower.StringLiteral:
 		return strconv.Quote(e.Value), nil
+	case *lower.UnitLiteral:
+		return "null", nil
 	case *lower.RuneLiteral:
 		return strconv.FormatInt(int64(e.Value), 10) + "L", nil
 	case *lower.ListLiteral:
@@ -922,6 +1112,22 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		return g.tupleLiteral(e)
 	case *lower.RecordLiteral:
 		return g.recordLiteral(e)
+	case *lower.TypeIs:
+		value, err := g.expr(e.Value)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("(%s instanceof %s)", value, sanitizeTypeName(e.Target)), nil
+	case *lower.Cast:
+		value, err := g.expr(e.Value)
+		if err != nil {
+			return "", err
+		}
+		targetType, err := g.javaType(e.Type, false)
+		if err != nil {
+			targetType = sanitizeTypeName(e.Target)
+		}
+		return fmt.Sprintf("((%s) %s)", targetType, value), nil
 	case *lower.Unary:
 		right, err := g.expr(e.Right)
 		if err != nil {
@@ -1386,6 +1592,8 @@ func exprType(expr lower.Expr) *typecheck.Type {
 		return e.Type
 	case *lower.StringLiteral:
 		return e.Type
+	case *lower.UnitLiteral:
+		return e.Type
 	case *lower.RuneLiteral:
 		return e.Type
 	case *lower.ListLiteral:
@@ -1393,6 +1601,10 @@ func exprType(expr lower.Expr) *typecheck.Type {
 	case *lower.TupleLiteral:
 		return e.Type
 	case *lower.RecordLiteral:
+		return e.Type
+	case *lower.TypeIs:
+		return e.Type
+	case *lower.Cast:
 		return e.Type
 	case *lower.Unary:
 		return e.Type
@@ -1462,9 +1674,31 @@ func (g *Generator) javaType(t *typecheck.Type, allowVoid bool) (string, error) 
 			return g.optionType(t)
 		}
 		if class, ok := g.classes[t.Name]; ok {
-			return g.className(class), nil
+			if len(t.Args) == 0 {
+				return g.className(class), nil
+			}
+			args := make([]string, len(t.Args))
+			for i, arg := range t.Args {
+				argType, err := g.javaReferenceType(arg)
+				if err != nil {
+					return "", err
+				}
+				args[i] = argType
+			}
+			return g.className(class) + "<" + strings.Join(args, ", ") + ">", nil
 		}
-		return sanitizeTypeName(t.Name), nil
+		if len(t.Args) == 0 {
+			return sanitizeTypeName(t.Name), nil
+		}
+		args := make([]string, len(t.Args))
+		for i, arg := range t.Args {
+			argType, err := g.javaReferenceType(arg)
+			if err != nil {
+				return "", err
+			}
+			args[i] = argType
+		}
+		return sanitizeTypeName(t.Name) + "<" + strings.Join(args, ", ") + ">", nil
 	case typecheck.TypeObject:
 		if class, ok := g.objects[t.Name]; ok {
 			return g.className(class), nil
@@ -1493,6 +1727,8 @@ func (g *Generator) javaType(t *typecheck.Type, allowVoid bool) (string, error) 
 		return g.tupleType(t)
 	case typecheck.TypeRecord:
 		return g.recordClassName(t), nil
+	case typecheck.TypeParam:
+		return sanitizeTypeName(t.Name), nil
 	default:
 		return "", fmt.Errorf("unsupported type %s", t.String())
 	}
@@ -1860,6 +2096,16 @@ func (g *Generator) lambdaExpr(lambda *lower.Lambda) (string, error) {
 	if !ok || ret.Value == nil {
 		return "", fmt.Errorf("unsupported lambda body %T", lambda.Body[0])
 	}
+	if ifExpr, ok := ret.Value.(*lower.IfExpr); ok && (len(ifExpr.ThenPrefix) > 0 || len(ifExpr.ElsePrefix) > 0) {
+		var body strings.Builder
+		body.WriteString(param)
+		body.WriteString(" -> {\n")
+		if err := g.writeLambdaReturnBlock(&body, 1, ifExpr); err != nil {
+			return "", err
+		}
+		body.WriteString("}")
+		return body.String(), nil
+	}
 	value, err := g.expr(ret.Value)
 	if err != nil {
 		return "", err
@@ -1868,6 +2114,86 @@ func (g *Generator) lambdaExpr(lambda *lower.Lambda) (string, error) {
 		return fmt.Sprintf("%s -> { %s; }", param, value), nil
 	}
 	return fmt.Sprintf("%s -> %s", param, value), nil
+}
+
+func (g *Generator) writeLambdaReturnBlock(b *strings.Builder, indent int, expr lower.Expr) error {
+	if ifExpr, ok := expr.(*lower.IfExpr); ok {
+		cond, err := g.expr(ifExpr.Condition)
+		if err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, fmt.Sprintf("if (%s) {", unwrapGroupedJavaExpr(cond)))
+		for _, stmt := range ifExpr.ThenPrefix {
+			if err := g.writeStmtIntoBuilder(b, indent+1, stmt); err != nil {
+				return err
+			}
+		}
+		if err := g.writeLambdaReturnBlock(b, indent+1, ifExpr.ThenValue); err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, "} else {")
+		for _, stmt := range ifExpr.ElsePrefix {
+			if err := g.writeStmtIntoBuilder(b, indent+1, stmt); err != nil {
+				return err
+			}
+		}
+		if err := g.writeLambdaReturnBlock(b, indent+1, ifExpr.ElseValue); err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, "}")
+		return nil
+	}
+	value, err := g.expr(expr)
+	if err != nil {
+		return err
+	}
+	writeIndentedLine(b, indent, fmt.Sprintf("return %s;", value))
+	return nil
+}
+
+func (g *Generator) writeStmtIntoBuilder(b *strings.Builder, indent int, stmt lower.Stmt) error {
+	switch s := stmt.(type) {
+	case *lower.VarDecl:
+		typ, err := g.javaType(s.Type, false)
+		if err != nil {
+			return err
+		}
+		if s.Init == nil {
+			writeIndentedLine(b, indent, fmt.Sprintf("%s %s;", typ, javaIdent(s.Name)))
+			return nil
+		}
+		initExpr, err := g.exprWithExpected(s.Init, s.Type)
+		if err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, fmt.Sprintf("%s %s = %s;", typ, javaIdent(s.Name), initExpr))
+		return nil
+	case *lower.Assign:
+		target, err := g.expr(s.Target)
+		if err != nil {
+			return err
+		}
+		value, err := g.exprWithExpected(s.Value, g.assignmentTargetType(s.Target))
+		if err != nil {
+			return err
+		}
+		op := s.Operator
+		if op == ":=" {
+			op = "="
+		}
+		writeIndentedLine(b, indent, fmt.Sprintf("%s %s %s;", target, op, value))
+		return nil
+	default:
+		return fmt.Errorf("unsupported lambda prefix statement %T", stmt)
+	}
+}
+
+func writeIndentedLine(b *strings.Builder, indent int, line string) {
+	for i := 0; i < indent; i++ {
+		b.WriteString("    ")
+	}
+	b.WriteString(line)
+	b.WriteByte('\n')
 }
 
 func OutputPath(baseDir, packageName string) string {

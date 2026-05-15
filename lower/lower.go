@@ -9,8 +9,9 @@ import (
 
 // Lowerer converts typed AST nodes into the lowered IR.
 type Lowerer struct {
-	tempID int
-	classes map[string]*typed.ClassDecl
+	tempID     int
+	classes    map[string]*typed.ClassDecl
+	typeParams map[string]struct{}
 }
 
 // ProgramFromTyped lowers a typed program into backend-friendly IR.

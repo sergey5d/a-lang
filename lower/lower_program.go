@@ -63,7 +63,25 @@ func (l *Lowerer) lowerGlobal(stmt typed.Stmt) ([]*Global, error) {
 }
 
 func (l *Lowerer) lowerClass(class *typed.ClassDecl) (*Class, error) {
-	out := &Class{Name: class.Name, Object: class.Object, Record: class.Record, Enum: class.Enum}
+	prevTypeParams := l.typeParams
+	l.typeParams = map[string]struct{}{}
+	for _, param := range class.TypeParameters {
+		l.typeParams[param.Name] = struct{}{}
+	}
+	defer func() {
+		l.typeParams = prevTypeParams
+	}()
+
+	out := &Class{
+		Name:           class.Name,
+		Object:         class.Object,
+		Record:         class.Record,
+		Enum:           class.Enum,
+		TypeParameters: make([]string, len(class.TypeParameters)),
+	}
+	for i, param := range class.TypeParameters {
+		out.TypeParameters[i] = param.Name
+	}
 	for _, field := range class.Fields {
 		var init Expr
 		var err error
@@ -100,6 +118,16 @@ func (l *Lowerer) lowerClass(class *typed.ClassDecl) (*Class, error) {
 				Mutable: field.Mutable,
 				Private: field.Private,
 				Type:    l.resolveFieldType(field.Type),
+			})
+		}
+		for _, assignment := range enumCase.Assignments {
+			value, err := l.lowerExprFromParser(assignment.Value)
+			if err != nil {
+				return nil, err
+			}
+			loweredCase.Assignments = append(loweredCase.Assignments, EnumCaseAssignment{
+				Name:  assignment.Name,
+				Value: value,
 			})
 		}
 		out.Cases = append(out.Cases, loweredCase)
@@ -181,7 +209,9 @@ func (l *Lowerer) resolveFieldType(ref *parser.TypeRef) *typecheck.Type {
 		args[i] = l.resolveFieldType(arg)
 	}
 	kind := typecheck.TypeUnknown
-	if _, ok := l.classes[ref.Name]; ok {
+	if _, ok := l.typeParams[ref.Name]; ok {
+		kind = typecheck.TypeParam
+	} else if _, ok := l.classes[ref.Name]; ok {
 		kind = typecheck.TypeClass
 	} else {
 		switch ref.Name {
