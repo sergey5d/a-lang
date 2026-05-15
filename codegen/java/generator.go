@@ -1575,7 +1575,7 @@ func (g *Generator) className(class *lower.Class) string {
 }
 
 func (g *Generator) objectClassName(name string) string {
-	return "Object_" + sanitizeTypeName(name)
+	return "Obj_" + sanitizeTypeName(name)
 }
 
 func (g *Generator) collectRecordTypes(program *lower.Program) {

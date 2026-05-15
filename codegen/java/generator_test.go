@@ -100,7 +100,7 @@ def run() Int {
 	if !strings.Contains(text, "public static void main(String[] args)") {
 		t.Fatalf("expected java main bridge in generated Java, got:\n%s", text)
 	}
-	if !strings.Contains(text, "final class Counter") || !strings.Contains(text, "final class Object_MathBox") {
+	if !strings.Contains(text, "final class Counter") || !strings.Contains(text, "final class Obj_MathBox") {
 		t.Fatalf("expected object backing class in generated Java, got:\n%s", text)
 	}
 	if !strings.Contains(text, "new long[] {1L, 2L, 3L}") {
