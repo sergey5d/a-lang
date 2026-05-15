@@ -2,6 +2,8 @@ package java
 
 import (
 	"a-lang/lower"
+	"a-lang/parser"
+	"a-lang/predef"
 	"a-lang/typecheck"
 	"fmt"
 	"os"
@@ -36,6 +38,10 @@ func GenerateNamed(program *lower.Program, className string) ([]byte, error) {
 
 func GenerateForPackage(program *lower.Program, packageName string) ([]byte, error) {
 	return GenerateForPackageNamed(program, packageName, ModuleClassName(packageName))
+}
+
+func GenerateForPackageSource(program *lower.Program, packageName, sourcePath string) ([]byte, error) {
+	return GenerateForPackageNamed(program, packageName, ModuleClassNameFor(packageName, sourcePath))
 }
 
 func GenerateForPackageNamed(program *lower.Program, packageName, className string) ([]byte, error) {
@@ -156,33 +162,84 @@ public final class OS {
 		sources[filepath.Join("alang", "stdlib", "Map.java")] = src
 	}
 
-	for arity := 2; arity <= 10; arity++ {
-		typeParams := make([]string, arity)
-		fields := make([]string, arity)
-		params := make([]string, arity)
-		assignments := make([]string, arity)
-		for i := 0; i < arity; i++ {
-			typeName := fmt.Sprintf("T%d", i+1)
-			fieldName := fmt.Sprintf("_%d", i+1)
-			typeParams[i] = typeName
-			fields[i] = fmt.Sprintf("    public final %s %s;", typeName, fieldName)
-			params[i] = fmt.Sprintf("%s %s", typeName, fieldName)
-			assignments[i] = fmt.Sprintf("        this.%s = %s;", fieldName, fieldName)
+	if registry, err := predef.Load(); err == nil {
+		for arity := 2; arity <= 10; arity++ {
+			name := fmt.Sprintf("Tuple%d", arity)
+			decl, ok := registry.Types[name]
+			if !ok || decl.Kind != predef.KindRecord {
+				continue
+			}
+			if src, err := tupleJavaSourceFromDescriptor(decl); err == nil {
+				sources[filepath.Join("alang", "stdlib", name+".java")] = src
+			}
 		}
-
-		sources[filepath.Join("alang", "stdlib", fmt.Sprintf("Tuple%d.java", arity))] = fmt.Sprintf(`package alang.stdlib;
-
-public final class Tuple%d<%s> {
-%s
-
-    public Tuple%d(%s) {
-%s
-    }
-}
-`, arity, strings.Join(typeParams, ", "), strings.Join(fields, "\n"), arity, strings.Join(params, ", "), strings.Join(assignments, "\n"))
 	}
 
 	return sources
+}
+
+func tupleJavaSourceFromDescriptor(desc predef.TypeDescriptor) (string, error) {
+	if desc.Kind != predef.KindRecord {
+		return "", fmt.Errorf("%s is not a record", desc.Name)
+	}
+	typeParams := make([]string, len(desc.TypeParameters))
+	for i, param := range desc.TypeParameters {
+		typeParams[i] = param.Name
+	}
+	fields := make([]string, len(desc.Fields))
+	params := make([]string, len(desc.Fields))
+	assignments := make([]string, len(desc.Fields))
+	for i, field := range desc.Fields {
+		fieldType, err := javaTypeRefFromTypeRef(field.Type)
+		if err != nil {
+			return "", fmt.Errorf("%s.%s: %w", desc.Name, field.Name, err)
+		}
+		fields[i] = fmt.Sprintf("    public final %s %s;", fieldType, field.Name)
+		params[i] = fmt.Sprintf("%s %s", fieldType, field.Name)
+		assignments[i] = fmt.Sprintf("        this.%s = %s;", field.Name, field.Name)
+	}
+	typeParamSuffix := ""
+	if len(typeParams) > 0 {
+		typeParamSuffix = "<" + strings.Join(typeParams, ", ") + ">"
+	}
+	return fmt.Sprintf(`package alang.stdlib;
+
+public final class %s%s {
+%s
+
+    public %s(%s) {
+%s
+    }
+}
+`, desc.Name, typeParamSuffix, strings.Join(fields, "\n"), desc.Name, strings.Join(params, ", "), strings.Join(assignments, "\n")), nil
+}
+
+func javaTypeRefFromTypeRef(ref *parser.TypeRef) (string, error) {
+	if ref == nil {
+		return "", fmt.Errorf("nil type ref")
+	}
+	switch ref.Name {
+	case "Int", "Int64", "Rune":
+		return "Long", nil
+	case "Float", "Float64", "Decimal":
+		return "Double", nil
+	case "Bool":
+		return "Boolean", nil
+	case "Str":
+		return "String", nil
+	}
+	if len(ref.Arguments) == 0 {
+		return ref.Name, nil
+	}
+	args := make([]string, len(ref.Arguments))
+	for i, arg := range ref.Arguments {
+		rendered, err := javaTypeRefFromTypeRef(arg)
+		if err != nil {
+			return "", err
+		}
+		args[i] = rendered
+	}
+	return ref.Name + "<" + strings.Join(args, ", ") + ">", nil
 }
 
 func bundledStdlibFile(rel string) (string, error) {
@@ -501,6 +558,11 @@ func (g *Generator) findJavaEntry(functions []*lower.Function) *lower.Function {
 			return fn
 		}
 	}
+	for _, fn := range functions {
+		if fn.Name == "main" && len(fn.Parameters) == 0 {
+			return fn
+		}
+	}
 	return nil
 }
 
@@ -687,7 +749,7 @@ func (g *Generator) rangeBounds(iterable lower.Expr) (string, string, error) {
 			return "", "", err
 		}
 		g.linef("%s %s = %s;", typeName, temp, iterableExpr)
-		return temp + ".item1", temp + ".item2", nil
+		return temp + "._1", temp + "._2", nil
 	}
 }
 
@@ -719,7 +781,7 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 	case *lower.RuneLiteral:
 		return strconv.FormatInt(int64(e.Value), 10) + "L", nil
 	case *lower.ListLiteral:
-		return "", fmt.Errorf("unsupported lowered expression %T", expr)
+		return g.listLiteral(e)
 	case *lower.TupleLiteral:
 		return g.tupleLiteral(e)
 	case *lower.Unary:
@@ -821,6 +883,9 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		if receiver, ok := e.Receiver.(*lower.VarRef); ok && receiver.Name == "Array" && e.Method == "ofLength" {
 			return g.arrayOfLength(e)
 		}
+		if receiverType := exprType(e.Receiver); receiverType != nil && receiverType.Kind == typecheck.TypeInterface && receiverType.Name == "List" && e.Method == "sort" && len(e.Args) == 1 {
+			return g.listSortCall(e)
+		}
 		if receiverType := exprType(e.Receiver); receiverType != nil && receiverType.Kind == typecheck.TypeBuiltin && receiverType.Name == "Array" {
 			if e.Method == "size" && len(e.Args) == 0 {
 				receiver, err := g.expr(e.Receiver)
@@ -910,6 +975,26 @@ func (g *Generator) exprList(args []lower.Expr) (string, error) {
 
 func (g *Generator) arrayLiteral(call *lower.FunctionCall) (string, error) {
 	return g.arrayLiteralFromArgs(call.Args, call.Type)
+}
+
+func (g *Generator) listLiteral(list *lower.ListLiteral) (string, error) {
+	items, err := g.exprList(list.Elements)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("List.of(%s)", items), nil
+}
+
+func (g *Generator) listSortCall(call *lower.MethodCall) (string, error) {
+	receiver, err := g.expr(call.Receiver)
+	if err != nil {
+		return "", err
+	}
+	ordering, err := g.expr(call.Args[0])
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s.sort((left, right) -> (int)(%s.compare(left, right)))", receiver, ordering), nil
 }
 
 func (g *Generator) collectionLiteral(className string, args []lower.Expr) (string, error) {
@@ -1304,6 +1389,18 @@ func ModuleClassName(packageName string) string {
 	return "Pkg_" + sanitizeTypeName(packageName)
 }
 
+func ModuleClassNameFor(packageName, sourcePath string) string {
+	if packageName != "" {
+		return ModuleClassName(packageName)
+	}
+	stem := strings.TrimSuffix(filepath.Base(sourcePath), filepath.Ext(sourcePath))
+	name := sanitizeFileStem(stem)
+	if name == "" {
+		return "Pkg_Default"
+	}
+	return "Pkg_" + name
+}
+
 func (g *Generator) nextTemp(prefix string) string {
 	g.tempID++
 	return "__" + prefix + strconv.Itoa(g.tempID)
@@ -1338,12 +1435,41 @@ func OutputPath(baseDir, packageName string) string {
 	return filepath.Join(all...)
 }
 
+func OutputPathFor(baseDir, packageName, sourcePath string) string {
+	parts := packagePathParts(packageName)
+	parts = append(parts, ModuleClassNameFor(packageName, sourcePath)+".java")
+	all := append([]string{baseDir}, parts...)
+	return filepath.Join(all...)
+}
+
 func javaPackageName(packageName string) string {
 	if packageName == "" {
 		return ""
 	}
 	parts := packagePathParts(packageName)
 	return strings.Join(parts, ".")
+}
+
+func sanitizeFileStem(name string) string {
+	if name == "" {
+		return ""
+	}
+	var out strings.Builder
+	upperNext := true
+	for _, r := range name {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			if upperNext && unicode.IsLetter(r) {
+				out.WriteRune(unicode.ToUpper(r))
+			} else {
+				out.WriteRune(r)
+			}
+			upperNext = false
+		default:
+			upperNext = true
+		}
+	}
+	return out.String()
 }
 
 func packagePathParts(packageName string) []string {

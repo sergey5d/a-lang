@@ -143,6 +143,9 @@ func (l *Lexer) nextToken() (Token, error) {
 		return l.token(TokenBang, "!", startLine, startColumn), nil
 	case '_':
 		l.advance()
+		if !l.isAtEnd() && (isAlphaNumeric(l.peek()) || l.peek() == '_') {
+			return l.lexUnderscoreIdentifier(startLine, startColumn), nil
+		}
 		return l.token(TokenUnder, "_", startLine, startColumn), nil
 	case '=':
 		l.advance()
@@ -305,6 +308,15 @@ func (l *Lexer) lexIdentifier(line, column int) Token {
 	if keyword, ok := keywords[lexeme]; ok {
 		return l.token(keyword, lexeme, line, column)
 	}
+	return l.token(TokenIdentifier, lexeme, line, column)
+}
+
+func (l *Lexer) lexUnderscoreIdentifier(line, column int) Token {
+	start := l.pos - 1
+	for !l.isAtEnd() && (isAlphaNumeric(l.peek()) || l.peek() == '_') {
+		l.advance()
+	}
+	lexeme := string(l.input[start:l.pos])
 	return l.token(TokenIdentifier, lexeme, line, column)
 }
 

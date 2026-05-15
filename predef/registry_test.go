@@ -48,6 +48,9 @@ func TestLoadRegistry(t *testing.T) {
 	if len(tuple2.Fields) != 2 {
 		t.Fatalf("expected Tuple2 to expose 2 fields, got %#v", tuple2.Fields)
 	}
+	if tuple2.Fields[0].Name != "_1" || tuple2.Fields[1].Name != "_2" {
+		t.Fatalf("expected Tuple2 fields to be _1/_2, got %#v", tuple2.Fields)
+	}
 
 	printer, ok := registry.Types["Printer"]
 	if !ok {

@@ -124,6 +124,31 @@ def run() Int {
 	}
 }
 
+func TestGenerateAddsJavaMainBridgeForTopLevelMain(t *testing.T) {
+	src := `
+def main() Int {
+	0
+}
+`
+
+	lowered := lowerProgram(t, src)
+	source, err := GenerateForPackage(lowered, "")
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+
+	text := string(source)
+	if !strings.Contains(text, "public static long main()") {
+		t.Fatalf("expected source main function in generated Java, got:\n%s", text)
+	}
+	if !strings.Contains(text, "public static void main(String[] args)") {
+		t.Fatalf("expected Java entry bridge in generated Java, got:\n%s", text)
+	}
+	if !strings.Contains(text, "main();") {
+		t.Fatalf("expected Java entry bridge to call top-level main(), got:\n%s", text)
+	}
+}
+
 func TestGenerateCompilesWithTupleAndOptionRuntime(t *testing.T) {
 	src := `
 pair (Int, Str) = (1, "ok")
@@ -242,27 +267,36 @@ def run() Int {
 	}
 }
 
-func TestGenerateRejectsUnsupportedListLiteral(t *testing.T) {
+func TestGenerateCompilesWithListLiteral(t *testing.T) {
 	src := `
 def run() Int {
-	values = [1, 2, 3]
-	return 1
+	values List[Int] = [1, 2, 3]
+	return values.size()
 }
 `
 
 	lowered := lowerProgram(t, src)
-	_, err := GenerateForPackage(lowered, "")
-	if err == nil {
-		t.Fatalf("expected Generate to reject list literals")
+	source, err := GenerateForPackage(lowered, "")
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "unsupported") {
-		t.Fatalf("expected unsupported-expression error, got %v", err)
+	text := string(source)
+	if !strings.Contains(text, "List.of(1L, 2L, 3L)") {
+		t.Fatalf("expected list literal lowering in generated Java, got:\n%s", text)
 	}
 }
 
 func TestOutputPathUsesPackageStructure(t *testing.T) {
 	path := OutputPath("bin/java/src", "model/pubdemo")
 	expected := filepath.Join("bin/java/src", "model", "pubdemo", "Pkg_Model_pubdemo.java")
+	if path != expected {
+		t.Fatalf("expected output path %q, got %q", expected, path)
+	}
+}
+
+func TestOutputPathUsesSourceFileNameWhenPackageMissing(t *testing.T) {
+	path := OutputPathFor("bin/java/src", "", "/tmp/find_circle_num.al")
+	expected := filepath.Join("bin/java/src", "Pkg_FindCircleNum.java")
 	if path != expected {
 		t.Fatalf("expected output path %q, got %q", expected, path)
 	}
@@ -284,6 +318,21 @@ func TestWriteStdlibSupportCreatesOptionAndTupleFiles(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(tmpDir, rel)); err != nil {
 			t.Fatalf("expected runtime file %s: %v", rel, err)
 		}
+	}
+}
+
+func TestWriteStdlibSupportGeneratesTupleFromPredefShape(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := WriteStdlibSupport(tmpDir); err != nil {
+		t.Fatalf("WriteStdlibSupport returned error: %v", err)
+	}
+	bytes, err := os.ReadFile(filepath.Join(tmpDir, "alang", "stdlib", "Tuple2.java"))
+	if err != nil {
+		t.Fatalf("read generated Tuple2 runtime: %v", err)
+	}
+	text := string(bytes)
+	if !strings.Contains(text, "public final A _1;") || !strings.Contains(text, "public final B _2;") {
+		t.Fatalf("expected Tuple2 runtime to follow predef field names, got:\n%s", text)
 	}
 }
 
