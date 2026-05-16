@@ -126,70 +126,6 @@ public final class OS {
     }
 }
 `,
-		filepath.Join("alang", "stdlib", "Result.java"): `package alang.stdlib;
-
-import java.util.function.*;
-
-public final class Result<T, E> {
-    public final boolean ok;
-    public final T value;
-    public final E error;
-
-    private Result(boolean ok, T value, E error) {
-        this.ok = ok;
-        this.value = value;
-        this.error = error;
-    }
-
-    public boolean isOk() {
-        return this.ok;
-    }
-
-    public boolean isErr() {
-        return !this.ok;
-    }
-
-    public boolean isFailure() {
-        return !this.ok;
-    }
-
-    public T unwrap() {
-        if (!this.ok) {
-            return OS.panic("Result has no value");
-        }
-        return this.value;
-    }
-
-    public E getError() {
-        if (this.ok) {
-            return OS.panic("Result has no error");
-        }
-        return this.error;
-    }
-
-    public T getOr(T defaultValue) {
-        if (this.ok) {
-            return this.value;
-        }
-        return defaultValue;
-    }
-
-    public <X> Result<X, E> map(Function<T, X> f) {
-        if (this.ok) {
-            return Result.Ok(f.apply(this.value));
-        }
-        return Result.Err(this.error);
-    }
-
-    public static <T, E> Result<T, E> Ok(T value) {
-        return new Result<>(true, value, null);
-    }
-
-    public static <T, E> Result<T, E> Err(E error) {
-        return new Result<>(false, null, error);
-    }
-}
-`,
 	}
 
 	if src, err := bundledStdlibFile(filepath.Join("alang", "stdlib", "List.java")); err == nil {
@@ -205,6 +141,11 @@ public final class Result<T, E> {
 	if registry, err := predef.Load(); err == nil {
 		if optionSources, err := optionJavaSourcesFromPredef(registry); err == nil {
 			for rel, src := range optionSources {
+				sources[rel] = src
+			}
+		}
+		if resultSources, err := resultJavaSourcesFromPredef(registry); err == nil {
+			for rel, src := range resultSources {
 				sources[rel] = src
 			}
 		}
@@ -430,6 +371,153 @@ func javaTypeParamNames(params []string) []string {
 		names[i] = sanitizeTypeName(param)
 	}
 	return names
+}
+
+func resultJavaSourcesFromPredef(registry *predef.Registry) (map[string]string, error) {
+	if registry == nil || registry.Program == nil {
+		return nil, fmt.Errorf("nil predef registry")
+	}
+	result := typecheck.Analyze(registry.Program)
+	typedProgram, err := typed.Build(registry.Program, result)
+	if err != nil {
+		return nil, err
+	}
+	loweredProgram, err := lower.ProgramFromTyped(typedProgram)
+	if err != nil {
+		return nil, err
+	}
+
+	var resultClass *lower.Class
+	for _, class := range loweredProgram.Classes {
+		if class.Name == "Result" {
+			resultClass = class
+			break
+		}
+	}
+	if resultClass == nil {
+		return nil, fmt.Errorf("predef Result not found")
+	}
+	okCase, errCase, err := resultCases(resultClass)
+	if err != nil {
+		return nil, err
+	}
+
+	typeParams := javaTypeParamNames(resultClass.TypeParameters)
+	okTypeParam := "T"
+	errTypeParam := "E"
+	if len(typeParams) > 0 {
+		okTypeParam = typeParams[0]
+	}
+	if len(typeParams) > 1 {
+		errTypeParam = typeParams[1]
+	}
+	typeParamDecl := "<" + okTypeParam + ", " + errTypeParam + ">"
+	typeParamUse := typeParamDecl
+	resultName := sanitizeTypeName(resultClass.Name)
+	okClassName := sanitizeTypeName(resultClass.Name + "_" + okCase.Name)
+	errClassName := sanitizeTypeName(resultClass.Name + "_" + errCase.Name)
+	okField := javaIdent(okCase.Fields[0].Name)
+	errField := javaIdent(errCase.Fields[0].Name)
+	resultType := resultName + typeParamDecl
+	okTypeUse := okClassName + typeParamUse
+	errTypeUse := errClassName + typeParamUse
+
+	var main strings.Builder
+	fmt.Fprintf(&main, "package alang.stdlib;\n\n")
+	fmt.Fprintf(&main, "import java.util.function.*;\n\n")
+	fmt.Fprintf(&main, "public interface %s {\n", resultType)
+	fmt.Fprintf(&main, "    default boolean isOk() {\n")
+	fmt.Fprintf(&main, "        return this instanceof %s;\n", okClassName)
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    default boolean isErr() {\n")
+	fmt.Fprintf(&main, "        return this instanceof %s;\n", errClassName)
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    @SuppressWarnings(\"unchecked\")\n")
+	fmt.Fprintf(&main, "    default %s expect() {\n", okTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", okClassName)
+	fmt.Fprintf(&main, "            return ((%s) this).%s;\n", okTypeUse, okField)
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return OS.panic(\"Result has no success value\");\n")
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    @SuppressWarnings(\"unchecked\")\n")
+	fmt.Fprintf(&main, "    default %s getError() {\n", errTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", errClassName)
+	fmt.Fprintf(&main, "            return ((%s) this).%s;\n", errTypeUse, errField)
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return OS.panic(\"Result has no error value\");\n")
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    default %s getOr(%s defaultValue) {\n", okTypeParam, okTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", okClassName)
+	fmt.Fprintf(&main, "            return this.expect();\n")
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return defaultValue;\n")
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    default <X> %s<X, %s> map(Function<%s, X> f) {\n", resultName, errTypeParam, okTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", okClassName)
+	fmt.Fprintf(&main, "            return %s.Ok(f.apply(this.expect()));\n", resultName)
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return %s.Err(this.getError());\n", resultName)
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    static %s %s Ok(%s value) {\n", typeParamDecl, resultType, okTypeParam)
+	fmt.Fprintf(&main, "        return new %s(value);\n", okTypeUse)
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    static %s %s Err(%s error) {\n", typeParamDecl, resultType, errTypeParam)
+	fmt.Fprintf(&main, "        return new %s(error);\n", errTypeUse)
+	fmt.Fprintf(&main, "    }\n")
+	fmt.Fprintf(&main, "}\n")
+
+	okSrc := fmt.Sprintf(`package alang.stdlib;
+
+public final class %s%s implements %s%s {
+    public final %s %s;
+
+    public %s(%s %s) {
+        this.%s = %s;
+    }
+}
+`, okClassName, typeParamDecl, resultName, typeParamUse, okTypeParam, okField, okClassName, okTypeParam, okField, okField, okField)
+
+	errSrc := fmt.Sprintf(`package alang.stdlib;
+
+public final class %s%s implements %s%s {
+    public final %s %s;
+
+    public %s(%s %s) {
+        this.%s = %s;
+    }
+}
+`, errClassName, typeParamDecl, resultName, typeParamUse, errTypeParam, errField, errClassName, errTypeParam, errField, errField, errField)
+
+	return map[string]string{
+		filepath.Join("alang", "stdlib", "Result.java"):        main.String(),
+		filepath.Join("alang", "stdlib", okClassName+".java"):  okSrc,
+		filepath.Join("alang", "stdlib", errClassName+".java"): errSrc,
+	}, nil
+}
+
+func resultCases(class *lower.Class) (lower.EnumCase, lower.EnumCase, error) {
+	var okCase lower.EnumCase
+	var errCase lower.EnumCase
+	foundOk := false
+	foundErr := false
+	for _, enumCase := range class.Cases {
+		switch enumCase.Name {
+		case "Ok":
+			if len(enumCase.Fields) == 1 {
+				okCase = enumCase
+				foundOk = true
+			}
+		case "Err":
+			if len(enumCase.Fields) == 1 {
+				errCase = enumCase
+				foundErr = true
+			}
+		}
+	}
+	if !foundOk || !foundErr {
+		return lower.EnumCase{}, lower.EnumCase{}, fmt.Errorf("unsupported Result enum shape")
+	}
+	return okCase, errCase, nil
 }
 
 func eitherJavaSourcesFromPredef(registry *predef.Registry) (map[string]string, error) {

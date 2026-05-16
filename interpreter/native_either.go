@@ -139,7 +139,7 @@ func nativeEitherToResult(in *Interpreter, receiver Value, args []Value, local *
 		return nil, RuntimeError{Message: "toResult expects 0 arguments", Span: span}
 	}
 	if value.rightSet {
-		return in.constructStdlibResult(value.right, nil, true, local)
+		return in.constructStdlibResult(value.right, nil, true, local, span)
 	}
-	return in.constructStdlibResult(nil, value.left, false, local)
+	return in.constructStdlibResult(nil, value.left, false, local, span)
 }

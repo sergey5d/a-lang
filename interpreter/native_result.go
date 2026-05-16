@@ -24,24 +24,13 @@ func nativeResultIsErr(_ *Interpreter, receiver Value, args []Value, _ *env, spa
 	return !value.ok, nil
 }
 
-func nativeResultIsFailure(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
+func nativeResultExpect(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
 	value, ok := asNativeResult(receiver)
 	if !ok {
-		return nil, RuntimeError{Message: "native Result.isFailure receiver mismatch", Span: span}
+		return nil, RuntimeError{Message: "native Result.expect receiver mismatch", Span: span}
 	}
 	if len(args) != 0 {
-		return nil, RuntimeError{Message: "isFailure expects 0 arguments", Span: span}
-	}
-	return !value.ok, nil
-}
-
-func nativeResultUnwrap(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
-	value, ok := asNativeResult(receiver)
-	if !ok {
-		return nil, RuntimeError{Message: "native Result.unwrap receiver mismatch", Span: span}
-	}
-	if len(args) != 0 {
-		return nil, RuntimeError{Message: "unwrap expects 0 arguments", Span: span}
+		return nil, RuntimeError{Message: "expect expects 0 arguments", Span: span}
 	}
 	if !value.ok {
 		return nil, RuntimeError{Message: "Result has no success value", Span: span}
@@ -86,11 +75,11 @@ func nativeResultMap(in *Interpreter, receiver Value, args []Value, local *env, 
 		return nil, RuntimeError{Message: "map expects 1 argument", Span: span}
 	}
 	if !value.ok {
-		return in.constructStdlibResult(nil, value.err, false, local)
+		return in.constructStdlibResult(nil, value.err, false, local, span)
 	}
 	mapped, err := in.invokeCallableValue(args[0], []Value{value.value}, local, span)
 	if err != nil {
 		return nil, err
 	}
-	return in.constructStdlibResult(mapped, nil, true, local)
+	return in.constructStdlibResult(mapped, nil, true, local, span)
 }

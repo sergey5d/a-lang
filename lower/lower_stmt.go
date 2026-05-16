@@ -160,17 +160,13 @@ func (l *Lowerer) lowerUnwrapAccess(sourceRef *VarRef, sourceType *typecheck.Typ
 				Type:     unwrapElemType(sourceType),
 			}, unwrapElemType(sourceType), nil
 	case "Result":
-		return &Unary{
-				Operator: "!",
-				Right: &MethodCall{
-					Receiver: sourceRef,
-					Method:   "isFailure",
-					Type:     &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Bool"},
-				},
-				Type: &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Bool"},
+		return &MethodCall{
+				Receiver: sourceRef,
+				Method:   "isOk",
+				Type:     &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Bool"},
 			}, &MethodCall{
 				Receiver: sourceRef,
-				Method:   "unwrap",
+				Method:   "expect",
 				Type:     unwrapElemType(sourceType),
 			}, unwrapElemType(sourceType), nil
 	case "Either":

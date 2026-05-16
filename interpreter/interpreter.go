@@ -1015,18 +1015,18 @@ func (in *Interpreter) unwrappableBindingValue(sourceValue Value, local *env, sp
 			}
 			return true, unwrapped, nil
 		}
-		isFailureValue, err := in.invokeMethod(value, "isFailure", nil, local, span)
+		isOkValue, err := in.invokeMethod(value, "isOk", nil, local, span)
 		if err != nil {
 			return false, nil, err
 		}
-		isFailure, ok := isFailureValue.(bool)
+		isOk, ok := isOkValue.(bool)
 		if !ok {
-			return false, nil, RuntimeError{Message: value.class.Name + ".isFailure must return Bool", Span: span}
+			return false, nil, RuntimeError{Message: value.class.Name + ".isOk must return Bool", Span: span}
 		}
-		if isFailure {
+		if !isOk {
 			return false, nil, nil
 		}
-		unwrapped, err := in.invokeMethod(value, "unwrap", nil, local, span)
+		unwrapped, err := in.invokeMethod(value, "expect", nil, local, span)
 		if err != nil {
 			return false, nil, err
 		}
@@ -2738,7 +2738,7 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 				args[i] = value
 			}
 		}
-		return in.constructStdlibResult(args[0], nil, true, local)
+		return in.constructStdlibResult(args[0], nil, true, local, span)
 	case "Err":
 		if len(argExprs) != 1 {
 			return nil, RuntimeError{Message: fmt.Sprintf("Err constructor expects 1 argument, got %d", len(argExprs)), Span: span}
@@ -2753,7 +2753,7 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 				args[i] = value
 			}
 		}
-		return in.constructStdlibResult(nil, args[0], false, local)
+		return in.constructStdlibResult(nil, args[0], false, local, span)
 	case "Left":
 		if len(argExprs) != 1 {
 			return nil, RuntimeError{Message: fmt.Sprintf("Left constructor expects 1 argument, got %d", len(argExprs)), Span: span}
@@ -3815,10 +3815,24 @@ func (in *Interpreter) constructStdlibOption(value Value, set bool, local *env, 
 	return in.construct(class, nil, local)
 }
 
-func (in *Interpreter) constructStdlibResult(value Value, errValue Value, ok bool, local *env) (Value, error) {
+func (in *Interpreter) constructStdlibResult(value Value, errValue Value, ok bool, local *env, span parser.Span) (Value, error) {
 	class, found := in.classes["Result"]
 	if !found {
 		return &nativeResult{value: value, err: errValue, ok: ok}, nil
+	}
+	if class.Enum {
+		caseName := "Err"
+		args := []Value{errValue}
+		if ok {
+			caseName = "Ok"
+			args = []Value{value}
+		}
+		for _, enumCase := range class.Cases {
+			if enumCase.Name == caseName {
+				return in.constructEnumCase(class, enumCase, args, local, span)
+			}
+		}
+		return nil, RuntimeError{Message: "stdlib Result enum is missing case '" + caseName + "'", Span: span}
 	}
 	obj, err := in.constructBuiltinInstance(class, local)
 	if err != nil {

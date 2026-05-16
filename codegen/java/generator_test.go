@@ -490,7 +490,7 @@ func TestOutputPathUsesSourceFileNameWhenPackageMissing(t *testing.T) {
 	}
 }
 
-func TestWriteStdlibSupportCreatesOptionAndTupleFiles(t *testing.T) {
+func TestWriteStdlibSupportCreatesOptionResultEitherAndTupleFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := WriteStdlibSupport(tmpDir); err != nil {
 		t.Fatalf("WriteStdlibSupport returned error: %v", err)
@@ -504,6 +504,9 @@ func TestWriteStdlibSupportCreatesOptionAndTupleFiles(t *testing.T) {
 		filepath.Join("alang", "stdlib", "Option.java"),
 		filepath.Join("alang", "stdlib", "Option_None.java"),
 		filepath.Join("alang", "stdlib", "Option_Some.java"),
+		filepath.Join("alang", "stdlib", "Result.java"),
+		filepath.Join("alang", "stdlib", "Result_Err.java"),
+		filepath.Join("alang", "stdlib", "Result_Ok.java"),
 		filepath.Join("alang", "stdlib", "Set.java"),
 		filepath.Join("alang", "stdlib", "Tuple2.java"),
 		filepath.Join("alang", "stdlib", "Tuple10.java"),
@@ -525,6 +528,24 @@ func TestOptionJavaSourceFromPredef(t *testing.T) {
 	}
 	if !strings.Contains(text, "interface Option<") && !strings.Contains(text, "abstract class Option<") {
 		t.Fatalf("expected generated Option type, got:\n%s", text)
+	}
+}
+
+func TestResultJavaSourceFromPredef(t *testing.T) {
+	registry, err := predef.Load()
+	if err != nil {
+		t.Fatalf("predef.Load returned error: %v", err)
+	}
+	sources, err := resultJavaSourcesFromPredef(registry)
+	if err != nil {
+		t.Fatalf("resultJavaSourcesFromPredef returned error: %v", err)
+	}
+	text := sources[filepath.Join("alang", "stdlib", "Result.java")]
+	if !strings.Contains(text, "interface Result<") && !strings.Contains(text, "abstract class Result<") {
+		t.Fatalf("expected generated Result type, got:\n%s", text)
+	}
+	if !strings.Contains(text, "static <T, E> Result<T, E> Ok(T value)") {
+		t.Fatalf("expected generated Result.Ok factory, got:\n%s", text)
 	}
 }
 

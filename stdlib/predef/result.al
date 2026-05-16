@@ -1,18 +1,36 @@
-class Result[T, E] {
-    hidden var ok Bool
-    hidden var value T
-    hidden var error E
-}
+enum Result[T, E] {
+    def isOk() Bool = match this {
+        Ok(_) => true
+        Err(_) => false
+    }
 
-impl Result[T, E] {
-    def isOk() Bool = ok
-    def isErr() Bool = !ok
-    def isFailure() Bool = !ok
-    def unwrap() T = value
-    def getError() E = error
-    def getOr(defaultValue T) T =
-        if ok then value else defaultValue
+    def isErr() Bool = !this.isOk()
 
-    def map[X](f T -> X) Result[X, E] =
-        if ok then Ok(f(value)) else Err(error)
+    def expect() T = match this {
+        Ok(value) => value
+        Err(_) => OS.panic("Result has no success value")
+    }
+
+    def getError() E = match this {
+        Ok(_) => OS.panic("Result has no error value")
+        Err(error) => error
+    }
+
+    def getOr(defaultValue T) T = match this {
+        Ok(value) => value
+        Err(_) => defaultValue
+    }
+
+    def map[X](f T -> X) Result[X, E] = match this {
+        Ok(value) => Ok(f(value))
+        Err(error) => Err(error)
+    }
+
+    case Ok {
+        value T
+    }
+
+    case Err {
+        error E
+    }
 }
