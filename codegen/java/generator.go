@@ -163,8 +163,8 @@ public final class OS {
         System.out.printf(format, values);
     }
 
-    public static void panic(Object value) {
-        throw new RuntimeException(String.valueOf(value));
+    public static void panic(Object... values) {
+        throw new RuntimeException(join(values));
     }
 
     private static String join(Object... values) {
@@ -1143,6 +1143,14 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if isStringType(exprType(e.Left)) || isStringType(exprType(e.Right)) {
+			switch e.Operator {
+			case "==":
+				return fmt.Sprintf("java.util.Objects.equals(%s, %s)", left, right), nil
+			case "!=":
+				return fmt.Sprintf("(!java.util.Objects.equals(%s, %s))", left, right), nil
+			}
+		}
 		return fmt.Sprintf("(%s %s %s)", left, e.Operator, right), nil
 	case *lower.IfExpr:
 		if len(e.ThenPrefix) > 0 || len(e.ElsePrefix) > 0 {
@@ -1260,7 +1268,15 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "None" {
 			return g.optionCallExpr("None", e.Args, nil)
 		}
-		return "", fmt.Errorf("unsupported lowered expression %T", expr)
+		callee, err := g.expr(e.Callee)
+		if err != nil {
+			return "", err
+		}
+		args, err := g.exprList(e.Args)
+		if err != nil {
+			return "", err
+		}
+		return g.invokeExpr(callee, exprType(e.Callee), args)
 	default:
 		return "", fmt.Errorf("unsupported lowered expression %T", expr)
 	}
@@ -1637,6 +1653,10 @@ func isUnitType(t *typecheck.Type) bool {
 	return t != nil && t.Kind == typecheck.TypeBuiltin && t.Name == "Unit"
 }
 
+func isStringType(t *typecheck.Type) bool {
+	return t != nil && t.Kind == typecheck.TypeBuiltin && t.Name == "Str"
+}
+
 func (g *Generator) javaType(t *typecheck.Type, allowVoid bool) (string, error) {
 	if t == nil {
 		return "", fmt.Errorf("nil type")
@@ -1727,10 +1747,113 @@ func (g *Generator) javaType(t *typecheck.Type, allowVoid bool) (string, error) 
 		return g.tupleType(t)
 	case typecheck.TypeRecord:
 		return g.recordClassName(t), nil
+	case typecheck.TypeFunction:
+		return g.javaFunctionType(t)
 	case typecheck.TypeParam:
 		return sanitizeTypeName(t.Name), nil
 	default:
 		return "", fmt.Errorf("unsupported type %s", t.String())
+	}
+}
+
+func (g *Generator) javaFunctionType(t *typecheck.Type) (string, error) {
+	if t == nil || t.Kind != typecheck.TypeFunction || t.Signature == nil {
+		return "", fmt.Errorf("unsupported function type %v", t)
+	}
+	params := t.Signature.Parameters
+	ret := t.Signature.ReturnType
+	unit := isUnitType(ret)
+	switch {
+	case len(params) == 0 && unit:
+		return "Runnable", nil
+	case len(params) == 0:
+		retType, err := g.javaReferenceType(ret)
+		if err != nil {
+			return "", err
+		}
+		return "java.util.function.Supplier<" + retType + ">", nil
+	case len(params) == 1 && unit:
+		arg0, err := g.javaReferenceType(params[0])
+		if err != nil {
+			return "", err
+		}
+		return "java.util.function.Consumer<" + arg0 + ">", nil
+	case len(params) == 1:
+		arg0, err := g.javaReferenceType(params[0])
+		if err != nil {
+			return "", err
+		}
+		retType, err := g.javaReferenceType(ret)
+		if err != nil {
+			return "", err
+		}
+		return "java.util.function.Function<" + arg0 + ", " + retType + ">", nil
+	case len(params) == 2 && unit:
+		arg0, err := g.javaReferenceType(params[0])
+		if err != nil {
+			return "", err
+		}
+		arg1, err := g.javaReferenceType(params[1])
+		if err != nil {
+			return "", err
+		}
+		return "java.util.function.BiConsumer<" + arg0 + ", " + arg1 + ">", nil
+	case len(params) == 2:
+		arg0, err := g.javaReferenceType(params[0])
+		if err != nil {
+			return "", err
+		}
+		arg1, err := g.javaReferenceType(params[1])
+		if err != nil {
+			return "", err
+		}
+		retType, err := g.javaReferenceType(ret)
+		if err != nil {
+			return "", err
+		}
+		return "java.util.function.BiFunction<" + arg0 + ", " + arg1 + ", " + retType + ">", nil
+	case len(params) == 3 && !unit:
+		arg0, err := g.javaReferenceType(params[0])
+		if err != nil {
+			return "", err
+		}
+		arg1, err := g.javaReferenceType(params[1])
+		if err != nil {
+			return "", err
+		}
+		arg2, err := g.javaReferenceType(params[2])
+		if err != nil {
+			return "", err
+		}
+		retType, err := g.javaReferenceType(ret)
+		if err != nil {
+			return "", err
+		}
+		return "Map.Mapper3<" + arg0 + ", " + arg1 + ", " + arg2 + ", " + retType + ">", nil
+	case len(params) == 4 && !unit:
+		arg0, err := g.javaReferenceType(params[0])
+		if err != nil {
+			return "", err
+		}
+		arg1, err := g.javaReferenceType(params[1])
+		if err != nil {
+			return "", err
+		}
+		arg2, err := g.javaReferenceType(params[2])
+		if err != nil {
+			return "", err
+		}
+		arg3, err := g.javaReferenceType(params[3])
+		if err != nil {
+			return "", err
+		}
+		retType, err := g.javaReferenceType(ret)
+		if err != nil {
+			return "", err
+		}
+		return "Map.Mapper4<" + arg0 + ", " + arg1 + ", " + arg2 + ", " + arg3 + ", " + retType + ">", nil
+	default:
+		return "", fmt.Errorf("unsupported function type %s", t.String())
 	}
 }
 
@@ -2085,35 +2208,43 @@ func (g *Generator) nextTemp(prefix string) string {
 }
 
 func (g *Generator) lambdaExpr(lambda *lower.Lambda) (string, error) {
-	if len(lambda.Parameters) != 1 {
-		return "", fmt.Errorf("unsupported lambda arity %d", len(lambda.Parameters))
+	params := make([]string, len(lambda.Parameters))
+	for i, param := range lambda.Parameters {
+		params[i] = javaIdent(param.Name)
 	}
-	param := javaIdent(lambda.Parameters[0].Name)
-	if len(lambda.Body) != 1 {
-		return "", fmt.Errorf("unsupported lambda body with %d statements", len(lambda.Body))
+	paramExpr := strings.Join(params, ", ")
+	if len(params) != 1 {
+		paramExpr = "(" + paramExpr + ")"
 	}
-	ret, ok := lambda.Body[0].(*lower.Return)
-	if !ok || ret.Value == nil {
-		return "", fmt.Errorf("unsupported lambda body %T", lambda.Body[0])
+	if len(lambda.Body) == 1 {
+		if ret, ok := lambda.Body[0].(*lower.Return); ok && ret.Value != nil {
+			if ifExpr, ok := ret.Value.(*lower.IfExpr); ok && (len(ifExpr.ThenPrefix) > 0 || len(ifExpr.ElsePrefix) > 0) {
+				var body strings.Builder
+				body.WriteString(paramExpr)
+				body.WriteString(" -> {\n")
+				if err := g.writeLambdaReturnBlock(&body, 1, ifExpr); err != nil {
+					return "", err
+				}
+				body.WriteString("}")
+				return body.String(), nil
+			}
+			value, err := g.expr(ret.Value)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("%s -> %s", paramExpr, value), nil
+		}
 	}
-	if ifExpr, ok := ret.Value.(*lower.IfExpr); ok && (len(ifExpr.ThenPrefix) > 0 || len(ifExpr.ElsePrefix) > 0) {
-		var body strings.Builder
-		body.WriteString(param)
-		body.WriteString(" -> {\n")
-		if err := g.writeLambdaReturnBlock(&body, 1, ifExpr); err != nil {
+	var body strings.Builder
+	body.WriteString(paramExpr)
+	body.WriteString(" -> {\n")
+	for _, stmt := range lambda.Body {
+		if err := g.writeStmtIntoBuilder(&body, 1, stmt); err != nil {
 			return "", err
 		}
-		body.WriteString("}")
-		return body.String(), nil
 	}
-	value, err := g.expr(ret.Value)
-	if err != nil {
-		return "", err
-	}
-	if isUnitType(lambda.ReturnType) {
-		return fmt.Sprintf("%s -> { %s; }", param, value), nil
-	}
-	return fmt.Sprintf("%s -> %s", param, value), nil
+	body.WriteString("}")
+	return body.String(), nil
 }
 
 func (g *Generator) writeLambdaReturnBlock(b *strings.Builder, indent int, expr lower.Expr) error {
@@ -2183,8 +2314,110 @@ func (g *Generator) writeStmtIntoBuilder(b *strings.Builder, indent int, stmt lo
 		}
 		writeIndentedLine(b, indent, fmt.Sprintf("%s %s %s;", target, op, value))
 		return nil
+	case *lower.If:
+		cond, err := g.expr(s.Condition)
+		if err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, fmt.Sprintf("if (%s) {", unwrapGroupedJavaExpr(cond)))
+		for _, stmt := range s.Then {
+			if err := g.writeStmtIntoBuilder(b, indent+1, stmt); err != nil {
+				return err
+			}
+		}
+		if len(s.Else) == 0 {
+			writeIndentedLine(b, indent, "}")
+			return nil
+		}
+		writeIndentedLine(b, indent, "} else {")
+		for _, stmt := range s.Else {
+			if err := g.writeStmtIntoBuilder(b, indent+1, stmt); err != nil {
+				return err
+			}
+		}
+		writeIndentedLine(b, indent, "}")
+		return nil
+	case *lower.While:
+		cond, err := g.expr(s.Condition)
+		if err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, fmt.Sprintf("while (%s) {", unwrapGroupedJavaExpr(cond)))
+		for _, stmt := range s.Body {
+			if err := g.writeStmtIntoBuilder(b, indent+1, stmt); err != nil {
+				return err
+			}
+		}
+		writeIndentedLine(b, indent, "}")
+		return nil
+	case *lower.ForEach:
+		iterable, err := g.expr(s.Iterable)
+		if err != nil {
+			return err
+		}
+		itemType, err := g.foreachItemType(s.Iterable)
+		if err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, fmt.Sprintf("for (%s %s : %s) {", itemType, javaIdent(s.Name), iterable))
+		for _, stmt := range s.Body {
+			if err := g.writeStmtIntoBuilder(b, indent+1, stmt); err != nil {
+				return err
+			}
+		}
+		writeIndentedLine(b, indent, "}")
+		return nil
+	case *lower.Return:
+		if s.Value == nil {
+			writeIndentedLine(b, indent, "return;")
+			return nil
+		}
+		value, err := g.expr(s.Value)
+		if err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, fmt.Sprintf("return %s;", value))
+		return nil
+	case *lower.Break:
+		writeIndentedLine(b, indent, "break;")
+		return nil
+	case *lower.ExprStmt:
+		expr, err := g.expr(s.Expr)
+		if err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, fmt.Sprintf("%s;", expr))
+		return nil
 	default:
 		return fmt.Errorf("unsupported lambda prefix statement %T", stmt)
+	}
+}
+
+func (g *Generator) invokeExpr(callee string, calleeType *typecheck.Type, args string) (string, error) {
+	if calleeType == nil || calleeType.Kind != typecheck.TypeFunction || calleeType.Signature == nil {
+		return "", fmt.Errorf("unsupported invoke target type %v", calleeType)
+	}
+	arity := len(calleeType.Signature.Parameters)
+	unit := isUnitType(calleeType.Signature.ReturnType)
+	switch {
+	case arity == 0 && unit:
+		return fmt.Sprintf("%s.run()", callee), nil
+	case arity == 0:
+		return fmt.Sprintf("%s.get()", callee), nil
+	case arity == 1 && unit:
+		return fmt.Sprintf("%s.accept(%s)", callee, args), nil
+	case arity == 1:
+		return fmt.Sprintf("%s.apply(%s)", callee, args), nil
+	case arity == 2 && unit:
+		return fmt.Sprintf("%s.accept(%s)", callee, args), nil
+	case arity == 2:
+		return fmt.Sprintf("%s.apply(%s)", callee, args), nil
+	case arity == 3:
+		return fmt.Sprintf("%s.apply(%s)", callee, args), nil
+	case arity == 4:
+		return fmt.Sprintf("%s.apply(%s)", callee, args), nil
+	default:
+		return "", fmt.Errorf("unsupported function invoke arity %d", arity)
 	}
 }
 

@@ -296,7 +296,7 @@ def run() Int {
 	if !strings.Contains(text, "row.get(0L).expect()") {
 		t.Fatalf("expected list indexing lowering in generated Java, got:\n%s", text)
 	}
-	if !strings.Contains(text, "row.forEach(next -> { stack.append(next); })") {
+	if !strings.Contains(text, "row.forEach(next -> stack.append(next))") {
 		t.Fatalf("expected lambda lowering in generated Java, got:\n%s", text)
 	}
 

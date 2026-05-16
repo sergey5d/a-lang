@@ -579,7 +579,17 @@ func (l *Lowerer) lowerLambdaBody(expr *typed.LambdaExpr) ([]Stmt, error) {
 		}
 		return []Stmt{&Return{Value: body}}, nil
 	}
-	return l.lowerBlock(expr.BlockBody)
+	if expr.BlockBody == nil {
+		return nil, nil
+	}
+	if isUnitType(lambdaReturnType(expr.GetType())) {
+		return l.lowerBlock(expr.BlockBody)
+	}
+	prefix, value, err := l.lowerExprBlock(expr.BlockBody)
+	if err != nil {
+		return nil, err
+	}
+	return append(prefix, &Return{Value: value}), nil
 }
 
 func (l *Lowerer) lowerLambdaParams(expr *typed.LambdaExpr) []Parameter {
@@ -607,4 +617,8 @@ func lambdaReturnType(t *typecheck.Type) *typecheck.Type {
 		return t.Signature.ReturnType
 	}
 	return unknownType()
+}
+
+func isUnitType(t *typecheck.Type) bool {
+	return t != nil && t.Kind == typecheck.TypeBuiltin && t.Name == "Unit"
 }
