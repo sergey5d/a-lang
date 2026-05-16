@@ -2750,7 +2750,7 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 				args[i] = value
 			}
 		}
-		return in.constructStdlibEither(args[0], nil, false, local)
+		return in.constructStdlibEither(args[0], nil, false, local, span)
 	case "Right":
 		if len(argExprs) != 1 {
 			return nil, RuntimeError{Message: fmt.Sprintf("Right constructor expects 1 argument, got %d", len(argExprs)), Span: span}
@@ -2765,7 +2765,7 @@ func (in *Interpreter) callBuiltin(name string, argExprs []parser.CallArg, args 
 				args[i] = value
 			}
 		}
-		return in.constructStdlibEither(nil, args[0], true, local)
+		return in.constructStdlibEither(nil, args[0], true, local, span)
 	case "Map":
 		m := &nativeMap{items: map[string]Value{}, keys: map[string]Value{}, order: []string{}}
 		for _, argExpr := range argExprs {
@@ -3817,10 +3817,24 @@ func (in *Interpreter) constructStdlibResult(value Value, errValue Value, ok boo
 	return obj, nil
 }
 
-func (in *Interpreter) constructStdlibEither(left Value, right Value, rightSet bool, local *env) (Value, error) {
+func (in *Interpreter) constructStdlibEither(left Value, right Value, rightSet bool, local *env, span parser.Span) (Value, error) {
 	class, found := in.classes["Either"]
 	if !found {
 		return &nativeEither{left: left, right: right, rightSet: rightSet}, nil
+	}
+	if class.Enum {
+		caseName := "Left"
+		args := []Value{left}
+		if rightSet {
+			caseName = "Right"
+			args = []Value{right}
+		}
+		for _, enumCase := range class.Cases {
+			if enumCase.Name == caseName {
+				return in.constructEnumCase(class, enumCase, args, local, span)
+			}
+		}
+		return nil, RuntimeError{Message: "stdlib Either enum is missing case '" + caseName + "'", Span: span}
 	}
 	obj, err := in.constructBuiltinInstance(class, local)
 	if err != nil {

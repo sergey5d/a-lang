@@ -38,6 +38,14 @@ func TestLoadRegistry(t *testing.T) {
 		t.Fatalf("expected Option to be an enum, got %s", option.Kind)
 	}
 
+	either, ok := registry.Types["Either"]
+	if !ok {
+		t.Fatalf("expected Either descriptor to be loaded")
+	}
+	if either.Kind != KindEnum {
+		t.Fatalf("expected Either to be an enum, got %s", either.Kind)
+	}
+
 	tuple2, ok := registry.Types["Tuple2"]
 	if !ok {
 		t.Fatalf("expected Tuple2 descriptor to be loaded")

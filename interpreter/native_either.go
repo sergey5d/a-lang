@@ -86,11 +86,11 @@ func nativeEitherMap(in *Interpreter, receiver Value, args []Value, local *env, 
 		return nil, RuntimeError{Message: "map expects 1 argument", Span: span}
 	}
 	if !value.rightSet {
-		return in.constructStdlibEither(value.left, nil, false, local)
+		return in.constructStdlibEither(value.left, nil, false, local, span)
 	}
 	mapped, err := in.invokeCallableValue(args[0], []Value{value.right}, local, span)
 	if err != nil {
 		return nil, err
 	}
-	return in.constructStdlibEither(nil, mapped, true, local)
+	return in.constructStdlibEither(nil, mapped, true, local, span)
 }

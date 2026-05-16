@@ -567,7 +567,7 @@ def run() Int {
 	}
 }
 
-func TestAnalyzeTupleMemberAccessIsRejected(t *testing.T) {
+func TestAnalyzeTupleMemberAccess(t *testing.T) {
 	src := `
 def run() Int {
 	pair = (1, "x")
@@ -575,9 +575,9 @@ def run() Int {
 }
 `
 
-	_, err := parser.Parse(src)
-	if err == nil || err.Error() != "expected member name after '.', got _(\"_\" @ 4:14)" {
-		t.Fatalf("expected parse error, got %#v", err)
+	result := Analyze(parseProgram(t, src))
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != "unknown_member" {
+		t.Fatalf("expected unknown_member diagnostic, got %#v", result.Diagnostics)
 	}
 }
 

@@ -144,6 +144,11 @@ public final class OS {
 				sources[rel] = src
 			}
 		}
+		if eitherSources, err := eitherJavaSourcesFromPredef(registry); err == nil {
+			for rel, src := range eitherSources {
+				sources[rel] = src
+			}
+		}
 		for arity := 2; arity <= 10; arity++ {
 			name := fmt.Sprintf("Tuple%d", arity)
 			decl, ok := registry.Types[name]
@@ -361,6 +366,167 @@ func javaTypeParamNames(params []string) []string {
 		names[i] = sanitizeTypeName(param)
 	}
 	return names
+}
+
+func eitherJavaSourcesFromPredef(registry *predef.Registry) (map[string]string, error) {
+	if registry == nil || registry.Program == nil {
+		return nil, fmt.Errorf("nil predef registry")
+	}
+	result := typecheck.Analyze(registry.Program)
+	typedProgram, err := typed.Build(registry.Program, result)
+	if err != nil {
+		return nil, err
+	}
+	loweredProgram, err := lower.ProgramFromTyped(typedProgram)
+	if err != nil {
+		return nil, err
+	}
+
+	var eitherClass *lower.Class
+	for _, class := range loweredProgram.Classes {
+		if class.Name == "Either" {
+			eitherClass = class
+			break
+		}
+	}
+	if eitherClass == nil {
+		return nil, fmt.Errorf("predef Either not found")
+	}
+	leftCase, rightCase, err := eitherCases(eitherClass)
+	if err != nil {
+		return nil, err
+	}
+
+	typeParams := javaTypeParamNames(eitherClass.TypeParameters)
+	leftTypeParam := "L"
+	rightTypeParam := "R"
+	if len(typeParams) > 0 {
+		leftTypeParam = typeParams[0]
+	}
+	if len(typeParams) > 1 {
+		rightTypeParam = typeParams[1]
+	}
+	typeParamDecl := "<" + leftTypeParam + ", " + rightTypeParam + ">"
+	typeParamUse := typeParamDecl
+	eitherName := sanitizeTypeName(eitherClass.Name)
+	leftClass := sanitizeTypeName(eitherClass.Name + "_" + leftCase.Name)
+	rightClass := sanitizeTypeName(eitherClass.Name + "_" + rightCase.Name)
+	leftField := javaIdent(leftCase.Fields[0].Name)
+	rightField := javaIdent(rightCase.Fields[0].Name)
+	eitherType := eitherName + typeParamDecl
+	eitherTypeUse := eitherName + typeParamUse
+	leftTypeUse := leftClass + typeParamUse
+	rightTypeUse := rightClass + typeParamUse
+
+	main := fmt.Sprintf(`package alang.stdlib;
+
+import java.util.function.*;
+
+public interface %s {
+    default boolean isLeft() {
+        return this instanceof %s;
+    }
+
+    default boolean isRight() {
+        return this instanceof %s;
+    }
+
+    default boolean isFailure() {
+        return this.isLeft();
+    }
+
+    @SuppressWarnings("unchecked")
+    default %s unwrap() {
+        if (this instanceof %s) {
+            return ((%s) this).%s;
+        }
+        return OS.panic("Either has no right value");
+    }
+
+    @SuppressWarnings("unchecked")
+    default %s getLeft() {
+        if (this instanceof %s) {
+            return ((%s) this).%s;
+        }
+        return OS.panic("Either has no left value");
+    }
+
+    default %s getOr(%s defaultValue) {
+        if (this instanceof %s) {
+            return this.unwrap();
+        }
+        return defaultValue;
+    }
+
+    default <X> %s<%s, X> map(Function<%s, X> f) {
+        if (this instanceof %s) {
+            return %s.Right(f.apply(this.unwrap()));
+        }
+        return %s.Left(this.getLeft());
+    }
+
+    static %s %s Left(%s value) {
+        return new %s(value);
+    }
+
+    static %s %s Right(%s value) {
+        return new %s(value);
+    }
+}
+`, eitherType, leftClass, rightClass, rightTypeParam, rightClass, rightTypeUse, rightField, leftTypeParam, leftClass, leftTypeUse, leftField, rightTypeParam, rightTypeParam, rightClass, eitherName, leftTypeParam, rightTypeParam, rightClass, eitherName, eitherName, typeParamDecl, eitherTypeUse, leftTypeParam, leftTypeUse, typeParamDecl, eitherTypeUse, rightTypeParam, rightTypeUse)
+
+	leftSrc := fmt.Sprintf(`package alang.stdlib;
+
+public final class %s%s implements %s%s {
+    public final %s %s;
+
+    public %s(%s %s) {
+        this.%s = %s;
+    }
+}
+`, leftClass, typeParamDecl, eitherName, typeParamUse, leftTypeParam, leftField, leftClass, leftTypeParam, leftField, leftField, leftField)
+
+	rightSrc := fmt.Sprintf(`package alang.stdlib;
+
+public final class %s%s implements %s%s {
+    public final %s %s;
+
+    public %s(%s %s) {
+        this.%s = %s;
+    }
+}
+`, rightClass, typeParamDecl, eitherName, typeParamUse, rightTypeParam, rightField, rightClass, rightTypeParam, rightField, rightField, rightField)
+
+	return map[string]string{
+		filepath.Join("alang", "stdlib", "Either.java"):      main,
+		filepath.Join("alang", "stdlib", leftClass+".java"):  leftSrc,
+		filepath.Join("alang", "stdlib", rightClass+".java"): rightSrc,
+	}, nil
+}
+
+func eitherCases(class *lower.Class) (lower.EnumCase, lower.EnumCase, error) {
+	var leftCase lower.EnumCase
+	var rightCase lower.EnumCase
+	foundLeft := false
+	foundRight := false
+	for _, enumCase := range class.Cases {
+		switch enumCase.Name {
+		case "Left":
+			if len(enumCase.Fields) == 1 {
+				leftCase = enumCase
+				foundLeft = true
+			}
+		case "Right":
+			if len(enumCase.Fields) == 1 {
+				rightCase = enumCase
+				foundRight = true
+			}
+		}
+	}
+	if !foundLeft || !foundRight {
+		return lower.EnumCase{}, lower.EnumCase{}, fmt.Errorf("unsupported Either enum shape")
+	}
+	return leftCase, rightCase, nil
 }
 
 func javaTypeRefFromTypeRef(ref *parser.TypeRef) (string, error) {
@@ -1320,6 +1486,9 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		if e.Name == "None" {
 			return g.optionCallExpr("None", e.Args, nil)
 		}
+		if e.Name == "Left" || e.Name == "Right" {
+			return g.eitherCallExpr(e.Name, e.Args)
+		}
 		args, err := g.exprList(e.Args)
 		if err != nil {
 			return "", err
@@ -1403,6 +1572,9 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		if callee, ok := e.Callee.(*lower.VarRef); ok && callee.Name == "None" {
 			return g.optionCallExpr("None", e.Args, nil)
 		}
+		if callee, ok := e.Callee.(*lower.VarRef); ok && (callee.Name == "Left" || callee.Name == "Right") {
+			return g.eitherCallExpr(callee.Name, e.Args)
+		}
 		callee, err := g.expr(e.Callee)
 		if err != nil {
 			return "", err
@@ -1469,6 +1641,17 @@ func (g *Generator) optionCallExpr(name string, args []lower.Expr, expected *typ
 	default:
 		return "", fmt.Errorf("unsupported option call %s", name)
 	}
+}
+
+func (g *Generator) eitherCallExpr(name string, args []lower.Expr) (string, error) {
+	if len(args) != 1 {
+		return "", fmt.Errorf("%s expects 1 argument", name)
+	}
+	value, err := g.expr(args[0])
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("Either.%s(%s)", javaIdent(name), value), nil
 }
 
 func (g *Generator) exprWithExpected(expr lower.Expr, expected *typecheck.Type) (string, error) {

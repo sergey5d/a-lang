@@ -194,6 +194,47 @@ def run() Int {
 	}
 }
 
+func TestGenerateCompilesWithEitherRuntime(t *testing.T) {
+	src := `
+def make() Either[Str, Int] = Right(5)
+
+def run() Int {
+	make()
+	return 0
+}
+`
+
+	lowered := lowerProgram(t, src)
+	source, err := GenerateForPackage(lowered, "")
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+
+	text := string(source)
+	if !strings.Contains(text, "Either.Right(5L)") {
+		t.Fatalf("expected Right(...) lowering in generated Java, got:\n%s", text)
+	}
+	if !strings.Contains(text, "Either.Right(5L)") {
+		t.Fatalf("expected Either runtime call in generated Java, got:\n%s", text)
+	}
+
+	tmpDir := t.TempDir()
+	if err := WriteStdlibSupport(tmpDir); err != nil {
+		t.Fatalf("WriteStdlibSupport returned error: %v", err)
+	}
+	path := filepath.Join(tmpDir, "Pkg_Default.java")
+	if err := os.WriteFile(path, source, 0o644); err != nil {
+		t.Fatalf("write generated source: %v", err)
+	}
+
+	javaFiles := collectJavaFiles(t, tmpDir)
+	cmd := exec.Command("javac", javaFiles...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("javac failed: %v\n%s\n%s", err, text, string(output))
+	}
+}
+
 func TestGenerateCompilesWithTupleRangeLoop(t *testing.T) {
 	src := `
 def run(limit Int) Int {
@@ -455,6 +496,9 @@ func TestWriteStdlibSupportCreatesOptionAndTupleFiles(t *testing.T) {
 		t.Fatalf("WriteStdlibSupport returned error: %v", err)
 	}
 	for _, rel := range []string{
+		filepath.Join("alang", "stdlib", "Either.java"),
+		filepath.Join("alang", "stdlib", "Either_Left.java"),
+		filepath.Join("alang", "stdlib", "Either_Right.java"),
 		filepath.Join("alang", "stdlib", "OS.java"),
 		filepath.Join("alang", "stdlib", "Map.java"),
 		filepath.Join("alang", "stdlib", "Option.java"),

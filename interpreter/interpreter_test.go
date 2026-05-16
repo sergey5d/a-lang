@@ -1096,7 +1096,7 @@ def run() Int {
 	}
 }
 
-func TestTupleMemberAccessIsRejected(t *testing.T) {
+func TestTupleMemberAccess(t *testing.T) {
 	src := `
 def run() Int {
 	pair = (1, "x")
@@ -1104,9 +1104,10 @@ def run() Int {
 }
 `
 
-	_, err := parser.Parse(src)
-	if err == nil || err.Error() != "expected member name after '.', got _(\"_\" @ 4:14)" {
-		t.Fatalf("expected parse error, got %#v", err)
+	in := New(parseProgram(t, src))
+	_, err := in.Call("run")
+	if err == nil || err.Error() != "unknown member '_1' at 4:9" {
+		t.Fatalf("expected unknown member error, got %#v", err)
 	}
 }
 
