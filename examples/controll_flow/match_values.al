@@ -4,9 +4,9 @@
 
 def main() Int {
     exactValue = match 5 {
-        4 => "nope"
-        5 => "exact value"
-        _ => "miss"
+        case 4 => "nope"
+        case 5 => "exact value"
+        case _ => "miss"
     }
     OS.println(exactValue)
     0

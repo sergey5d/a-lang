@@ -47,8 +47,8 @@ def main() Unit {
     }
     matched = {
         match MaybeInt.SomeX(42) {
-            SomeX(value) => value
-            MaybeInt.NoneX => 0
+            case SomeX(value) => value
+            case MaybeInt.NoneX => 0
         }
     }
 

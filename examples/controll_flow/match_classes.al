@@ -28,14 +28,14 @@ class PairBox {
 def main() Int {
     workerLike WorkerLike = Worker()
     OS.println(match workerLike {
-        case worker Worker => worker.doWork()
-        case _ Other => 100
-        case _ => 0
+       case worker Worker => worker.doWork()
+       case _ Other => 100
+       case _ => 0
     })
 
     pair PairBox = PairBox(4, 9)
     result = match pair {
-        case PairBox(left, right) => left + right
+       case PairBox(left, right) => left + right
     }
     if result != 13 {
         return 1

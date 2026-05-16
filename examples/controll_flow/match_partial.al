@@ -19,11 +19,11 @@ def main() Unit {
 
     options = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
     matchMapped = options.map(match {
-        case SomeX(x) => x + 1
-        case NoneX => 0
+       case SomeX(x) => x + 1
+       case NoneX => 0
     })
     partialMapped List[Option[Int]] = options.map(partial {
-        case SomeX(x) => x + 1
+       case SomeX(x) => x + 1
     })
 
     OS.println(ifMapped.get(0).getOr(0))

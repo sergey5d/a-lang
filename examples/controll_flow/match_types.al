@@ -31,15 +31,15 @@ impl Slacker {
 
 def describe(value WorkerLike) {
     match value {
-        worker Worker => {
+        case worker Worker => {
             OS.println("worker " + worker.doWork())
         }
-        other Other => {
+        case other Other => {
             OS.println("other " + other.doWork())
         }
-        _ Slacker =>
+        case _ Slacker =>
             OS.println("slacker " + value.doWork())
-        _ => {
+        case _ => {
             OS.println("unknown")
         }
     }

@@ -130,10 +130,10 @@ enum OptionX[T] {
 
 def run(value OptionX[Int]) Int {
 	match value {
-		SomeX(x) => {
+		case SomeX(x) => {
 			return x
 		}
-		OptionX.NoneX => {
+		case OptionX.NoneX => {
 			return 0
 		}
 	}
@@ -158,9 +158,9 @@ enum OptionX[T] {
 
 def run(value OptionX[Int]) Int =
 	match value {
-		SomeX(x) if x > 10 => x
-		SomeX(_) => 10
-		OptionX.NoneX => 0
+		case SomeX(x) if x > 10 => x
+		case SomeX(_) => 10
+		case OptionX.NoneX => 0
 	}
 `
 
@@ -181,8 +181,8 @@ enum OptionX[T] {
 
 def run(value OptionX[Int]) Int =
 	match value {
-		SomeX(x) if x => x
-		OptionX.NoneX => 0
+		case SomeX(x) if x => x
+		case OptionX.NoneX => 0
 	}
 `
 
@@ -213,7 +213,7 @@ enum OptionX[T] {
 
 def run(value OptionX[Int]) Int {
 	match value {
-		SomeX(x) => {
+		case SomeX(x) => {
 			return x
 		}
 	}
@@ -241,7 +241,7 @@ enum OptionX[T] {
 
 def run(value OptionX[Int]) Int =
 	match value {
-		SomeX(x) => x
+		case SomeX(x) => x
 	}
 `
 
@@ -263,7 +263,7 @@ class PairBox {
 
 def run(value PairBox) Int {
 	match value {
-		PairBox(left, right) => {
+		case PairBox(left, right) => {
 			return left + right
 		}
 	}
@@ -292,13 +292,13 @@ class Box[T] {
 
 def unwrapSome(value OptionX[Int]) Int =
 	match value {
-		SomeX(x) => x + 1
-		OptionX.NoneX => 0
+		case SomeX(x) => x + 1
+		case OptionX.NoneX => 0
 	}
 
 def unwrapBox(value Box[Int]) Int =
 	match value {
-		Box(x) => x + 2
+		case Box(x) => x + 2
 	}
 `
 
@@ -317,7 +317,7 @@ record Amount {
 
 def run(value Amount) Int {
 	match value {
-		Amount(count, label) => {
+		case Amount(count, label) => {
 			return count
 		}
 	}
@@ -340,7 +340,7 @@ class PairBox {
 
 def run(value PairBox) Int =
 	match value {
-		(left, right) => left + right
+		case (left, right) => left + right
 	}
 `
 
@@ -371,9 +371,9 @@ enum BoolBox {
 
 def run(value BoolBox) Int =
 	match value {
-		Wrap(true) => 1
-		Wrap(false) => 0
-		BoolBox.Empty => 2
+		case Wrap(true) => 1
+		case Wrap(false) => 0
+		case BoolBox.Empty => 2
 	}
 `
 
@@ -394,9 +394,9 @@ enum BoolBox {
 
 def run(value BoolBox) Int =
 	match value {
-		Wrap(_) => 1
-		Wrap(true) => 2
-		BoolBox.Empty => 0
+		case Wrap(_) => 1
+		case Wrap(true) => 2
+		case BoolBox.Empty => 0
 	}
 `
 
@@ -423,7 +423,7 @@ enum BigBox {
 
 def run(value BigBox) Int =
 	match value {
-		Wrap((true, true, true, true, true, true)) => 1
+		case Wrap((true, true, true, true, true, true)) => 1
 	}
 `
 
@@ -446,13 +446,13 @@ class Other with WorkerLike {
 
 def run(value WorkerLike) Int {
 	match value {
-		worker Worker => {
+		case worker Worker => {
 			return 1
 		}
-		_ Other => {
+		case _ Other => {
 			return 2
 		}
-		_ => {
+		case _ => {
 			return 3
 		}
 	}
@@ -481,12 +481,12 @@ class Box[T] {
 
 def describe(value OptionX[Int]) Int =
 	match value {
-		some OptionX => 1
+		case some OptionX => 1
 	}
 
 def describeBox(value Box[Int]) Int =
 	match value {
-		box Box => 2
+		case box Box => 2
 	}
 `
 
@@ -504,8 +504,8 @@ class Box[T] {
 
 def describe(value Box[Int]) Int =
 	match value {
-		_ Box[Int] => 1
-		_ => 0
+		case _ Box[Int] => 1
+		case _ => 0
 	}
 `
 
@@ -2907,8 +2907,8 @@ enum Outcome {
 
 impl Outcome {
 	def describe() Str = match this {
-		Left(value) => value
-		Right(value) => "num " + value
+		case Left(value) => value
+		case Right(value) => "num " + value
 	}
 }
 
@@ -2955,11 +2955,11 @@ def run() Bool {
 	ifMapped List[Int] = values.map(if _ > 5 then 10 else 8)
 	options List[MaybeInt] = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
 	matchMapped List[Int] = options.map(match {
-		case SomeX(x) => x + 1
-		case NoneX => 0
+	case SomeX(x) => x + 1
+	case NoneX => 0
 	})
 	partialMapped = options.map(partial {
-		case SomeX(x) => x + 1
+	case SomeX(x) => x + 1
 	})
 	unwrap firstPartial <- partialMapped.get(0) else {
 		false
@@ -3007,7 +3007,7 @@ enum MaybeInt {
 def run() Bool {
 	options List[MaybeInt] = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
 	partialMapped List[Option[Int]] = options.map(partial {
-		case SomeX(x) => x + 1
+	case SomeX(x) => x + 1
 	})
 	return partialMapped.get(1).getOr(None()).isEmpty()
 }
@@ -3026,8 +3026,8 @@ class Classifier {
 
 impl Classifier {
 	partial classify(value Int) Int {
-		case 3 => 5
-		case 4 => 0
+	case 3 => 5
+	case 4 => 0
 	}
 }
 

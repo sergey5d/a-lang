@@ -1,5 +1,5 @@
 # FAIL_REGEX:
-# expected end of expression, got IDENT\("Some" @ .*?\)
+# expected end of expression, got CASE\("case" @ .*?\)
 
 def main() Option[Int] =
-    partial Some(1) Some(x) => x
+    partial Some(1) case Some(x) => x

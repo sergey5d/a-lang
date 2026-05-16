@@ -88,90 +88,90 @@ record FlagRecord {
 
 def main() Unit {
     classInClass = match AppleBox(Apple(11)) {
-        AppleBox(Apple(size)) => "class in class " + size
+        case AppleBox(Apple(size)) => "class in class " + size
     }
     OS.println(classInClass)
 
     recordInClass = match AmountBox(Amount(3, "usd")) {
-        AmountBox(Amount(count, label)) => "record in class " + count + " " + label
+        case AmountBox(Amount(count, label)) => "record in class " + count + " " + label
     }
     OS.println(recordInClass)
 
     classInRecord = match AppleRecord(Apple(7)) {
-        AppleRecord(Apple(size)) => "class in record " + size
+        case AppleRecord(Apple(size)) => "class in record " + size
     }
     OS.println(classInRecord)
 
     tupleInTuple = match ((1, 2), 3) {
-        ((left, right), tail) => "tuple in tuple " + left + " " + right + " " + tail
+        case ((left, right), tail) => "tuple in tuple " + left + " " + right + " " + tail
     }
     OS.println(tupleInTuple)
 
     tupleTupleTuple = match ((20, 21), (22, 23)) {
-        ((left1, right1), (left2, right2)) => "tuple tuple tuple " + left1 + " " + right1 + " " + left2 + " " + right2
+        case ((left1, right1), (left2, right2)) => "tuple tuple tuple " + left1 + " " + right1 + " " + left2 + " " + right2
     }
     OS.println(tupleTupleTuple)
 
     tupleInClass = match PairHolder((4, 5)) {
-        PairHolder((left, right)) => "tuple in class " + left + " " + right
+        case PairHolder((left, right)) => "tuple in class " + left + " " + right
     }
     OS.println(tupleInClass)
 
     classInTuple = match (Apple(6), 9) {
-        (Apple(size), tail) => "class in tuple " + size + " " + tail
+        case (Apple(size), tail) => "class in tuple " + size + " " + tail
     }
     OS.println(classInTuple)
 
     recordInTuple = match (Amount(8, "eur"), 0) {
-        (Amount(count, label), _) => "record in tuple " + count + " " + label
+        case (Amount(count, label), _) => "record in tuple " + count + " " + label
     }
     OS.println(recordInTuple)
 
     tupleInRecord = match PairRecord((10, 11)) {
-        PairRecord((left, right)) => "tuple in record " + left + " " + right
+        case PairRecord((left, right)) => "tuple in record " + left + " " + right
     }
     OS.println(tupleInRecord)
 
     enumInEnum = match OuterFlag.Wrap(InnerFlag.On) {
-        Wrap(InnerFlag.On) => "enum in enum on"
-        Wrap(InnerFlag.Off) => "enum in enum off"
-        OuterFlag.Empty => "enum in enum empty"
+        case Wrap(InnerFlag.On) => "enum in enum on"
+        case Wrap(InnerFlag.Off) => "enum in enum off"
+        case OuterFlag.Empty => "enum in enum empty"
     }
     OS.println(enumInEnum)
 
     classInEnum = match MaybeApple.SomeX(Apple(12)) {
-        SomeX(Apple(size)) => "class in enum " + size
-        MaybeApple.NoneX => "class in enum none"
+        case SomeX(Apple(size)) => "class in enum " + size
+        case MaybeApple.NoneX => "class in enum none"
     }
     OS.println(classInEnum)
 
     recordInEnum = match MaybeAmount.SomeX(Amount(13, "cad")) {
-        SomeX(Amount(count, label)) => "record in enum " + count + " " + label
-        MaybeAmount.NoneX => "record in enum none"
+        case SomeX(Amount(count, label)) => "record in enum " + count + " " + label
+        case MaybeAmount.NoneX => "record in enum none"
     }
     OS.println(recordInEnum)
 
     tupleInEnum = match MaybePair.SomeX((14, 15)) {
-        SomeX((left, right)) => "tuple in enum " + left + " " + right
-        MaybePair.NoneX => "tuple in enum none"
+        case SomeX((left, right)) => "tuple in enum " + left + " " + right
+        case MaybePair.NoneX => "tuple in enum none"
     }
     OS.println(tupleInEnum)
 
     enumInClass = match FlagBox(InnerFlag.Off) {
-        FlagBox(InnerFlag.On) => "enum in class on"
-        FlagBox(InnerFlag.Off) => "enum in class off"
+        case FlagBox(InnerFlag.On) => "enum in class on"
+        case FlagBox(InnerFlag.Off) => "enum in class off"
     }
     OS.println(enumInClass)
 
     enumInRecord = match FlagRecord(InnerFlag.On) {
-        FlagRecord(InnerFlag.On) => "enum in record on"
-        FlagRecord(InnerFlag.Off) => "enum in record off"
+        case FlagRecord(InnerFlag.On) => "enum in record on"
+        case FlagRecord(InnerFlag.Off) => "enum in record off"
     }
     OS.println(enumInRecord)
 
     enumInTuple = match (InnerFlag.Off, 16) {
-        (InnerFlag.On, value) => "enum in tuple on " + value
-        (InnerFlag.Off, value) => "enum in tuple off " + value
+        case (InnerFlag.On, value) => "enum in tuple on " + value
+        case (InnerFlag.Off, value) => "enum in tuple off " + value
     }
     OS.println(enumInTuple)
 }

@@ -12,9 +12,9 @@ enum MaybeInt {
 
 def describe(value MaybeInt) Int =
     match value {
-        SomeX(x) if x > 10 => x
-        SomeX(_) => 10
-        MaybeInt.NoneX => 0
+        case SomeX(x) if x > 10 => x
+        case SomeX(_) => 10
+        case MaybeInt.NoneX => 0
     }
 
 def main() Unit {

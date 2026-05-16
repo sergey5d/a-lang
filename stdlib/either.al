@@ -9,49 +9,49 @@ enum Either[L, R] {
     }
 
     def isLeft() Bool = match this {
-        case Left(_) => true
-        case Right(_) => false
+       case Left(_) => true
+       case Right(_) => false
     }
 
     def isRight() Bool = !this.isLeft()
 
     def expectRight() R = match this {
-        case Left(_) => OS.panic("Either has no right value")
-        case Right(value) => value
+       case Left(_) => OS.panic("Either has no right value")
+       case Right(value) => value
     }
 
     def expectLeft() L = match this {
-        case Left(value) => value
-        case Right(_) => OS.panic("Either has no left value")
+       case Left(value) => value
+       case Right(_) => OS.panic("Either has no left value")
     }
 
     def getOr(defaultValue R) R = match this {
-        case Left(_) => defaultValue
-        case Right(value) => value
+       case Left(_) => defaultValue
+       case Right(value) => value
     }
 
     def map[X](f R -> X) Either[L, X] = match this {
-        case Left(value) => Left(value)
-        case Right(value) => Right(f(value))
+       case Left(value) => Left(value)
+       case Right(value) => Right(f(value))
     }
 
     def mapLeft[X](f L -> X) Either[X, R] = match this {
-        case Left(value) => Left(f(value))
-        case Right(value) => Right(value)
+       case Left(value) => Left(f(value))
+       case Right(value) => Right(value)
     }
 
     def flatMap[X](f R -> Either[L, X]) Either[L, X] = match this {
-        case Left(value) => Left(value)
-        case Right(value) => f(value)
+       case Left(value) => Left(value)
+       case Right(value) => f(value)
     }
 
     def toOption() Option[R] = match this {
-        case Left(_) => None()
-        case Right(value) => Some(value)
+       case Left(_) => None()
+       case Right(value) => Some(value)
     }
 
     def toResult() Result[R, L] = match this {
-        case Left(value) => Err(value)
-        case Right(value) => Ok(value)
+       case Left(value) => Err(value)
+       case Right(value) => Ok(value)
     }
 }

@@ -439,7 +439,7 @@ enum MaybeInt {
 
 def run(values List[MaybeInt]) List[Option[Int]] {
 	values.map(item -> partial item {
-		SomeX(x) if x > 0 => {
+		case SomeX(x) if x > 0 => {
 			x * 10
 		}
 	})

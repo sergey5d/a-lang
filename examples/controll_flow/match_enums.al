@@ -22,18 +22,18 @@ enum PairText {
 
 def printOption(value MaybeInt) {
     match value {
-        SomeX(x) => {
+        case SomeX(x) => {
             OS.println("some " + x)
         }
-        MaybeInt.NoneX => {
+        case MaybeInt.NoneX => {
             OS.println("none")
         }
     }
 }
 
 def matchSingleLine(value MaybeInt) Int = match value {
-    SomeX(x) => x
-    MaybeInt.NoneX => 100
+    case SomeX(x) => x
+    case MaybeInt.NoneX => 100
 }
 
 def main() Int {
@@ -46,7 +46,7 @@ def main() Int {
 
     pairText PairText = PairText.PairX("left", "right")
     OS.println(match pairText {
-        PairX(left, right) => left + "-" + right
+        case PairX(left, right) => left + "-" + right
     })
 
     0

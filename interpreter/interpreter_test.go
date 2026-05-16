@@ -612,17 +612,17 @@ def run() Int {
 	var total Int = 0
 
 	match value {
-		SomeX(item) => {
+		case SomeX(item) => {
 			total += item
 		}
-		OptionX.NoneX => {
+		case OptionX.NoneX => {
 			total += 100
 		}
 	}
 
 	pair = (1, 2)
 	match pair {
-		(left, right) => {
+		case (left, right) => {
 			total += left + right
 		}
 	}
@@ -665,9 +665,9 @@ def run() Int {
 	value WorkerLike = Worker()
 
 	return match value {
-		worker Worker => worker.doWork()
-		_ Other => 100
-		_ => 0
+		case worker Worker => worker.doWork()
+		case _ Other => 100
+		case _ => 0
 	}
 }
 `
@@ -697,12 +697,12 @@ class Box[T] {
 
 def describe(value OptionX[Int]) Int =
 	match value {
-		some OptionX => 1
+		case some OptionX => 1
 	}
 
 def describeBox(value Box[Int]) Int =
 	match value {
-		box Box => 2
+		case box Box => 2
 	}
 
 def run() Int {
@@ -731,9 +731,9 @@ enum OptionX[T] {
 
 def describe(value OptionX[Int]) Int =
 	match value {
-		SomeX(x) if x > 10 => x
-		SomeX(_) => 10
-		OptionX.NoneX => 0
+		case SomeX(x) if x > 10 => x
+		case SomeX(_) => 10
+		case OptionX.NoneX => 0
 	}
 
 def run() Int {
@@ -761,7 +761,7 @@ class PairBox {
 def run() Int {
 	value PairBox = PairBox(4, 9)
 	return match value {
-		PairBox(left, right) => left + right
+		case PairBox(left, right) => left + right
 	}
 }
 `
@@ -791,13 +791,13 @@ class Box[T] {
 
 def unwrapSome(value OptionX[Int]) Int =
 	match value {
-		SomeX(x) => x + 1
-		OptionX.NoneX => 0
+		case SomeX(x) => x + 1
+		case OptionX.NoneX => 0
 	}
 
 def unwrapBox(value Box[Int]) Int =
 	match value {
-		Box(x) => x + 2
+		case Box(x) => x + 2
 	}
 
 def run() Int {
@@ -825,7 +825,7 @@ record Amount {
 def run() Int {
 	value Amount = Amount(42, "hello")
 	return match value {
-		Amount(count, label) => count
+		case Amount(count, label) => count
 	}
 }
 `
@@ -858,15 +858,15 @@ enum PairBox {
 
 def describeFlag(value BoolBox) Int =
 	match value {
-		Wrap(true) => 1
-		Wrap(false) => 2
-		BoolBox.Empty => 3
+		case Wrap(true) => 1
+		case Wrap(false) => 2
+		case BoolBox.Empty => 3
 	}
 
 def describePair(value PairBox) Int =
 	match value {
-		Full((left, right)) => left + right
-		PairBox.NoneX => 0
+		case Full((left, right)) => left + right
+		case PairBox.NoneX => 0
 	}
 
 def run() Int {
@@ -2510,8 +2510,8 @@ enum Outcome {
 
 impl Outcome {
 	def describe() Str = match this {
-		Left(value) => value
-		Right(value) => "num " + value
+		case Left(value) => value
+		case Right(value) => "num " + value
 	}
 }
 
@@ -2569,11 +2569,11 @@ def run() Str {
 	ifMapped = values.map(if _ > 5 then 10 else 8)
 	options = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
 	matchMapped = options.map(match {
-		case SomeX(x) => x + 1
-		case NoneX => 0
+	case SomeX(x) => x + 1
+	case NoneX => 0
 	})
 	partialMapped = options.map(partial {
-		case SomeX(x) => x + 1
+	case SomeX(x) => x + 1
 	})
 	unwrap firstPartial <- partialMapped.get(0) else {
 		""
@@ -2602,8 +2602,8 @@ class Classifier {
 
 impl Classifier {
 	partial classify(value Int) Int {
-		case 3 => 5
-		case 4 => 0
+	case 3 => 5
+	case 4 => 0
 	}
 }
 

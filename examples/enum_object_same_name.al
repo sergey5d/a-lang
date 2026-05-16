@@ -4,8 +4,8 @@
 
 enum Color {
     def label() Str = match this {
-        Color.Red => "red"
-        Color.Blue => "blue"
+        case Color.Red => "red"
+        case Color.Blue => "blue"
     }
 
     case Red

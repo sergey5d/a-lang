@@ -25,32 +25,32 @@ record Amount {
 
 def describeList(value List[Int]) {
     match value {
-        _ List => OS.println("list")
+        case _ List => OS.println("list")
     }
 }
 
 def describeClass(value Worker) {
     match value {
-        _ Worker => OS.println("class")
+        case _ Worker => OS.println("class")
     }
 }
 
 def describeRecord(value Amount) {
     match value {
-        _ Amount => OS.println("record")
+        case _ Amount => OS.println("record")
     }
 }
 
 def describeInterface(value Named) {
     match value {
-        _ Named => OS.println("interface")
+        case _ Named => OS.println("interface")
     }
 }
 
 def describeNamedWorker(value Named) {
     match value {
-        worker Worker => OS.println("named " + worker.label())
-        _ => OS.println("unknown")
+        case worker Worker => OS.println("named " + worker.label())
+        case _ => OS.println("unknown")
     }
 }
 

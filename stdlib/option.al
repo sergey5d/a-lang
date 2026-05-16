@@ -1,26 +1,26 @@
 enum Option[T] {
     def isSet() Bool = match this {
-        Some(_) => true
-        Option.None => false
+        case Some(_) => true
+        case Option.None => false
     }
 
     def isEmpty() Bool = !this.isSet()
 
     def expect() T = match this {
-        Some(value) => value
-        Option.None => OS.panic("Option has no value")
+        case Some(value) => value
+        case Option.None => OS.panic("Option has no value")
     }
 
     def getOr(defaultValue T) T = match this {
-        Some(value) => value
-        Option.None => defaultValue
+        case Some(value) => value
+        case Option.None => defaultValue
     }
 
     def getOrElse(defaultValue T) T = this.getOr(defaultValue)
 
     def map[X](f T -> X) Option[X] = match this {
-        Some(value) => Some(f(value))
-        Option.None => None()
+        case Some(value) => Some(f(value))
+        case Option.None => None()
     }
 
     case None

@@ -572,7 +572,9 @@ func (p *Parser) parseMatchCases() ([]MatchCase, Token, error) {
 	}
 	var cases []MatchCase
 	for !p.check(TokenRBrace) && !p.isAtEnd() {
-		p.match(TokenCase)
+		if _, err := p.consume(TokenCase, "expected 'case' before match pattern"); err != nil {
+			return nil, Token{}, err
+		}
 		pattern, err := p.parsePattern()
 		if err != nil {
 			return nil, Token{}, err
@@ -946,7 +948,9 @@ func (p *Parser) parseInlineMatchCases(statementMode bool) ([]MatchCase, Token, 
 	if p.isAtEnd() {
 		return nil, Token{}, fmt.Errorf("expected match case after ':'")
 	}
-	p.match(TokenCase)
+	if _, err := p.consume(TokenCase, "expected 'case' before match pattern"); err != nil {
+		return nil, Token{}, err
+	}
 	pattern, err := p.parsePattern()
 	if err != nil {
 		return nil, Token{}, err

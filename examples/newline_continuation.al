@@ -33,11 +33,11 @@ def main() Unit {
         size()
 
     matched Int = match 2 {
-        1 =>
+        case 1 =>
             10
-        2 =>
+        case 2 =>
             20
-        _ =>
+        case _ =>
             0
     }
 
@@ -50,13 +50,13 @@ def main() Unit {
 
     var fromMatchStmt = 0
     match 2 {
-        1 => {
+        case 1 => {
             fromMatchStmt := 1
         }
     }
 
     match 3 {
-        3 => {
+        case 3 => {
             fromMatchStmt := 9
         }
     }
