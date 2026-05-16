@@ -1,6 +1,6 @@
 # FAIL_REGEX:
-# expected end of expression, got IDENT\("Some" @ .*?\)
+# expected end of expression, got CASE\("case" @ .*?\)
 
 def main() Int =
     match Some(1)
-        Some(x) => x
+        case Some(x) => x

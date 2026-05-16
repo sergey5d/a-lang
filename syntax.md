@@ -511,8 +511,8 @@ Contextual `match` lambda sugar is also allowed in a unary-function context:
 
 ```txt
 options.map(match {
-    SomeX(x) => x + 1
-    NoneX => 0
+    case SomeX(x) => x + 1
+    case NoneX => 0
 })
 ```
 
@@ -926,10 +926,10 @@ Statement form:
 
 ```txt
 match value {
-    SomeX(x) => {
+    case SomeX(x) => {
         OS.println(x)
     }
-    OptionX.NoneX => {
+    case OptionX.NoneX => {
         OS.println("none")
     }
 }
@@ -939,8 +939,8 @@ Expression form:
 
 ```txt
 result = match value {
-    SomeX(x) => x
-    OptionX.NoneX => 0
+    case SomeX(x) => x
+    case OptionX.NoneX => 0
 }
 ```
 
@@ -948,9 +948,9 @@ Guards are supported on cases with `if ... =>`:
 
 ```txt
 result = match value {
-    SomeX(x) if x > 10 => x
-    SomeX(_) => 10
-    OptionX.NoneX => 0
+    case SomeX(x) if x > 10 => x
+    case SomeX(_) => 10
+    case OptionX.NoneX => 0
 }
 ```
 
@@ -958,11 +958,13 @@ Partial expression form:
 
 ```txt
 result Option[Int] = partial value {
-    SomeX(x) => x
+    case SomeX(x) => x
 }
 ```
 
 `match` and `partial` always require a block of cases. Inline `match value: ...` shorthand is not supported.
+
+Using `case` at the start of each branch is the preferred match style.
 
 If no case matches, `partial` returns `None`.
 

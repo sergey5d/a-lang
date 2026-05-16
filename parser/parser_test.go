@@ -88,10 +88,10 @@ func TestParseMatchStmt(t *testing.T) {
 	program, err := Parse(`
 def run(value OptionX[Int]) Int {
 	match value {
-		SomeX(x) => {
+		case SomeX(x) => {
 			return x
 		}
-		OptionX.NoneX => {
+		case OptionX.NoneX => {
 			return 0
 		}
 	}
@@ -131,8 +131,8 @@ enum OptionX[T] {
 
 def run(value OptionX[Int]) Int =
 	match value {
-		SomeX(x) if x > 10 => x
-		_ => 0
+		case SomeX(x) if x > 10 => x
+		case _ => 0
 	}
 `)
 	if err != nil {
@@ -159,10 +159,10 @@ class Worker {
 
 def run(value Worker) Int {
 	match value {
-		item Worker => {
+		case item Worker => {
 			return 1
 		}
-		_ Worker => {
+		case _ Worker => {
 			return 2
 		}
 	}
