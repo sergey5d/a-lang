@@ -518,6 +518,14 @@ options.map(match {
 
 `match { ... }` in that position desugars to `match _ { ... }`. The same also works for `partial { ... }`.
 
+```txt
+options.map(partial {
+    case SomeX(x) => x + 1
+})
+```
+
+`partial { ... }` in that position desugars to `partial _ { ... }`.
+
 Nested blocks are also valid expressions:
 
 ```txt
@@ -962,9 +970,17 @@ result Option[Int] = partial value {
 }
 ```
 
+Contextual partial form:
+
+```txt
+values.map(partial {
+    case SomeX(x) => x + 1
+})
+```
+
 `match` and `partial` always require a block of cases. Inline `match value: ...` shorthand is not supported.
 
-Every `match` and `partial` branch must start with `case`.
+Every `match` and `partial` branch must start with `case`, including contextual forms like `match { ... }` and `partial { ... }`.
 
 If no case matches, `partial` returns `None`.
 
