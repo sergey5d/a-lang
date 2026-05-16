@@ -2955,11 +2955,11 @@ def run() Bool {
 	ifMapped List[Int] = values.map(if _ > 5 then 10 else 8)
 	options List[MaybeInt] = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
 	matchMapped List[Int] = options.map(match {
-		SomeX(x) => x + 1
-		NoneX => 0
+		case SomeX(x) => x + 1
+		case NoneX => 0
 	})
 	partialMapped = options.map(partial {
-		SomeX(x) => x + 1
+		case SomeX(x) => x + 1
 	})
 	unwrap firstPartial <- partialMapped.get(0) else {
 		false
@@ -3007,7 +3007,7 @@ enum MaybeInt {
 def run() Bool {
 	options List[MaybeInt] = List(MaybeInt.SomeX(1), MaybeInt.NoneX, MaybeInt.SomeX(3))
 	partialMapped List[Option[Int]] = options.map(partial {
-		SomeX(x) => x + 1
+		case SomeX(x) => x + 1
 	})
 	return partialMapped.get(1).getOr(None()).isEmpty()
 }
@@ -3026,8 +3026,8 @@ class Classifier {
 
 impl Classifier {
 	partial classify(value Int) Int {
-		3 => 5
-		4 => 0
+		case 3 => 5
+		case 4 => 0
 	}
 }
 

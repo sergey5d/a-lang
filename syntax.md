@@ -964,7 +964,7 @@ result Option[Int] = partial value {
 
 `match` and `partial` always require a block of cases. Inline `match value: ...` shorthand is not supported.
 
-Using `case` at the start of each branch is the preferred match style.
+Every `match` and `partial` branch must start with `case`.
 
 If no case matches, `partial` returns `None`.
 

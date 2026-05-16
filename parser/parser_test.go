@@ -192,8 +192,8 @@ enum AppleBox {
 
 def run(value AppleBox) Int =
 	match value {
-		Full((left, right)) => left + right
-		AppleBox.Empty => 0
+		case Full((left, right)) => left + right
+		case AppleBox.Empty => 0
 	}
 `)
 	if err != nil {
@@ -226,8 +226,8 @@ class Box {
 
 def run(value OptionX[(Box, Int)]) Int =
 	match value {
-		SomeX((Box(x), y)) => x + y
-		OptionX.NoneX => 0
+		case SomeX((Box(x), y)) => x + y
+		case OptionX.NoneX => 0
 	}
 `)
 	if err == nil {
@@ -531,7 +531,7 @@ def run(values List[Int], flag Bool, maybe MaybeInt) Int {
 		break
 	}
 	match maybe {
-		SomeX(x) => {
+		case SomeX(x) => {
 			return x
 		}
 	}
@@ -598,8 +598,8 @@ def run(values List[Int], flag Bool, maybe MaybeInt) Int {
 	else 7
 	items = for value <- values yield value + 1
 	picked = match maybe {
-		SomeX(x) => x
-		MaybeInt.NoneX => 0
+		case SomeX(x) => x
+		case MaybeInt.NoneX => 0
 	}
 	return label + picked
 }
@@ -676,7 +676,7 @@ func TestParsePartialMatchExpr(t *testing.T) {
 	src := `
 def run(value MaybeInt) Option[Int] =
 	partial value {
-		SomeX(x) => x + 1
+		case SomeX(x) => x + 1
 	}
 `
 
@@ -706,8 +706,8 @@ class Classifier {
 
 impl Classifier {
 	partial classify(value Int) Int {
-		3 => 5
-		4 => 0
+		case 3 => 5
+		case 4 => 0
 	}
 }
 `
@@ -2363,8 +2363,8 @@ func TestParseContextualMatchLambda(t *testing.T) {
 	src := `
 def run() Unit {
 	options.map(match {
-		SomeX(x) => x + 1
-		NoneX => 0
+		case SomeX(x) => x + 1
+		case NoneX => 0
 	})
 }
 `

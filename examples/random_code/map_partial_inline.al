@@ -18,7 +18,7 @@ def main() Unit {
     )
 
     extracted List[Option[Int]] = values.map(partial _ {
-            SomeX(x) => x * 10
+            case SomeX(x) => x * 10
         }
     )
 
