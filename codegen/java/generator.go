@@ -293,6 +293,8 @@ func (g *Generator) writeProgram(program *lower.Program) error {
 		g.line("")
 	}
 	g.line("import alang.stdlib.*;")
+	g.line("import java.util.Objects;")
+	g.line("import java.util.function.*;")
 	g.line("")
 
 	g.linef("public final class %s {", g.moduleClass)
@@ -1146,9 +1148,9 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		if isStringType(exprType(e.Left)) || isStringType(exprType(e.Right)) {
 			switch e.Operator {
 			case "==":
-				return fmt.Sprintf("java.util.Objects.equals(%s, %s)", left, right), nil
+				return fmt.Sprintf("Objects.equals(%s, %s)", left, right), nil
 			case "!=":
-				return fmt.Sprintf("(!java.util.Objects.equals(%s, %s))", left, right), nil
+				return fmt.Sprintf("(!Objects.equals(%s, %s))", left, right), nil
 			}
 		}
 		return fmt.Sprintf("(%s %s %s)", left, e.Operator, right), nil
@@ -1771,13 +1773,13 @@ func (g *Generator) javaFunctionType(t *typecheck.Type) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "java.util.function.Supplier<" + retType + ">", nil
+		return "Supplier<" + retType + ">", nil
 	case len(params) == 1 && unit:
 		arg0, err := g.javaReferenceType(params[0])
 		if err != nil {
 			return "", err
 		}
-		return "java.util.function.Consumer<" + arg0 + ">", nil
+		return "Consumer<" + arg0 + ">", nil
 	case len(params) == 1:
 		arg0, err := g.javaReferenceType(params[0])
 		if err != nil {
@@ -1787,7 +1789,7 @@ func (g *Generator) javaFunctionType(t *typecheck.Type) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "java.util.function.Function<" + arg0 + ", " + retType + ">", nil
+		return "Function<" + arg0 + ", " + retType + ">", nil
 	case len(params) == 2 && unit:
 		arg0, err := g.javaReferenceType(params[0])
 		if err != nil {
@@ -1797,7 +1799,7 @@ func (g *Generator) javaFunctionType(t *typecheck.Type) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "java.util.function.BiConsumer<" + arg0 + ", " + arg1 + ">", nil
+		return "BiConsumer<" + arg0 + ", " + arg1 + ">", nil
 	case len(params) == 2:
 		arg0, err := g.javaReferenceType(params[0])
 		if err != nil {
@@ -1811,7 +1813,7 @@ func (g *Generator) javaFunctionType(t *typecheck.Type) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "java.util.function.BiFunction<" + arg0 + ", " + arg1 + ", " + retType + ">", nil
+		return "BiFunction<" + arg0 + ", " + arg1 + ", " + retType + ">", nil
 	case len(params) == 3 && !unit:
 		arg0, err := g.javaReferenceType(params[0])
 		if err != nil {
