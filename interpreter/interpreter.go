@@ -997,6 +997,24 @@ func (in *Interpreter) unwrappableBindingValue(sourceValue Value, local *env, sp
 		if value.class.Name != "Result" && value.class.Name != "Either" {
 			return false, nil, RuntimeError{Message: "unwrap binding requires Option[T], Result[T, E], or Either[L, R]", Span: span}
 		}
+		if value.class.Name == "Either" {
+			isRightValue, err := in.invokeMethod(value, "isRight", nil, local, span)
+			if err != nil {
+				return false, nil, err
+			}
+			isRight, ok := isRightValue.(bool)
+			if !ok {
+				return false, nil, RuntimeError{Message: "Either.isRight must return Bool", Span: span}
+			}
+			if !isRight {
+				return false, nil, nil
+			}
+			unwrapped, err := in.invokeMethod(value, "expectRight", nil, local, span)
+			if err != nil {
+				return false, nil, err
+			}
+			return true, unwrapped, nil
+		}
 		isFailureValue, err := in.invokeMethod(value, "isFailure", nil, local, span)
 		if err != nil {
 			return false, nil, err

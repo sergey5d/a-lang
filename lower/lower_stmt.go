@@ -159,7 +159,7 @@ func (l *Lowerer) lowerUnwrapAccess(sourceRef *VarRef, sourceType *typecheck.Typ
 				Method:   "expect",
 				Type:     unwrapElemType(sourceType),
 			}, unwrapElemType(sourceType), nil
-	case "Result", "Either":
+	case "Result":
 		return &Unary{
 				Operator: "!",
 				Right: &MethodCall{
@@ -171,6 +171,16 @@ func (l *Lowerer) lowerUnwrapAccess(sourceRef *VarRef, sourceType *typecheck.Typ
 			}, &MethodCall{
 				Receiver: sourceRef,
 				Method:   "unwrap",
+				Type:     unwrapElemType(sourceType),
+			}, unwrapElemType(sourceType), nil
+	case "Either":
+		return &MethodCall{
+				Receiver: sourceRef,
+				Method:   "isRight",
+				Type:     &typecheck.Type{Kind: typecheck.TypeBuiltin, Name: "Bool"},
+			}, &MethodCall{
+				Receiver: sourceRef,
+				Method:   "expectRight",
 				Type:     unwrapElemType(sourceType),
 			}, unwrapElemType(sourceType), nil
 	default:

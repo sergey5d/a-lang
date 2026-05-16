@@ -142,12 +142,17 @@ func AnalyzeModule(mod *module.LoadedModule) Result {
 			importedInterfaces:     map[string]interfaceInfo{},
 			importedInterfaceNames: map[string]string{},
 			exprTypes:              map[parser.Expr]*Type{},
+			exprAliases:            map[parser.Expr]parser.Expr{},
 		}
 		c.installBuiltinInterfaces()
 		c.installModuleImports(current)
 		c.collectDecls(current.Program)
 		c.checkProgram(current.Program)
-		result := Result{Diagnostics: append([]semantic.Diagnostic(nil), c.diagnostics...), ExprTypes: c.exprTypes}
+		result := Result{
+			Diagnostics: append([]semantic.Diagnostic(nil), c.diagnostics...),
+			ExprTypes:   c.exprTypes,
+			ExprAliases: c.exprAliases,
+		}
 		seen[current.Path] = result
 		for _, imported := range current.Dependencies {
 			child := analyzeOne(imported)
@@ -182,12 +187,12 @@ func (c *Checker) installBuiltinInterfaces() {
 			continue
 		}
 		info := classInfo{
-			name:      decl.Name,
-			decl:      decl,
-			fields:    map[string]fieldInfo{},
-			methods:   map[string][]methodInfo{},
+			name:        decl.Name,
+			decl:        decl,
+			fields:      map[string]fieldInfo{},
+			methods:     map[string][]methodInfo{},
 			caseMethods: map[string]map[string][]methodInfo{},
-			enumCases: map[string]parser.EnumCaseDecl{},
+			enumCases:   map[string]parser.EnumCaseDecl{},
 		}
 		for _, field := range decl.Fields {
 			info.fields[field.Name] = fieldInfo{decl: field}
@@ -279,12 +284,12 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 			}
 			qualified := imported.Path + "::" + decl.Name
 			class := classInfo{
-				name:      qualified,
-				decl:      decl,
-				fields:    map[string]fieldInfo{},
-				methods:   map[string][]methodInfo{},
+				name:        qualified,
+				decl:        decl,
+				fields:      map[string]fieldInfo{},
+				methods:     map[string][]methodInfo{},
 				caseMethods: map[string]map[string][]methodInfo{},
-				enumCases: map[string]parser.EnumCaseDecl{},
+				enumCases:   map[string]parser.EnumCaseDecl{},
 			}
 			for _, field := range decl.Fields {
 				class.fields[field.Name] = fieldInfo{decl: field}
@@ -414,12 +419,12 @@ func (c *Checker) installModuleImports(current *module.LoadedModule) {
 				break
 			}
 			class := classInfo{
-				name:      symbol.Module.Path + "::" + decl.Name,
-				decl:      decl,
-				fields:    map[string]fieldInfo{},
-				methods:   map[string][]methodInfo{},
+				name:        symbol.Module.Path + "::" + decl.Name,
+				decl:        decl,
+				fields:      map[string]fieldInfo{},
+				methods:     map[string][]methodInfo{},
 				caseMethods: map[string]map[string][]methodInfo{},
-				enumCases: map[string]parser.EnumCaseDecl{},
+				enumCases:   map[string]parser.EnumCaseDecl{},
 			}
 			for _, field := range decl.Fields {
 				class.fields[field.Name] = fieldInfo{decl: field}
@@ -464,12 +469,12 @@ func (c *Checker) collectDecls(program *parser.Program) {
 	}
 	for _, decl := range program.Classes {
 		info := classInfo{
-			name:      decl.Name,
-			decl:      decl,
-			fields:    map[string]fieldInfo{},
-			methods:   map[string][]methodInfo{},
+			name:        decl.Name,
+			decl:        decl,
+			fields:      map[string]fieldInfo{},
+			methods:     map[string][]methodInfo{},
 			caseMethods: map[string]map[string][]methodInfo{},
-			enumCases: map[string]parser.EnumCaseDecl{},
+			enumCases:   map[string]parser.EnumCaseDecl{},
 		}
 		for _, field := range decl.Fields {
 			info.fields[field.Name] = fieldInfo{decl: field}
@@ -2369,8 +2374,8 @@ func (c *Checker) checkMatchStmtResult(s *parser.MatchStmt, code, message string
 		}
 	}
 	if !s.Partial {
-			c.checkMatchUnreachableCases(valueType, s.Cases)
-			c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
+		c.checkMatchUnreachableCases(valueType, s.Cases)
+		c.checkMatchExhaustiveness(valueType, s.Cases, s.Span)
 	}
 	if resultType == nil {
 		c.addDiagnostic(code, message, s.Span)
@@ -2713,14 +2718,14 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 			}
 			return sig.ReturnType
 		}
-			if sig, ok := c.functions[ident.Name]; ok {
-				if hasNamedCallArgs(call.Args) {
-					for _, arg := range call.Args {
-						c.checkExpr(arg.Value)
-					}
-					c.addDiagnostic("invalid_named_argument", "named arguments require a direct function or method declaration", call.Span)
-					return sig.ReturnType
+		if sig, ok := c.functions[ident.Name]; ok {
+			if hasNamedCallArgs(call.Args) {
+				for _, arg := range call.Args {
+					c.checkExpr(arg.Value)
 				}
+				c.addDiagnostic("invalid_named_argument", "named arguments require a direct function or method declaration", call.Span)
+				return sig.ReturnType
+			}
 			if !validArgCount(sig, len(call.Args)) {
 				c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(sig), len(call.Args)), call.Span)
 			}
@@ -2731,33 +2736,33 @@ func (c *Checker) checkCall(call *parser.CallExpr) *Type {
 					continue
 				}
 				c.checkExpr(arg.Value)
+			}
+			return sig.ReturnType
+		}
+		if isImplicitOSMethod(ident.Name) {
+			sig, ok := c.implicitOSMethodSignature(ident.Name)
+			if ok {
+				if hasNamedCallArgs(call.Args) {
+					for _, arg := range call.Args {
+						c.checkExpr(arg.Value)
+					}
+					c.addDiagnostic("invalid_named_argument", "named arguments require a direct function or method declaration", call.Span)
+					return sig.ReturnType
+				}
+				if !validArgCount(sig, len(call.Args)) {
+					c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(sig), len(call.Args)), call.Span)
+				}
+				for i, arg := range call.Args {
+					if expected, ok := paramTypeForArg(sig, i); ok {
+						argType := c.checkExprWithExpected(arg.Value, expected)
+						c.requireAssignable(argType, expected, exprSpan(arg.Value), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
+						continue
+					}
+					c.checkExpr(arg.Value)
 				}
 				return sig.ReturnType
 			}
-			if isImplicitOSMethod(ident.Name) {
-				sig, ok := c.implicitOSMethodSignature(ident.Name)
-				if ok {
-					if hasNamedCallArgs(call.Args) {
-						for _, arg := range call.Args {
-							c.checkExpr(arg.Value)
-						}
-						c.addDiagnostic("invalid_named_argument", "named arguments require a direct function or method declaration", call.Span)
-						return sig.ReturnType
-					}
-					if !validArgCount(sig, len(call.Args)) {
-						c.addDiagnostic("invalid_argument_count", fmt.Sprintf("call expects %s arguments, got %d", expectedArgCount(sig), len(call.Args)), call.Span)
-					}
-					for i, arg := range call.Args {
-						if expected, ok := paramTypeForArg(sig, i); ok {
-							argType := c.checkExprWithExpected(arg.Value, expected)
-							c.requireAssignable(argType, expected, exprSpan(arg.Value), "invalid_argument_type", "cannot pass "+argType.String()+" to parameter of type "+expected.String())
-							continue
-						}
-						c.checkExpr(arg.Value)
-					}
-					return sig.ReturnType
-				}
-			}
+		}
 	}
 	if member, ok := call.Callee.(*parser.MemberExpr); ok {
 		return c.checkMethodCall(member, call.Args)
