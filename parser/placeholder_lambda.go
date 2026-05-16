@@ -222,7 +222,7 @@ func WrapPlaceholderLambdaExpr(expr Expr) Expr {
 	if !HasPlaceholderExpr(expr) {
 		return expr
 	}
-	param := "__placeholder"
+	param := "v1"
 	return &LambdaExpr{
 		Parameters: []LambdaParameter{{Name: param, Span: exprSpan(expr)}},
 		Body:       replacePlaceholderExpr(expr, param),
