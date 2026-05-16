@@ -2286,8 +2286,15 @@ func javaIdent(name string) string {
 }
 
 func (g *Generator) line(s string) {
-	g.b.WriteString(strings.Repeat("    ", g.indent))
-	g.b.WriteString(s)
+	indent := strings.Repeat("    ", g.indent)
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		if i > 0 {
+			g.b.WriteByte('\n')
+		}
+		g.b.WriteString(indent)
+		g.b.WriteString(line)
+	}
 	g.b.WriteByte('\n')
 }
 
