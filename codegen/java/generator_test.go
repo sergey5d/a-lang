@@ -386,6 +386,52 @@ enum OptionX[T] {
 	}
 }
 
+func TestGenerateCompilesStatementfulIfExpr(t *testing.T) {
+	src := `
+enum MaybeInt {
+	case NoneX
+	case SomeX {
+		value Int
+	}
+}
+
+def run(values List[MaybeInt]) List[Option[Int]] {
+	values.map(item -> partial item {
+		SomeX(x) if x > 0 => {
+			x * 10
+		}
+	})
+}
+`
+
+	lowered := lowerProgram(t, src)
+	source, err := GenerateForPackage(lowered, "")
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+
+	text := string(source)
+	if !strings.Contains(text, "if (item instanceof MaybeInt_SomeX)") {
+		t.Fatalf("expected statementful if-expression lowering in generated Java, got:\n%s", text)
+	}
+
+	tmpDir := t.TempDir()
+	if err := WriteStdlibSupport(tmpDir); err != nil {
+		t.Fatalf("WriteStdlibSupport returned error: %v", err)
+	}
+	path := filepath.Join(tmpDir, "Pkg_Default.java")
+	if err := os.WriteFile(path, source, 0o644); err != nil {
+		t.Fatalf("write generated source: %v", err)
+	}
+
+	javaFiles := collectJavaFiles(t, tmpDir)
+	cmd := exec.Command("javac", javaFiles...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("javac failed: %v\n%s\n%s", err, text, string(output))
+	}
+}
+
 func TestOutputPathUsesPackageStructure(t *testing.T) {
 	path := OutputPath("bin/java/src", "model/pubdemo")
 	expected := filepath.Join("bin/java/src", "model", "pubdemo", "Pkg_Model_pubdemo.java")

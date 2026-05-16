@@ -1156,7 +1156,7 @@ func (g *Generator) expr(expr lower.Expr) (string, error) {
 		return fmt.Sprintf("(%s %s %s)", left, e.Operator, right), nil
 	case *lower.IfExpr:
 		if len(e.ThenPrefix) > 0 || len(e.ElsePrefix) > 0 {
-			return "", fmt.Errorf("unsupported lowered expression %T with branch statements", expr)
+			return g.statementfulIfExpr(e)
 		}
 		condition, err := g.expr(e.Condition)
 		if err != nil {
@@ -1354,6 +1354,34 @@ func (g *Generator) exprWithExpected(expr lower.Expr, expected *typecheck.Type) 
 		}
 	}
 	return g.expr(expr)
+}
+
+func (g *Generator) statementfulIfExpr(expr *lower.IfExpr) (string, error) {
+	if expr == nil {
+		return "", fmt.Errorf("nil if expression")
+	}
+	if isUnitType(expr.Type) {
+		var body strings.Builder
+		body.WriteString("((Runnable) () -> {\n")
+		if err := g.writeLambdaUnitBlock(&body, 1, expr); err != nil {
+			return "", err
+		}
+		body.WriteString("}).run()")
+		return body.String(), nil
+	}
+	resultType, err := g.javaReferenceType(expr.Type)
+	if err != nil {
+		return "", err
+	}
+	var body strings.Builder
+	body.WriteString("((Supplier<")
+	body.WriteString(resultType)
+	body.WriteString(">) () -> {\n")
+	if err := g.writeLambdaReturnBlock(&body, 1, expr); err != nil {
+		return "", err
+	}
+	body.WriteString("}).get()")
+	return body.String(), nil
 }
 
 func (g *Generator) params(params []lower.Parameter) string {
@@ -2281,6 +2309,41 @@ func (g *Generator) writeLambdaReturnBlock(b *strings.Builder, indent int, expr 
 		return err
 	}
 	writeIndentedLine(b, indent, fmt.Sprintf("return %s;", value))
+	return nil
+}
+
+func (g *Generator) writeLambdaUnitBlock(b *strings.Builder, indent int, expr lower.Expr) error {
+	if ifExpr, ok := expr.(*lower.IfExpr); ok {
+		cond, err := g.expr(ifExpr.Condition)
+		if err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, fmt.Sprintf("if (%s) {", unwrapGroupedJavaExpr(cond)))
+		for _, stmt := range ifExpr.ThenPrefix {
+			if err := g.writeStmtIntoBuilder(b, indent+1, stmt); err != nil {
+				return err
+			}
+		}
+		if err := g.writeLambdaUnitBlock(b, indent+1, ifExpr.ThenValue); err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, "} else {")
+		for _, stmt := range ifExpr.ElsePrefix {
+			if err := g.writeStmtIntoBuilder(b, indent+1, stmt); err != nil {
+				return err
+			}
+		}
+		if err := g.writeLambdaUnitBlock(b, indent+1, ifExpr.ElseValue); err != nil {
+			return err
+		}
+		writeIndentedLine(b, indent, "}")
+		return nil
+	}
+	value, err := g.expr(expr)
+	if err != nil {
+		return err
+	}
+	writeIndentedLine(b, indent, fmt.Sprintf("%s;", value))
 	return nil
 }
 
