@@ -73,13 +73,13 @@ public final class Set<T> implements Iterable<T> {
     public Option<T> reduce(BinaryOperator<T> f) {
         Iterator<T> it = this.items.iterator();
         if (!it.hasNext()) {
-            return Option.none();
+            return Option.None();
         }
         T result = it.next();
         while (it.hasNext()) {
             result = f.apply(result, it.next());
         }
-        return Option.some(result);
+        return Option.Some(result);
     }
 
     public boolean exists(Predicate<? super T> f) {

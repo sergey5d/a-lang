@@ -5,6 +5,7 @@ import (
 	"a-lang/parser"
 	"a-lang/predef"
 	"a-lang/typecheck"
+	"a-lang/typed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -87,63 +88,6 @@ func WriteStdlibSupport(baseDir string) error {
 
 func stdlibSources() map[string]string {
 	sources := map[string]string{
-		filepath.Join("alang", "stdlib", "Option.java"): `package alang.stdlib;
-
-public final class Option<T> {
-    public interface Mapper<T, R> {
-        R apply(T value);
-    }
-
-    private static final Option<?> NONE = new Option<>(false, null);
-
-    private final boolean set;
-    private final T value;
-
-    private Option(boolean set, T value) {
-        this.set = set;
-        this.value = value;
-    }
-
-    public static <T> Option<T> some(T value) {
-        return new Option<>(true, value);
-    }
-
-    @SuppressWarnings("unchecked")
-    public static <T> Option<T> none() {
-        return (Option<T>) NONE;
-    }
-
-    public boolean isSet() {
-        return this.set;
-    }
-
-    public boolean isEmpty() {
-        return !this.set;
-    }
-
-    public T expect() {
-        if (!this.set) {
-            throw new IllegalStateException("Option.None");
-        }
-        return this.value;
-    }
-
-    public T getOr(T defaultValue) {
-        return this.set ? this.value : defaultValue;
-    }
-
-    public T getOrElse(T defaultValue) {
-        return this.getOr(defaultValue);
-    }
-
-    public <R> Option<R> map(Mapper<? super T, ? extends R> mapper) {
-        if (!this.set) {
-            return Option.none();
-        }
-        return Option.some(mapper.apply(this.value));
-    }
-}
-`,
 		filepath.Join("alang", "stdlib", "OS.java"): `package alang.stdlib;
 
 public final class OS {
@@ -163,7 +107,7 @@ public final class OS {
         System.out.printf(format, values);
     }
 
-    public static void panic(Object... values) {
+    public static <T> T panic(Object... values) {
         throw new RuntimeException(join(values));
     }
 
@@ -195,6 +139,11 @@ public final class OS {
 	}
 
 	if registry, err := predef.Load(); err == nil {
+		if optionSources, err := optionJavaSourcesFromPredef(registry); err == nil {
+			for rel, src := range optionSources {
+				sources[rel] = src
+			}
+		}
 		for arity := 2; arity <= 10; arity++ {
 			name := fmt.Sprintf("Tuple%d", arity)
 			decl, ok := registry.Types[name]
@@ -244,6 +193,174 @@ public final class %s%s {
     }
 }
 `, desc.Name, typeParamSuffix, strings.Join(fields, "\n"), desc.Name, strings.Join(params, ", "), strings.Join(assignments, "\n")), nil
+}
+
+func optionJavaSourceFromPredef(registry *predef.Registry) (string, error) {
+	sources, err := optionJavaSourcesFromPredef(registry)
+	if err != nil {
+		return "", err
+	}
+	src, ok := sources[filepath.Join("alang", "stdlib", "Option.java")]
+	if !ok {
+		return "", fmt.Errorf("generated Option.java missing")
+	}
+	return src, nil
+}
+
+func optionJavaSourcesFromPredef(registry *predef.Registry) (map[string]string, error) {
+	if registry == nil || registry.Program == nil {
+		return nil, fmt.Errorf("nil predef registry")
+	}
+	result := typecheck.Analyze(registry.Program)
+	typedProgram, err := typed.Build(registry.Program, result)
+	if err != nil {
+		return nil, err
+	}
+	loweredProgram, err := lower.ProgramFromTyped(typedProgram)
+	if err != nil {
+		return nil, err
+	}
+
+	var optionClass *lower.Class
+	for _, class := range loweredProgram.Classes {
+		if class.Name == "Option" {
+			optionClass = class
+			break
+		}
+	}
+	if optionClass == nil {
+		return nil, fmt.Errorf("predef Option not found")
+	}
+
+	noneCase, someCase, err := optionCases(optionClass)
+	if err != nil {
+		return nil, err
+	}
+
+	typeParams := javaTypeParamNames(optionClass.TypeParameters)
+	typeParamDecl := ""
+	typeParamUse := ""
+	typeParamName := "T"
+	if len(typeParams) > 0 {
+		typeParamDecl = "<" + strings.Join(typeParams, ", ") + ">"
+		typeParamUse = typeParamDecl
+		typeParamName = typeParams[0]
+	}
+	optionName := sanitizeTypeName(optionClass.Name)
+	noneClass := sanitizeTypeName(optionClass.Name + "_" + noneCase.Name)
+	someClass := sanitizeTypeName(optionClass.Name + "_" + someCase.Name)
+	valueField := javaIdent(someCase.Fields[0].Name)
+	optionType := optionName + typeParamDecl
+	optionTypeUse := optionName + typeParamUse
+	someTypeUse := someClass + typeParamUse
+
+	main := fmt.Sprintf(`package alang.stdlib;
+
+import java.util.function.*;
+
+public interface %s {
+    default boolean isSet() {
+        return this instanceof %s;
+    }
+
+    default boolean isEmpty() {
+        return !this.isSet();
+    }
+
+    @SuppressWarnings("unchecked")
+    default %s expect() {
+        if (this instanceof %s) {
+            return ((%s) this).%s;
+        }
+        return OS.panic("Option has no value");
+    }
+
+    default %s getOr(%s defaultValue) {
+        if (this instanceof %s) {
+            return this.expect();
+        }
+        return defaultValue;
+    }
+
+    default %s getOrElse(%s defaultValue) {
+        return this.getOr(defaultValue);
+    }
+
+    default <X> %s<X> map(Function<%s, X> f) {
+        if (this instanceof %s) {
+            return %s.Some(f.apply(this.expect()));
+        }
+        return %s.None();
+    }
+
+    %s None = %s.INSTANCE;
+
+    @SuppressWarnings("unchecked")
+    static %s %s None() {
+        return (%s) None;
+    }
+
+    static %s %s Some(%s value) {
+        return new %s(value);
+    }
+}
+`, optionType, someClass, typeParamName, someClass, someTypeUse, valueField, typeParamName, typeParamName, someClass, typeParamName, typeParamName, optionName, typeParamName, someClass, optionName, optionName, optionName, noneClass, typeParamDecl, optionTypeUse, optionTypeUse, typeParamDecl, optionTypeUse, typeParamName, someTypeUse)
+
+	noneSrc := fmt.Sprintf(`package alang.stdlib;
+
+public final class %s%s implements %s%s {
+    static final %s INSTANCE = new %s();
+
+    private %s() {
+    }
+}
+`, noneClass, typeParamDecl, optionName, typeParamUse, noneClass, noneClass, noneClass)
+
+	someSrc := fmt.Sprintf(`package alang.stdlib;
+
+public final class %s%s implements %s%s {
+    public final %s %s;
+
+    public %s(%s %s) {
+        this.%s = %s;
+    }
+}
+`, someClass, typeParamDecl, optionName, typeParamUse, typeParamName, valueField, someClass, typeParamName, valueField, valueField, valueField)
+
+	return map[string]string{
+		filepath.Join("alang", "stdlib", "Option.java"):     main,
+		filepath.Join("alang", "stdlib", noneClass+".java"): noneSrc,
+		filepath.Join("alang", "stdlib", someClass+".java"): someSrc,
+	}, nil
+}
+
+func optionCases(class *lower.Class) (lower.EnumCase, lower.EnumCase, error) {
+	var noneCase lower.EnumCase
+	var someCase lower.EnumCase
+	foundNone := false
+	foundSome := false
+	for _, enumCase := range class.Cases {
+		switch {
+		case len(enumCase.Fields) == 0 && !foundNone:
+			noneCase = enumCase
+			foundNone = true
+		case len(enumCase.Fields) == 1 && !foundSome:
+			someCase = enumCase
+			foundSome = true
+		}
+	}
+	if !foundNone || !foundSome {
+		return lower.EnumCase{}, lower.EnumCase{}, fmt.Errorf("unsupported Option enum shape")
+	}
+	return noneCase, someCase, nil
+}
+
+func javaTypeParamNames(params []string) []string {
+	names := make([]string, len(params))
+	for i, param := range params {
+		names[i] = sanitizeTypeName(param)
+	}
+	return names
 }
 
 func javaTypeRefFromTypeRef(ref *parser.TypeRef) (string, error) {
@@ -470,7 +587,7 @@ func (g *Generator) writeEnumClass(class *lower.Class) error {
 		g.indent++
 		for _, method := range class.Methods {
 			if err := g.writeEnumInterfaceMethod(class, method); err != nil {
-				return err
+				return fmt.Errorf("%s.%s: %w", class.Name, method.Name, err)
 			}
 			g.line("")
 		}
@@ -534,7 +651,7 @@ func (g *Generator) writeEnumClass(class *lower.Class) error {
 		g.line("")
 		for i, method := range class.Methods {
 			if err := g.writeMethod(class, method); err != nil {
-				return err
+				return fmt.Errorf("%s.%s: %w", class.Name, method.Name, err)
 			}
 			if i < len(class.Methods)-1 || len(class.Cases) > 0 {
 				g.line("")
@@ -592,7 +709,11 @@ func (g *Generator) writeEnumInterfaceMethod(class *lower.Class, fn *lower.Funct
 	if err != nil {
 		return err
 	}
-	header := "default " + returnType + " " + javaIdent(fn.Name) + "(" + g.params(fn.Parameters) + ")"
+	header := "default "
+	if len(fn.TypeParameters) > 0 {
+		header += g.typeParamsDecl(fn.TypeParameters) + " "
+	}
+	header += returnType + " " + javaIdent(fn.Name) + "(" + g.params(fn.Parameters) + ")"
 	g.linef("%s {", header)
 	g.indent++
 	prevClass := g.thisClass
@@ -782,9 +903,17 @@ func (g *Generator) writeMethod(class *lower.Class, fn *lower.Function) error {
 	if err != nil {
 		return err
 	}
-	header := "public " + returnType + " " + javaIdent(fn.Name) + "(" + g.params(fn.Parameters) + ")"
+	header := "public "
+	if len(fn.TypeParameters) > 0 {
+		header += g.typeParamsDecl(fn.TypeParameters) + " "
+	}
+	header += returnType + " " + javaIdent(fn.Name) + "(" + g.params(fn.Parameters) + ")"
 	if fn.Private {
-		header = returnType + " " + javaIdent(fn.Name) + "(" + g.params(fn.Parameters) + ")"
+		header = ""
+		if len(fn.TypeParameters) > 0 {
+			header += g.typeParamsDecl(fn.TypeParameters) + " "
+		}
+		header += returnType + " " + javaIdent(fn.Name) + "(" + g.params(fn.Parameters) + ")"
 	}
 	g.linef("%s {", header)
 	g.indent++
@@ -805,7 +934,11 @@ func (g *Generator) writeFunction(fn *lower.Function) error {
 	if fn.Private {
 		access = "private static"
 	}
-	g.linef("%s %s %s(%s) {", access, returnType, javaIdent(fn.Name), g.params(fn.Parameters))
+	typeDecl := ""
+	if len(fn.TypeParameters) > 0 {
+		typeDecl = g.typeParamsDecl(fn.TypeParameters) + " "
+	}
+	g.linef("%s %s%s %s(%s) {", access, typeDecl, returnType, javaIdent(fn.Name), g.params(fn.Parameters))
 	g.indent++
 	if err := g.writeCallableBody(fn.Body, fn.ReturnType, false); err != nil {
 		return err
@@ -1320,7 +1453,7 @@ func (g *Generator) optionCallExpr(name string, args []lower.Expr, expected *typ
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("Option.some(%s)", value), nil
+		return fmt.Sprintf("Option.Some(%s)", value), nil
 	case "None":
 		if len(args) != 0 {
 			return "", fmt.Errorf("None expects 0 arguments")
@@ -1330,9 +1463,9 @@ func (g *Generator) optionCallExpr(name string, args []lower.Expr, expected *typ
 			if err != nil {
 				return "", err
 			}
-			return fmt.Sprintf("Option.<%s>none()", argType), nil
+			return fmt.Sprintf("Option.<%s>None()", argType), nil
 		}
-		return "Option.none()", nil
+		return "Option.None()", nil
 	default:
 		return "", fmt.Errorf("unsupported option call %s", name)
 	}
@@ -1690,6 +1823,9 @@ func isStringType(t *typecheck.Type) bool {
 func (g *Generator) javaType(t *typecheck.Type, allowVoid bool) (string, error) {
 	if t == nil {
 		return "", fmt.Errorf("nil type")
+	}
+	if t.Kind == typecheck.TypeUnknown && t.Name != "" && t.Name != "<unknown>" {
+		return sanitizeTypeName(t.Name), nil
 	}
 	switch t.Kind {
 	case typecheck.TypeBuiltin:

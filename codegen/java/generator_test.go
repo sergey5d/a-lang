@@ -9,6 +9,7 @@ import (
 
 	"a-lang/lower"
 	"a-lang/parser"
+	"a-lang/predef"
 	"a-lang/typecheck"
 	"a-lang/typed"
 )
@@ -169,7 +170,7 @@ def run() Int {
 	if !strings.Contains(text, "new Tuple2<Long, String>(1L, \"ok\")") {
 		t.Fatalf("expected tuple literal lowering in generated Java, got:\n%s", text)
 	}
-	if !strings.Contains(text, "Option.some(5L)") {
+	if !strings.Contains(text, "Option.Some(5L)") {
 		t.Fatalf("expected Some(...) lowering in generated Java, got:\n%s", text)
 	}
 	if !strings.Contains(text, "Option<Long>") {
@@ -457,6 +458,8 @@ func TestWriteStdlibSupportCreatesOptionAndTupleFiles(t *testing.T) {
 		filepath.Join("alang", "stdlib", "OS.java"),
 		filepath.Join("alang", "stdlib", "Map.java"),
 		filepath.Join("alang", "stdlib", "Option.java"),
+		filepath.Join("alang", "stdlib", "Option_None.java"),
+		filepath.Join("alang", "stdlib", "Option_Some.java"),
 		filepath.Join("alang", "stdlib", "Set.java"),
 		filepath.Join("alang", "stdlib", "Tuple2.java"),
 		filepath.Join("alang", "stdlib", "Tuple10.java"),
@@ -464,6 +467,20 @@ func TestWriteStdlibSupportCreatesOptionAndTupleFiles(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(tmpDir, rel)); err != nil {
 			t.Fatalf("expected runtime file %s: %v", rel, err)
 		}
+	}
+}
+
+func TestOptionJavaSourceFromPredef(t *testing.T) {
+	registry, err := predef.Load()
+	if err != nil {
+		t.Fatalf("predef.Load returned error: %v", err)
+	}
+	text, err := optionJavaSourceFromPredef(registry)
+	if err != nil {
+		t.Fatalf("optionJavaSourceFromPredef returned error: %v", err)
+	}
+	if !strings.Contains(text, "interface Option<") && !strings.Contains(text, "abstract class Option<") {
+		t.Fatalf("expected generated Option type, got:\n%s", text)
 	}
 }
 

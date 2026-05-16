@@ -89,7 +89,7 @@ public final class Map<K, V> implements Iterable<Tuple2<K, V>> {
     public Option<Tuple2<K, V>> reduce(Mapper4<? super K, ? super V, ? super K, ? super V, Tuple2<K, V>> f) {
         Iterator<java.util.Map.Entry<K, V>> it = this.items.entrySet().iterator();
         if (!it.hasNext()) {
-            return Option.none();
+            return Option.None();
         }
         java.util.Map.Entry<K, V> first = it.next();
         K currentKey = first.getKey();
@@ -100,7 +100,7 @@ public final class Map<K, V> implements Iterable<Tuple2<K, V>> {
             currentKey = result._1;
             currentValue = result._2;
         }
-        return Option.some(new Tuple2<>(currentKey, currentValue));
+        return Option.Some(new Tuple2<>(currentKey, currentValue));
     }
 
     public boolean exists(Predicate<Tuple2<K, V>> f) {
@@ -129,9 +129,9 @@ public final class Map<K, V> implements Iterable<Tuple2<K, V>> {
 
     public Option<V> get(K key) {
         if (!this.items.containsKey(key)) {
-            return Option.none();
+            return Option.None();
         }
-        return Option.some(this.items.get(key));
+        return Option.Some(this.items.get(key));
     }
 
     public boolean contains(K key) {

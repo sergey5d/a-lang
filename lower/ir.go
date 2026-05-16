@@ -47,13 +47,14 @@ type Field struct {
 }
 
 type Function struct {
-	Name        string
-	Parameters  []Parameter
-	ReturnType  *typecheck.Type
-	Body        []Stmt
-	Receiver    string
-	Private     bool
-	Constructor bool
+	Name           string
+	TypeParameters []string
+	Parameters     []Parameter
+	ReturnType     *typecheck.Type
+	Body           []Stmt
+	Receiver       string
+	Private        bool
+	Constructor    bool
 }
 
 type Parameter struct {

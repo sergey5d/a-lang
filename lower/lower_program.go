@@ -136,40 +136,105 @@ func (l *Lowerer) lowerClass(class *typed.ClassDecl) (*Class, error) {
 }
 
 func (l *Lowerer) lowerFunction(fn *typed.FunctionDecl) (*Function, error) {
+	prevTypeParams := l.typeParams
+	l.typeParams = cloneTypeParams(prevTypeParams)
+	for _, param := range fn.TypeParameters {
+		l.typeParams[param.Name] = struct{}{}
+	}
 	body, err := l.lowerBlock(fn.Body)
+	l.typeParams = prevTypeParams
 	if err != nil {
 		return nil, err
 	}
+	typeParams := make([]string, len(fn.TypeParameters))
+	for i, param := range fn.TypeParameters {
+		typeParams[i] = param.Name
+	}
 	return &Function{
-		Name:       fn.Name,
-		Parameters: l.lowerParams(fn.Parameters),
-		ReturnType: fn.ReturnType,
-		Body:       body,
+		Name:           fn.Name,
+		TypeParameters: typeParams,
+		Parameters:     l.lowerParams(fn.Parameters),
+		ReturnType:     l.normalizeType(fn.ReturnType),
+		Body:           body,
 	}, nil
 }
 
 func (l *Lowerer) lowerMethod(receiver string, method *typed.MethodDecl) (*Function, error) {
+	prevTypeParams := l.typeParams
+	l.typeParams = cloneTypeParams(prevTypeParams)
+	for _, param := range method.TypeParameters {
+		l.typeParams[param.Name] = struct{}{}
+	}
 	body, err := l.lowerBlock(method.Body)
+	l.typeParams = prevTypeParams
 	if err != nil {
 		return nil, err
 	}
+	typeParams := make([]string, len(method.TypeParameters))
+	for i, param := range method.TypeParameters {
+		typeParams[i] = param.Name
+	}
 	return &Function{
-		Name:        method.Name,
-		Parameters:  l.lowerParams(method.Parameters),
-		ReturnType:  method.ReturnType,
-		Body:        body,
-		Receiver:    receiver,
-		Private:     method.Private,
-		Constructor: method.Constructor,
+		Name:           method.Name,
+		TypeParameters: typeParams,
+		Parameters:     l.lowerParams(method.Parameters),
+		ReturnType:     l.normalizeType(method.ReturnType),
+		Body:           body,
+		Receiver:       receiver,
+		Private:        method.Private,
+		Constructor:    method.Constructor,
 	}, nil
 }
 
 func (l *Lowerer) lowerParams(params []typed.Parameter) []Parameter {
 	out := make([]Parameter, len(params))
 	for i, param := range params {
-		out[i] = Parameter{Name: param.Name, Type: param.Type}
+		out[i] = Parameter{Name: param.Name, Type: l.normalizeType(param.Type)}
 	}
 	return out
+}
+
+func cloneTypeParams(src map[string]struct{}) map[string]struct{} {
+	out := map[string]struct{}{}
+	for name := range src {
+		out[name] = struct{}{}
+	}
+	return out
+}
+
+func (l *Lowerer) normalizeType(t *typecheck.Type) *typecheck.Type {
+	if t == nil {
+		return nil
+	}
+	if t.Kind == typecheck.TypeUnknown {
+		if _, ok := l.typeParams[t.Name]; ok {
+			return &typecheck.Type{Kind: typecheck.TypeParam, Name: t.Name}
+		}
+	}
+	out := *t
+	if len(t.Args) > 0 {
+		out.Args = make([]*typecheck.Type, len(t.Args))
+		for i, arg := range t.Args {
+			out.Args[i] = l.normalizeType(arg)
+		}
+	}
+	if len(t.Fields) > 0 {
+		out.Fields = make([]typecheck.RecordField, len(t.Fields))
+		for i, field := range t.Fields {
+			out.Fields[i] = typecheck.RecordField{Name: field.Name, Type: l.normalizeType(field.Type)}
+		}
+	}
+	if t.Signature != nil {
+		params := make([]*typecheck.Type, len(t.Signature.Parameters))
+		for i, param := range t.Signature.Parameters {
+			params[i] = l.normalizeType(param)
+		}
+		out.Signature = &typecheck.Signature{
+			Parameters: params,
+			ReturnType: l.normalizeType(t.Signature.ReturnType),
+		}
+	}
+	return &out
 }
 
 func (l *Lowerer) resolveFieldType(ref *parser.TypeRef) *typecheck.Type {

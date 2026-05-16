@@ -73,13 +73,13 @@ public final class List<T> implements Iterable<T> {
 
     public Option<T> reduce(BinaryOperator<T> f) {
         if (this.items.isEmpty()) {
-            return Option.none();
+            return Option.None();
         }
         T result = this.items.get(0);
         for (int i = 1; i < this.items.size(); i++) {
             result = f.apply(result, this.items.get(i));
         }
-        return Option.some(result);
+        return Option.Some(result);
     }
 
     public boolean exists(Predicate<? super T> f) {
@@ -125,16 +125,16 @@ public final class List<T> implements Iterable<T> {
     public Option<T> get(long index) {
         int idx = (int) index;
         if (idx < 0 || idx >= this.items.size()) {
-            return Option.none();
+            return Option.None();
         }
-        return Option.some(this.items.get(idx));
+        return Option.Some(this.items.get(idx));
     }
 
     public Option<T> head() {
         if (this.items.isEmpty()) {
-            return Option.none();
+            return Option.None();
         }
-        return Option.some(this.items.get(0));
+        return Option.Some(this.items.get(0));
     }
 
     public List<T> tail() {
@@ -152,16 +152,16 @@ public final class List<T> implements Iterable<T> {
     public Option<T> remove(long index) {
         int idx = (int) index;
         if (idx < 0 || idx >= this.items.size()) {
-            return Option.none();
+            return Option.None();
         }
-        return Option.some(this.items.remove(idx));
+        return Option.Some(this.items.remove(idx));
     }
 
     public Option<T> removeLast() {
         if (this.items.isEmpty()) {
-            return Option.none();
+            return Option.None();
         }
-        return Option.some(this.items.remove(this.items.size() - 1));
+        return Option.Some(this.items.remove(this.items.size() - 1));
     }
 
     public long size() {
