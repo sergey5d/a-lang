@@ -126,6 +126,70 @@ public final class OS {
     }
 }
 `,
+		filepath.Join("alang", "stdlib", "Result.java"): `package alang.stdlib;
+
+import java.util.function.*;
+
+public final class Result<T, E> {
+    public final boolean ok;
+    public final T value;
+    public final E error;
+
+    private Result(boolean ok, T value, E error) {
+        this.ok = ok;
+        this.value = value;
+        this.error = error;
+    }
+
+    public boolean isOk() {
+        return this.ok;
+    }
+
+    public boolean isErr() {
+        return !this.ok;
+    }
+
+    public boolean isFailure() {
+        return !this.ok;
+    }
+
+    public T unwrap() {
+        if (!this.ok) {
+            return OS.panic("Result has no value");
+        }
+        return this.value;
+    }
+
+    public E getError() {
+        if (this.ok) {
+            return OS.panic("Result has no error");
+        }
+        return this.error;
+    }
+
+    public T getOr(T defaultValue) {
+        if (this.ok) {
+            return this.value;
+        }
+        return defaultValue;
+    }
+
+    public <X> Result<X, E> map(Function<T, X> f) {
+        if (this.ok) {
+            return Result.Ok(f.apply(this.value));
+        }
+        return Result.Err(this.error);
+    }
+
+    public static <T, E> Result<T, E> Ok(T value) {
+        return new Result<>(true, value, null);
+    }
+
+    public static <T, E> Result<T, E> Err(E error) {
+        return new Result<>(false, null, error);
+    }
+}
+`,
 	}
 
 	if src, err := bundledStdlibFile(filepath.Join("alang", "stdlib", "List.java")); err == nil {
@@ -414,66 +478,76 @@ func eitherJavaSourcesFromPredef(registry *predef.Registry) (map[string]string, 
 	leftField := javaIdent(leftCase.Fields[0].Name)
 	rightField := javaIdent(rightCase.Fields[0].Name)
 	eitherType := eitherName + typeParamDecl
-	eitherTypeUse := eitherName + typeParamUse
 	leftTypeUse := leftClass + typeParamUse
 	rightTypeUse := rightClass + typeParamUse
 
-	main := fmt.Sprintf(`package alang.stdlib;
-
-import java.util.function.*;
-
-public interface %s {
-    default boolean isLeft() {
-        return this instanceof %s;
-    }
-
-    default boolean isRight() {
-        return this instanceof %s;
-    }
-
-    default boolean isFailure() {
-        return this.isLeft();
-    }
-
-    @SuppressWarnings("unchecked")
-    default %s unwrap() {
-        if (this instanceof %s) {
-            return ((%s) this).%s;
-        }
-        return OS.panic("Either has no right value");
-    }
-
-    @SuppressWarnings("unchecked")
-    default %s getLeft() {
-        if (this instanceof %s) {
-            return ((%s) this).%s;
-        }
-        return OS.panic("Either has no left value");
-    }
-
-    default %s getOr(%s defaultValue) {
-        if (this instanceof %s) {
-            return this.unwrap();
-        }
-        return defaultValue;
-    }
-
-    default <X> %s<%s, X> map(Function<%s, X> f) {
-        if (this instanceof %s) {
-            return %s.Right(f.apply(this.unwrap()));
-        }
-        return %s.Left(this.getLeft());
-    }
-
-    static %s %s Left(%s value) {
-        return new %s(value);
-    }
-
-    static %s %s Right(%s value) {
-        return new %s(value);
-    }
-}
-`, eitherType, leftClass, rightClass, rightTypeParam, rightClass, rightTypeUse, rightField, leftTypeParam, leftClass, leftTypeUse, leftField, rightTypeParam, rightTypeParam, rightClass, eitherName, leftTypeParam, rightTypeParam, rightClass, eitherName, eitherName, typeParamDecl, eitherTypeUse, leftTypeParam, leftTypeUse, typeParamDecl, eitherTypeUse, rightTypeParam, rightTypeUse)
+	var main strings.Builder
+	fmt.Fprintf(&main, "package alang.stdlib;\n\n")
+	fmt.Fprintf(&main, "import java.util.function.*;\n\n")
+	fmt.Fprintf(&main, "public interface %s {\n", eitherType)
+	fmt.Fprintf(&main, "    default boolean isLeft() {\n")
+	fmt.Fprintf(&main, "        return this instanceof %s;\n", leftClass)
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    default boolean isRight() {\n")
+	fmt.Fprintf(&main, "        return this instanceof %s;\n", rightClass)
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    @SuppressWarnings(\"unchecked\")\n")
+	fmt.Fprintf(&main, "    default %s expectRight() {\n", rightTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", rightClass)
+	fmt.Fprintf(&main, "            return ((%s) this).%s;\n", rightTypeUse, rightField)
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return OS.panic(\"Either has no right value\");\n")
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    @SuppressWarnings(\"unchecked\")\n")
+	fmt.Fprintf(&main, "    default %s expectLeft() {\n", leftTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", leftClass)
+	fmt.Fprintf(&main, "            return ((%s) this).%s;\n", leftTypeUse, leftField)
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return OS.panic(\"Either has no left value\");\n")
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    default %s getOr(%s defaultValue) {\n", rightTypeParam, rightTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", rightClass)
+	fmt.Fprintf(&main, "            return this.expectRight();\n")
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return defaultValue;\n")
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    default <X> %s<%s, X> map(Function<%s, X> f) {\n", eitherName, leftTypeParam, rightTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", rightClass)
+	fmt.Fprintf(&main, "            return %s.Right(f.apply(this.expectRight()));\n", eitherName)
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return %s.Left(this.expectLeft());\n", eitherName)
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    default <X> %s<X, %s> mapLeft(Function<%s, X> f) {\n", eitherName, rightTypeParam, leftTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", leftClass)
+	fmt.Fprintf(&main, "            return %s.Left(f.apply(this.expectLeft()));\n", eitherName)
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return %s.Right(this.expectRight());\n", eitherName)
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    default <X> %s<%s, X> flatMap(Function<%s, %s<%s, X>> f) {\n", eitherName, leftTypeParam, rightTypeParam, eitherName, leftTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", rightClass)
+	fmt.Fprintf(&main, "            return f.apply(this.expectRight());\n")
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return %s.Left(this.expectLeft());\n", eitherName)
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    default Option<%s> toOption() {\n", rightTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", rightClass)
+	fmt.Fprintf(&main, "            return Option.Some(this.expectRight());\n")
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return Option.None();\n")
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    default Result<%s, %s> toResult() {\n", rightTypeParam, leftTypeParam)
+	fmt.Fprintf(&main, "        if (this instanceof %s) {\n", rightClass)
+	fmt.Fprintf(&main, "            return Result.Ok(this.expectRight());\n")
+	fmt.Fprintf(&main, "        }\n")
+	fmt.Fprintf(&main, "        return Result.Err(this.expectLeft());\n")
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    static %s %s Left(%s value) {\n", typeParamDecl, eitherType, leftTypeParam)
+	fmt.Fprintf(&main, "        return new %s(value);\n", leftTypeUse)
+	fmt.Fprintf(&main, "    }\n\n")
+	fmt.Fprintf(&main, "    static %s %s Right(%s value) {\n", typeParamDecl, eitherType, rightTypeParam)
+	fmt.Fprintf(&main, "        return new %s(value);\n", rightTypeUse)
+	fmt.Fprintf(&main, "    }\n")
+	fmt.Fprintf(&main, "}\n")
 
 	leftSrc := fmt.Sprintf(`package alang.stdlib;
 
@@ -498,7 +572,7 @@ public final class %s%s implements %s%s {
 `, rightClass, typeParamDecl, eitherName, typeParamUse, rightTypeParam, rightField, rightClass, rightTypeParam, rightField, rightField, rightField)
 
 	return map[string]string{
-		filepath.Join("alang", "stdlib", "Either.java"):      main,
+		filepath.Join("alang", "stdlib", "Either.java"):      main.String(),
 		filepath.Join("alang", "stdlib", leftClass+".java"):  leftSrc,
 		filepath.Join("alang", "stdlib", rightClass+".java"): rightSrc,
 	}, nil

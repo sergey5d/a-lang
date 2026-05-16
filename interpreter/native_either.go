@@ -24,24 +24,13 @@ func nativeEitherIsRight(_ *Interpreter, receiver Value, args []Value, _ *env, s
 	return value.rightSet, nil
 }
 
-func nativeEitherIsFailure(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
+func nativeEitherExpectRight(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
 	value, ok := asNativeEither(receiver)
 	if !ok {
-		return nil, RuntimeError{Message: "native Either.isFailure receiver mismatch", Span: span}
+		return nil, RuntimeError{Message: "native Either.expectRight receiver mismatch", Span: span}
 	}
 	if len(args) != 0 {
-		return nil, RuntimeError{Message: "isFailure expects 0 arguments", Span: span}
-	}
-	return !value.rightSet, nil
-}
-
-func nativeEitherUnwrap(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
-	value, ok := asNativeEither(receiver)
-	if !ok {
-		return nil, RuntimeError{Message: "native Either.unwrap receiver mismatch", Span: span}
-	}
-	if len(args) != 0 {
-		return nil, RuntimeError{Message: "unwrap expects 0 arguments", Span: span}
+		return nil, RuntimeError{Message: "expectRight expects 0 arguments", Span: span}
 	}
 	if !value.rightSet {
 		return nil, RuntimeError{Message: "Either has no right value", Span: span}
@@ -49,13 +38,13 @@ func nativeEitherUnwrap(_ *Interpreter, receiver Value, args []Value, _ *env, sp
 	return value.right, nil
 }
 
-func nativeEitherGetLeft(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
+func nativeEitherExpectLeft(_ *Interpreter, receiver Value, args []Value, _ *env, span parser.Span) (Value, error) {
 	value, ok := asNativeEither(receiver)
 	if !ok {
-		return nil, RuntimeError{Message: "native Either.getLeft receiver mismatch", Span: span}
+		return nil, RuntimeError{Message: "native Either.expectLeft receiver mismatch", Span: span}
 	}
 	if len(args) != 0 {
-		return nil, RuntimeError{Message: "getLeft expects 0 arguments", Span: span}
+		return nil, RuntimeError{Message: "expectLeft expects 0 arguments", Span: span}
 	}
 	if value.rightSet {
 		return nil, RuntimeError{Message: "Either has no left value", Span: span}
@@ -93,4 +82,64 @@ func nativeEitherMap(in *Interpreter, receiver Value, args []Value, local *env, 
 		return nil, err
 	}
 	return in.constructStdlibEither(nil, mapped, true, local, span)
+}
+
+func nativeEitherMapLeft(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeEither(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Either.mapLeft receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "mapLeft expects 1 argument", Span: span}
+	}
+	if value.rightSet {
+		return in.constructStdlibEither(nil, value.right, true, local, span)
+	}
+	mapped, err := in.invokeCallableValue(args[0], []Value{value.left}, local, span)
+	if err != nil {
+		return nil, err
+	}
+	return in.constructStdlibEither(mapped, nil, false, local, span)
+}
+
+func nativeEitherFlatMap(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeEither(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Either.flatMap receiver mismatch", Span: span}
+	}
+	if len(args) != 1 {
+		return nil, RuntimeError{Message: "flatMap expects 1 argument", Span: span}
+	}
+	if !value.rightSet {
+		return in.constructStdlibEither(value.left, nil, false, local, span)
+	}
+	return in.invokeCallableValue(args[0], []Value{value.right}, local, span)
+}
+
+func nativeEitherToOption(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeEither(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Either.toOption receiver mismatch", Span: span}
+	}
+	if len(args) != 0 {
+		return nil, RuntimeError{Message: "toOption expects 0 arguments", Span: span}
+	}
+	if value.rightSet {
+		return in.constructStdlibOption(value.right, true, local, span)
+	}
+	return in.constructStdlibOption(nil, false, local, span)
+}
+
+func nativeEitherToResult(in *Interpreter, receiver Value, args []Value, local *env, span parser.Span) (Value, error) {
+	value, ok := asNativeEither(receiver)
+	if !ok {
+		return nil, RuntimeError{Message: "native Either.toResult receiver mismatch", Span: span}
+	}
+	if len(args) != 0 {
+		return nil, RuntimeError{Message: "toResult expects 0 arguments", Span: span}
+	}
+	if value.rightSet {
+		return in.constructStdlibResult(value.right, nil, true, local)
+	}
+	return in.constructStdlibResult(nil, value.left, false, local)
 }

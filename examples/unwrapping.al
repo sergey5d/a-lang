@@ -46,12 +46,12 @@ def main() {
     eitherRight = plusOneEither(Right(7))
     eitherLeft = plusOneEither(Left("nope"))
     OS.println("either right ${eitherRight.getOr(0)}")
-    OS.println("either left ${eitherLeft.getLeft()}")
+    OS.println("either left ${eitherLeft.expectLeft()}")
 
     if true {
         combo = twoEithers(Right(7), Right("abc"))
         comboLeft = twoEithers(Right(7), Left("size bad"))
         OS.println("either combo ${combo.getOr(0)}")
-        OS.println("either combo left ${comboLeft.getLeft()}")
+        OS.println("either combo left ${comboLeft.expectLeft()}")
     }
 }
